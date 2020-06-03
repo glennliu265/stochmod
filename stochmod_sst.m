@@ -9,20 +9,27 @@ h      =  150 ;% Typical Height Scale [m]
 T0     =  0;% Temperature Anomaly at time 0 [C]
 
 % Integration Options
-t_end   = 120000;% Timestep to integrate up to
+t_end   = 12*1000;% Timestep to integrate up to
 
 % Filtering Options (expressed in terms of timesteps
-filter_cutoff = 240 % Filter out freqs below this # of timesteps
-butterord     =   5 % Order of the butterworth filter
+% filter_cutoff = 240 % Filter out freqs below this # of timesteps
+% butterord     =   5 % Order of the butterworth filter
 
 % Path to data
-datpath  = '/Users/gyl/Downloads/02_Research/01_Data/AMV_hfdamping/';
-outpath  = '/Users/gyl/Downloads/02_Research/02_Figures/20200221/';
+projpath = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/';
+scriptpath  = [projpath,'/03_Scripts/stochmod/'];
+datpath  = [projpath,'/01_Data/'];
+
+% Add paths
+addpath(scriptpath)
+addpath(datpath)
+addpath('/Users/gliu/')
+startup
 
 % Select Point to model at
 lonf = 330; % [0 360]
 latf = 50; % [-90 90]
-mon  = 11;
+mon  = 3;
 
 % White Noise Generator Options
 rescaler  = 10^0; % Multiplier to rescale whitenoise
@@ -32,29 +39,19 @@ savenoise = 1    ;   % Option to save generated white noise
 
 %% Script Start / Setup
 
-% Load in Damping Coefficients if not already in workspace
-if exist('dnhflx','var') ~= 1
-    addpath(datpath)
-    
-    % Load in corrected damping coefficients
-    load('Damping_Coeffs_Net_Corrected.mat')
-    
-    % Load in climatological MLD from levitus 1994 wod
-    load('wod_1994_mldclim.mat')
-end
-
-% Load in Lat/Lon Variables
-load('CESM1_LATLON.mat')
-
-% Load in MLD Climatology and get point Lat/Lon
-[mld_lon,mld_lat] = findcoords(lonf,latf,2,{lonlev,latlev});
-
-% Get Ensemble and Lag Average
-vrb = permute(dnhflx,[1,2,4,3,5]);% Move month element to the 3rd position
-vrb = nanmean(vrb(:,:,:,:),4);
+% Load damping variable (ensemble and lag averaged)
+damppath = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/'
+dampmat = 'ensavg_nhflxdamping_monwin3_sig020_dof082_mode4.mat'
+load([damppath,dampmat],'ensavg','LON1','LAT') 
 
 % Find the point
-[oid,aid] = findcoords(lonf,latf,2,{LON,LAT});
+[oid,aid] = findcoords(lonf,latf,2,{LON1,LAT});
+  
+% % Load in climatological MLD from levitus 1994 wod
+% load('wod_1994_mldclim.mat')
+% % Load in MLD Climatology and get point Lat/Lon
+% [mld_lon,mld_lat] = findcoords(lonf,latf,2,{lonlev,latlev});
+
 
 % Generate Random White Noise Time Series based on nondimensionalized
 % parameters
@@ -68,6 +65,14 @@ else
     load([datpath,noisemat]);
 end
 
+
+monscale = 30*24*60*60;
+
+
+
+
+lambda = squeeze(ensavg(oid,aid,:))/(rho*cp0*h) * monscale;
+explam = exp(-lambda);
 
 
 % Preallocate
@@ -83,12 +88,15 @@ for t = 1:t_end
         m = 12;
     end
     
+    lambda = ensavg(oid,aid,m);
+    
     % Use damping coefficient to compute e-folding time
-    l = vrb(oid,aid,m)/(rho*cp0*h);
+    l = lambda / (rho*cp0*h)*monscale;
     
     % Get mixed layer depth
-    h = mld(mld_lon,mld_lat,m);
+    %h = mld(mld_lon,mld_lat,m);
     
+    % Get SST from the last timestep
     if t == 1
         T = T0;
     else
@@ -96,18 +104,32 @@ for t = 1:t_end
     end
     
     % Calculate Noise term (include seasonal correction)
-    %noise_term = F(1,t) / (rho * cp0 * h) * ((1 - exp(-l)) / l);
-    noise_term = F(1,t);
+    %noise_term = F(1,t) %/ (rho * cp0 * h) %* ((1 - exp(-l)) / l);
+    noise_term = eta(1,t);
     
     % Calculate temp at next timestep
     %T1 = T*-1*l + noise_term;
-    T1 = exp(-l*t)*T + noise_term;
+    T1 = -1*l*T + noise_term;
     
     % Record values
-    damp_ts(:,t) = exp(-l*t)*T;
+    damp_ts(:,t) = l*T;
     noise_ts(:,t) = noise_term;
     temp_ts(:,t) = T1;
 end
+
+% Reshape to separate month and year dimensions
+tempr = reshape(temp_ts,12,length(temp_ts)/12);
+
+% Calculate autocorrelation
+tot_lag = 60; % Total Lag in Months
+kmonth  = 3 ; % Lag Base Month (Lag 0)
+lag_rng = 0:60;
+[corr_ts] = calc_lagcovar(tempr,tempr,lag_rng,kmonth)
+
+
+
+
+
 
 
 %% Filter data
