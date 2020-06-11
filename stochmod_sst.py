@@ -146,6 +146,99 @@ def stochmod_noentrain(t_end,lbd,T0,F):
     
     return temp_ts,noise_ts,damp_ts
 
+
+"""
+SST Stochastic Model, with Entrainment
+Integrated with the forward method
+assuming lambda at a constant monthly timestep
+
+Dependencies: 
+    - numpy as np
+
+ Inputs
+ 1) t_end : timestep to integrate until (monthly)
+ 2) lbd   : seasonally varying decay term (lambda)
+ 3) T0    : Initial temperature
+ 4) F     : Forcing term
+    
+"""
+def stochmod_entrain(t_end,lbd,T0,F,beta,h):
+
+    
+    
+    
+    
+    # Preallocate
+    temp_ts = np.zeros(t_end)
+    noise_ts = np.zeros(t_end)
+    damp_ts = np.zeros(t_end)
+    entrain_ts = np.zeros(t_end)
+    Td_ts   = np.zeros(t_end)
+    
+    # Create MLD arrays
+    mlddepths = np.arange(0,np.max(h)+1,1)
+    mldtemps = np.zeros(mlddepths.shape)
+
+    # Loop for integration period (indexing convention from matlab)
+    for t in range(1,t_end):
+        
+        # Get the month
+        m  = t%12
+        m0 = m - 1 
+        if m == 0:
+            m = 12
+            m0= 11
+        
+        
+    
+        # Get the temperature from the previous step
+        if t == 1:
+            T = T0
+        else:
+            T = temp_ts[t-1]
+            
+        
+        
+        # Calculate entrainment term
+        if t<13:
+            entrain_term = 0
+        else:
+            
+            Td1 = mldtemps[round(h.item(m-1))]
+            Td0 = mldtemps[round(h.item(m0-1))]
+            
+            Td = (Td1+Td0)/2
+            Td_ts[t] = Td
+            entrain_term = beta[m-1]*Td
+
+        
+    
+        # Get Noise/Forcing Term
+        noise_term = F[t-1]
+        
+    
+        # Compute the temperature
+        temp_ts[t] = lbd[m-1]*T + noise_term + entrain_term
+    
+        # Save other variables
+        noise_ts[t] = noise_term
+        damp_ts[t] = lbd[m-1]*T
+        entrain_ts[t] = entrain_term
+        
+        
+        # Set mixed layer depth tempertures
+        mldtemps[mlddepths<=h.item(m-1)] = temp_ts[t]
+
+
+    # Quick indexing fix
+    temp_ts[0] = T0
+    noise_ts = np.delete(noise_ts,0)
+    damp_ts = np.delete(damp_ts,0)
+    entrain_ts = np.delete(entrain_ts,0)
+    
+    return temp_ts,noise_ts,damp_ts,entrain_ts,Td_ts
+
+
 # User Edits -----------------------------------------------------------------           
 
 # Set Point and month
@@ -273,9 +366,14 @@ if useeta == 1:
 # Mixed Layer Depth term preparations ----------------------------------------
 
 # Compute the integral of the entrainment term
-beta = np.log( h / np.roll(h,1) )
+seasoncorr = (1-lbd)/ (damping[oid,aid,:]/ (rho*cp0*h))
+beta = 1/dt * np.log( h / np.roll(h,1) ) * seasoncorr 
 beta[beta < 0] = 0
-    
+
+#lbd_entr = np.exp(-1 * (damping[oid,aid,:] / (rho*cp0*h) * dt+ np.log( h / np.roll(h,1) )))
+ 
+lbd_entr = np.exp(-1 * (damping[oid,aid,:] / (rho*cp0*h) * dt+ beta ))
+   
 # Create a predefined array to represent MLD temps (1 meter resolution)
 mlddepths = np.arange(0,np.max(h)+1,1)
 mldtemps = np.zeros(mlddepths.shape)
@@ -294,8 +392,18 @@ temp_ts,noise_ts,damp_ts = stochmod_noentrain(t_end,lbd,T0,F)
 # t_end = time.localtime()
 # end = time.strftime("%H:%M:%S",t)
 elapsed = time.time() - start
-tprint = "Model ran in %.2fs" % (elapsed)
+tprint = "No Entrain Model ran in %.2fs" % (elapsed)
 print(tprint)
+
+
+
+# Run model with entrainment
+start = time.time()
+temp_ts,noise_ts,damp_ts,entrain_ts,Td_ts=stochmod_entrain(t_end,lbd_entr,T0,F,beta,h)
+elapsed = time.time() - start
+tprint = "Entrain Model ran in %.2fs" % (elapsed)
+print(tprint)
+
 
 # Prepare for Correlation Calculations----------------------------------------
 # Reshape Time Series to months x year
