@@ -106,10 +106,18 @@ Dependencies:
     
 """
 def stochmod_noentrain(t_end,lbd,T0,F):
+    debugmode = 0 # Set to 1 to also save noise and damping time series
+    
     # Preallocate
     temp_ts = np.zeros(t_end)
-    noise_ts = np.zeros(t_end)
-    damp_ts = np.zeros(t_end)
+    
+    if debugmode == 1:
+        damp_ts = np.zeros(t_end)
+        noise_ts = np.zeros(t_end)
+    else:
+        noise_ts = []
+        damp_ts = []
+        
     
 
     # Loop for integration period (indexing convention from matlab)
@@ -135,16 +143,18 @@ def stochmod_noentrain(t_end,lbd,T0,F):
         temp_ts[t] = lbd[m-1]*T + noise_term  
     
         # Save other variables
-        noise_ts[t] = noise_term
-        damp_ts[t] = lbd[m-1]*T
+        if debugmode == 1:
+            noise_ts[t] = noise_term
+            damp_ts[t] = lbd[m-1]*T
 
 
     # Quick indexing fix
     temp_ts[0] = T0
-    noise_ts = np.delete(noise_ts,0)
-    damp_ts = np.delete(damp_ts,0)
+    if debugmode == 1:
+        noise_ts = np.delete(noise_ts,0)
+        damp_ts = np.delete(damp_ts,0)
     
-    return temp_ts,noise_ts,damp_ts
+    return temp_ts,noise_ts,damp_ts if debugmode ==1 else temp_ts
 
 
 """
@@ -163,17 +173,22 @@ Dependencies:
     
 """
 def stochmod_entrain(t_end,lbd,T0,F,beta,h):
-
-    
-    
+    debugmode = 0 # Set to 1 to also save noise,damping,entrain, and Td time series
     
     
     # Preallocate
     temp_ts = np.zeros(t_end)
-    noise_ts = np.zeros(t_end)
-    damp_ts = np.zeros(t_end)
-    entrain_ts = np.zeros(t_end)
-    Td_ts   = np.zeros(t_end)
+    if debugmode == 1:
+        noise_ts = np.zeros(t_end)
+        damp_ts = np.zeros(t_end)
+        entrain_ts = np.zeros(t_end)
+        Td_ts   = np.zeros(t_end)
+    else:
+        noise_ts = []
+        damp_ts = []
+        entrain_ts = []
+        Td_ts = []
+        
     
     # Create MLD arrays
     mlddepths = np.arange(0,np.max(h)+1,1)
@@ -204,12 +219,16 @@ def stochmod_entrain(t_end,lbd,T0,F,beta,h):
             entrain_term = 0
         else:
             
+            # Calculate Td
             Td1 = mldtemps[round(h.item(m-1))]
-            Td0 = mldtemps[round(h.item(m0-1))]
-            
+            Td0 = mldtemps[round(h.item(m0-1))]           
             Td = (Td1+Td0)/2
-            Td_ts[t] = Td
+            
+            # Calculate entrainment term
             entrain_term = beta[m-1]*Td
+            
+            if debugmode == 1:
+                Td_ts[t] = Td
 
         
     
@@ -221,9 +240,10 @@ def stochmod_entrain(t_end,lbd,T0,F,beta,h):
         temp_ts[t] = lbd[m-1]*T + noise_term + entrain_term
     
         # Save other variables
-        noise_ts[t] = noise_term
-        damp_ts[t] = lbd[m-1]*T
-        entrain_ts[t] = entrain_term
+        if debugmode == 1:
+            noise_ts[t] = noise_term
+            damp_ts[t] = lbd[m-1]*T
+            entrain_ts[t] = entrain_term
         
         
         # Set mixed layer depth tempertures
@@ -232,9 +252,10 @@ def stochmod_entrain(t_end,lbd,T0,F,beta,h):
 
     # Quick indexing fix
     temp_ts[0] = T0
-    noise_ts = np.delete(noise_ts,0)
-    damp_ts = np.delete(damp_ts,0)
-    entrain_ts = np.delete(entrain_ts,0)
+    if debugmode == 1:
+        noise_ts = np.delete(noise_ts,0)
+        damp_ts = np.delete(damp_ts,0)
+        entrain_ts = np.delete(entrain_ts,0)
     
     return temp_ts,noise_ts,damp_ts,entrain_ts,Td_ts
 
@@ -274,7 +295,7 @@ genrand   = 1  #
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath = projpath + '03_Scripts/stochmod/'
 datpath = projpath + '01_Data/'
-outpath = projpath + '02_Figures/20200608/'
+outpath = projpath + '02_Figures/20200610/'
 
 
 # Set up some strings for labeling
@@ -288,6 +309,8 @@ mons3=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
 ## ------------ Script Start -------------------------------------------------
 
 # Load Variables -------------------------------------------------------------
+
+
 
 # Load damping variables
 damppath = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/'
@@ -314,11 +337,30 @@ SST0 = loadmod['SST']
 mldnc = "XMXL_HTR_clim.nc"
 ds = xr.open_dataset(datpath+mldnc)
 
+# ----------------------------
+# Generate White Noise Forcing------------------------------------------------
+# ----------------------------
+
+
+# Generate Random White Noise Series (or load existing)
+if genrand == 1:
+    
+    # Mean = 0 , Std = 1, Draw from Gaussian Sample
+    F = np.random.normal(0,1,size=t_end)/4
+    #plt.plot(F)
+    
+    np.savetxt(datpath+"randts.csv",F,delimiter=",")
+    
+else:
+    
+    F = np.loadtxt(datpath+"randts.csv",delimiter=",")
 
 
 
-# ----------------------------------------------------------------------------
-
+# ---------------------------------------
+# Calc Ens Avg Mixed Layer Seasonal Cycle-------------------------------------
+# ---------------------------------------
+    
 # Find the corresponding Lat/Lon indices
 oid = np.abs(LON-lonf).argmin()
 aid = np.abs(LAT-latf).argmin()
@@ -337,21 +379,9 @@ if hvar == 1:
     h = np.squeeze(ensmean.to_array())
 
 
-
-# Generate Random White Noise Series (or load existing)
-if genrand == 1:
-    
-    # Mean = 0 , Std = 1, Draw from Gaussian Sample
-    F = np.random.normal(0,1,size=t_end)/4
-    #plt.plot(F)
-    
-    np.savetxt(datpath+"randts.csv",F,delimiter=",")
-    
-else:
-    
-    F = np.loadtxt(datpath+"randts.csv",delimiter=",")
-
-# Calculate Lambda
+# ----------------
+# Calculate Lambda------------------------------------------------------------
+# ----------------
 if usetau == 1:
     lbd = np.exp(-1 * 1 / np.mean(tauall, axis=1) )
 else:
@@ -363,58 +393,72 @@ if useeta == 1:
     F = np.copy(eta)
     F = np.squeeze(F)
 
-# Mixed Layer Depth term preparations ----------------------------------------
 
-# Compute the integral of the entrainment term
-seasoncorr = (1-lbd)/ (damping[oid,aid,:]/ (rho*cp0*h))
-beta = 1/dt * np.log( h / np.roll(h,1) ) * seasoncorr 
+# -------------------------
+# Prepare Entrainment Terms --------------------------------------------------
+# -------------------------
+
+
+# Compute seasonal correction factor from lambda
+FAC = (1-lbd)/ (damping[oid,aid,:]/ (rho*cp0*h))
+
+# Compute the integral of the entrainment term, with dt and correction factor
+beta = 1/dt * np.log( h / np.roll(h,1) ) * FAC
+
+# Set term to zero where detrainment is occuring
 beta[beta < 0] = 0
 
-#lbd_entr = np.exp(-1 * (damping[oid,aid,:] / (rho*cp0*h) * dt+ np.log( h / np.roll(h,1) )))
+
  
+# Calculate lambda that includes entrainment
 lbd_entr = np.exp(-1 * (damping[oid,aid,:] / (rho*cp0*h) * dt+ beta ))
+## No seasonal correction
+#lbd_entr = np.exp(-1 * (damping[oid,aid,:] / (rho*cp0*h) * dt+ np.log( h / np.roll(h,1) )))
    
-# Create a predefined array to represent MLD temps (1 meter resolution)
-mlddepths = np.arange(0,np.max(h)+1,1)
-mldtemps = np.zeros(mlddepths.shape)
- 
-# Prepare for Correlation Calculations----------------------------------------
-# Run model
 
-# t_start = time.localtime()
-# start = time.strftime("%H:%M:%S",t)
+# ----------
+# RUN MODELS -----------------------------------------------------------------
+# ----------
+
+
+# Run Model Without Entrainment
 start = time.time()
-
-
-# Try doing the same via function
-temp_ts,noise_ts,damp_ts = stochmod_noentrain(t_end,lbd,T0,F)
-
-# t_end = time.localtime()
-# end = time.strftime("%H:%M:%S",t)
+#temp_ts,noise_ts,damp_ts = stochmod_noentrain(t_end,lbd,T0,F)
+T_entr0,_,_ = stochmod_noentrain(t_end,lbd,T0,F)
 elapsed = time.time() - start
 tprint = "No Entrain Model ran in %.2fs" % (elapsed)
 print(tprint)
 
 
-
 # Run model with entrainment
 start = time.time()
-temp_ts,noise_ts,damp_ts,entrain_ts,Td_ts=stochmod_entrain(t_end,lbd_entr,T0,F,beta,h)
+#temp_ts,noise_ts,damp_ts,entrain_ts,Td_ts=stochmod_entrain(t_end,lbd_entr,T0,F,beta,h)
+T_entr1,_,_,_,_=stochmod_entrain(t_end,lbd_entr,T0,F,beta,h)
 elapsed = time.time() - start
 tprint = "Entrain Model ran in %.2fs" % (elapsed)
 print(tprint)
 
 
+# ------------------------------------
 # Prepare for Correlation Calculations----------------------------------------
+# ------------------------------------
+
+
 # Reshape Time Series to months x year
 if usesst == 1:
-    #temp_ts = SST1
+    temp_ts = SST1
     #temps   = np.reshape(temp_ts,(1000,12))
-    temps   = np.reshape(temp_ts,(76,12))
+    temps = np.reshape(temp_ts,(76,12))
     temps = np.transpose(temps,(1,0))
 else:
-    temps = np.reshape(temp_ts,(int(np.ceil(temp_ts.size/12)),12))
-    temps = np.transpose(temps,(1,0))
+    
+    # No Entrainment
+    temps_e0 = np.reshape(T_entr0,(int(np.ceil(T_entr0.size/12)),12))
+    temps_e0 = np.transpose(temps_e0,(1,0))
+    
+    # With Entrainment
+    temps_e1 = np.reshape(T_entr1,(int(np.ceil(T_entr1.size/12)),12))
+    temps_e1 = np.transpose(temps_e1,(1,0))
 
 #temps = np.reshape(temp_ts,(int(np.ceil(len(temp_ts)/12)),12))
 # Reshaping test
@@ -423,10 +467,13 @@ rs1 = np.reshape(test,(12,int(len(test)/12)))
 rs2 = np.reshape(test,(int(len(test)/12),12)) 
 rs2 = np.transpose(rs2,(1,0))
 
+
+
+# -------------------------
 # Calculate autocorrelation --------------------------------------------------
+# -------------------------
 lags = np.arange(0,61)
 kmonth = 3;
-
 
 ## YO's Method (Currently not working, need to check indexing)
 # corr_ts = np.zeros(len(lags))
@@ -438,14 +485,18 @@ kmonth = 3;
 #     corr_ts[i] = stats.pearsonr(temp_ts[0,baserng],temp_ts[0,lagrng])[0]
     
 #detrendopt = 1
-corr_ts = calc_lagcovar(temps,temps,lags,kmonth,detrendopt)
+
+corr_e0 = calc_lagcovar(temps_e0,temps_e0,lags,kmonth,detrendopt)
+corr_e1 = calc_lagcovar(temps_e1,temps_e1,lags,kmonth,detrendopt)
 
 
+# --------------
+# Make Figures  --------------------------------------------------------------
+# --------------
 
-## Make Figures
-
-
-# Xorrelation plots
+# *********************
+# Autocorrelation Plots
+# ********************* 
 f1 = plt.figure()
 ax = plt.axes()
 sns.set('paper','whitegrid','bright')
@@ -453,9 +504,9 @@ sns.set('paper','whitegrid','bright')
 ax.plot(lags,AVG0,color='b',label='CESM1 (YO)')
 ax.plot(lags,AVG1,color='c',label='No-Entrain (YO)')
 ax.plot(lags,AVG2,color='g',label='Entrain (YO)')
-ax.plot(lags,corr_ts,'-r',label='No-Entrain (GL)')
+ax.plot(lags,corr_e0,'-r',label='No-Entrain (GL)')
+ax.plot(lags,corr_e1,':r',label='Entrain (GL)')
 ax.legend()
-
 
 titlestr = 'SST Autocorrelation; Month'+str(kmonth) + '\n Lon: ' + \
     str(lonf) + ' Lat: '+ str(latf)
@@ -468,50 +519,61 @@ plt.savefig(outname, bbox_inches="tight",dpi=200)
 
 
     
-
+# ************
 # lambda plots ----------------------------------------------------------------
+# ************
 
-lbd1 = np.exp(-1 * 1 / np.mean(tauall, axis=1) )
-lbd2 = np.exp(-1 * damping[oid,aid,:] / (rho*cp0*h) * dt)
-lbd3 = np.exp(-1 * damping[oid,aid,:] / (rho*cp0*150) * dt)
+# Calculate Lambda Values
+lbd1 = np.exp(-1 * 1 / np.mean(tauall, axis=1) ) # Tau
+lbd2 = np.exp(-1 * damping[oid,aid,:] / (rho*cp0*h) * dt) # Lambda, Constant H
+lbd3 = np.exp(-1 * damping[oid,aid,:] / (rho*cp0*150) * dt) # Lambda, s.var H
 
+# Calculate Lambda for all ensemble members
 lbd1all =np.exp(-1 * 1 / tauall)
+
+# Month Array
 monthx = np.arange(1,13,1)        
 
-
-
-
+# Start Plot
 f2 = plt.figure()
 ax = plt.axes()
 sns.set('paper','whitegrid','bright')
+
+# Plot each ensemble member, then 1 for labeling
 for e in range(1,np.shape(tauall)[1]):
     #print(e)
     ax.plot(monthx,lbd1all [:,e],color=(.75,.75,.75))
 ln0 = ax.plot(monthx,lbd1all [:,-1],color=(.75,.75,.75),label=r'$exp(-1/\tau)$ : Indv. Member')
+
+# Plot other lines
 ln1 = ax.plot(monthx,lbd1,color='k',label=r'$exp(-1/\tau)$ : EnsAvg)')
 ln2 = ax.plot(monthx,lbd2,color='b',label=r'$exp(-\lambda_{net} / (\rho cp_0H)\Delta t)$ : Varying MLD')
 ln3 = ax.plot(monthx,lbd3,color='r',label=r'$exp(-\lambda_{net} / (\rho cp_0H)\Delta t)$ : Constant MLD')
-ax.legend(loc='best',)
-plt.rc('legend', fontsize=10)    # legend fontsize
 
-
-
+# Set legend location and fontsize
+#ax.legend(loc='best',)
+#plt.rc('legend', fontsize=10)    # legend fontsize
 lns = ln0 + ln1 + ln2 + ln3
 labs = [l.get_label() for l in lns]
 ax.legend(lns,labs,loc=0,bbox_to_anchor=(0., 1.02, 1., .102),ncol=2)
 
+# Title and axis options
 titlestr = 'Seasonal Values for Damping Term'
 ax.set(xticks=np.arange(1,13,1),
        xlim=(1,12),
        xlabel='Month',
        ylabel='Value ($mon^{-1}$)',
        title=titlestr)
+ax.set_xticklabels(mons3)
+
+# Print figure
 outname = outpath+"LambdaComp.png"
 plt.savefig(outname, bbox_inches="tight",dpi=200)
 
         
-
-
+# **********************
+# Plot for a single lambda value
+# **********************
 f3 = plt.figure()
 ax = plt.axes()
 sns.set('paper','whitegrid','bright')
@@ -526,11 +588,9 @@ outname = outpath+'Damping.png'
 plt.savefig(outname, bbox_inches="tight",dpi=200)
 
 
-
-
-
-
+# **********************
 # Twin Axis Damping Plot
+# **********************
 SMALL_SIZE =  12
 MEDIUM_SIZE = 14
 BIGGER_SIZE = 24
@@ -576,11 +636,9 @@ outname = outpath+'Damping_MLD_lon' + str(strlon) + '_lat' + str(latf) + '.png'
 plt.savefig(outname, bbox_inches="tight",dpi=200)
 
 
-
-
-
-
+# **********************
 # Xorrelation plots detrended
+# **********************
 f1 = plt.figure()
 ax = plt.axes()
 sns.set('paper','whitegrid','bright')
@@ -603,9 +661,9 @@ plt.savefig(outname, bbox_inches="tight",dpi=200)
 
 
 
-
+# **********************
 # Visualize differences between mixed layer variables ------------------------
-
+# **********************
 
 # Load Mixed layer variables and calculate ensemble average
 varmx = ('HMXL','XMXL')
