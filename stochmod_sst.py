@@ -14,7 +14,7 @@ import seaborn as sns
 import xarray as xr
 import time
 
-## Functions --------------------------------------------------
+# Functions --------------------------------------------------
 # Function to calculate lag correlation
 # Dependencies: numpy, scipy
 def calc_lagcovar(var1,var2,lags,basemonth,detrendopt):
@@ -276,10 +276,10 @@ h       = 150 # Effective MLD [m]
 T0      = 0   # Initial Temp [degC]
 
 # Integration Options
-nyr     = 1000      # Number of years to integrate over
+nyr     = 40000      # Number of years to integrate over
 t_end   = 12*nyr      # Timestep to integrate up to
 dt      = 60*60*24*30 # Timestep size (Will be used to multiply lambda)
-usetau  = 0           # Use tau (estimated damping timescale)
+usetau  = 1           # Use tau (estimated damping timescale)
 useeta  = 0          # Use eta from YO's model run
 usesst  = 0
 hvar    = 1           # seasonally varying h
@@ -334,7 +334,7 @@ SST0 = loadmod['SST']
 
 
 # Load Mixed layer variables
-mldnc = "XMXL_HTR_clim.nc"
+mldnc = "HMXL_HTR_clim.nc"
 ds = xr.open_dataset(datpath+mldnc)
 
 # ----------------------------
@@ -411,7 +411,10 @@ beta[beta < 0] = 0
 
  
 # Calculate lambda that includes entrainment
-lbd_entr = np.exp(-1 * (damping[oid,aid,:] / (rho*cp0*h) * dt+ beta ))
+
+lbd_entr = lbd * np.exp(-beta)
+
+    #lbd_entr = np.exp(-1 * (damping[oid,aid,:] / (rho*cp0*h) * dt+ beta ))
 ## No seasonal correction
 #lbd_entr = np.exp(-1 * (damping[oid,aid,:] / (rho*cp0*h) * dt+ np.log( h / np.roll(h,1) )))
    
@@ -700,3 +703,7 @@ ax.set(xlim=(1,12),ylim=(0,200),xlabel='Months',ylabel='MLD(m)')
 outname = outpath+'HMXL_v_XMXL.png'
 plt.savefig(outname, bbox_inches="tight",dpi=200)
 
+
+# Save files
+np.savetxt(datpath+"T_entr0.csv",T_entr0,delimiter=",")
+np.savetxt(datpath+"T_entr1.csv",T_entr1,delimiter=",")
