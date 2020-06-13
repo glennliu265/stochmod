@@ -172,9 +172,9 @@ Dependencies:
  4) F     : Forcing term
     
 """
-def stochmod_entrain(t_end,lbd,T0,F,beta,h):
+def stochmod_entrain(t_end,lbd,T0,F,beta,h,kprev):
     debugmode = 0 # Set to 1 to also save noise,damping,entrain, and Td time series
-    
+    linterp   = 1 # Set to 1 to use the kprev variable and linearly interpolate variables
     
     # Preallocate
     temp_ts = np.zeros(t_end)
@@ -191,8 +191,9 @@ def stochmod_entrain(t_end,lbd,T0,F,beta,h):
         
     
     # Create MLD arrays
-    mlddepths = np.arange(0,np.max(h)+1,1)
-    mldtemps = np.zeros(mlddepths.shape)
+    if linterp == 0:
+        mlddepths = np.arange(0,np.max(h)+1,1)
+        mldtemps = np.zeros(mlddepths.shape)
 
     # Loop for integration period (indexing convention from matlab)
     for t in range(1,t_end):
@@ -220,8 +221,27 @@ def stochmod_entrain(t_end,lbd,T0,F,beta,h):
         else:
             
             # Calculate Td
-            Td1 = mldtemps[round(h.item(m-1))]
-            Td0 = mldtemps[round(h.item(m0-1))]           
+            if linterp == 1:
+                
+                
+                
+                # Find # of months since the anomaly was formed
+                k1m = (m - np.floor(kprev[m-1])) % 12
+                k0m = (m - np.floor(kprev[m0-1])) % 12
+                
+                # Get the corresponding index
+                kp1 = int(t - k1m)
+                kp0 = int(t - k0m) 
+
+                                
+                
+                Td1 = np.interp(kprev[m-1] ,[kp1,kp1+1],[temp_ts[kp1],temp_ts[kp1+1]])
+                Td0 = np.interp(kprev[m0-1],[kp0,kp0+1],[temp_ts[kp0],temp_ts[kp0+1]])
+                
+            elif linterp == 0:
+                Td1 = mldtemps[round(h.item(m-1))]
+                Td0 = mldtemps[round(h.item(m0-1))]           
+            
             Td = (Td1+Td0)/2
             
             # Calculate entrainment term
@@ -247,8 +267,8 @@ def stochmod_entrain(t_end,lbd,T0,F,beta,h):
         
         
         # Set mixed layer depth tempertures
-        mldtemps[mlddepths<=h.item(m-1)] = temp_ts[t]
-
+        if linterp == 0:
+            mldtemps[mlddepths<=h.item(m-1)] = temp_ts[t]
 
     # Quick indexing fix
     temp_ts[0] = T0
@@ -259,6 +279,89 @@ def stochmod_entrain(t_end,lbd,T0,F,beta,h):
     
     return temp_ts,noise_ts,damp_ts,entrain_ts,Td_ts
 
+
+def find_kprev(h):
+    
+    # Preallocate
+    kprev = np.zeros(12)
+    hout = np.zeros(12)
+    
+    # Month Array
+    monthx = np.arange(1,13,1)  
+    
+    # Determine if the mixed layer is deepening (true) or shoaling (false)--
+    dz = h / np.roll(h,1) 
+    dz = dz > 1
+    dz = dz.values
+    
+        
+        
+        
+    for m in monthx:
+        
+        
+        # Quick Indexing Fixes ------------------
+        im = m-1 # Month Index (Pythonic)
+        m0 = m-1 # Previous month
+        im0 = m0-1 # M-1 Index
+        
+        # Fix settings for january
+        if m0 < 1:
+            m0 = 12
+            im0 = m0-1
+        
+        # Set values for minimun/maximum -----------------------------------------
+        if h[im] == h.max() or h[im]== h.min():
+            print("Ignoring %i, max/min" % m)
+            kprev[im] = m
+            hout[im] = h[im]
+            continue
+        
+    
+        
+        # Ignore detrainment months
+        if dz[im] == False:
+            print("Ignoring %i, shoaling month" % m)
+            continue
+        
+        # For all other entraining months.., search backwards
+        findmld = h[im]  # Target MLD   
+        hdiff = h - findmld
+          
+        searchflag = 0
+        ifindm = im0
+        
+        
+        while searchflag == 0:
+                
+            hfind= hdiff[ifindm]
+            
+            # For the first month greater than the target MLD,
+            # grab this value and the value before it
+            if hfind > 0:
+                # Set searchflag to 1 to prepare for exit
+                searchflag = 1
+                
+                # record MLD values
+                h_before = h[ifindm+1]
+                h_after  = h[ifindm]
+                m_before = monthx[ifindm+1]
+                m_after =  monthx[ifindm]
+                
+                # For months between Dec/Jan, assign value between 0 and 1
+                if ifindm < 0 and ifindm == -1:
+                    m_after = ifindm+1
+                
+                # For even more negative indices
+                
+                print("Found kprev for month %i it is %f!" % (m,np.interp(findmld,[h_before,h_after],[m_before,m_after])))
+                kprev[im] = np.interp(findmld,[h_before,h_after],[m_before,m_after])
+                hout[im] = findmld
+            
+            # Go back one month
+            ifindm -= 1
+    
+    return kprev, hout
 
 # User Edits -----------------------------------------------------------------           
 
@@ -276,10 +379,10 @@ h       = 150 # Effective MLD [m]
 T0      = 0   # Initial Temp [degC]
 
 # Integration Options
-nyr     = 40000      # Number of years to integrate over
+nyr     = 10000      # Number of years to integrate over
 t_end   = 12*nyr      # Timestep to integrate up to
 dt      = 60*60*24*30 # Timestep size (Will be used to multiply lambda)
-usetau  = 1           # Use tau (estimated damping timescale)
+usetau  = 10           # Use tau (estimated damping timescale)
 useeta  = 0          # Use eta from YO's model run
 usesst  = 0
 hvar    = 1           # seasonally varying h
@@ -378,6 +481,10 @@ if hvar == 1:
     ensmean = selectmld.mean(('ensemble','nlon','nlat'))/100
     h = np.squeeze(ensmean.to_array())
 
+# Find previous, entraining month
+kprev,_ = find_kprev(h)
+
+
 
 # ----------------
 # Calculate Lambda------------------------------------------------------------
@@ -436,7 +543,7 @@ print(tprint)
 # Run model with entrainment
 start = time.time()
 #temp_ts,noise_ts,damp_ts,entrain_ts,Td_ts=stochmod_entrain(t_end,lbd_entr,T0,F,beta,h)
-T_entr1,_,_,_,_=stochmod_entrain(t_end,lbd_entr,T0,F,beta,h)
+T_entr1,_,_,_,_=stochmod_entrain(t_end,lbd_entr,T0,F,beta,h,kprev)
 elapsed = time.time() - start
 tprint = "Entrain Model ran in %.2fs" % (elapsed)
 print(tprint)
@@ -517,7 +624,7 @@ ax.set(xlabel='Lag (months)',
        ylabel='Correlation',
        ylim=(-0.3,1.1),
        title=titlestr )
-outname = outpath+'SSTAC_usetau_40kyr'+str(usetau)+'.png'
+outname = outpath+'SSTAC_usetau'+str(usetau)+'_mldlinterp.png'
 plt.savefig(outname, bbox_inches="tight",dpi=200)
 
 
