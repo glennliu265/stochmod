@@ -366,8 +366,8 @@ def find_kprev(h):
 # User Edits -----------------------------------------------------------------           
 
 # Set Point and month
-lonf    = -30
-latf    = 50
+lonf    = -80
+latf    = 5
 kmon    = 3
 
 # Set Variables
@@ -382,7 +382,7 @@ T0      = 0   # Initial Temp [degC]
 nyr     = 10000      # Number of years to integrate over
 t_end   = 12*nyr      # Timestep to integrate up to
 dt      = 60*60*24*30 # Timestep size (Will be used to multiply lambda)
-usetau  = 10           # Use tau (estimated damping timescale)
+usetau  = 1           # Use tau (estimated damping timescale)
 useeta  = 0          # Use eta from YO's model run
 usesst  = 0
 hvar    = 1           # seasonally varying h
@@ -398,7 +398,7 @@ genrand   = 1  #
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath = projpath + '03_Scripts/stochmod/'
 datpath = projpath + '01_Data/'
-outpath = projpath + '02_Figures/20200610/'
+outpath = projpath + '02_Figures/20200617/'
 
 
 # Set up some strings for labeling
@@ -424,16 +424,16 @@ LAT = loaddamp['LAT']
 damping = loaddamp['ensavg']
 
 # Load data from YO's model run
-loadmod = loadmat(datpath+"stochrun.mat")
+loadmod = loadmat(datpath+"stochrun_"+loc_fname+".mat")
 eta = loadmod['eta']
 AVG0 = loadmod['AVG0']
 AVG1 = loadmod['AVG1']
 AVG2 = loadmod['AVG2']
 tauall = loadmod['TAUall']
 
-SST1 = loadmod['SST1']
-SST2 = loadmod['SST2']
-SST0 = loadmod['SST']
+#SST1 = loadmod['SST1']
+#SST2 = loadmod['SST2']
+#SST0 = loadmod['SST']
 
 
 # Load Mixed layer variables
@@ -484,11 +484,10 @@ if hvar == 1:
 # Find previous, entraining month
 kprev,_ = find_kprev(h)
 
-
-
 # ----------------
 # Calculate Lambda------------------------------------------------------------
 # ----------------
+
 if usetau == 1:
     lbd = np.exp(-1 * 1 / np.mean(tauall, axis=1) )
 else:
@@ -500,14 +499,15 @@ if useeta == 1:
     F = np.copy(eta)
     F = np.squeeze(F)
 
-
 # -------------------------
 # Prepare Entrainment Terms --------------------------------------------------
 # -------------------------
 
-
 # Compute seasonal correction factor from lambda
-FAC = (1-lbd)/ (damping[oid,aid,:]/ (rho*cp0*h))
+if usetau == 1:
+    FAC = np.nan_to_num((1-lbd)/ (1 / np.mean(tauall, axis=1)))
+else:
+    FAC = np.nan_to_num((1-lbd)/ (damping[oid,aid,:]/ (rho*cp0*h)))
 
 # Compute the integral of the entrainment term, with dt and correction factor
 beta = 1/dt * np.log( h / np.roll(h,1) ) * FAC
@@ -578,10 +578,11 @@ rs2 = np.reshape(test,(int(len(test)/12),12))
 rs2 = np.transpose(rs2,(1,0))
 
 
-
 # -------------------------
 # Calculate autocorrelation --------------------------------------------------
 # -------------------------
+
+
 lags = np.arange(0,61)
 kmonth = 3;
 
@@ -622,16 +623,14 @@ titlestr = 'SST Autocorrelation; Month'+str(kmonth) + '\n Lon: ' + \
     str(lonf) + ' Lat: '+ str(latf)
 ax.set(xlabel='Lag (months)',
        ylabel='Correlation',
-       ylim=(-0.3,1.1),
+       ylim=(-0.5,1.1),
        title=titlestr )
-outname = outpath+'SSTAC_usetau'+str(usetau)+'_mldlinterp.png'
+outname = outpath+'SSTAC_usetau'+str(usetau)+'_mldlinterp_'+ loc_fname +'.png'
 plt.savefig(outname, bbox_inches="tight",dpi=200)
-
-
     
-# ************
+# *************
 # lambda plots ----------------------------------------------------------------
-# ************
+# *************
 
 # Calculate Lambda Values
 lbd1 = np.exp(-1 * 1 / np.mean(tauall, axis=1) ) # Tau
@@ -681,9 +680,10 @@ outname = outpath+"LambdaComp.png"
 plt.savefig(outname, bbox_inches="tight",dpi=200)
 
         
-# **********************
+# ******************************
 # Plot for a single lambda value
-# **********************
+# ******************************
+
 f3 = plt.figure()
 ax = plt.axes()
 sns.set('paper','whitegrid','bright')
