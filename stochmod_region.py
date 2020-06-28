@@ -228,6 +228,13 @@ def stochmod_entrain(t_end,lbd,T0,F,beta,h,kprev):
                 # Find # of months since the anomaly was formed
                 k1m = (m - np.floor(kprev[m-1])) % 12
                 k0m = (m - np.floor(kprev[m0-1])) % 12
+                if k1m == 0:
+                    k1m = 12
+                if k0m == 0:
+                    k0m = 12
+                    
+                
+                
                 
                 # Get the corresponding index
                 kp1 = int(t - k1m)
@@ -278,6 +285,8 @@ def stochmod_entrain(t_end,lbd,T0,F,beta,h,kprev):
         entrain_ts = np.delete(entrain_ts,0)
     
     return temp_ts,noise_ts,damp_ts,entrain_ts,Td_ts
+
+
 
 """
 SST Stochastic Model, with/wo Entrainment
@@ -680,6 +689,8 @@ if genrand == 1:
     if funiform == 1:
         randts = np.random.normal(0,1,size=t_end)/4
         F      = np.ones((lonsize,latsize,t_end))
+        F      = np.multiply(F,randts[None,None,:])
+        
     else:
         F = np.random.normal(0,1,size=(lonsize,latsize,t_end))
         
@@ -688,7 +699,7 @@ if genrand == 1:
     
 else:
     
-    F = np.loadtxt(datpath+"randts_2d.npy")
+    F = np.load(datpath+"randts_2d.npy")
 
 # ---------------------------------------
 # Calc Ens Avg Mixed Layer Seasonal Cycle-------------------------------------
@@ -846,7 +857,7 @@ print(tprint)
         
 
 
-# Run Model WitEntrainment
+# Run Model With Entrainment
 start = time.time()
 T_entr1 = np.zeros((lonsize,latsize,t_end))
 icount = 0
@@ -871,334 +882,21 @@ for o in range(0,lonsize):
             #print(msg)
             T_entr1[o,a,:] = np.zeros(t_end)*np.nan
         else:
-            T_entr1[o,a,:],_,_ = stochmod_noentrain(t_end,lbd[o,a,:],T0,F[o,a,:],beta[o,a,:],hclim[o,a,:],kprev[o,a,:])
+            T_entr1[o,a,:],_,_,_,_ = stochmod_entrain(t_end,lbd[o,a,:],T0,F[o,a,:],beta[o,a,:],hclim[o,a,:],kprev[o,a,:])
         
         icount += 1
-        msg = '\rCompleted No Entrain Run for %i of %i points' % (icount,lonsize*latsize)
+        msg = '\rCompleted Entrain Run for %i of %i points' % (icount,lonsize*latsize)
         print(msg,end="\r",flush=True)
 #
         
 elapsed = time.time() - start
-tprint = "No Entrain Model ran in %.2fs" % (elapsed)
+tprint = "Entrain Model ran in %.2fs" % (elapsed)
 print(tprint)    
         
 
 
+# save output
+np.save(datpath+"stoch_output_1000yr_entrain1.npy",T_entr1)
+np.save(datpath+"stoch_output_1000yr_entrain0.npy",T_entr0)
+np.save(datpath+"stoch_output_1000yr_Forcing.npy",F)
 
-# Run model with entrainment
-start = time.time()
-#temp_ts,noise_ts,damp_ts,entrain_ts,Td_ts=stochmod_entrain(t_end,lbd_entr,T0,F,beta,h)
-T_entr1,_,_,_,_=stochmod_entrain(t_end,lbd_entr,T0,F,beta,h,kprev)
-elapsed = time.time() - start
-tprint = "Entrain Model ran in %.2fs" % (elapsed)
-print(tprint)
-
-
-# ------------------------------------
-# Prepare for Correlation Calculations----------------------------------------
-# ------------------------------------
-
-
-# Reshape Time Series to months x year
-if usesst == 1:
-    temp_ts = SST1
-    #temps   = np.reshape(temp_ts,(1000,12))
-    temps = np.reshape(temp_ts,(76,12))
-    temps = np.transpose(temps,(1,0))
-else:
-    
-    # No Entrainment
-    temps_e0 = np.reshape(T_entr0,(int(np.ceil(T_entr0.size/12)),12))
-    temps_e0 = np.transpose(temps_e0,(1,0))
-    
-    # With Entrainment
-    temps_e1 = np.reshape(T_entr1,(int(np.ceil(T_entr1.size/12)),12))
-    temps_e1 = np.transpose(temps_e1,(1,0))
-    
-    F_ts = np.reshape(F,(int(np.ceil(F.size/12)),12))
-    F_ts = np.transpose(F_ts,(1,0))
-
-#temps = np.reshape(temp_ts,(int(np.ceil(len(temp_ts)/12)),12))
-# Reshaping test
-test = np.arange(1,37)
-rs1 = np.reshape(test,(12,int(len(test)/12)))
-rs2 = np.reshape(test,(int(len(test)/12),12)) 
-rs2 = np.transpose(rs2,(1,0))
-
-
-# -------------------------
-# Calculate autocorrelation --------------------------------------------------
-# -------------------------
-
-
-lags = np.arange(0,61)
-kmonth = 3;
-
-## YO's Method (Currently not working, need to check indexing)
-# corr_ts = np.zeros(len(lags))
-# for i in lags:
-#     lag_yr = int(np.floor(i+kmonth/12))
-    
-#     baserng = range(kmonth,t_end-lag_yr*12,12)
-#     lagrng = range(kmonth+i,t_end-lag_yr*12,12)
-#     corr_ts[i] = stats.pearsonr(temp_ts[0,baserng],temp_ts[0,lagrng])[0]
-    
-#detrendopt = 1
-
-corr_e0 = calc_lagcovar(temps_e0,temps_e0,lags,kmonth,detrendopt)
-corr_e1 = calc_lagcovar(temps_e1,temps_e1,lags,kmonth,detrendopt)
-corr_noise = calc_lagcovar(F_ts,F_ts,lags,kmonth,detrendopt)
-
-# --------------
-# Make Figures  --------------------------------------------------------------
-# --------------
-
-# *********************
-# Autocorrelation Plots
-# ********************* 
-f1 = plt.figure()
-ax = plt.axes()
-sns.set('paper','whitegrid','bright')
-
-ax.plot(lags,AVG0,color='b',label='CESM1 (YO)')
-ax.plot(lags,AVG1,color='c',label='No-Entrain (YO)')
-ax.plot(lags,AVG2,color='g',label='Entrain (YO)')
-ax.plot(lags,corr_e0,'-r',label='No-Entrain (GL)')
-ax.plot(lags,corr_e1,':r',label='Entrain (GL)')
-ax.legend()
-
-titlestr = 'SST Autocorrelation; Month'+str(kmonth) + '\n Lon: ' + \
-    str(lonf) + ' Lat: '+ str(latf)
-ax.set(xlabel='Lag (months)',
-       ylabel='Correlation',
-       ylim=(-0.5,1.1),
-       title=titlestr )
-outname = outpath+'SSTAC_usetau'+str(usetau)+'_mldlinterp_'+ loc_fname +'.png'
-plt.savefig(outname, bbox_inches="tight",dpi=200)
-
-
-# *********************
-# Autocorrelation Plots v2
-# ********************* 
-f1 = plt.figure()
-ax = plt.axes()
-
-
-ax.plot(lags,AVG0,color='b',lw=3,label='CESM1 (Fully Coupled)')
-#ax.plot(lags,corr_noise,'k',lw=3,label='Forcing')
-ax.plot(lags,corr_e0,'c',lw=3,label='Stochastic (No-Entrain)')
-ax.plot(lags,corr_e1,'g',lw=3,label='Stochastic (Entrain)')
-ax.legend(prop=dict(size=16))
-
-titlestr = 'SST Anomaly Autocorrelation; \n Month: '+monsfull[kmonth-1] + ' | Lon: ' + \
-    str(lonf) + ' | Lat: '+ str(latf)
-    
-ax.set_ylabel('Correlation',fontsize=14)
-ax.set_ylim(-0.2,1.1)
-ax.set_xlabel('Lag (months)',fontsize=14)
-#ax.set_yticklabels(labels=np.arange(-0.2,1.2,0.2),fontsize=12)
-#ax.set_xticklabels(labels=np.arange(0,65,5),fontsize=12)
-ax.set_title(titlestr,fontsize=20)
-#plt.style.use('seaborn')
-outname = outpath+'SSTAC_usetau'+str(usetau)+'_mldlinterp_'+ loc_fname +'_onlyGL.png'
-plt.savefig(outname, bbox_inches="tight",dpi=200)
-
-
-# 
-# Noise vs SST
-#
-
-f2,axs = plt.subplots(2,1)
-axs[0].plot(np.arange(0,101,1),F[0:101])
-axs[1].plot(np.arange(0,101,1),T_entr1[0:101])
-
-
-
-
-
-# *************
-# lambda plots ----------------------------------------------------------------
-# *************
-
-# Calculate Lambda Values
-lbd1 = np.exp(-1 * 1 / np.mean(tauall, axis=1) ) # Tau
-lbd2 = np.exp(-1 * damping[oid,aid,:] / (rho*cp0*h) * dt) # Lambda, Constant H
-lbd3 = np.exp(-1 * damping[oid,aid,:] / (rho*cp0*150) * dt) # Lambda, s.var H
-
-# Calculate Lambda for all ensemble members
-lbd1all =np.exp(-1 * 1 / tauall)
-
-# Month Array
-monthx = np.arange(1,13,1)        
-
-# Start Plot
-f2 = plt.figure()
-ax = plt.axes()
-sns.set('paper','whitegrid','bright')
-
-# Plot each ensemble member, then 1 for labeling
-for e in range(1,np.shape(tauall)[1]):
-    #print(e)
-    ax.plot(monthx,lbd1all [:,e],color=(.75,.75,.75))
-ln0 = ax.plot(monthx,lbd1all [:,-1],color=(.75,.75,.75),label=r'$exp(-1/\tau)$ : Indv. Member')
-
-# Plot other lines
-ln1 = ax.plot(monthx,lbd1,color='k',label=r'$exp(-1/\tau)$ : EnsAvg)')
-ln2 = ax.plot(monthx,lbd2,color='b',label=r'$exp(-\lambda_{net} / (\rho cp_0H)\Delta t)$ : Varying MLD')
-ln3 = ax.plot(monthx,lbd3,color='r',label=r'$exp(-\lambda_{net} / (\rho cp_0H)\Delta t)$ : Constant MLD')
-
-# Set legend location and fontsize
-#ax.legend(loc='best',)
-#plt.rc('legend', fontsize=10)    # legend fontsize
-lns = ln0 + ln1 + ln2 + ln3
-labs = [l.get_label() for l in lns]
-ax.legend(lns,labs,loc=0,bbox_to_anchor=(0., 1.02, 1., .102),ncol=2)
-
-# Title and axis options
-titlestr = 'Seasonal Values for Damping Term'
-ax.set(xticks=np.arange(1,13,1),
-       xlim=(1,12),
-       xlabel='Month',
-       ylabel='Value ($mon^{-1}$)',
-       title=titlestr)
-ax.set_xticklabels(mons3)
-
-# Print figure
-outname = outpath+"LambdaComp.png"
-plt.savefig(outname, bbox_inches="tight",dpi=200)
-
-        
-# ******************************
-# Plot for a single lambda value
-# ******************************
-
-f3 = plt.figure()
-ax = plt.axes()
-sns.set('paper','whitegrid','bright')
-ax.plot(np.arange(1,13,1),damping[oid,aid,:],color='r',label=r'$\lambda_{net}$')
-ax.legend(loc='best',)
-titlestr = 'Seasonal Values for Damping Term'
-ax.set(xticks=np.arange(1,13,1),
-       xlabel='Month',
-       ylabel='Value ($W/m^{-2}K^{-1}$)',
-       title=titlestr )
-outname = outpath+'Damping.png'
-plt.savefig(outname, bbox_inches="tight",dpi=200)
-
-
-# **********************
-# Twin Axis Damping Plot
-# **********************
-SMALL_SIZE =  12
-MEDIUM_SIZE = 14
-BIGGER_SIZE = 24
-
-plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
-plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
-plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
-plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
-plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
-plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
-plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
-f3,ax1 = plt.subplots()
-
-color = 'tab:red'
-ax1.set_xlabel('Month')
-ax1.set_ylabel('$\lambda_{net} (W m^{-2} K^{-1}$)')
-ln1 = ax1.plot(np.arange(1,13,1),damping[oid,aid,:],color='r',label=r'$\lambda_{net}$')
-ax1.tick_params(axis='y',labelcolor=color)
-ax1.grid(None)
-
-ax2 = ax1.twinx()
-color = 'tab:blue'
-ax2.set_ylabel('Mixed Layer Depth (m)',color=color)
-ln2 = ax2.plot(np.arange(1,13,1),h,color='b',label=r'HMXL')
-ax2.tick_params(axis='y',labelcolor=color)
-ax2.grid(None)
-
-
-# Set Legend
-lns = ln1 + ln2
-labs = [l.get_label() for l in lns]
-ax1.legend(lns,labs,loc=0)
-
-# Set Title
-titlestr = 'Seasonal Values for MLD and $\lambda$ (Ensemble Average) \n Lon: ' + \
-    str(lonf) + ' Lat: '+ str(latf)
-plt.title(titlestr)
-
-
-if lonf < 0:
-    strlon = 360+lonf
-outname = outpath+'Damping_MLD_lon' + str(strlon) + '_lat' + str(latf) + '.png'
-plt.savefig(outname, bbox_inches="tight",dpi=200)
-
-
-# **********************
-# Xorrelation plots detrended
-# **********************
-f1 = plt.figure()
-ax = plt.axes()
-sns.set('paper','whitegrid','bright')
-
-ax.plot(lags,dt_SST0,color='b',label='CESM1 (YO)')
-ax.plot(lags,dt_SST1,color='c',label='No-Entrain (YO)')
-ax.plot(lags,dt_SST2,color='g',label='Entrain (YO)')
-ax.plot(lags,dt_GL,'-r',label='No-Entrain (GL)')
-ax.legend()
-
-
-titlestr = 'Detrended SST Autocorrelation; Month'+str(kmonth) + '\n Lon: ' + \
-    str(lonf) + ' Lat: '+ str(latf)
-ax.set(xlabel='Lag (months)',
-       ylabel='Correlation',
-       ylim=(-0.3,1.1),
-       title=titlestr )
-outname = outpath+'DT_SSTAC_usetau'+str(usetau)+'.png'
-plt.savefig(outname, bbox_inches="tight",dpi=200)
-
-
-
-# **********************
-# Visualize differences between mixed layer variables ------------------------
-# **********************
-
-# Load Mixed layer variables and calculate ensemble average
-varmx = ('HMXL','XMXL')
-mx_ensavg = {}
-
-for mx in varmx:
-    mldnc = mx + "_HTR_clim.nc"
-
-    ds = xr.open_dataset(datpath+mldnc)
-
-
-    # Do same for curivilinear grid
-    if lonf < 0:
-        lonfc = lonf + 360 # Convert to 0-360 if using negative coordinates
-    
-    # Find the specified point on curvilinear grid and average values
-    selectmld = ds.where((lonfc-0.5 < ds.TLONG) & (ds.TLONG < lonfc+0.5)
-                        & (latf-0.5 < ds.TLAT) & (ds.TLAT < latf+0.5),drop=True)
-    # Select accordingly 
-    ensmean = selectmld.mean(('ensemble','nlon','nlat'))/100
-    h = np.squeeze(ensmean.to_array())
-    
-    
-    # Assign to dictionary
-    mx_ensavg[mx] = h
-    
-fmx = plt.figure()
-ax = plt.axes()
-for mx in varmx:
-    ax.plot(range(1,13),mx_ensavg[mx],label=mx)
-ax.legend()
-plt.title('Mixed Layer Seasonal Cycle (Ens Average) \n' + loc_figtitle)
-ax.set(xlim=(1,12),ylim=(0,200),xlabel='Months',ylabel='MLD(m)')
-outname = outpath+'HMXL_v_XMXL.png'
-plt.savefig(outname, bbox_inches="tight",dpi=200)
-
-
-# Save files
-np.savetxt(datpath+"T_entr0.csv",T_entr0,delimiter=",")
-np.savetxt(datpath+"T_entr1.csv",T_entr1,delimiter=",")
