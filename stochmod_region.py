@@ -600,6 +600,13 @@ hvar    = 1           # seasonally varying h
 funiform = 1        # Spatially uniform forcing
 
 
+# hvarmode
+hvarmode = 1 # hvar modes (0 - fixe mld, 1 - effective mld, 2 - seasonally varying mld)
+hfix     = 50 # Fixed MLD (meters)
+
+
+
+
 # Region options
 lonW = -80
 lonE = 20
@@ -612,7 +619,7 @@ detrendopt = 0  # Option to detrend before calculations
 
 
 # White Noise Options
-genrand   = 1  #
+genrand   = 0  #
 
 #Set Paths
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
@@ -667,13 +674,11 @@ latr = np.squeeze(LAT[klat])
 
 # Further restrict to non-nan locations
 
-
-
 # Get lat and long sizes
 lonsize = lonr.shape[0]
 latsize = latr.shape[0]
-
-
+np.save(datpath+"lat.npy",latr)
+np.save(datpath+"lon.npy",lonr)
 # ----------------------
 # Select non-nan points ------------------------------------------------------
 # ----------------------
@@ -786,19 +791,39 @@ plt.contourf(lonr,latr,np.transpose(np.squeeze(kprev[:,:,5])))
 # Calculate Lambda------------------------------------------------------------
 # ----------------
 
+if hvarmode == 0:
+    
+    # Use fixed mixed layer depth
+    
+    lbd = np.exp(-1 * dampingr / (rho*cp0*hfix) * dt)
+    
+elif hvarmode == 1:
+    
+    
+    # Find maximum mld for each point in basin
+    
+    hmax = np.amax(hclim,axis=2)
+    lbd = np.exp(-1 * dampingr / (rho*cp0*hmax[:,:,None]) * dt)
+    
+elif hvarmode == 2:
 
-lbd = np.exp(-1 * dampingr / (rho*cp0*hclim) * dt)
+    lbd = np.exp(-1 * dampingr / (rho*cp0*hclim) * dt)
     
 
 # -------------------------
 # Prepare Entrainment Terms --------------------------------------------------
 # -------------------------
 
+
+
+
 # Compute seasonal correction factor from lambda
 FAC = (1-lbd)/ (dampingr / (rho*cp0*hclim))
 
 # Compute the integral of the entrainment term, with dt and correction factor
 beta = np.nan_to_num(1/dt * np.log( hclim / np.roll(hclim,1,2) ) * FAC)
+
+
 
 # Set term to zero where detrainment is occuring
 beta[beta < 0] = 0
@@ -851,7 +876,7 @@ for o in range(0,lonsize):
 #
         
 elapsed = time.time() - start
-tprint = "No Entrain Model ran in %.2fs" % (elapsed)
+tprint = "\nNo Entrain Model ran in %.2fs" % (elapsed)
 print(tprint)    
         
         
@@ -890,13 +915,13 @@ for o in range(0,lonsize):
 #
         
 elapsed = time.time() - start
-tprint = "Entrain Model ran in %.2fs" % (elapsed)
+tprint = "\nEntrain Model ran in %.2fs" % (elapsed)
 print(tprint)    
         
 
 
 # save output
-np.save(datpath+"stoch_output_1000yr_entrain1.npy",T_entr1)
-np.save(datpath+"stoch_output_1000yr_entrain0.npy",T_entr0)
-np.save(datpath+"stoch_output_1000yr_Forcing.npy",F)
+np.save(datpath+"stoch_output_1000yr_entrain1_hvar%i.npy"%(hvarmode),T_entr1)
+np.save(datpath+"stoch_output_1000yr_entrain0_hvar%i.npy"%(hvarmode),T_entr0)
+#np.save(datpath+"stoch_output_1000yr_Forcing_hvar%i.npy",F)
 
