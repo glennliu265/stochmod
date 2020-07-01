@@ -14,7 +14,7 @@ import seaborn as sns
 import xarray as xr
 import time
 
-# Functions --------------------------------------------------
+#%% Functions --------------------------------------------------
 # Function to calculate lag correlation
 # Dependencies: numpy, scipy
 def calc_lagcovar(var1,var2,lags,basemonth,detrendopt):
@@ -89,6 +89,8 @@ def calc_lagcovar(var1,var2,lags,basemonth,detrendopt):
             
             
     return corr_ts
+
+
 
 """
 SST Stochastic Model, no Entrainment
@@ -198,13 +200,15 @@ def stochmod_entrain(t_end,lbd,T0,F,beta,h,kprev):
     # Loop for integration period (indexing convention from matlab)
     for t in range(1,t_end):
         
+        
         # Get the month
         m  = t%12
         m0 = m - 1 
         if m == 0:
             m = 12
             m0= 11
-        
+        if m0 == 0:
+            m0 = 12
         
     
         # Get the temperature from the previous step
@@ -220,23 +224,34 @@ def stochmod_entrain(t_end,lbd,T0,F,beta,h,kprev):
             entrain_term = 0
         else:
             
+            # If not an entraining month, skip this step
+            if beta[m-1] == 0:
+                entrain_term = 0
+            
+            
             # Calculate Td
             if linterp == 1:
-                
                 
                 
                 # Find # of months since the anomaly was formed
                 k1m = (m - np.floor(kprev[m-1])) % 12
                 k0m = (m - np.floor(kprev[m0-1])) % 12
+                if k1m == 0:
+                    k1m = 12
+                if k0m == 0:
+                    k0m = 12
+                    
                 
-                # Get the corresponding index
-                kp1 = int(t - k1m)
-                kp0 = int(t - k0m) 
+                
+                
+                # Get the corresponding index month, shifting back for zero indexing
+                kp1 = int(t - k1m)-1
+                kp0 = int(t - k0m)-1 
 
                                 
-                
-                Td1 = np.interp(kprev[m-1] ,[kp1,kp1+1],[temp_ts[kp1],temp_ts[kp1+1]])
-                Td0 = np.interp(kprev[m0-1],[kp0,kp0+1],[temp_ts[kp0],temp_ts[kp0+1]])
+                # Get points (rememebering to shift backwards to account for indexing)
+                Td1 = np.interp(kprev[m-1]-1,[kp1,kp1+1],[temp_ts[kp1],temp_ts[kp1+1]])
+                Td0 = np.interp(kprev[m0-1]-1,[kp0,kp0+1],[temp_ts[kp0],temp_ts[kp0+1]])
                 
             elif linterp == 0:
                 Td1 = mldtemps[round(h.item(m-1))]
@@ -363,11 +378,11 @@ def find_kprev(h):
     
     return kprev, hout
 
-# User Edits -----------------------------------------------------------------           
+#%% User Edits -----------------------------------------------------------------           
 
 # Set Point and month
-lonf    = -80
-latf    = 5
+lonf    = -30
+latf    = 50
 kmon    = 3
 
 # Set Variables
@@ -379,10 +394,10 @@ h       = 150 # Effective MLD [m]
 T0      = 0   # Initial Temp [degC]
 
 # Integration Options
-nyr     = 10000      # Number of years to integrate over
+nyr     = 1000    # Number of years to integrate over
 t_end   = 12*nyr      # Timestep to integrate up to
 dt      = 60*60*24*30 # Timestep size (Will be used to multiply lambda)
-usetau  = 1           # Use tau (estimated damping timescale)
+usetau  = 0          # Use tau (estimated damping timescale)
 useeta  = 0          # Use eta from YO's model run
 usesst  = 0
 hvar    = 1           # seasonally varying h
@@ -407,11 +422,11 @@ if lonf < 0:
     lonstr = lonf + 360
 loc_fname    = "Lon%03d_Lat%03d"  % (lonstr,latf)
 mons3=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
-
+monsfull=('January','Febuary','March','April','May','June','July','August','September','October','November','December')
 
 ## ------------ Script Start -------------------------------------------------
 
-# Load Variables -------------------------------------------------------------
+#%% Load Variables -------------------------------------------------------------
 
 
 
@@ -441,7 +456,7 @@ mldnc = "HMXL_HTR_clim.nc"
 ds = xr.open_dataset(datpath+mldnc)
 
 # ----------------------------
-# Generate White Noise Forcing------------------------------------------------
+#%% Generate White Noise Forcing------------------------------------------------
 # ----------------------------
 
 
@@ -461,7 +476,7 @@ else:
 
 
 # ---------------------------------------
-# Calc Ens Avg Mixed Layer Seasonal Cycle-------------------------------------
+#%% Calc Ens Avg Mixed Layer Seasonal Cycle-------------------------------------
 # ---------------------------------------
     
 # Find the corresponding Lat/Lon indices
@@ -485,7 +500,7 @@ if hvar == 1:
 kprev,_ = find_kprev(h)
 
 # ----------------
-# Calculate Lambda------------------------------------------------------------
+#%% Calculate Lambda------------------------------------------------------------
 # ----------------
 
 if usetau == 1:
@@ -500,17 +515,21 @@ if useeta == 1:
     F = np.squeeze(F)
 
 # -------------------------
-# Prepare Entrainment Terms --------------------------------------------------
+#%% Prepare Entrainment Terms --------------------------------------------------
 # -------------------------
 
 # Compute seasonal correction factor from lambda
 if usetau == 1:
-    FAC = np.nan_to_num((1-lbd)/ (1 / np.mean(tauall, axis=1)))
+    FAC = np.nan_to_num((1-lbd) / (1 / np.mean(tauall, axis=1)))
+    
+    # Compute the integral of the entrainment term, with dt and correction factor
+    beta = np.log( h / np.roll(h,1) ) * FAC
 else:
-    FAC = np.nan_to_num((1-lbd)/ (damping[oid,aid,:]/ (rho*cp0*h)))
 
-# Compute the integral of the entrainment term, with dt and correction factor
-beta = 1/dt * np.log( h / np.roll(h,1) ) * FAC
+    FAC = np.nan_to_num((1-lbd) / (damping[oid,aid,:]/ (rho*cp0*h)))
+
+    # Compute the integral of the entrainment term, with dt and correction factor
+    beta = 1/dt * np.log( h / np.roll(h,1) ) * FAC
 
 # Set term to zero where detrainment is occuring
 beta[beta < 0] = 0
@@ -526,8 +545,13 @@ lbd_entr = lbd * np.exp(-beta)
 #lbd_entr = np.exp(-1 * (damping[oid,aid,:] / (rho*cp0*h) * dt+ np.log( h / np.roll(h,1) )))
    
 
+
+
+
+
+
 # ----------
-# RUN MODELS -----------------------------------------------------------------
+#%% RUN MODELS -----------------------------------------------------------------
 # ----------
 
 
@@ -550,7 +574,7 @@ print(tprint)
 
 
 # ------------------------------------
-# Prepare for Correlation Calculations----------------------------------------
+#%% Prepare for Correlation Calculations----------------------------------------
 # ------------------------------------
 
 
@@ -569,6 +593,9 @@ else:
     # With Entrainment
     temps_e1 = np.reshape(T_entr1,(int(np.ceil(T_entr1.size/12)),12))
     temps_e1 = np.transpose(temps_e1,(1,0))
+    
+    F_ts = np.reshape(F,(int(np.ceil(F.size/12)),12))
+    F_ts = np.transpose(F_ts,(1,0))
 
 #temps = np.reshape(temp_ts,(int(np.ceil(len(temp_ts)/12)),12))
 # Reshaping test
@@ -579,30 +606,42 @@ rs2 = np.transpose(rs2,(1,0))
 
 
 # -------------------------
-# Calculate autocorrelation --------------------------------------------------
+#%% Calculate autocorrelation --------------------------------------------------
 # -------------------------
 
 
 lags = np.arange(0,61)
 kmonth = 3;
 
-## YO's Method (Currently not working, need to check indexing)
-# corr_ts = np.zeros(len(lags))
-# for i in lags:
-#     lag_yr = int(np.floor(i+kmonth/12))
+# # YO's method Currently not working, need to check indexing)
+# def yo_cor(var,lags,t_end,kmonth):
+#     corr_ts = np.zeros(len(lags))
     
-#     baserng = range(kmonth,t_end-lag_yr*12,12)
-#     lagrng = range(kmonth+i,t_end-lag_yr*12,12)
-#     corr_ts[i] = stats.pearsonr(temp_ts[0,baserng],temp_ts[0,lagrng])[0]
+#     for i in lags:
+#         lag_yr = int(np.floor((i+kmonth-1)/12))
+
+#         baserng = np.arange(kmonth-1,t_end-lag_yr*12+2,12)
+#         lagrng  = np.arange(kmonth+i-1,t_end-lag_yr*12+2,12)
+#         if len(baserng) > len(lagrng):
+#             baserng = baserng[:0-lag_yr:]
+        
+        
+#         print("Doing %i with lagyr %i"% (i,lag_yr))
+        
+#         corr_ts[i] = stats.pearsonr(var[baserng],var[lagrng])[0]
     
+
+# corr_e1=yo_cor(T_entr1,lags,t_end,kmonth)
+
+
 #detrendopt = 1
 
 corr_e0 = calc_lagcovar(temps_e0,temps_e0,lags,kmonth,detrendopt)
 corr_e1 = calc_lagcovar(temps_e1,temps_e1,lags,kmonth,detrendopt)
-
+corr_noise = calc_lagcovar(F_ts,F_ts,lags,kmonth,detrendopt)
 
 # --------------
-# Make Figures  --------------------------------------------------------------
+#%% Make Figures  --------------------------------------------------------------
 # --------------
 
 # *********************
@@ -627,9 +666,49 @@ ax.set(xlabel='Lag (months)',
        title=titlestr )
 outname = outpath+'SSTAC_usetau'+str(usetau)+'_mldlinterp_'+ loc_fname +'.png'
 plt.savefig(outname, bbox_inches="tight",dpi=200)
+
+
+# ***********************
+#%% Autocorrelation Plots v2
+# ***********************
+f1 = plt.figure()
+ax = plt.axes()
+
+
+ax.plot(lags,AVG0,color='b',lw=3,label='CESM1 (Fully Coupled)')
+#ax.plot(lags,corr_noise,'k',lw=3,label='Forcing')
+ax.plot(lags,corr_e0,'c',lw=3,label='Stochastic (No-Entrain)')
+ax.plot(lags,corr_e1,'g',lw=3,label='Stochastic (Entrain)')
+ax.legend(prop=dict(size=16))
+
+titlestr = 'SST Anomaly Autocorrelation; \n Month: '+monsfull[kmonth-1] + ' | Lon: ' + \
+    str(lonf) + ' | Lat: '+ str(latf)
     
+ax.set_ylabel('Correlation',fontsize=14)
+ax.set_ylim(-0.2,1.1)
+ax.set_xlabel('Lag (months)',fontsize=14)
+#ax.set_yticklabels(labels=np.arange(-0.2,1.2,0.2),fontsize=12)
+#ax.set_xticklabels(labels=np.arange(0,65,5),fontsize=12)
+ax.set_title(titlestr,fontsize=20)
+#plt.style.use('seaborn')
+outname = outpath+'SSTAC_usetau'+str(usetau)+'_mldlinterp_'+ loc_fname +'_onlyGL.png'
+plt.savefig(outname, bbox_inches="tight",dpi=200)
+
+
+# 
+#%% Noise vs SST
+#
+
+f2,axs = plt.subplots(2,1)
+axs[0].plot(np.arange(0,101,1),F[0:101])
+axs[1].plot(np.arange(0,101,1),T_entr1[0:101])
+
+
+
+
+
 # *************
-# lambda plots ----------------------------------------------------------------
+#%% lambda plots ----------------------------------------------------------------
 # *************
 
 # Calculate Lambda Values
@@ -681,7 +760,7 @@ plt.savefig(outname, bbox_inches="tight",dpi=200)
 
         
 # ******************************
-# Plot for a single lambda value
+#%% Plot for a single lambda value
 # ******************************
 
 f3 = plt.figure()
@@ -699,7 +778,7 @@ plt.savefig(outname, bbox_inches="tight",dpi=200)
 
 
 # **********************
-# Twin Axis Damping Plot
+#%% Twin Axis Damping Plot
 # **********************
 SMALL_SIZE =  12
 MEDIUM_SIZE = 14
@@ -747,7 +826,7 @@ plt.savefig(outname, bbox_inches="tight",dpi=200)
 
 
 # **********************
-# Xorrelation plots detrended
+#%% Xorrelation plots detrended
 # **********************
 f1 = plt.figure()
 ax = plt.axes()
