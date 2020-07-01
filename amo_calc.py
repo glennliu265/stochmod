@@ -21,9 +21,7 @@ import cmocean
 import matplotlib.ticker as mticker
 from cartopy.util import add_cyclic_point
 
-
-
-# Functions
+#%% Functions
 def calc_lagcovar(var1,var2,lags,basemonth,detrendopt):
     import numpy as np
     from scipy import signal
@@ -183,7 +181,7 @@ def detrendlin(var_in):
     m,b,r_val,p_val,std_err=stats.linregress(x[inotnan],var_in[inotnan])
     
     # Detrend
-    var_detrend = var_in - (m*x +b)
+    var_detrend = var_in - (m * x +b)
     
     return var_detrend
 
@@ -322,20 +320,15 @@ def regress2ts(var,ts,normalizeall,method):
                     continue
                 
                 # Perform regression 
-                var_reg[o,a]=stats.pearsonr(vartime,ts)[0]
+                r = np.polyfit(ts,vartime,1)
+                #r=stats.linregress(vartime,ts)
+                var_reg[o,a] = r[0]
+                #var_reg[o,a]=stats.pearsonr(vartime,ts)[0]
     
     return var_reg
         
-        
-        
-    
-    
-    
-    
-    
-    
 
-# ----------------------------------------------------------------------------
+#%% ----------------------------------------------------------------------------
 # Set data paths
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath = projpath + '03_Scripts/stochmod/'
@@ -361,13 +354,13 @@ bbox = [-75,5,0,65]
 order = 5
 cutofftime = 120
 
-print('cutoff = ',1/cutoff*nyquist*30*24*3600,' months')
+#print('cutoff = ',1/cutoff*nyquist*30*24*3600,' months')
 
 
 
 
 # ----------------------------------------------------------------------------
-# Script Start 
+#%% Script Start 
 
 
 hvarmode = np.arange(0,3,1)
@@ -383,7 +376,7 @@ lat      = np.load(datpath+"lat.npy")
 
 
 
-# Calculate AMV INdex
+#%% Calculate AMV Index
 sst = {}
 amv = {}
 aa = {}
@@ -403,7 +396,7 @@ lpforcing,aaforcing = calc_AMV(lon,lat,F,bbox,order,cutofftime)
     
     
 
-# Regress back to SST
+#%% Regress back to SST
 regr_meth1 = {}
 regr_meth2 = {}
 # Perform regression for each mode
@@ -414,7 +407,7 @@ for mode in hvarmode:
  
     
 # ----------------------------------------
-# For Comparison, Repeat for Observations
+# %% For Comparison, Repeat for Observations
 # ----------------------------------------
 # Path to SST data from obsv
 datpath2 = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/"
@@ -428,6 +421,12 @@ hsst = obvhad['SST']
 
 # Change hsst to lon x lat x time
 hsst = np.transpose(hsst,(2,1,0))
+
+# Take the set time period
+startyr = 1920
+monstart = (1920+1-hyr[0,0])*12
+hsst = hsst[:,:,monstart::]
+
 
 # For hsst, flip the latitude axis
 # currently it is arranged 90:-90, need to flip to south first
@@ -449,15 +448,11 @@ hsstnew = np.concatenate((hsstsouth,hsstnorth),axis=1)
 h_amv,aa_hsst = calc_AMV(hlon,hlatnew,hsstnew,bbox,order,cutofftime)  
 
 # Restrict to time domain
-startyr = 1920
-monstart = (1920-hyr[0,0])*12
-hsstin = hsstnew[:,:,monstart::]
-hamvin = h_amv[monstart::]
 
-# Regress back to SST
-h_regr=regress2ts(hsstin,hamvin,0,2)
+# Regress back to SST (Note: Normalizing seems to remove canonical AMV pattern)
+h_regr=regress2ts(hsstnew,h_amv,0,2)
 
-
+#%%
 # -------------------------------
 # Plot AMV from the 3 experiments
 # -------------------------------
@@ -494,7 +489,7 @@ plt.savefig(outname, bbox_inches="tight",dpi=200)
     
     
 # -------------------------------
-# Compare AMV to forcing
+# %%Compare AMV to forcing
 # -------------------------------
 # Add forcing as first plot
 fig,ax = plt.subplots(2,1,sharex=True,sharey=False,figsize=(14,6))
@@ -524,17 +519,18 @@ plt.savefig(outname, bbox_inches="tight",dpi=200)
     
     
 # -------------------------------
-# AMV Spatial Pattern Plots
+#%% AMV Spatial Pattern Plots
 # -------------------------------
 
 
-def plot_AMV_spatial(var,lon,lat,bbox,cmap,cint,clab,ax=None):
+def plot_AMV_spatial(var,lon,lat,bbox,cmap,cint=[0,],clab=[0,],ax=None):
 
     
     if ax is None:
         ax = plt.gca()
         
-    
+        
+        
     # Add cyclic point to avoid the gap
     var,lon1 = add_cyclic_point(var,coord=lon)
     
@@ -546,28 +542,32 @@ def plot_AMV_spatial(var,lon,lat,bbox,cmap,cint,clab,ax=None):
     # Add filled coastline
     ax.add_feature(cfeature.COASTLINE,facecolor='k')
     
+    if len(cint) == 1:
+        # Draw contours
+        cs = ax.contourf(lon1,lat,var,cmap=cmap)
     
-    # Draw contours
-    cs = ax.contourf(lon1,lat,var,cint,cmap=cmap)
-
-
-
-    # Negative contours
-    cln = ax.contour(lon1,lat,var,
-                cint[cint<0],
-                linestyles='dashed',
-                colors='k',
-                linewidths=0.5,
-                transform=ccrs.PlateCarree())
-
-    # Positive Contours
-    clp = ax.contour(lon1,lat,var,
-                cint[cint>=0],
-                colors='k',
-                linewidths=0.5,
-                transform=ccrs.PlateCarree())    
-                  
-    #ax.clabel(cln,colors=None)
+    else:
+        # Draw contours
+        cs = ax.contourf(lon1,lat,var,cint,cmap=cmap)
+    
+    
+    
+        # Negative contours
+        cln = ax.contour(lon1,lat,var,
+                    cint[cint<0],
+                    linestyles='dashed',
+                    colors='k',
+                    linewidths=0.5,
+                    transform=ccrs.PlateCarree())
+    
+        # Positive Contours
+        clp = ax.contour(lon1,lat,var,
+                    cint[cint>=0],
+                    colors='k',
+                    linewidths=0.5,
+                    transform=ccrs.PlateCarree())    
+                      
+        #ax.clabel(cln,colors=None)
                                 
                 
     # Add Gridlines
@@ -576,7 +576,10 @@ def plot_AMV_spatial(var,lon,lat,bbox,cmap,cint,clab,ax=None):
     gl.xlabels_top = gl.ylabels_right = False
     gl.xformatter = LONGITUDE_FORMATTER
     gl.yformatter = LATITUDE_FORMATTER
-    bc = plt.colorbar(cs,ticks=clab)
+    if len(clab) == 1:
+        bc = plt.colorbar(cs)
+    else:
+        bc = plt.colorbar(cs,ticks=clab)
     
     
     return ax
@@ -586,9 +589,11 @@ def plot_AMV_spatial(var,lon,lat,bbox,cmap,cint,clab,ax=None):
 # Set up plot
 # Set colormaps and contour intervals
 cmap = cmocean.cm.balance
-#cint = np.arange(-0.50,0.55,0.05)
+cint = np.arange(-4,4.5,0.5)
 #clab = np.arange(-0.50,0.60,0.10)
-cint = np.arange(-1,1.2,0.2)
+#cint = np.arange(-1,1.2,0.2)
+#cint = np.arange(-2,2.5,0.5)
+
 clab = cint
 for mode in hvarmode:
     print(mode)
@@ -605,10 +610,11 @@ for mode in hvarmode:
     
 
 
-
+#%% Plot AMV FFor HADLISST
 # Same plot, but for HadlISST
 cmap = cmocean.cm.balance
-cint = np.arange(-0.50,0.55,0.05)
+#cint = np.arange(-3.5,3.25,0.25)
+cint = np.arange(-4,4.5,0.5)
 #clab = np.arange(-0.50,0.60,0.10)
 #cint = np.arange(-1,1.2,0.2)
 clab = cint
@@ -627,5 +633,13 @@ plt.savefig(outname, bbox_inches="tight",dpi=200)
 
 
 
-
-
+#%% Load Matlab Data for Comparison
+# Load matlab data for debugging
+matlabver = loadmat(datpath+"test30W50N.mat")
+SSTpt = matlabver['SSTpt']
+MLamv = matlabver['AnomSSTfilt_DT']
+fig,ax = plt.subplots(1,1)
+#ax.plot(MLamv)
+#ax.plot(amv)
+ax.plot(SSTpt,color='k')
+ax.plot(vartime,color='b')
