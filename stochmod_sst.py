@@ -6,7 +6,7 @@ stochmod_sst, Python Version
 This is a temporary script file.
 """
 
-from scipy.io import loadmat
+from scipy.io import loadmat, savemat
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import stats
@@ -203,14 +203,10 @@ def stochmod_entrain(t_end,lbd,T0,F,beta,h,kprev):
         
         # Get the month
         m  = t%12
-        m0 = m - 1 
+
         if m == 0:
             m = 12
-            m0= 11
-        if m0 == 0:
-            m0 = 12
         
-    
         # Get the temperature from the previous step
         if t == 1:
             T = T0
@@ -227,43 +223,58 @@ def stochmod_entrain(t_end,lbd,T0,F,beta,h,kprev):
             # If not an entraining month, skip this step
             if beta[m-1] == 0:
                 entrain_term = 0
-            
-            
-            # Calculate Td
-            if linterp == 1:
+            else:
                 
                 
-                # Find # of months since the anomaly was formed
-                k1m = (m - np.floor(kprev[m-1])) % 12
-                k0m = (m - np.floor(kprev[m0-1])) % 12
-                if k1m == 0:
-                    k1m = 12
-                if k0m == 0:
-                    k0m = 12
+                # Calculate Td
+                if linterp == 1:
                     
-                
-                
-                
-                # Get the corresponding index month, shifting back for zero indexing
-                kp1 = int(t - k1m)-1
-                kp0 = int(t - k0m)-1 
 
-                                
-                # Get points (rememebering to shift backwards to account for indexing)
-                Td1 = np.interp(kprev[m-1]-1,[kp1,kp1+1],[temp_ts[kp1],temp_ts[kp1+1]])
-                Td0 = np.interp(kprev[m0-1]-1,[kp0,kp0+1],[temp_ts[kp0],temp_ts[kp0+1]])
+                    
+                    # Get information about the last month
+                    m0 = m - 1
+                    if m0 == 0:
+                        m0 = 12
+                    
+                    
+                    
+                    # Find # of months since the anomaly was formed
+                    k1m = (m - np.floor(kprev[m-1])) % 12
+                    k0m = (m - np.floor(kprev[m0-1])) % 12
+                    if k1m == 0:
+                        k1m = 12
+                    if k0m == 0:
+                        k0m = 12
+                        
+                    
+                    
+                    
+                    # Get the corresponding index month, shifting back for zero indexing
+                    kp1 = int(t - k1m)
+                    kp0 = int(t - k0m)
+    
+                                    
+                    # Get points (rememebering to shift backwards to account for indexing)
+                    # To save computing power, store the Td1 as Td0 for next step?
+                    Td1 = np.interp(kprev[m-1],[kp1,kp1+1],[temp_ts[kp1],temp_ts[kp1+1]])
+                    if m0-1 == h.argmin():
+                        Td0 = Td1
+                    else:        
+                        Td0 = np.interp(kprev[m0-1],[kp0,kp0+1],[temp_ts[kp0],temp_ts[kp0+1]])
+                    
+                elif linterp == 0:
+                    Td1 = mldtemps[round(h.item(m-1))]
+                    Td0 = mldtemps[round(h.item(m0-1))]           
                 
-            elif linterp == 0:
-                Td1 = mldtemps[round(h.item(m-1))]
-                Td0 = mldtemps[round(h.item(m0-1))]           
-            
-            Td = (Td1+Td0)/2
-            
-            # Calculate entrainment term
-            entrain_term = beta[m-1]*Td
-            
-            if debugmode == 1:
-                Td_ts[t] = Td
+                Td = (Td1+Td0)/2
+                
+
+                
+                # Calculate entrainment term
+                entrain_term = beta[m-1]*Td
+                
+                if debugmode == 1:
+                    Td_ts[t] = Td
 
         
     
@@ -307,7 +318,7 @@ def find_kprev(h):
     # Determine if the mixed layer is deepening (true) or shoaling (false)--
     dz = h / np.roll(h,1) 
     dz = dz > 1
-    dz = dz.values
+    #dz = dz.values
     
         
         
@@ -394,7 +405,7 @@ h       = 150 # Effective MLD [m]
 T0      = 0   # Initial Temp [degC]
 
 # Integration Options
-nyr     = 1000    # Number of years to integrate over
+nyr     = 10000    # Number of years to integrate over
 t_end   = 12*nyr      # Timestep to integrate up to
 dt      = 60*60*24*30 # Timestep size (Will be used to multiply lambda)
 usetau  = 0          # Use tau (estimated damping timescale)
@@ -407,7 +418,7 @@ detrendopt = 0  # Option to detrend before calculations
 
 
 # White Noise Options
-genrand   = 1  #
+genrand    = 0   #
 
 #Set Paths
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
@@ -446,6 +457,11 @@ AVG1 = loadmod['AVG1']
 AVG2 = loadmod['AVG2']
 tauall = loadmod['TAUall']
 
+
+loadmld = loadmat(datpath+"mld_lon280_lat005.mat")
+yo_kprev40 = loadmld['kprev']
+yo_mld     = loadmld['MLDall']
+
 #SST1 = loadmod['SST1']
 #SST2 = loadmod['SST2']
 #SST0 = loadmod['SST']
@@ -464,7 +480,7 @@ ds = xr.open_dataset(datpath+mldnc)
 if genrand == 1:
     
     # Mean = 0 , Std = 1, Draw from Gaussian Sample
-    F = np.random.normal(0,1,size=t_end)/4
+    F = np.random.normal(0,1,size=t_end)
     #plt.plot(F)
     
     np.savetxt(datpath+"randts.csv",F,delimiter=",")
@@ -496,8 +512,27 @@ if hvar == 1:
     ensmean = selectmld.mean(('ensemble','nlon','nlat'))/100
     h = np.squeeze(ensmean.to_array())
 
-# Find previous, entraining month
+
+
+
+h = h.values
+#h = np.copy(np.nanmean(yo_mld,1))
 kprev,_ = find_kprev(h)
+
+#hyo = np.copy(np.nanmean(yo_mld,1))
+# Find previous, entraining month
+
+
+
+# Find the difference
+
+
+#kprevkprev40,_ = find_kprev()
+
+# fig,ax=plt.subplots(1,1)
+# ax.plot(np.arange(1,13,1),h,label='used')
+# ax.plot(np.arange(1,13,1),hyo,label='mldyo',color='k')
+
 
 # ----------------
 #%% Calculate Lambda------------------------------------------------------------
@@ -507,7 +542,8 @@ if usetau == 1:
     lbd = np.exp(-1 * 1 / np.mean(tauall, axis=1) )
 else:
     lbd = np.exp(-1 * damping[oid,aid,:] / (rho*cp0*h) * dt)
-    
+
+#lbd = np.exp(-1 * np.ones(12)*15 / (rho*cp0*h) * dt)
 
 # Select which forcing to use
 if useeta == 1:
@@ -521,15 +557,17 @@ if useeta == 1:
 # Compute seasonal correction factor from lambda
 if usetau == 1:
     FAC = np.nan_to_num((1-lbd) / (1 / np.mean(tauall, axis=1)))
+    #FAC = 1
     
     # Compute the integral of the entrainment term, with dt and correction factor
     beta = np.log( h / np.roll(h,1) ) * FAC
 else:
-
-    FAC = np.nan_to_num((1-lbd) / (damping[oid,aid,:]/ (rho*cp0*h)))
-
+    
+    FAC = np.nan_to_num((1-lbd) / (dt*damping[oid,aid,:]/ (rho*cp0*h)))
+    #FAC = 1
+    #FAC = np.nan_to_num((1-lbd) / (dt*np.ones(12)*15/ (rho*cp0*h))) # Testing constant lamda (seems to enhance)
     # Compute the integral of the entrainment term, with dt and correction factor
-    beta = 1/dt * np.log( h / np.roll(h,1) ) * FAC
+    beta = np.log( h / np.roll(h,1) ) * FAC
 
 # Set term to zero where detrainment is occuring
 beta[beta < 0] = 0
@@ -537,17 +575,27 @@ beta[beta < 0] = 0
 
  
 # Calculate lambda that includes entrainment
-
-lbd_entr = lbd * np.exp(-beta)
-
+weh = np.log( h / np.roll(h,1) )
+weh[weh<0] = 0
+lbd_entr = lbd * np.exp(-weh)
+#lbd_entr = lbd * np.exp(-beta) #Using this value increases the correlation
     #lbd_entr = np.exp(-1 * (damping[oid,aid,:] / (rho*cp0*h) * dt+ beta ))
 ## No seasonal correction
 #lbd_entr = np.exp(-1 * (damping[oid,aid,:] / (rho*cp0*h) * dt+ np.log( h / np.roll(h,1) )))
    
 
 
+# fig,ax=plt.subplots(1,1)
+# ax.plot(np.arange(1,13,1),lbdtau1,label="Use Tau")
+# ax.plot(np.arange(1,13,1),lbdtau0,label="No Use Tau")
+# plt.title("Lbd_entr")
+# plt.legend()
 
-
+# fig,ax=plt.subplots(1,1)
+# ax.plot(np.arange(1,13,1),FACtau1,label="Use Tau")
+# ax.plot(np.arange(1,13,1),FACtau0,label="No Use Tau")
+# plt.title("FAC")
+# plt.legend()
 
 
 # ----------
@@ -613,32 +661,56 @@ rs2 = np.transpose(rs2,(1,0))
 lags = np.arange(0,61)
 kmonth = 3;
 
-# # YO's method Currently not working, need to check indexing)
-# def yo_cor(var,lags,t_end,kmonth):
-#     corr_ts = np.zeros(len(lags))
+# YO's method Currently seems to be working)
+def yo_cor(var,lags,t_end,kmonth):
+    corr_ts = np.zeros(len(lags))
     
-#     for i in lags:
-#         lag_yr = int(np.floor((i+kmonth-1)/12))
+    for i in lags:
+        lag_yr = int(np.floor((i+kmonth-1)/12))
 
-#         baserng = np.arange(kmonth-1,t_end-lag_yr*12+2,12)
-#         lagrng  = np.arange(kmonth+i-1,t_end-lag_yr*12+2,12)
-#         if len(baserng) > len(lagrng):
-#             baserng = baserng[:0-lag_yr:]
+        baserng = np.arange(kmonth-1,t_end-lag_yr*12+2,12)
+        lagrng  = np.arange(kmonth+i-1,t_end-lag_yr*12+2,12)
+        print("Doing %i with lagyr %i"% (i,lag_yr))
+        if len(baserng) > len(lagrng):
+            diffsize = len(baserng)-len(lagrng)
+            baserng = baserng[:0-diffsize:]
+            print("Baserng has %i more than Lagrng"%(diffsize))
         
         
-#         print("Doing %i with lagyr %i"% (i,lag_yr))
         
-#         corr_ts[i] = stats.pearsonr(var[baserng],var[lagrng])[0]
+        
+        corr_ts[i] = stats.pearsonr(var[baserng],var[lagrng])[0]
     
+    return corr_ts
+corr_e1=yo_cor(T_entr1,lags,t_end,kmonth)
 
-# corr_e1=yo_cor(T_entr1,lags,t_end,kmonth)
 
-
-#detrendopt = 1
 
 corr_e0 = calc_lagcovar(temps_e0,temps_e0,lags,kmonth,detrendopt)
 corr_e1 = calc_lagcovar(temps_e1,temps_e1,lags,kmonth,detrendopt)
 corr_noise = calc_lagcovar(F_ts,F_ts,lags,kmonth,detrendopt)
+
+
+
+
+
+
+# testing general lag correlation
+# #https://stackoverflow.com/questions/643699/how-can-i-use-numpy-correlate-to-do-autocorrelation
+# import numpy
+    
+# def autocorr5(x,lags):
+#     '''numpy.correlate, non partial'''
+#     mean=x.mean()
+#     var=numpy.var(x)
+#     xp=x-mean
+#     corr=numpy.correlate(xp,xp,'full')[len(x)-1:]/var/len(x)
+
+#     return corr[:len(lags)]
+
+# corr_e1 = autocorr5(T_entr1,lags)
+
+
 
 # --------------
 #%% Make Figures  --------------------------------------------------------------
@@ -671,15 +743,19 @@ plt.savefig(outname, bbox_inches="tight",dpi=200)
 # ***********************
 #%% Autocorrelation Plots v2
 # ***********************
-f1 = plt.figure()
+f1 = plt.figure(figsize=(6.56,4.82))
 ax = plt.axes()
+plt.style.use('ggplot')
+#sns.set('paper','whitegrid','bright')
 
 
 ax.plot(lags,AVG0,color='b',lw=3,label='CESM1 (Fully Coupled)')
 #ax.plot(lags,corr_noise,'k',lw=3,label='Forcing')
 ax.plot(lags,corr_e0,'c',lw=3,label='Stochastic (No-Entrain)')
 ax.plot(lags,corr_e1,'g',lw=3,label='Stochastic (Entrain)')
-ax.legend(prop=dict(size=16))
+ax.plot(lags,corr_noise,color=(0.65,0.65,0.65),lw=3,label='Forcing')
+#ax.legend(prop=dict(size=16))
+ax.legend()
 
 titlestr = 'SST Anomaly Autocorrelation; \n Month: '+monsfull[kmonth-1] + ' | Lon: ' + \
     str(lonf) + ' | Lat: '+ str(latf)
@@ -775,6 +851,38 @@ ax.set(xticks=np.arange(1,13,1),
        title=titlestr )
 outname = outpath+'Damping.png'
 plt.savefig(outname, bbox_inches="tight",dpi=200)
+
+
+
+
+# ******************************
+#%% Plot for a 1/tau comparison
+# ******************************
+
+f3 = plt.figure()
+ax = plt.axes()
+sns.set('paper','whitegrid','bright')
+# Plot each ensemble member, then 1 for labeling
+for e in range(1,np.shape(tauall)[1]):
+    #print(e)
+    ax.plot(np.arange(1,13,1),1/tauall[:,e],color=(.75,.75,.75))
+ln0 = ax.plot(np.arange(1,13,1),1/tauall[:,-1],color=(.75,.75,.75),label=r'$-1/\tau)$ : Indv. Member')
+
+
+ax.plot(np.arange(1,13,1),damping[oid,aid,:] / (rho*cp0*h) * dt,color='r',label=r'$\lambda_{net}$')
+ax.plot(np.arange(1,13,1),1 / np.mean(tauall, axis=1),color='k',label=r'$ 1/\tau (ensemble mean)$')
+ax.legend(loc='best',)
+titlestr = 'Seasonal Values for Damping Term'
+ax.set(xticks=np.arange(1,13,1),
+       xlabel='Month',
+       ylabel='Value ($W/m^{-2}K^{-1}$)',
+       title=titlestr )
+outname = outpath+'Damping.png'
+plt.savefig(outname, bbox_inches="tight",dpi=200)
+
+savetau = 1/(damping[oid,aid,:] / (rho*cp0*h) * dt)
+matdict = {"lambdaastau":savetau}
+savemat(outpath+"lambdaastau.mat",matdict)
 
 
 # **********************
