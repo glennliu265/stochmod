@@ -121,6 +121,8 @@ def stochmod_noentrain(t_end,lbd,T0,F):
         damp_ts = []
         
     
+    # Prepare the entrainment term
+    explbd = np.exp(-lbd)
 
     # Loop for integration period (indexing convention from matlab)
     for t in range(1,t_end):
@@ -140,14 +142,17 @@ def stochmod_noentrain(t_end,lbd,T0,F):
         # Get Noise/Forcing Term
         noise_term = F[t-1]
         
+        # Form the damping term
+        damp_term = explbd[m-1]*T
+        
     
         # Compute the temperature
-        temp_ts[t] = lbd[m-1]*T + noise_term  
+        temp_ts[t] = damp_term + noise_term  
     
         # Save other variables
         if debugmode == 1:
-            noise_ts[t] = noise_term
-            damp_ts[t] = lbd[m-1]*T
+            noise_ts[t] = np.copy(noise_term)
+            damp_ts[t] = np.copy(damp_term)
 
 
     # Quick indexing fix
@@ -174,7 +179,7 @@ Dependencies:
  4) F     : Forcing term
     
 """
-def stochmod_entrain(t_end,lbd,T0,F,beta,h,kprev):
+def stochmod_entrain(t_end,lbd,T0,F,beta,h,kprev,FAC):
     debugmode = 0 # Set to 1 to also save noise,damping,entrain, and Td time series
     linterp   = 1 # Set to 1 to use the kprev variable and linearly interpolate variables
     
@@ -190,7 +195,10 @@ def stochmod_entrain(t_end,lbd,T0,F,beta,h,kprev):
         damp_ts = []
         entrain_ts = []
         Td_ts = []
-        
+    
+    
+    # Prepare the entrainment term
+    explbd = np.exp(-lbd)
     
     # Create MLD arrays
     if linterp == 0:
@@ -271,7 +279,7 @@ def stochmod_entrain(t_end,lbd,T0,F,beta,h,kprev):
 
                 
                 # Calculate entrainment term
-                entrain_term = beta[m-1]*Td
+                entrain_term = beta[m-1]*Td*FAC[m-1]
                 
                 if debugmode == 1:
                     Td_ts[t] = Td
@@ -281,14 +289,17 @@ def stochmod_entrain(t_end,lbd,T0,F,beta,h,kprev):
         # Get Noise/Forcing Term
         noise_term = F[t-1]
         
-    
+        
+        # Form the damping term
+        damp_term = explbd[m-1]*T
+        
         # Compute the temperature
-        temp_ts[t] = lbd[m-1]*T + noise_term + entrain_term
-    
+        temp_ts[t] = damp_term + noise_term + entrain_term
+
         # Save other variables
         if debugmode == 1:
             noise_ts[t] = noise_term
-            damp_ts[t] = lbd[m-1]*T
+            damp_ts[t] = damp_term
             entrain_ts[t] = entrain_term
         
         
@@ -337,7 +348,7 @@ def find_kprev(h):
             im0 = m0-1
         
         # Set values for minimun/maximum -----------------------------------------
-        if h[im] == h.max() or h[im]== h.min():
+        if im == h.argmax() or im== h.argmin():
             print("Ignoring %i, max/min" % m)
             kprev[im] = m
             hout[im] = h[im]
@@ -418,7 +429,7 @@ detrendopt = 0  # Option to detrend before calculations
 
 
 # White Noise Options
-genrand    = 0   #
+genrand    = 1   #
 
 #Set Paths
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
@@ -438,8 +449,6 @@ monsfull=('January','Febuary','March','April','May','June','July','August','Sept
 ## ------------ Script Start -------------------------------------------------
 
 #%% Load Variables -------------------------------------------------------------
-
-
 
 # Load damping variables
 damppath = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/'
@@ -480,7 +489,7 @@ ds = xr.open_dataset(datpath+mldnc)
 if genrand == 1:
     
     # Mean = 0 , Std = 1, Draw from Gaussian Sample
-    F = np.random.normal(0,1,size=t_end)
+    F = np.random.normal(0,1,size=t_end)/4
     #plt.plot(F)
     
     np.savetxt(datpath+"randts.csv",F,delimiter=",")
@@ -508,15 +517,32 @@ if hvar == 1:
     # Find the specified point on curvilinear grid and average values
     selectmld = ds.where((lonfc-0.5 < ds.TLONG) & (ds.TLONG < lonfc+0.5)
                         & (latf-0.5 < ds.TLAT) & (ds.TLAT < latf+0.5),drop=True)
-    # Select accordingly 
-    ensmean = selectmld.mean(('ensemble','nlon','nlat'))/100
-    h = np.squeeze(ensmean.to_array())
+    
+    
+    
+    # Output mean of points
+    pmean = selectmld.mean(('nlon','nlat'))/100
+    h = np.squeeze(pmean.to_array())
+    
+    
+    # Take ensemble mean of selection
+    #ensmean = selectmld.mean(('ensemble','nlon','nlat'))/100
+    #h = np.squeeze(ensmean.to_array())
 
-
-
-
+# Convert to np array 
 h = h.values
+
+
+#and take the ensemble average
+h = np.squeeze(np.nanmean(h,0))
+
+
+
+# DDD use YOs calculated mld values
 #h = np.copy(np.nanmean(yo_mld,1))
+#h = np.squeeze(yo_mld[:,-1])
+
+
 kprev,_ = find_kprev(h)
 
 #hyo = np.copy(np.nanmean(yo_mld,1))
@@ -527,7 +553,7 @@ kprev,_ = find_kprev(h)
 # Find the difference
 
 
-#kprevkprev40,_ = find_kprev()
+kprev40,_ = find_kprev(yo_mld[:,39])
 
 # fig,ax=plt.subplots(1,1)
 # ax.plot(np.arange(1,13,1),h,label='used')
@@ -538,12 +564,37 @@ kprev,_ = find_kprev(h)
 #%% Calculate Lambda------------------------------------------------------------
 # ----------------
 
-if usetau == 1:
-    lbd = np.exp(-1 * 1 / np.mean(tauall, axis=1) )
-else:
-    lbd = np.exp(-1 * damping[oid,aid,:] / (rho*cp0*h) * dt)
 
-#lbd = np.exp(-1 * np.ones(12)*15 / (rho*cp0*h) * dt)
+# Calculate Entrainment Portion
+beta = np.log( h / np.roll(h,1) )
+beta[beta<0] = 0
+
+
+if usetau == 1:
+    lbd = 1/np.mean(tauall,axis=1)
+    
+    # DDD try last ensemble
+    #lbd = 1 / tauall[:,39]
+
+else:
+    lbd = damping[oid,aid,:] / (rho*cp0*h) * dt
+
+lbd_entr = lbd + beta
+
+
+## The old method included the exponentiation directly in the lambda term
+# if usetau == 1:
+#     lbd = np.exp(-1 * 1 / np.mean(tauall, axis=1) )
+    
+    
+    
+#     # For debugging use the value for the last ensemble memner
+#     lbd = np.exp(-1 * 1 / tauall[:,-1])
+    
+# else:
+#     lbd = np.exp(-1 * damping[oid,aid,:] / (rho*cp0*h) * dt)
+
+# #lbd = np.exp(-1 * np.ones(12)*15 / (rho*cp0*h) * dt)
 
 # Select which forcing to use
 if useeta == 1:
@@ -554,30 +605,35 @@ if useeta == 1:
 #%% Prepare Entrainment Terms --------------------------------------------------
 # -------------------------
 
-# Compute seasonal correction factor from lambda
-if usetau == 1:
-    FAC = np.nan_to_num((1-lbd) / (1 / np.mean(tauall, axis=1)))
-    #FAC = 1
+
+# Calculate Reduction Factor
+FAC      = (1-np.exp(-lbd))/lbd # I dont think this will be used...
+FAC_entr = (1-np.exp(-lbd_entr))/lbd_entr
+
+
+# # Compute seasonal correction factor from lambda
+# if usetau == 1:
+#     FAC = np.nan_to_num((1-lbd) / (1 / np.mean(tauall, axis=1)))
+#     #FAC = 1
     
-    # Compute the integral of the entrainment term, with dt and correction factor
-    beta = np.log( h / np.roll(h,1) ) * FAC
-else:
+#     # Compute the integral of the entrainment term, with dt and correction factor
+#     beta = np.log( h / np.roll(h,1) ) * FAC
+# else:
     
-    FAC = np.nan_to_num((1-lbd) / (dt*damping[oid,aid,:]/ (rho*cp0*h)))
-    #FAC = 1
-    #FAC = np.nan_to_num((1-lbd) / (dt*np.ones(12)*15/ (rho*cp0*h))) # Testing constant lamda (seems to enhance)
-    # Compute the integral of the entrainment term, with dt and correction factor
-    beta = np.log( h / np.roll(h,1) ) * FAC
+#     FAC = np.nan_to_num((1-lbd) / (dt*damping[oid,aid,:]/ (rho*cp0*h)))
+#     #FAC = 1
+#     #FAC = np.nan_to_num((1-lbd) / (dt*np.ones(12)*15/ (rho*cp0*h))) # Testing constant lamda (seems to enhance)
+#     # Compute the integral of the entrainment term, with dt and correction factor
+#     beta = np.log( h / np.roll(h,1) ) * FAC
 
-# Set term to zero where detrainment is occuring
-beta[beta < 0] = 0
+# # Set term to zero where detrainment is occuring
+# beta[beta < 0] = 0
 
 
- 
-# Calculate lambda that includes entrainment
-weh = np.log( h / np.roll(h,1) )
-weh[weh<0] = 0
-lbd_entr = lbd * np.exp(-weh)
+#  # Calculate lambda that includes entrainment
+
+# lbd_entr = lbd * np.exp(-weh)
+
 #lbd_entr = lbd * np.exp(-beta) #Using this value increases the correlation
     #lbd_entr = np.exp(-1 * (damping[oid,aid,:] / (rho*cp0*h) * dt+ beta ))
 ## No seasonal correction
@@ -615,7 +671,7 @@ print(tprint)
 # Run model with entrainment
 start = time.time()
 #temp_ts,noise_ts,damp_ts,entrain_ts,Td_ts=stochmod_entrain(t_end,lbd_entr,T0,F,beta,h)
-T_entr1,_,_,_,_=stochmod_entrain(t_end,lbd_entr,T0,F,beta,h,kprev)
+T_entr1,_,_,_,_=stochmod_entrain(t_end,lbd_entr,T0,F,beta,h,kprev,FAC_entr)
 elapsed = time.time() - start
 tprint = "Entrain Model ran in %.2fs" % (elapsed)
 print(tprint)
@@ -659,33 +715,33 @@ rs2 = np.transpose(rs2,(1,0))
 
 
 lags = np.arange(0,61)
-kmonth = 3;
+kmonth = h.argmax()+1;
 
-# YO's method Currently seems to be working)
-def yo_cor(var,lags,t_end,kmonth):
-    corr_ts = np.zeros(len(lags))
+# # YO's method Currently seems to be working)
+# def yo_cor(var,lags,t_end,kmonth):
+#     corr_ts = np.zeros(len(lags))
     
-    for i in lags:
-        lag_yr = int(np.floor((i+kmonth-1)/12))
+#     for i in lags:
+#         lag_yr = int(np.floor((i+kmonth-1)/12))
 
-        baserng = np.arange(kmonth-1,t_end-lag_yr*12+2,12)
-        lagrng  = np.arange(kmonth+i-1,t_end-lag_yr*12+2,12)
-        print("Doing %i with lagyr %i"% (i,lag_yr))
-        if len(baserng) > len(lagrng):
-            diffsize = len(baserng)-len(lagrng)
-            baserng = baserng[:0-diffsize:]
-            print("Baserng has %i more than Lagrng"%(diffsize))
+#         baserng = np.arange(kmonth-1,t_end-lag_yr*12+2,12)
+#         lagrng  = np.arange(kmonth+i-1,t_end-lag_yr*12+2,12)
+#         print("Doing %i with lagyr %i"% (i,lag_yr))
+#         if len(baserng) > len(lagrng):
+#             diffsize = len(baserng)-len(lagrng)
+#             baserng = baserng[:0-diffsize:]
+#             print("Baserng has %i more than Lagrng"%(diffsize))
         
         
         
         
-        corr_ts[i] = stats.pearsonr(var[baserng],var[lagrng])[0]
+#         corr_ts[i] = stats.pearsonr(var[baserng],var[lagrng])[0]
     
-    return corr_ts
-corr_e1=yo_cor(T_entr1,lags,t_end,kmonth)
+#     return corr_ts
+# corr_e1=yo_cor(T_entr1,lags,t_end,kmonth)
 
 
-
+#detrendopt = 1
 corr_e0 = calc_lagcovar(temps_e0,temps_e0,lags,kmonth,detrendopt)
 corr_e1 = calc_lagcovar(temps_e1,temps_e1,lags,kmonth,detrendopt)
 corr_noise = calc_lagcovar(F_ts,F_ts,lags,kmonth,detrendopt)
