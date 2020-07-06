@@ -480,6 +480,8 @@ yo_mld     = loadmld['MLDall']
 mldnc = "HMXL_HTR_clim.nc"
 ds = xr.open_dataset(datpath+mldnc)
 
+
+
 # ----------------------------
 #%% Generate White Noise Forcing------------------------------------------------
 # ----------------------------
@@ -508,56 +510,69 @@ else:
 oid = np.abs(LON-lonf).argmin()
 aid = np.abs(LAT-latf).argmin()
 
-# Create seasonally varying h value
-if hvar == 1:
+
+
+def getpt_pop(lonf,latf,ds,searchdeg=0.5,returnarray=1):
+    """ Quick script to read in a xr.Dataset (ds)
+        and return the value for the point specified by lonf,latf
+        
+    
+    """
+    
+    
     # Do same for curivilinear grid
     if lonf < 0:
         lonfc = lonf + 360 # Convert to 0-360 if using negative coordinates
-    
+        
     # Find the specified point on curvilinear grid and average values
-    selectmld = ds.where((lonfc-0.5 < ds.TLONG) & (ds.TLONG < lonfc+0.5)
-                        & (latf-0.5 < ds.TLAT) & (ds.TLAT < latf+0.5),drop=True)
+    selectmld = ds.where((lonfc-searchdeg < ds.TLONG) & (ds.TLONG < lonfc+searchdeg)
+                    & (latf-searchdeg < ds.TLAT) & (ds.TLAT < latf+searchdeg),drop=True)
     
+    pmean = selectmld.mean(('nlon','nlat'))
     
+    if returnarray ==1:
+        h = np.squeeze(pmean.to_array())
+        return h
+    else:
+        return pmean
     
-    # Output mean of points
-    pmean = selectmld.mean(('nlon','nlat'))/100
-    h = np.squeeze(pmean.to_array())
+
+
+
+
+if hvar == 1:
     
+    # Get value at the point for all ensemble members 
+    h = getpt_pop(lonf,latf,ds)
     
-    # Take ensemble mean of selection
-    #ensmean = selectmld.mean(('ensemble','nlon','nlat'))/100
-    #h = np.squeeze(ensmean.to_array())
-
-# Convert to np array 
-h = h.values
+    # Convert to meters and take ensemble average
+    h = np.nanmean(h,axis=0)/100
 
 
-#and take the ensemble average
-h = np.squeeze(np.nanmean(h,0))
-
-
-
-# DDD use YOs calculated mld values
-#h = np.copy(np.nanmean(yo_mld,1))
-#h = np.squeeze(yo_mld[:,-1])
-
-
+# Calculate kprev values
 kprev,_ = find_kprev(h)
 
-#hyo = np.copy(np.nanmean(yo_mld,1))
-# Find previous, entraining month
 
 
 
-# Find the difference
+# # DDD use YOs calculated mld values
+# #h = np.copy(np.nanmean(yo_mld,1))
+# #h = np.squeeze(yo_mld[:,-1])
 
 
-kprev40,_ = find_kprev(yo_mld[:,39])
 
-# fig,ax=plt.subplots(1,1)
-# ax.plot(np.arange(1,13,1),h,label='used')
-# ax.plot(np.arange(1,13,1),hyo,label='mldyo',color='k')
+
+hyo = np.copy(np.nanmean(yo_mld,1))
+# # Find previous, entraining month
+
+# # Find the difference
+
+# kprev40,_ = find_kprev(yo_mld[:,39])
+
+fig,ax=plt.subplots(1,1)
+ax.plot(np.arange(1,13,1),h,label='used2')
+#ax.plot(np.arange(1,13,1),h1clim,label='used1')
+ax.plot(np.arange(1,13,1),hyo,label='mldyo',color='k')
 
 
 # ----------------
@@ -766,6 +781,23 @@ corr_noise = calc_lagcovar(F_ts,F_ts,lags,kmonth,detrendopt)
 
 # corr_e1 = autocorr5(T_entr1,lags)
 
+#
+#%% Do some Power Spectral Analysis...
+from scipy import signal
+fs = 1/(3600*24*30) # Sampling Frequency in seconds
+freqs,pxx = signal.periodogram(T_entr1,fs)
+                              
+plt.plot(freqs, pxx)
+#plt.ylim([1e-7, 1e2])
+plt.xlabel('frequency [Hz]')
+plt.ylabel('PSD [degC**2/Hz]')
+plt.xscale('log')
+#plt.yscale('log')
+#plt.ylim([1e1,1e6])
+xtk     = [fs/1200,fs/120,fs/12,fs,fs*30]
+xtklabel = ['century','decade','year','mon',"day"]
+plt.xticks(xtk,xtklabel)
+plt.show()
 
 
 # --------------
