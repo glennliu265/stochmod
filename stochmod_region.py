@@ -6,6 +6,7 @@ stochmod_sst, Python Version
 This is a temporary script file.
 """
 
+
 from scipy.io import loadmat
 import numpy as np
 import matplotlib.pyplot as plt
@@ -14,7 +15,15 @@ import seaborn as sns
 import xarray as xr
 import time
 
-# Functions --------------------------------------------------
+from cartopy import config
+import cartopy.feature as cfeature
+import cartopy.crs as ccrs
+from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+import cmocean
+import matplotlib.ticker as mticker
+from cartopy.util import add_cyclic_point
+
+# %% Functions --------------------------------------------------
 # Function to calculate lag correlation
 # Dependencies: numpy, scipy
 def calc_lagcovar(var1,var2,lags,basemonth,detrendopt):
@@ -172,6 +181,7 @@ Dependencies:
  4) F     : Forcing term
     
 """
+
 def stochmod_entrain(t_end,lbd,T0,F,beta,h,kprev):
     debugmode = 0 # Set to 1 to also save noise,damping,entrain, and Td time series
     linterp   = 1 # Set to 1 to use the kprev variable and linearly interpolate variables
@@ -198,15 +208,13 @@ def stochmod_entrain(t_end,lbd,T0,F,beta,h,kprev):
     # Loop for integration period (indexing convention from matlab)
     for t in range(1,t_end):
         
+        
         # Get the month
         m  = t%12
-        m0 = m - 1 
+
         if m == 0:
             m = 12
-            m0= 11
         
-        
-    
         # Get the temperature from the previous step
         if t == 1:
             T = T0
@@ -220,42 +228,61 @@ def stochmod_entrain(t_end,lbd,T0,F,beta,h,kprev):
             entrain_term = 0
         else:
             
-            # Calculate Td
-            if linterp == 1:
+            # If not an entraining month, skip this step
+            if beta[m-1] == 0:
+                entrain_term = 0
+            else:
                 
                 
-                
-                # Find # of months since the anomaly was formed
-                k1m = (m - np.floor(kprev[m-1])) % 12
-                k0m = (m - np.floor(kprev[m0-1])) % 12
-                if k1m == 0:
-                    k1m = 12
-                if k0m == 0:
-                    k0m = 12
+                # Calculate Td
+                if linterp == 1:
                     
-                
-                
-                
-                # Get the corresponding index
-                kp1 = int(t - k1m)
-                kp0 = int(t - k0m) 
 
-                                
+                    
+                    # Get information about the last month
+                    m0 = m - 1
+                    if m0 == 0:
+                        m0 = 12
+                    
+                    
+                    
+                    # Find # of months since the anomaly was formed
+                    k1m = (m - np.floor(kprev[m-1])) % 12
+                    k0m = (m - np.floor(kprev[m0-1])) % 12
+                    if k1m == 0:
+                        k1m = 12
+                    if k0m == 0:
+                        k0m = 12
+                        
+                    
+                    
+                    
+                    # Get the corresponding index month, shifting back for zero indexing
+                    kp1 = int(t - k1m)
+                    kp0 = int(t - k0m)
+    
+                                    
+                    # Get points (rememebering to shift backwards to account for indexing)
+                    # To save computing power, store the Td1 as Td0 for next step?
+                    Td1 = np.interp(kprev[m-1],[kp1,kp1+1],[temp_ts[kp1],temp_ts[kp1+1]])
+                    if m0-1 == h.argmin():
+                        Td0 = Td1
+                    else:        
+                        Td0 = np.interp(kprev[m0-1],[kp0,kp0+1],[temp_ts[kp0],temp_ts[kp0+1]])
+                    
+                elif linterp == 0:
+                    Td1 = mldtemps[round(h.item(m-1))]
+                    Td0 = mldtemps[round(h.item(m0-1))]           
                 
-                Td1 = np.interp(kprev[m-1] ,[kp1,kp1+1],[temp_ts[kp1],temp_ts[kp1+1]])
-                Td0 = np.interp(kprev[m0-1],[kp0,kp0+1],[temp_ts[kp0],temp_ts[kp0+1]])
+                Td = (Td1+Td0)/2
                 
-            elif linterp == 0:
-                Td1 = mldtemps[round(h.item(m-1))]
-                Td0 = mldtemps[round(h.item(m0-1))]           
-            
-            Td = (Td1+Td0)/2
-            
-            # Calculate entrainment term
-            entrain_term = beta[m-1]*Td
-            
-            if debugmode == 1:
-                Td_ts[t] = Td
+
+                
+                # Calculate entrainment term
+                entrain_term = beta[m-1]*Td
+                
+                if debugmode == 1:
+                    Td_ts[t] = Td
 
         
     
@@ -285,7 +312,6 @@ def stochmod_entrain(t_end,lbd,T0,F,beta,h,kprev):
         entrain_ts = np.delete(entrain_ts,0)
     
     return temp_ts,noise_ts,damp_ts,entrain_ts,Td_ts
-
 
 
 """
@@ -398,7 +424,6 @@ Dependencies:
 #         entrain_ts = np.delete(entrain_ts,0)
     
 #     return temp_ts,noise_ts,damp_ts,entrain_ts,Td_ts
-
 
 
 def find_kprev_2d(h,lonr,latr):
@@ -519,14 +544,13 @@ def find_kprev(h):
             m0 = 12
             im0 = m0-1
         
-        # Set values for minimun/maximum -----------------------------------------
+        # Set values for minimum/maximum -----------------------------------------
         if h[im] == np.nanmax(h) or h[im]== np.nanmin(h):
             if printst == 1:
                 print("Ignoring %i, max/min" % m)
             kprev[im] = m
             hout[im] = h[im]
             continue
-        
     
         
         # Ignore detrainment months
@@ -576,7 +600,7 @@ def find_kprev(h):
 
     
 
-# User Edits -----------------------------------------------------------------           
+#%% User Edits -----------------------------------------------------------------           
 
 # Set Point and month
 kmon    = 3
@@ -599,13 +623,9 @@ usesst  = 0
 hvar    = 1           # seasonally varying h
 funiform = 1        # Spatially uniform forcing
 
-
 # hvarmode
-hvarmode = 1 # hvar modes (0 - fixe mld, 1 - effective mld, 2 - seasonally varying mld)
+hvarmode = 2 # hvar modes (0 - fixe mld, 1 - effective mld, 2 - seasonally varying mld)
 hfix     = 50 # Fixed MLD (meters)
-
-
-
 
 # Region options
 lonW = -80
@@ -637,7 +657,7 @@ monsfull=('January','Febuary','March','April','May','June','July','August','Sept
 
 
 # --------------
-# Load Variables -------------------------------------------------------------
+# %% Load Variables -------------------------------------------------------------
 # --------------
 
 
@@ -655,7 +675,7 @@ ds = xr.open_dataset(datpath+mldnc)
 
 
 # ------------------
-# Restrict to region ---------------------------------------------------------
+# %% Restrict to region ---------------------------------------------------------
 # ------------------
 
 
@@ -685,7 +705,7 @@ np.save(datpath+"lon.npy",lonr)
 
 
 # ----------------------------
-# Generate White Noise Forcing------------------------------------------------
+# %% Generate White Noise Forcing------------------------------------------------
 # ----------------------------
 
 # Generate Random White Noise Series (or load existing)
@@ -707,7 +727,7 @@ else:
     F = np.load(datpath+"randts_2d.npy")
 
 # ---------------------------------------
-# Calc Ens Avg Mixed Layer Seasonal Cycle-------------------------------------
+# %% Calc Ens Avg Mixed Layer Seasonal Cycle-------------------------------------
 # ---------------------------------------
 
 # Preallocate and specify search tolerance 
@@ -783,12 +803,14 @@ for o in range(0,lonsize):
 print("Finished in %f seconds" % (time.time()-start))
 
 # Quick visualization to check
-plt.contourf(lonr,latr,np.transpose(np.squeeze(hclim[:,:,5])))
-plt.contourf(lonr,latr,np.transpose(np.squeeze(kprev[:,:,5])))
+cs = plt.contourf(lonr,latr,np.transpose(np.squeeze(hclim[:,:,2])),cmap = cmocean.cm.balance)
+plt.colorbar(cs)
+
+#plt.contourf(lonr,latr,np.transpose(np.squeeze(kprev[:,:,5])))
 
 
 # ----------------
-# Calculate Lambda------------------------------------------------------------
+# %% Calculate Lambda------------------------------------------------------------
 # ----------------
 
 if hvarmode == 0:
@@ -811,7 +833,7 @@ elif hvarmode == 2:
     
 
 # -------------------------
-# Prepare Entrainment Terms --------------------------------------------------
+# %% Prepare Entrainment Terms --------------------------------------------------
 # -------------------------
 
 
@@ -831,8 +853,11 @@ beta[beta < 0] = 0
 
  
 # Calculate lambda that includes entrainment
+weh = np.log( hclim / np.roll(hclim,1,2))
+weh[weh<0] = 0
+lbd_entr = lbd * np.exp(-weh)
 
-lbd_entr = lbd * np.exp(-beta)
+#lbd_entr = lbd * np.exp(-beta)
 
     #lbd_entr = np.exp(-1 * (damping[oid,aid,:] / (rho*cp0*h) * dt+ beta ))
 ## No seasonal correction
@@ -840,7 +865,7 @@ lbd_entr = lbd * np.exp(-beta)
    
 
 # ----------
-# RUN MODELS -----------------------------------------------------------------
+# %%RUN MODELS -----------------------------------------------------------------
 # ----------
 
 # Run Model Without Entrainment
@@ -882,7 +907,7 @@ print(tprint)
         
 
 
-# Run Model With Entrainment
+# %% Run Model With Entrainment
 start = time.time()
 T_entr1 = np.zeros((lonsize,latsize,t_end))
 icount = 0
@@ -907,7 +932,7 @@ for o in range(0,lonsize):
             #print(msg)
             T_entr1[o,a,:] = np.zeros(t_end)*np.nan
         else:
-            T_entr1[o,a,:],_,_,_,_ = stochmod_entrain(t_end,lbd[o,a,:],T0,F[o,a,:],beta[o,a,:],hclim[o,a,:],kprev[o,a,:])
+            T_entr1[o,a,:],_,_,_,_ = stochmod_entrain(t_end,lbd_entr[o,a,:],T0,F[o,a,:],beta[o,a,:],hclim[o,a,:],kprev[o,a,:])
         
         icount += 1
         msg = '\rCompleted Entrain Run for %i of %i points' % (icount,lonsize*latsize)
@@ -920,8 +945,114 @@ print(tprint)
         
 
 
-# save output
+# %% save output
 np.save(datpath+"stoch_output_1000yr_entrain1_hvar%i.npy"%(hvarmode),T_entr1)
 np.save(datpath+"stoch_output_1000yr_entrain0_hvar%i.npy"%(hvarmode),T_entr0)
-#np.save(datpath+"stoch_output_1000yr_Forcing_hvar%i.npy",F)
+np.save(datpath+"stoch_output_1000yr_Forcing_hvar%i.npy",F)
 
+
+#%% Find and calculate autocorrelation at a single point
+# Set Point and month
+lonf    = -30
+latf    = 50
+kmon    = 3
+lags    = np.arange(0,61,1)
+
+
+
+# Load data if it hasnt been
+loaddata = 1
+if loaddata == 1:
+    dataname = datpath+"stoch_output_1000yr_entrain1_hvar2.npy"
+    noentrain = np.load(dataname)
+
+# Find Lat/Lon (can write this into a function)
+klon = np.abs(lonr - lonf).argmin()
+klat = np.abs(latr - latf).argmin()
+msg1 = "For Longitude %.02f, I found %.02f" % (lonf,lonr[klon])
+msg2 = "For Latitude %.02f, I found %.02f" % (latf,latr[klat])
+print(msg1)
+print(msg2)
+
+#Get data for a single point
+hcycle_pt = hclim[klon,klat,:]
+
+temp_ts = noentrain[klon,klat,:]
+temp_ts = np.reshape(temp_ts,(int(np.ceil(len(temp_ts)/12)),12))
+temp_ts = np.transpose(temp_ts,(1,0))
+
+# Calculate Lag Autocorrelation
+corr_ts = calc_lagcovar(temp_ts,temp_ts,lags,kmon,0)
+    
+    
+# Plot Correlation
+f1 = plt.figure()
+ax = plt.axes()
+plt.style.use('seaborn')
+ax.plot(lags,corr_ts,'c',lw=3,label='Stochastic (No-Entrain)')
+ax.legend(prop=dict(size=16))
+titlestr = 'SST Anomaly Autocorrelation; \n Month: '+monsfull[kmon-1] + ' | Lon: ' + \
+    str(lonf) + ' | Lat: '+ str(latf)
+    
+ax.set_ylabel('Correlation',fontsize=14)
+ax.set_ylim(-0.2,1.1)
+ax.set_xlabel('Lag (months)',fontsize=14)
+ax.set_title(titlestr,fontsize=20)
+
+# Plot Seasonal MLD
+fmx = plt.figure()
+ax = plt.axes()
+ax.plot(range(1,13),hcycle_pt)
+ax.legend()
+ax.set(xlim=(1,12),ylim=(0,200),xlabel='Months',ylabel='MLD(m)')
+
+
+
+# Plot a map of the climatological MLD
+mon = 12
+cmap = cmocean.cm.balance
+bbox = [-75,5,0,65]
+hplot = hclim[:,:,mon-1]
+var = np.transpose(np.copy(hplot),(1,0))
+
+
+# Add cyclic point to avoid the gap
+var,lon1 = add_cyclic_point(var,coord=lonr)
+
+
+# Set up projections and extent
+ax = plt.axes(projection=ccrs.PlateCarree())
+ax.set_extent(bbox)
+
+# Add filled coastline
+ax.add_feature(cfeature.COASTLINE,facecolor='k')
+
+
+# Draw contours
+cs = ax.contourf(lon1,latr,var,cmap=cmap)            
+# Add Gridlines
+gl = ax.gridlines(draw_labels=True,linewidth=0.75,color='gray',linestyle=':')
+gl.xlabels_top = gl.ylabels_right = False
+gl.xformatter = LONGITUDE_FORMATTER
+gl.yformatter = LATITUDE_FORMATTER
+bc = plt.colorbar(cs)
+
+
+
+#%% Attempt at animation....
+
+import matplotlib.animation as animation
+
+animationname = outpath + "test.mp4"
+
+
+fig,ax = make_figure()
+
+frames    = t_end # Number of frames
+min_value =# Lowest Value
+max_value = # Highest Value
+
+def draw(frame,add_colorbar):
+    grid = 
+
+    
