@@ -128,6 +128,8 @@ def stochmod_noentrain(t_end,lbd,T0,F):
         damp_ts = []
         
     
+    # Prepare the entrainment term
+    explbd = np.exp(-lbd)
 
     # Loop for integration period (indexing convention from matlab)
     for t in range(1,t_end):
@@ -147,14 +149,17 @@ def stochmod_noentrain(t_end,lbd,T0,F):
         # Get Noise/Forcing Term
         noise_term = F[t-1]
         
+        # Form the damping term
+        damp_term = explbd[m-1]*T
+        
     
         # Compute the temperature
-        temp_ts[t] = lbd[m-1]*T + noise_term  
+        temp_ts[t] = damp_term + noise_term  
     
         # Save other variables
         if debugmode == 1:
-            noise_ts[t] = noise_term
-            damp_ts[t] = lbd[m-1]*T
+            noise_ts[t] = np.copy(noise_term)
+            damp_ts[t] = np.copy(damp_term)
 
 
     # Quick indexing fix
@@ -182,7 +187,7 @@ Dependencies:
     
 """
 
-def stochmod_entrain(t_end,lbd,T0,F,beta,h,kprev):
+def stochmod_entrain(t_end,lbd,T0,F,beta,h,kprev,FAC):
     debugmode = 0 # Set to 1 to also save noise,damping,entrain, and Td time series
     linterp   = 1 # Set to 1 to use the kprev variable and linearly interpolate variables
     
@@ -198,7 +203,10 @@ def stochmod_entrain(t_end,lbd,T0,F,beta,h,kprev):
         damp_ts = []
         entrain_ts = []
         Td_ts = []
-        
+    
+    
+    # Prepare the entrainment term
+    explbd = np.exp(-lbd)
     
     # Create MLD arrays
     if linterp == 0:
@@ -279,7 +287,7 @@ def stochmod_entrain(t_end,lbd,T0,F,beta,h,kprev):
 
                 
                 # Calculate entrainment term
-                entrain_term = beta[m-1]*Td
+                entrain_term = beta[m-1]*Td*FAC[m-1]
                 
                 if debugmode == 1:
                     Td_ts[t] = Td
@@ -289,14 +297,17 @@ def stochmod_entrain(t_end,lbd,T0,F,beta,h,kprev):
         # Get Noise/Forcing Term
         noise_term = F[t-1]
         
-    
+        
+        # Form the damping term
+        damp_term = explbd[m-1]*T
+        
         # Compute the temperature
-        temp_ts[t] = lbd[m-1]*T + noise_term + entrain_term
-    
+        temp_ts[t] = damp_term + noise_term + entrain_term
+
         # Save other variables
         if debugmode == 1:
             noise_ts[t] = noise_term
-            damp_ts[t] = lbd[m-1]*T
+            damp_ts[t] = damp_term
             entrain_ts[t] = entrain_term
         
         
@@ -329,193 +340,10 @@ Dependencies:
  4) F     : [m x n x t ]  Forcing term
     
 """
-# def stochmod_entrain(t_end,lbd,T0,F,*args):
-    
-    
-#     # Set entrain mode if args is long
-#     entrain = [0]
-#     if len(args) > 0:
-#         entrain[0] = 1
-#         beta  = args[0]
-#         h     = args[1]
-#         kprev = args[2]
-        
-
-#     debugmode = 0 # Set to 1 to also save noise,damping,entrain, and Td time series
- 
-#     # Preallocate
-#     temp_ts = np.zeros(F.shape)
-
-#     # Loop for integration period (indexing convention from matlab)
-#     for t in range(1,t_end):
-        
-#         # Get the month
-#         m  = t%12
-#         m0 = m - 1 
-#         if m == 0:
-#             m = 12
-#             m0= 11
-        
-        
-    
-#         # Get the temperature from the previous step
-#         if t == 1:
-#             T = T0
-#         else:
-#             T = temp_ts[:,:,t-1]
-            
-        
-#         # Calculate entrainment term
-#         if t<13 or entrain[0]==0:
-#             entrain_term = np.zero((lonsize,latsize))
-#         else:
-            
-#             # Calculate Td
-#             if linterp == 1:
-                            
-#                 # Find # of months since the anomaly was formed
-#                 k1m = (m - np.floor(kprev[:,:,m-1])) % 12
-#                 k0m = (m - np.floor(kprev[:,:,m0-1])) % 12
-                
-#                 # Get the corresponding index
-#                 kp1 = (t - k1m).astype(int)
-#                 kp0 = (t - k0m).astype(int)
-                
-#                 ## AM STUCK HERE..... How to vectorize this? 
-#                 # Perform Interpolation
-#                 Td1 = np.interp(kprev[m-1] ,[kp1,kp1+1],[temp_ts[kp1],temp_ts[kp1+1]])
-#                 Td0 = np.interp(kprev[m0-1],[kp0,kp0+1],[temp_ts[kp0],temp_ts[kp0+1]])
-                
-      
-            
-#             Td = (Td1+Td0)/2
-            
-#             # Calculate entrainment term
-#             entrain_term = beta[m-1]*Td
-            
-#             if debugmode == 1:
-#                 Td_ts[t] = Td
-
-        
-    
-#         # Get Noise/Forcing Term
-#         noise_term = F[t-1]
-        
-    
-#         # Compute the temperature
-#         temp_ts[t] = lbd[m-1]*T + noise_term + entrain_term
-    
-#         # Save other variables
-#         if debugmode == 1:
-#             noise_ts[t] = noise_term
-#             damp_ts[t] = lbd[m-1]*T
-#             entrain_ts[t] = entrain_term
-        
-        
-#         # Set mixed layer depth tempertures
-#         if linterp == 0:
-#             mldtemps[mlddepths<=h.item(m-1)] = temp_ts[t]
-
-#     # Quick indexing fix
-#     temp_ts[0] = T0
-#     if debugmode == 1:
-#         noise_ts = np.delete(noise_ts,0)
-#         damp_ts = np.delete(damp_ts,0)
-#         entrain_ts = np.delete(entrain_ts,0)
-    
-#     return temp_ts,noise_ts,damp_ts,entrain_ts,Td_ts
-
-
-def find_kprev_2d(h,lonr,latr):
-    
-    lonsize = len(lonr)
-    latsize = len(latr)
-    
-    
-    # Preallocate
-    kprev = np.zeros((lonsize,latsize,12))
-    hout = np.zeros((lonsize,latsize,12))
-                                                                                                                                                                                                                                                                    
-    # Month Array
-    monthx = np.arange(1,13,1)  
-    
-    # Determine if the mixed layer is deepening (true) or shoaling (false)--
-    dz = h / np.roll(h,shift=1,axis=2) 
-    dz = dz > 1
-    #dz = dz.values
-    
-        
-        
-        
-    for m in monthx:
-        
-        
-        # Quick Indexing Fixes ------------------
-        im = m-1 # Month Index (Pythonic)
-        m0 = m-1 # Previous month
-        im0 = m0-1 # M-1 Index
-        
-        # Fix settings for january
-        if m0 < 1:
-            m0 = 12
-            im0 = m0-1
-        
-        # Set values for minimun/maximum -----------------------------------------
-        if h[im] == h.max() or h[im]== h.min():
-            print("Ignoring %i, max/min" % m)
-            kprev[im] = m
-            hout[im] = h[im]
-            continue
-        
-    
-        
-        # Ignore detrainment months
-        if dz[im] == False:
-            print("Ignoring %i, shoaling month" % m)
-            continue
-        
-        # For all other entraining months.., search backwards
-        findmld = h[im]  # Target MLD   
-        hdiff = h - findmld
-          
-        searchflag = 0
-        ifindm = im0
-        
-        
-        while searchflag == 0:
-                
-            hfind= hdiff[ifindm]
-            
-            # For the first month greater than the target MLD,
-            # grab this value and the value before it
-            if hfind > 0:
-                # Set searchflag to 1 to prepare for exit
-                searchflag = 1
-                
-                # record MLD values
-                h_before = h[ifindm+1]
-                h_after  = h[ifindm]
-                m_before = monthx[ifindm+1]
-                m_after =  monthx[ifindm]
-                
-                # For months between Dec/Jan, assign value between 0 and 1
-                if ifindm < 0 and ifindm == -1:
-                    m_after = ifindm+1
-                
-                # For even more negative indices
-                
-                print("Found kprev for month %i it is %f!" % (m,np.interp(findmld,[h_before,h_after],[m_before,m_after])))
-                kprev[im] = np.interp(findmld,[h_before,h_after],[m_before,m_after])
-                hout[im] = findmld
-            
-            # Go back one month
-            ifindm -= 1
-    
-    return kprev, hout
 
 
 def find_kprev(h):
-    printst = 0
+    
     # Preallocate
     kprev = np.zeros(12)
     hout = np.zeros(12)
@@ -544,19 +372,18 @@ def find_kprev(h):
             m0 = 12
             im0 = m0-1
         
-        # Set values for minimum/maximum -----------------------------------------
-        if h[im] == np.nanmax(h) or h[im]== np.nanmin(h):
-            if printst == 1:
-                print("Ignoring %i, max/min" % m)
+        # Set values for minimun/maximum -----------------------------------------
+        if im == h.argmax() or im== h.argmin():
+            #print("Ignoring %i, max/min" % m)
             kprev[im] = m
             hout[im] = h[im]
             continue
+        
     
         
         # Ignore detrainment months
         if dz[im] == False:
-            if printst == 1:
-                print("Ignoring %i, shoaling month" % m)
+            #print("Ignoring %i, shoaling month" % m)
             continue
         
         # For all other entraining months.., search backwards
@@ -588,8 +415,8 @@ def find_kprev(h):
                     m_after = ifindm+1
                 
                 # For even more negative indices
-                if printst == 1:
-                    print("Found kprev for month %i it is %f!" % (m,np.interp(findmld,[h_before,h_after],[m_before,m_after])))
+                
+                #print("Found kprev for month %i it is %f!" % (m,np.interp(findmld,[h_before,h_after],[m_before,m_after])))
                 kprev[im] = np.interp(findmld,[h_before,h_after],[m_before,m_after])
                 hout[im] = findmld
             
@@ -610,7 +437,6 @@ cp0     = 3850 # Specific Heat [J/(kg*C)]
 rho     = 1025 # Density of Seawater [kg/m3]
 
 # Initial Conditions/Presets
-h       = 150 # Effective MLD [m]
 T0      = 0   # Initial Temp [degC]
 
 # Integration Options
@@ -620,7 +446,6 @@ dt      = 60*60*24*30 # Timestep size (Will be used to multiply lambda)
 usetau  = 0          # Use tau (estimated damping timescale)
 useeta  = 0          # Use eta from YO's model run
 usesst  = 0
-hvar    = 1           # seasonally varying h
 funiform = 1        # Spatially uniform forcing
 
 # hvarmode
@@ -710,7 +535,7 @@ np.save(datpath+"lon.npy",lonr)
 
 # Generate Random White Noise Series (or load existing)
 if genrand == 1:
-    
+    print("Making New Forcing Data")
     if funiform == 1:
         randts = np.random.normal(0,1,size=t_end)/4
         F      = np.ones((lonsize,latsize,t_end))
@@ -720,11 +545,13 @@ if genrand == 1:
         F = np.random.normal(0,1,size=(lonsize,latsize,t_end))
         
         
-    np.save(datpath+"randts_2d.npy",F)
+    np.save(datpath+"randts_2d_uniform%s.npy"%(funiform),F)
     
 else:
-    
-    F = np.load(datpath+"randts_2d.npy")
+    print("Loading Old Data")
+    F = np.load(datpath+"randts_2d_uniform%s.npy"%(funiform))
+
+
 
 # ---------------------------------------
 # %% Calc Ens Avg Mixed Layer Seasonal Cycle-------------------------------------
@@ -737,11 +564,41 @@ kprev = np.zeros((lonsize,latsize,12),dtype=float)
 stol  = 0.75 # Search tolerance for curivilinear grid (degrees) <Note there is sensitivity to this>....
 
 # Take ensemble mean
-h_ensmean = ds.HMXL.mean('ensemble')
+h_ensmean = ds.HMXL.mean('ensemble')/100
 
 # This portion of the data unfortunately has an ensemble dimension
 tlon = ds.TLONG.mean('ensemble')
 tlat = ds.TLAT.mean('ensemble')
+
+h_ensmean = h_ensmean.assign_coords(TLONG=tlon)
+h_ensmean = h_ensmean.assign_coords(TLAT=tlat)
+
+def getpt_pop(lonf,latf,ds,searchdeg=0.5,returnarray=1):
+    """ Quick script to read in a xr.Dataset (ds)
+        and return the value for the point specified by lonf,latf
+        
+    
+    """
+    
+    
+    # Do same for curivilinear grid
+    if lonf < 0:
+        lonfc = lonf + 360 # Convert to 0-360 if using negative coordinates
+    else:
+        lonfc = lonf
+        
+    # Find the specified point on curvilinear grid and average values
+    selectmld = ds.where((lonfc-searchdeg < ds.TLONG) & (ds.TLONG < lonfc+searchdeg)
+                    & (latf-searchdeg < ds.TLAT) & (ds.TLAT < latf+searchdeg),drop=True)
+    
+    pmean = selectmld.mean(('nlon','nlat'))
+    
+    if returnarray ==1:
+        h = np.squeeze(pmean.values)
+        return h
+    else:
+        return pmean
+    
 
 
 start = time.time()
@@ -767,38 +624,17 @@ for o in range(0,lonsize):
             hclim[o,a,:] = np.ones(12)*np.nan
             kprev[o,a,:] = np.ones(12)*np.nan
             continue
-            
-        # Select Points        
-        selectmld = h_ensmean.where((lonf-stol < tlon) & (tlon < lonf+stol)
-                        & (latf-stol < tlat) & (tlat < latf+stol),drop=True)
         
-        # Take the mean of the selected points
-        ensmean = selectmld.mean(('nlon','nlat'))/100
         
-        # Record values
-        hclim[o,a,:] = np.squeeze(ensmean.values)
+        # Get point
+        hclim[o,a,:] = getpt_pop(lonf,latf,h_ensmean,searchdeg=stol)
+        
+
         
         # Find Entraining Months
         kprev[o,a,:],_ = find_kprev(hclim[o,a,:])
         
-        # # Find points out of range the range or on land
-        # if selectmld.size == 0 or np.all(xr.ufuncs.isnan(selectmld)):
-        #     msg = "Could not find data for lon %f lat %f" % (lonf,latf)
-        #     print(msg)
-        #     hclim[o,a,:] = np.nan
-        # else:
-        #     # Take the mean of the points
-        #     ensmean = selectmld.mean(('nlon','nlat'))/100
-            
-            
-        #     # Ignore points where there is a nan during the seasonal cycle
-        #     if np.any(xr.ufuncs.isnan(ensmean)):
-        #         msg = "Due to NaN in seasonal cycle, ignoring lon %f lat %f" % (lonf,latf)
-        #         print(msg)
-        #         hclim[o,a,:] = np.nan
-        #     else:
-        #         # Asssign to variable
-        #         hclim[o,a,:] = np.squeeze(ensmean.values)
+
 
 print("Finished in %f seconds" % (time.time()-start))
 
@@ -809,60 +645,61 @@ plt.colorbar(cs)
 #plt.contourf(lonr,latr,np.transpose(np.squeeze(kprev[:,:,5])))
 
 
+
+
 # ----------------
-# %% Calculate Lambda------------------------------------------------------------
+# %% Set H based on mode------------------------------------------------------------
 # ----------------
 
 if hvarmode == 0:
     
-    # Use fixed mixed layer depth
-    
-    lbd = np.exp(-1 * dampingr / (rho*cp0*hfix) * dt)
+    # Use fixed mixed layer depth for the whole basin
+    h = hfix
     
 elif hvarmode == 1:
     
     
     # Find maximum mld for each point in basin
-    
     hmax = np.amax(hclim,axis=2)
-    lbd = np.exp(-1 * dampingr / (rho*cp0*hmax[:,:,None]) * dt)
+    h = hmax[:,:,None]
     
 elif hvarmode == 2:
-
-    lbd = np.exp(-1 * dampingr / (rho*cp0*hclim) * dt)
     
+    # Use spatially and temporally varying h
+    h = np.copy(hclim)
+
+
+# ----------------
+# %% Calculate Lambda ------------------------------------------------------------
+# ----------------
+
+
+
+
+
+if usetau == 1:
+    lbd = 1/np.mean(tauall,axis=1)
+    
+    # DDD try last ensemble
+    #lbd = 1 / tauall[:,39]
+
+else:
+    lbd = dampingr/ (rho*cp0*h) * dt
+
+# Calculate Entrainment Portion
+if hvarmode == 2:
+    beta = np.nan_to_num(np.log( h / np.roll(h,1) )) # Currently replacing Nans with zero
+    beta[beta<0] = 0
+    lbd_entr = lbd + beta
+
 
 # -------------------------
-# %% Prepare Entrainment Terms --------------------------------------------------
+# %% Prepare Reduction Factor --------------------------------------------------
 # -------------------------
 
+# Calculate Reduction Factor
+FAC_entr = np.nan_to_num((1-np.exp(-lbd_entr))/lbd_entr)
 
-
-
-# Compute seasonal correction factor from lambda
-FAC = (1-lbd)/ (dampingr / (rho*cp0*hclim))
-
-# Compute the integral of the entrainment term, with dt and correction factor
-beta = np.nan_to_num(1/dt * np.log( hclim / np.roll(hclim,1,2) ) * FAC)
-
-
-
-# Set term to zero where detrainment is occuring
-beta[beta < 0] = 0
-
-
- 
-# Calculate lambda that includes entrainment
-weh = np.log( hclim / np.roll(hclim,1,2))
-weh[weh<0] = 0
-lbd_entr = lbd * np.exp(-weh)
-
-#lbd_entr = lbd * np.exp(-beta)
-
-    #lbd_entr = np.exp(-1 * (damping[oid,aid,:] / (rho*cp0*h) * dt+ beta ))
-## No seasonal correction
-#lbd_entr = np.exp(-1 * (damping[oid,aid,:] / (rho*cp0*h) * dt+ np.log( h / np.roll(h,1) )))
-   
 
 # ----------
 # %%RUN MODELS -----------------------------------------------------------------
@@ -894,7 +731,6 @@ for o in range(0,lonsize):
             T_entr0[o,a,:] = np.zeros(t_end)*np.nan
         else:
             T_entr0[o,a,:],_,_ = stochmod_noentrain(t_end,lbd[o,a,:],T0,F[o,a,:])
-        
         icount += 1
         msg = '\rCompleted No Entrain Run for %i of %i points' % (icount,lonsize*latsize)
         print(msg,end="\r",flush=True)
@@ -908,54 +744,54 @@ print(tprint)
 
 
 # %% Run Model With Entrainment
-start = time.time()
-T_entr1 = np.zeros((lonsize,latsize,t_end))
-icount = 0
-for o in range(0,lonsize):
-    # Get Longitude Value
-    lonf = lonr[o]
-    
-    # Convert to degrees East
-    if lonf < 0:
-        lonf = lonf + 360
-    
-    for a in range(0,latsize):
+if hvarmode == 2:
+    start = time.time()
+    T_entr1 = np.zeros((lonsize,latsize,t_end))
+    icount = 0
+    for o in range(0,lonsize):
+        # Get Longitude Value
+        lonf = lonr[o]
         
+        # Convert to degrees East
+        if lonf < 0:
+            lonf = lonf + 360
         
-        # Get latitude indices
-        latf = latr[a]
-        
-        
-        # Skip if the point is land
-        if np.isnan(np.mean(dampingr[o,a,:])):
-            msg = "Land Point @ lon %f lat %f" % (lonf,latf)
-            #print(msg)
-            T_entr1[o,a,:] = np.zeros(t_end)*np.nan
-        else:
-            T_entr1[o,a,:],_,_,_,_ = stochmod_entrain(t_end,lbd_entr[o,a,:],T0,F[o,a,:],beta[o,a,:],hclim[o,a,:],kprev[o,a,:])
-        
-        icount += 1
-        msg = '\rCompleted Entrain Run for %i of %i points' % (icount,lonsize*latsize)
-        print(msg,end="\r",flush=True)
-#
-        
-elapsed = time.time() - start
-tprint = "\nEntrain Model ran in %.2fs" % (elapsed)
-print(tprint)    
+        for a in range(0,latsize):
+            
+            
+            # Get latitude indices
+            latf = latr[a]
+            
+            
+            # Skip if the point is land
+            if np.isnan(np.mean(dampingr[o,a,:])):
+                msg = "Land Point @ lon %f lat %f" % (lonf,latf)
+                #print(msg)
+                T_entr1[o,a,:] = np.zeros(t_end)*np.nan
+            else:
+                T_entr1[o,a,:],_,_,_,_ = stochmod_entrain(t_end,lbd_entr[o,a,:],T0,F[o,a,:],beta[o,a,:],hclim[o,a,:],kprev[o,a,:],FAC_entr[o,a,:])
+            icount += 1
+            msg = '\rCompleted Entrain Run for %i of %i points' % (icount,lonsize*latsize)
+            print(msg,end="\r",flush=True)
+    #
+            
+    elapsed = time.time() - start
+    tprint = "\nEntrain Model ran in %.2fs" % (elapsed)
+    print(tprint)    
         
 
 
 # %% save output
-np.save(datpath+"stoch_output_1000yr_entrain1_hvar%i.npy"%(hvarmode),T_entr1)
-np.save(datpath+"stoch_output_1000yr_entrain0_hvar%i.npy"%(hvarmode),T_entr0)
-np.save(datpath+"stoch_output_1000yr_Forcing_hvar%i.npy",F)
+np.save(datpath+"stoch_output_1000yr_funiform%i_entrain1_hvar%i.npy"%(funiform,hvarmode),T_entr1)
+np.save(datpath+"stoch_output_1000yr_funiform%i_entrain0_hvar%i.npy"%(funiform,hvarmode),T_entr0)
+np.save(datpath+"stoch_output_1000yr_funiform%i_Forcing_hvar%i.npy"%(funiform,hvarmode),F)
 
 
 #%% Find and calculate autocorrelation at a single point
 # Set Point and month
 lonf    = -30
 latf    = 50
-kmon    = 3
+kmon    = hclim[klon,klat,:].argmax()
 lags    = np.arange(0,61,1)
 
 
