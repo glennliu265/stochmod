@@ -223,7 +223,7 @@ def calc_AMV(lon,lat,sst,bbox,order,cutofftime):
     
     
     # Take the weighted area average
-    aa_sst = area_avg(sst,bbox,lon,lat,1)
+    aa_sst = area_avg(sst,bbox,lon,lat,0)
     
     # Linearly detrend the data
     aa_sst = detrendlin(aa_sst)
@@ -333,7 +333,7 @@ def regress2ts(var,ts,normalizeall,method):
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath = projpath + '03_Scripts/stochmod/'
 datpath = projpath + '01_Data/'
-outpath = projpath + '02_Figures/20200629/'
+outpath = projpath + '02_Figures/20200707/'
 
 # Path to SST data from obsv
 datpath2 = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/"
@@ -356,8 +356,10 @@ cutofftime = 120
 
 #print('cutoff = ',1/cutoff*nyquist*30*24*3600,' months')
 
+# Other options
 
-
+funiform = 1
+ 
 
 # ----------------------------------------------------------------------------
 #%% Script Start 
@@ -366,10 +368,8 @@ cutofftime = 120
 hvarmode = np.arange(0,3,1)
 hvarnames = ("Fixed (50m)","Maximum","Seasonal")
 
-
-
 # Load in forcing and lat/lon
-F        = np.load(datpath+"stoch_output_1000yr_Forcing.npy")
+F        = np.load(datpath+"stoch_output_1000yr_funiform%i_Forcing.npy"%(funiform))
 lon      = np.load(datpath+"lon.npy")
 lat      = np.load(datpath+"lat.npy")
 
@@ -383,7 +383,7 @@ aa = {}
 # Load in dat for each mode and compute amv index
 for mode in hvarmode:
     
-    sst[mode] = np.load(datpath+"stoch_output_1000yr_entrain0_hvar%i.npy" % mode)
+    sst[mode] = np.load(datpath+"stoch_output_1000yr_funiform%i_entrain0_hvar%i.npy" % (funiform,mode))
 
 
     # Calculate AMV Index
@@ -401,11 +401,19 @@ regr_meth1 = {}
 regr_meth2 = {}
 # Perform regression for each mode
 for mode in hvarmode:
-    regr_meth1[mode]=regress2ts(sst[mode],amv[mode],0,1)
+    #regr_meth1[mode]=regress2ts(sst[mode],amv[mode],0,1)
     
     regr_meth2[mode]=regress2ts(sst[mode],amv[mode],0,2)
  
+
+
+#%% Repeat for entrainment case
     
+sstentrain  = np.load(datpath+"stoch_output_1000yr_funiform%i_entrain1_hvar2.npy"%(funiform))    
+amventrain,aaentrain= calc_AMV(lon,lat,F,bbox,order,cutofftime)
+regrentrain = regress2ts(sstentrain,amventrain,0,2)
+    
+
 # ----------------------------------------
 # %% For Comparison, Repeat for Observations
 # ----------------------------------------
@@ -482,7 +490,7 @@ for mode in hvarmode:
 plt.ylabel("AMV Index",fontsize=20)
 plt.xlabel("Years",fontsize=20)
 plt.tight_layout()
-outname = outpath+'AMV_hvar_noentraing.png'
+outname = outpath+'AMV_hvar_noentrain_funiform%i.png'%(funiform)
 plt.savefig(outname, bbox_inches="tight",dpi=200)
 
 
@@ -512,7 +520,7 @@ plt.yticks(np.arange(-2,2.5,0.5),fontsize=16)
 plt.title("AMV Index for MLD %s" % hvarnames[mode],fontsize=20)
 plt.ylabel("AMV Index",fontsize=16)
 plt.tight_layout()
-outname = outpath+'AMV_hvar_forcing_comparison.png'
+outname = outpath+'AMV_hvar_forcing_comparison_funiform%i.png' % (funiform)
 plt.savefig(outname, bbox_inches="tight",dpi=200)
 
     
@@ -594,7 +602,7 @@ cint = np.arange(-4,4.5,0.5)
 #cint = np.arange(-1,1.2,0.2)
 #cint = np.arange(-2,2.5,0.5)
 
-clab = cint
+#clab = cint
 for mode in hvarmode:
     print(mode)
     fig,ax = plt.subplots(1,1,figsize=(8,4))
@@ -603,9 +611,10 @@ for mode in hvarmode:
     varin = np.transpose(regr_meth2[mode],(1,0))
     
     plt.subplot(1,3,mode+1)
-    plot_AMV_spatial(varin,lon,lat,bbox,cmap,cint,clab)
+    #plot_AMV_spatial(varin,lon,lat,bbox,cmap,cint,clab)
+    plot_AMV_spatial(varin,lon,lat,bbox,cmap)
     plt.title("AMV Spatial Pattern \n MLD %s" % hvarnames[mode],fontsize=14)
-    outname = outpath+'AMVpattern_hvar%i.png' % mode
+    outname = outpath+'AMVpattern_funiform%i_hvar%i.png' % (funiform,mode)
     plt.savefig(outname, bbox_inches="tight",dpi=200)
     
 
@@ -629,8 +638,26 @@ plot_AMV_spatial(varin,hlon,hlatnew,bbox,cmap,cint,clab)
 plt.title("AMV-related SST Pattern from HadISST, %i-%i"%(startyr,hyr[0,-1]),fontsize=14)
 outname = outpath+'AMVpattern_HADLISST.png' 
 plt.savefig(outname, bbox_inches="tight",dpi=200)
+#%% Plot AMV FFor entrain case
 
 
+cmap = cmocean.cm.balance
+#cint = np.arange(-3.5,3.25,0.25)
+cint = np.arange(-8,9,1)
+#clab = np.arange(-0.50,0.60,0.10)
+#cint = np.arange(-1,1.2,0.2)
+clab = cint
+
+fig,ax = plt.subplots(1,1,figsize=(8,4))
+plt.style.use("ggplot")
+
+varin = np.transpose(regrentrain,(1,0))
+
+plt.subplot(1,1,1)
+plot_AMV_spatial(varin,lon,lat,bbox,cmap,cint,clab)
+plt.title("AMV-related SST Pattern, Entrain Case")
+outname = outpath+'AMVpattern_funiform%i_entrain.png'  % (funiform)
+plt.savefig(outname, bbox_inches="tight",dpi=200)
 
 
 #%% Load Matlab Data for Comparison
@@ -643,3 +670,74 @@ fig,ax = plt.subplots(1,1)
 #ax.plot(amv)
 ax.plot(SSTpt,color='k')
 ax.plot(vartime,color='b')
+
+
+
+#%% Try to animate a forcing map
+
+
+from matplotlib.animation import FuncAnimation
+
+import matplotlib.animation as animation
+
+
+
+# Prepare variables
+invar = np.transpose(np.copy(sst[2]),(1,0,2))
+frames = 10 #Indicate number of frames
+
+# Define Figure to create base map for plotting
+def make_figure(bbox):
+    fig = plt.figure(figsize=(12,8))
+    ax = fig.add_subplot(1,1,1,projection=ccrs.PlateCarree())
+    
+    # Set extent
+    ax.set_extent(bbox)
+    
+    # Add filled coastline
+    ax.add_feature(cfeature.COASTLINE,facecolor='k')
+    
+    # Add Gridlines
+    gl = ax.gridlines(draw_labels=True,linewidth=0.75,color='gray',linestyle=':')
+
+    gl.xlabels_top = gl.ylabels_right = False
+    gl.xformatter = LONGITUDE_FORMATTER
+    gl.yformatter = LATITUDE_FORMATTER
+    
+    
+    return fig,ax
+    
+    
+
+fig,ax = make_figure(bbox) # Make the basemap
+
+
+
+def draw(lon,lat,invar,frame,add_colorbar):
+    ax = plt.gca()
+    plotvar = invar[...,frame] # Assume dims [lonxlatxtime]
+    pcm     = plt.pcolormesh(lon,lat,plotvar)
+    title   = "t = %i" % frame
+    ax.set_title(title)
+    if add_colorbar==True:
+        cbar  = plt.colorbar(pcm,ax=ax,orientation='horizontal')
+    return pcm
+    
+
+# # Indicate initial conditions
+def drawinit():
+    return draw(lon,lat,invar,0,add_colorbar=True)
+
+# Indicate other conditions
+def animate(frame):
+    return draw(lon,lat,invar,frame,add_colorbar=False)
+
+ani = animation.FuncAnimation(fig, animate,frames,interval=0.1,blit=False,init_func=drawinit,repeat=False)
+
+ani.save("%stestanim.mp4"%(outpath),writer=animation.FFMpegWriter(fps=8))
+plt.close(fig)
+
+
+
+
+
