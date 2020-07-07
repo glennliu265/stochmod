@@ -440,16 +440,16 @@ rho     = 1025 # Density of Seawater [kg/m3]
 T0      = 0   # Initial Temp [degC]
 
 # Integration Options
-nyr     = 1000    # Number of years to integrate over
-t_end   = 12*nyr      # Timestep to integrate up to
-dt      = 60*60*24*30 # Timestep size (Will be used to multiply lambda)
-usetau  = 0          # Use tau (estimated damping timescale)
-useeta  = 0          # Use eta from YO's model run
-usesst  = 0
+nyr      = 1000    # Number of years to integrate over
+t_end    = 12*nyr      # Timestep to integrate up to
+dt       = 60*60*24*30 # Timestep size (Will be used to multiply lambda)
+usetau   = 0          # Use tau (estimated damping timescale)
+useeta   = 0          # Use eta from YO's model run
+usesst   = 0
 funiform = 1        # Spatially uniform forcing
 
 # hvarmode
-hvarmode = 2 # hvar modes (0 - fixe mld, 1 - effective mld, 2 - seasonally varying mld)
+hvarmode = 0 # hvar modes (0 - fixe mld, 1 - effective mld, 2 - seasonally varying mld)
 hfix     = 50 # Fixed MLD (meters)
 
 # Region options
@@ -693,12 +693,12 @@ if hvarmode == 2:
     lbd_entr = lbd + beta
 
 
-# -------------------------
-# %% Prepare Reduction Factor --------------------------------------------------
-# -------------------------
-
-# Calculate Reduction Factor
-FAC_entr = np.nan_to_num((1-np.exp(-lbd_entr))/lbd_entr)
+    # -------------------------
+    # Prepare Reduction Factor --------------------------------------------------
+    # -------------------------
+    
+    # Calculate Reduction Factor
+    FAC_entr = np.nan_to_num((1-np.exp(-lbd_entr))/lbd_entr)
 
 
 # ----------
