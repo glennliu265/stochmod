@@ -22,6 +22,7 @@ levelname = "lev"
 varkeep = [varname,lonname,latname,timename,levelname]
 
 # NAO Calculation Settings
+bbox = 1 # Set to 1 to specify region to cut to
 lonW = -90
 lonE = 40
 latS = 20
@@ -29,11 +30,9 @@ latN = 80
 djfm = [12,1,2,3] # Seasons to keep
 
 # File names
-datpath = "/vortex/jetstream/climate/data1/yokwon/CESM1_LE/downloaded/atm/proc/tseries/monthly/PSL/"
+datpath = "/vortex/jetstream/climate/data1/yokwon/CESM1_LE/downloaded/atm/proc/tseries/monthly/%s/" % varname
 ncsearch = "b.e11.B20TRC5CNBDRD.f09_g16.*.cam.h0.PSL.*.nc"
-
-
-
+outpath = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/NAO_Forcing_DataProc"
 
 # --
 globby = datpath+ncsearch
@@ -62,30 +61,31 @@ for nc in nclist:
     ds = ds.drop(varrem)
     
     
-    # Slice to region, vertical level, and time (CESM1-LE Specific)
+    #%% Slice to region, vertical level, and time (CESM1-LE Specific)
     
-    # Convert to degrees East
-    if lonW < 0:
-        lonW += 360
-    if lonE < 0:
-        lonE += 360
-    
-    # Select North Atlantic Region for NAO Calculation...
-    if lonW > lonE: # Cases crossing the prime meridian
-        #print("Crossing Prime Meridian!")
-        dsna = ds.where((ds[lonname]>=lonW) | (ds[lonname]<=lonE),drop=True).sel(lat=slice(latS,latN))
+    if bbox == 1:
+        # Convert to degrees East
+        if lonW < 0:
+            lonW += 360
+        if lonE < 0:
+            lonE += 360
+        
+        # Select North Atlantic Region for NAO Calculation...
+        if lonW > lonE: # Cases crossing the prime meridian
+            #print("Crossing Prime Meridian!")
+            dsna = ds.where((ds[lonname]>=lonW) | (ds[lonname]<=lonE),drop=True).sel(lat=slice(latS,latN))
+        else:
+            dsna = ds.sel(lon=slice(lonW,lonE),lat=slice(latS,latN))
     else:
-        dsna = ds.sel(lon=slice(lonW,lonE),lat=slice(latS,latN))
+        dsna = ds
     
-    # Further slice for latitude and bottom pressure level
+    #%% Further slice for latitude and bottom pressure level
     dsna = dsna.isel(lev=-1)
     
-    # Select time period after 1920-01-01
+    #%% Select time period after 1920-01-01
     dsna = dsna.sel(time=slice('1920-01-01','2005-12-31'))
     
-    
-    
-    # select djfm
+    #%% select djfm
     season = dsna.sel(time= np.in1d(dsna['time.month'],djfm))
     
     # take monthly anomaly
@@ -94,17 +94,8 @@ for nc in nclist:
     # take winter average
     dswm = dsm.groupby('time.year').mean('time')
     
-    dswm,dswm.PSL.isel(lat=0,lon=0).plot.line()
     
-    # select djfm
-    season = dsna.sel(time= np.in1d(dsna['time.month'],djfm))
-    
-    # take monthly anomaly
-    dsm = season.groupby('time.month') - season.groupby('time.month').mean('time') # Calculate monthly anomalies
-    
-    # take winter average
-    dswm = dsm.groupby('time.year').mean('time')
-
+    # Just copy for first iteration to make container dataset
     if i == 0:
         dsall = dswm.copy()
     else:
@@ -124,8 +115,6 @@ for nc in nclist:
     
     
 # Save output
-
-
 outpath = '/home/glliu/01_Data/'
 outname = varname+'_NAOproc.nc'
 dsall.to_netcdf(outpath+outname)
