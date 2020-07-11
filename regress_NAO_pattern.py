@@ -1,0 +1,299 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Jul 10 11:38:34 2020
+
+@author: gliu
+"""
+
+import xarray as xr
+from scipy import signal
+import numpy as np
+import time
+
+import matplotlib.pyplot as plt
+from cartopy import config
+import cartopy.feature as cfeature
+import cartopy.crs as ccrs
+from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+import cmocean
+import matplotlib.ticker as mticker
+from cartopy.util import add_cyclic_point
+
+
+
+# Functions
+def regress_2d(A,B):
+    """
+    Regresses A (independent variable) onto B (dependent variable), where
+    either A or B can be a timeseries [N-dimensions] or a space x time matrix 
+    [N x M]. Script automatically detects this and permutes to allow for matrix
+    multiplication.
+    
+    Returns the slope (beta) for each point, array of size [M]
+    
+    
+    """
+    # Determine if A or B is 2D and find anomalies
+    
+    
+    # 2D Matrix is in A [MxN]
+    if len(A.shape) > len(B.shape):
+        
+        # Tranpose A so that A = [MxN]
+        if A.shape[1] != B.shape[0]:
+            A = A.T
+        
+        
+        # Set axis for summing/averaging
+        a_axis = 1
+        b_axis = 0
+        
+        # Compute anomalies along appropriate axis
+        Aanom = A - np.nanmean(A,axis=a_axis)[:,None]
+        Banom = B - np.nanmean(B,axis=b_axis)
+        
+
+        
+    # 2D matrix is B [N x M]
+    elif len(A.shape) < len(B.shape):
+        
+        # Tranpose B so that it is [N x M]
+        if B.shape[0] != A.shape[0]:
+            B = B.T
+        
+        # Set axis for summing/averaging
+        a_axis = 0
+        b_axis = 0
+        
+        # Compute anomalies along appropriate axis        
+        Aanom = A - np.nanmean(A,axis=a_axis)
+        Banom = B - np.nanmean(B,axis=b_axis)[None,:]
+    
+    # Calculate denominator, summing over N
+    Aanom2 = np.power(Aanom,2)
+    denom = np.sum(Aanom2,axis=a_axis)    
+    
+    # Calculate Beta
+    beta = Aanom @ Banom / denom
+    
+        
+    return beta
+
+    
+
+
+
+# Path to data
+projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
+datpath  = projpath + '01_Data/'
+outpath = projpath+'/02_Figures/20200714/'
+
+ncname = "NHFLX_NAOproc.nc"
+
+
+
+# %% Load data
+
+# Load NHFLX data
+ds = xr.open_dataset(datpath+ncname)
+nhflx = ds['NHFLX'].values
+lon = ds['lon'].values
+lat = ds['lat'].values
+time = ds['year'].values
+
+
+# Load Data (NAO Index)
+npzdata = np.load(datpath+"Manual_EOF_Calc_NAO.npz")
+eofall    = npzdata['eofall']
+pcall     = npzdata['pcall']
+varexpall = npzdata['varexpall'] 
+
+
+# %% Prepare data
+
+var = np.copy(nhflx)*-1 # Note, multiply by negative 1 to convert to upwards negative
+
+# Get dimension sizes
+nens,nyr,nlat,nlon = var.shape
+npc = pcall.shape[2]
+
+# Combine lat and lon dimensions
+var = np.reshape(var,(nens,nyr,nlat*nlon))
+
+# Regress for each mode and ensemble member
+varpattern = np.zeros((npc,nens,nlat*nlon))
+for n in range(npc):
+    for e in range(nens):
+        
+        pcin = pcall[e,:,n]
+        datain = var[e,...]
+
+        varpattern[n,e,:] = regress_2d(pcin,datain)
+        
+        msg = '\rCompleted Regression for PC %02i/%02i, ENS %02i/%02i' % (n+1,npc,e+1,nens)
+        print(msg,end="\r",flush=True)
+
+# Reshape variable [pc, ens, lat, lon]
+varout = np.reshape(varpattern,(npc,nens,nlat,nlon))
+
+
+
+
+#%%
+# Try Plotting ensemble average
+
+
+
+
+def plot_regression(N,e,varin,lon,lat,cint=[0]):
+    
+    
+    # Restrict to Ensemble and PC
+    if e == "avg":
+        # Assumed [pc, ens, lat, lon]
+        varplot = np.nanmean(varin,axis=1)[N,...]
+        estring = "AVG"
+    else:
+        varplot = varin[N,e,:,:]
+        estring = "%02i"%e
+    
+    cmap = cmocean.cm.balance
+    #Plotting boundaries
+    lonW = -90
+    lonE = 40
+    latS = 20
+    latN = 80
+
+    # if N == 0:
+    #     cint = np.arange(-3,3.5,0.5)
+    # elif N == 1:
+    #     cint = np.arange(-1,1.2,0.2)
+    # elif N == 2:
+    #     cint = np.arange(-2,2.1,0.1)
+    
+    
+    # Plot the EOF
+    var1,lon1 = add_cyclic_point(varplot,lon) 
+    
+    plt.style.use('ggplot')
+    fig,ax= plt.subplots(1,1,figsize=(6,4))
+    
+    ax = plt.axes(projection=ccrs.PlateCarree())
+    ax.set_extent([lonW,lonE,latS,latN])
+    
+    # Add filled coastline
+    ax.add_feature(cfeature.COASTLINE)
+    
+    # Add contours
+    if len(cint) == 1:
+        cs = ax.contourf(lon1,lat,var1,cmap=cmap,transform=ccrs.PlateCarree())
+    else:
+        cs = ax.contourf(lon1,lat,var1,cint,cmap=cmap,transform=ccrs.PlateCarree())
+        # Negative contours
+        cln = ax.contour(lon1,lat,var1,
+                    cint[cint<0],
+                    linestyles='dashed',
+                    colors='k',
+                    linewidths=0.5,
+                    transform=ccrs.PlateCarree())
+        
+        # Positive Contours
+        clp = ax.contour(lon1,lat,var1,
+                    cint[cint>=0],
+                    colors='k',
+                    linewidths=0.5,
+                    transform=ccrs.PlateCarree())   
+    
+    # Add Gridlines
+    gl = ax.gridlines(draw_labels=True,linewidth=0.75,color='black',linestyle=':')
+    
+    gl.xlabels_top = gl.ylabels_right = False
+    gl.xformatter = LONGITUDE_FORMATTER
+    gl.yformatter = LATITUDE_FORMATTER
+    bc = plt.colorbar(cs,orientation='horizontal')
+    ax.set_title("NHFLX - PC%i Regression, ENS %s, " %(N+1,estring),fontsize=16)
+
+
+    return fig
+N =0
+e = 'avg'
+cint = np.arange(-50,55,5)
+estring = str(e)
+
+
+
+fig = plot_regression(N,e,varout,lon,lat,cint=cint)
+plt.savefig(outpath+"NAO_EOF%i_Ens%s.png"%(N+1,estring), bbox_inches="tight",dpi=200)
+
+#%%
+
+varin = np.copy(varout)
+
+# Restrict to Ensemble and PC
+if e == "avg":
+    # Assumed [pc, ens, lat, lon]
+    varplot = np.nanmean(varin,axis=1)[N,...]
+    estring = "AVG"
+else:
+    varplot = varin[N,e,:,:]
+    estring = "%02i"%e
+
+cmap = cmocean.cm.balance
+#Plotting boundaries
+lonW = -90
+lonE = 40
+latS = 20
+latN = 80
+
+# if N == 0:
+#     cint = np.arange(-3,3.5,0.5)
+# elif N == 1:
+#     cint = np.arange(-1,1.2,0.2)
+# elif N == 2:
+#     cint = np.arange(-2,2.1,0.1)
+
+
+# Plot the EOF
+var1,lon1 = add_cyclic_point(varplot,lon) 
+
+plt.style.use('ggplot')
+fig,ax= plt.subplots(1,1,figsize=(6,4))
+
+p = ccrs.LambertConformal(central_longitude=-20,central_latitude=45,cutoff=0)
+
+ax = plt.axes(projection=p)
+ax.set_extent([lonW,lonE,latS,latN],crs=ccrs.PlateCarree())
+
+# Add filled coastline
+ax.coastlines()
+
+# Add contours
+if len(cint) == 1:
+    cs = ax.contourf(lon1,lat,var1,cmap=cmap,transform=ccrs.PlateCarree())
+else:
+    cs = ax.contourf(lon1,lat,var1,cint,cmap=cmap,transform=ccrs.PlateCarree())
+    # Negative contours
+    cln = ax.contour(lon1,lat,var1,
+                cint[cint<0],
+                linestyles='dashed',
+                colors='k',
+                linewidths=0.5,
+                transform=ccrs.PlateCarree())
+    
+    # Positive Contours
+    clp = ax.contour(lon1,lat,var1,
+                cint[cint>=0],
+                colors='k',
+                linewidths=0.5,
+                transform=ccrs.PlateCarree()
+                )  
+
+# Add Gridlines
+gl = ax.gridlines(draw_labels=True,linewidth=0.75,color='black',linestyle=':')
+
+gl.xlabels_top = gl.ylabels_right = False
+gl.xformatter = LONGITUDE_FORMATTER
+gl.yformatter = LATITUDE_FORMATTER
+bc = plt.colorbar(cs,orientation='horizontal')
+ax.set_title("NHFLX - PC%i Regression, ENS %s, " %(N+1,estring),fontsize=16)
