@@ -14,7 +14,7 @@ import numpy as np
 start = time.time()
 
 # Set variable names
-varname = 'PSL'
+varname = 'FLNS'
 lonname = "lon"
 latname = "lat"
 timename = "time"
@@ -22,7 +22,7 @@ levelname = "lev"
 varkeep = [varname,lonname,latname,timename,levelname]
 
 # NAO Calculation Settings
-bbox = 1 # Set to 1 to specify region to cut to
+bbox = 0 # Set to 1 to specify region to cut to
 lonW = -90
 lonE = 40
 latS = 20
@@ -31,8 +31,8 @@ djfm = [12,1,2,3] # Seasons to keep
 
 # File names
 datpath = "/vortex/jetstream/climate/data1/yokwon/CESM1_LE/downloaded/atm/proc/tseries/monthly/%s/" % varname
-ncsearch = "b.e11.B20TRC5CNBDRD.f09_g16.*.cam.h0.PSL.*.nc"
-outpath = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/NAO_Forcing_DataProc"
+ncsearch = "b.e11.B20TRC5CNBDRD.f09_g16.*.cam.h0.%s.*.nc" % varname
+outpath = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/NAO_Forcing_DataProc/"
 
 # --
 globby = datpath+ncsearch
@@ -41,6 +41,7 @@ nclist =glob.glob(globby)
 nclist = [x for x in nclist if "OIC" not in x]
 nclist.sort()
 
+print("Processing %s"%varname)
 i = 0
 for nc in nclist:
     startloop = time.time()
@@ -108,14 +109,13 @@ for nc in nclist:
     
     i += 1
     print("Finished concatenating ensemble %i of %i in %.2fs" % (i,len(nclist),time.time()-startloop))
-    if np.any(np.isnan(dsall.PSL.values)):
+    if np.any(np.isnan(dsall[varname].values)):
         print("Error on %i"%i)
         break
 
-    
-    
+
 # Save output
-outpath = '/home/glliu/01_Data/'
+#outpath = '/home/glliu/01_Data/'
 outname = varname+'_NAOproc.nc'
 dsall.to_netcdf(outpath+outname)
 elapsed = time.time() - start
