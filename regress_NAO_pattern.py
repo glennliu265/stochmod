@@ -183,7 +183,7 @@ def plot_regression(N,e,varin,lon,lat,cint=[0]):
     ax.set_extent([lonW,lonE,latS,latN])
     
     # Add filled coastline
-    ax.add_feature(cfeature.COASTLINE)
+    ax.add_feature(cfeature.COASTLINE,linewidth=0.75,linestyle=":")
     
     # Add contours
     if len(cint) == 1:
@@ -195,22 +195,26 @@ def plot_regression(N,e,varin,lon,lat,cint=[0]):
                     cint[cint<0],
                     linestyles='dashed',
                     colors='k',
-                    linewidths=0.5,
+                    linewidths=1,
                     transform=ccrs.PlateCarree())
         
         # Positive Contours
         clp = ax.contour(lon1,lat,var1,
                     cint[cint>=0],
                     colors='k',
-                    linewidths=0.5,
+                    linewidths=1,
                     transform=ccrs.PlateCarree())   
+        # Add Label
+        plt.clabel(cln,fmt='%i',fontsize=8)
+        plt.clabel(clp,fmt='%i',fontsize=8)
     
     # Add Gridlines
-    gl = ax.gridlines(draw_labels=True,linewidth=0.75,color='black',linestyle=':')
-    
+    gl = ax.gridlines(draw_labels=True,linewidth=0.5,color='black',linestyle=':')
     gl.xlabels_top = gl.ylabels_right = False
     gl.xformatter = LONGITUDE_FORMATTER
     gl.yformatter = LATITUDE_FORMATTER
+    
+
     bc = plt.colorbar(cs,orientation='horizontal')
     ax.set_title("NHFLX - PC%i Regression, ENS %s, " %(N+1,estring),fontsize=16)
 
@@ -225,6 +229,16 @@ estring = str(e)
 
 fig = plot_regression(N,e,varout,lon,lat,cint=cint)
 plt.savefig(outpath+"NAO_EOF%i_Ens%s.png"%(N+1,estring), bbox_inches="tight",dpi=200)
+
+
+#
+#%%Loop for each ensemble member
+cint = np.arange(-50,55,5)
+
+for e in range(42):
+    estring = str(e)
+    fig = plot_regression(0,e,varout,lon,lat,cint=cint)
+    plt.savefig(outpath+"NAO_EOF%i_Ens%s.png"%(N+1,estring), bbox_inches="tight",dpi=200)
 
 #%%
 
@@ -297,3 +311,136 @@ gl.xformatter = LONGITUDE_FORMATTER
 gl.yformatter = LATITUDE_FORMATTER
 bc = plt.colorbar(cs,orientation='horizontal')
 ax.set_title("NHFLX - PC%i Regression, ENS %s, " %(N+1,estring),fontsize=16)
+
+#%% Ensemble and annual average of nhflux
+
+
+nhflxavg = np.squeeze(nhflx[0,0,...])
+
+varplot = np.copy(nhflxavg)
+
+cmap = cmocean.cm.balance
+#Plotting boundaries
+lonW = -90
+lonE = 40
+latS = 20
+latN = 80
+
+
+# Plot the EOF
+var1,lon1 = add_cyclic_point(varplot,lon) 
+
+plt.style.use('ggplot')
+fig,ax= plt.subplots(1,1,figsize=(6,4))
+
+ax = plt.axes(projection=ccrs.PlateCarree())
+ax.set_extent([lonW,lonE,latS,latN])
+
+# Add filled coastline
+ax.add_feature(cfeature.COASTLINE,linewidth=0.75,linestyle=":")
+
+# Add contours
+if len(cint) == 1:
+    cs = ax.contourf(lon1,lat,var1,cmap=cmap,transform=ccrs.PlateCarree())
+else:
+    cs = ax.contourf(lon1,lat,var1,cint,cmap=cmap,transform=ccrs.PlateCarree())
+    # Negative contours
+    cln = ax.contour(lon1,lat,var1,
+                cint[cint<0],
+                linestyles='dashed',
+                colors='k',
+                linewidths=1,
+                transform=ccrs.PlateCarree())
+    
+    # Positive Contours
+    clp = ax.contour(lon1,lat,var1,
+                cint[cint>=0],
+                colors='k',
+                linewidths=1,
+                transform=ccrs.PlateCarree())   
+    # Add Label
+    plt.clabel(cln,fmt='%i',fontsize=8)
+    plt.clabel(clp,fmt='%i',fontsize=8)
+    
+    # Add Gridlines
+    gl = ax.gridlines(draw_labels=True,linewidth=0.5,color='black',linestyle=':')
+    gl.xlabels_top = gl.ylabels_right = False
+    gl.xformatter = LONGITUDE_FORMATTER
+    gl.yformatter = LATITUDE_FORMATTER
+
+
+bc = plt.colorbar(cs,orientation='horizontal')
+ax.set_title("NHFLX - PC%i Regression, ENS %s, " %(N+1,estring),fontsize=16)
+
+
+
+#%% Testing with another projection
+
+# Restrict to Ensemble and PC
+    if e == "avg":
+        # Assumed [pc, ens, lat, lon]
+        varplot = np.nanmean(varin,axis=1)[N,...]
+        estring = "AVG"
+    else:
+        varplot = varin[N,e,:,:]
+        estring = "%02i"%e
+    
+    cmap = cmocean.cm.balance
+    #Plotting boundaries
+    lonW = -90
+    lonE = 40
+    latS = 20
+    latN = 80
+
+    # if N == 0:
+    #     cint = np.arange(-3,3.5,0.5)
+    # elif N == 1:
+    #     cint = np.arange(-1,1.2,0.2)
+    # elif N == 2:
+    #     cint = np.arange(-2,2.1,0.1)
+    
+    
+    # Plot the EOF
+    var1,lon1 = add_cyclic_point(varplot,lon) 
+    
+    plt.style.use('ggplot')
+    fig,ax= plt.subplots(1,1,figsize=(6,4))
+    
+    ax = plt.axes(projection=ccrs.PlateCarree())
+    ax.set_extent([lonW,lonE,latS,latN])
+    
+    # Add filled coastline
+    ax.add_feature(cfeature.COASTLINE,linewidth=0.75,linestyle=":")
+    
+    # Add contours
+    if len(cint) == 1:
+        cs = ax.contourf(lon1,lat,var1,cmap=cmap,transform=ccrs.PlateCarree())
+    else:
+        cs = ax.contourf(lon1,lat,var1,cint,cmap=cmap,transform=ccrs.PlateCarree())
+        # Negative contours
+        cln = ax.contour(lon1,lat,var1,
+                    cint[cint<0],
+                    linestyles='dashed',
+                    colors='k',
+                    linewidths=1,
+                    transform=ccrs.PlateCarree())
+        
+        # Positive Contours
+        clp = ax.contour(lon1,lat,var1,
+                    cint[cint>=0],
+                    colors='k',
+                    linewidths=1,
+                    transform=ccrs.PlateCarree())   
+        # Add Label
+        plt.clabel(cln,fmt='%i',fontsize=8)
+        plt.clabel(clp,fmt='%i',fontsize=8)
+    
+    # Add Gridlines
+    gl = ax.gridlines(draw_labels=True,linewidth=0.5,color='black',linestyle=':')
+    gl.xlabels_top = gl.ylabels_right = False
+    gl.xformatter = LONGITUDE_FORMATTER
+    gl.yformatter = LATITUDE_FORMATTER
+    
+
+    bc = plt.colorbar(cs,orientation='horizontal')
+    ax.set_title("NHFLX - PC%i Regression, ENS %s, " %(N+1,estring),fontsize=16)
