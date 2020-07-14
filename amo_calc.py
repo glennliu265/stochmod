@@ -12,6 +12,7 @@ import numpy as np
 from scipy.signal import butter, lfilter, freqz, filtfilt, detrend
 from scipy import stats
 from scipy.io import loadmat
+from scipy import signal
 
 from cartopy import config
 import cartopy.feature as cfeature
@@ -187,7 +188,7 @@ def detrendlin(var_in):
 
 
 
-def calc_AMV(lon,lat,sst,bbox,order,cutofftime):
+def calc_AMV(lon,lat,sst,bbox,order,cutofftime,awgt):
     """
     
 
@@ -223,7 +224,7 @@ def calc_AMV(lon,lat,sst,bbox,order,cutofftime):
     
     
     # Take the weighted area average
-    aa_sst = area_avg(sst,bbox,lon,lat,0)
+    aa_sst = area_avg(sst,bbox,lon,lat,awgt)
     
     # Linearly detrend the data
     aa_sst = detrendlin(aa_sst)
@@ -295,10 +296,15 @@ def regress2ts(var,ts,normalizeall,method):
         var = np.reshape(var,(londim*latdim,var.shape[2]))
         
         # Perform regression
-        var_reg = np.matmul(np.ma.anomalies(var,axis=1),np.ma.anomalies(ts,axis=0))/len(ts)
+        #var_reg = np.matmul(np.ma.anomalies(var,axis=1),np.ma.anomalies(ts,axis=0))/len(ts)
+        var_reg = regress_2d(ts,var)
+        
         
         # Reshape to match lon x lat dim
         var_reg = np.reshape(var_reg,(londim,latdim))
+    
+    
+    
     
     # 2nd method is looping point by poin  
     elif method == 2:
@@ -328,12 +334,72 @@ def regress2ts(var,ts,normalizeall,method):
     return var_reg
         
 
+# Functions
+def regress_2d(A,B):
+    """
+    Regresses A (independent variable) onto B (dependent variable), where
+    either A or B can be a timeseries [N-dimensions] or a space x time matrix 
+    [N x M]. Script automatically detects this and permutes to allow for matrix
+    multiplication.
+    
+    Returns the slope (beta) for each point, array of size [M]
+    
+    
+    """
+    # Determine if A or B is 2D and find anomalies
+    
+    
+    # 2D Matrix is in A [MxN]
+    if len(A.shape) > len(B.shape):
+        
+        # Tranpose A so that A = [MxN]
+        if A.shape[1] != B.shape[0]:
+            A = A.T
+        
+        
+        # Set axis for summing/averaging
+        a_axis = 1
+        b_axis = 0
+        
+        # Compute anomalies along appropriate axis
+        Aanom = A - np.nanmean(A,axis=a_axis)[:,None]
+        Banom = B - np.nanmean(B,axis=b_axis)
+        
+
+        
+    # 2D matrix is B [N x M]
+    elif len(A.shape) < len(B.shape):
+        
+        # Tranpose B so that it is [N x M]
+        if B.shape[0] != A.shape[0]:
+            B = B.T
+        
+        # Set axis for summing/averaging
+        a_axis = 0
+        b_axis = 0
+        
+        # Compute anomalies along appropriate axis        
+        Aanom = A - np.nanmean(A,axis=a_axis)
+        Banom = B - np.nanmean(B,axis=b_axis)[None,:]
+    
+    # Calculate denominator, summing over N
+    Aanom2 = np.power(Aanom,2)
+    denom = np.sum(Aanom2,axis=a_axis)    
+    
+    # Calculate Beta
+    beta = Aanom @ Banom / denom
+    
+        
+    return beta
+
+
+
 #%% ----------------------------------------------------------------------------
 # Set data paths
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath = projpath + '03_Scripts/stochmod/'
 datpath = projpath + '01_Data/'
-outpath = projpath + '02_Figures/20200707/'
+outpath = projpath + '02_Figures/20200714/'
 
 # Path to SST data from obsv
 datpath2 = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/"
@@ -387,10 +453,10 @@ for mode in hvarmode:
 
 
     # Calculate AMV Index
-    amv[mode],aa[mode] = calc_AMV(lon,lat,sst[mode],bbox,order,cutofftime)
+    amv[mode],aa[mode] = calc_AMV(lon,lat,sst[mode],bbox,order,cutofftime,1)
 
 # Repeat, but for forcing
-lpforcing,aaforcing = calc_AMV(lon,lat,F,bbox,order,cutofftime)
+lpforcing,aaforcing = calc_AMV(lon,lat,F,bbox,order,cutofftime,1)
     
     
     
@@ -403,18 +469,22 @@ regr_meth2 = {}
 for mode in hvarmode:
     #regr_meth1[mode]=regress2ts(sst[mode],amv[mode],0,1)
     
-    regr_meth2[mode]=regress2ts(sst[mode],amv[mode],0,2)
+    regr_meth2[mode]=regress2ts(sst[mode],amv[mode],0,1)
  
 
 
 #%% Repeat for entrainment case
     
 sstentrain  = np.load(datpath+"stoch_output_1000yr_funiform%i_entrain1_hvar2.npy"%(funiform))    
-amventrain,aaentrain= calc_AMV(lon,lat,F,bbox,order,cutofftime)
-regrentrain = regress2ts(sstentrain,amventrain,0,2)
-    
+amventrain,aaentrain= calc_AMV(lon,lat,sstentrain,bbox,order,cutofftime,1)
+regrentrain0 = regress2ts(sstentrain,amventrain,0,1)
 
-# ----------------------------------------
+
+#regrentrain = regress_2d()
+
+
+
+#----------------------------------------
 # %% For Comparison, Repeat for Observations
 # ----------------------------------------
 # Path to SST data from obsv
@@ -453,12 +523,101 @@ hsstnew = np.concatenate((hsstsouth,hsstnorth),axis=1)
 
 
 # Take average from amv
-h_amv,aa_hsst = calc_AMV(hlon,hlatnew,hsstnew,bbox,order,cutofftime)  
+h_amv,aa_hsst = calc_AMV(hlon,hlatnew,hsstnew,bbox,order,cutofftime,1)  
 
 # Restrict to time domain
 
 # Regress back to SST (Note: Normalizing seems to remove canonical AMV pattern)
-h_regr=regress2ts(hsstnew,h_amv,0,2)
+h_regr=regress2ts(hsstnew,h_amv,0,1)
+#h_regr1 =regress2ts(hsstnew,h_amv,0,1)
+
+
+
+# %% Perform psd
+
+
+# User defined settings
+fs = 1/(3600*24*30) # Sampling Frequency (1 month in seconds0
+#xtk     = [fs/1200,fs/120,fs/12,fs,fs*30]
+#xtklabel = ['century','decade','year','mon',"day"]
+
+xtk     = [fs/1200,fs/120,fs/12,fs]
+xtklabel = ['century','decade','year','mon']
+
+pxx = {}
+freqs = {}
+for mode in hvarmode:
+    freqs[mode],pxx[mode] = signal.periodogram(aa[mode],fs)
+
+
+freq,pxxentrain = signal.periodogram(aaentrain,fs)
+
+freqhad,pxxhad = signal.periodogram(aa_hsst,fs)
+
+
+freqforce,pxxforce = signal.periodogram(aaforcing,fs)
+
+
+# Plot for HadlISST
+fig,ax = plt.subplots(figsize=(6,3))
+plt.style.use("ggplot")
+ax.plot(freqhad,pxxhad)
+ax.set_xlabel('Period [s]')
+ax.set_ylabel('PSD [degC**2/Hz')
+ax.set_xscale('log')
+ax.set_ylim([1e-1,1e11])
+ax.set_yscale('log')
+ax.set_xticks(xtk)
+ax.set_xticklabels(xtklabel)
+ax.set_title("HadlISST Area-Average SST Anomaly Periodogram")
+
+# Make Secondary xAxis
+secax = ax.secondary_xaxis('top')
+secax.set_xscale('log')
+secax.set_xlabel('Frequency [Hz]')
+secax.set_xticks(xtk)
+secax.set_xticklabels(xtk)
+
+plt.tight_layout()
+
+plt.savefig("%sPeriodogram_Hadlisst.png"%outpath,dpi=200)
+
+
+
+
+# Plot for no entrain (hvar2), entrain, and forcing
+fig,ax = plt.subplots(figsize=(6,3))
+plt.style.use("ggplot")
+l1 = ax.plot(freqforce,pxxforce,label="Forcing")
+l2 = ax.plot(freq,pxxentrain,label="Entrain")
+l3 = ax.plot(freqs[2],pxx[2],label="No-Entrain")
+
+ax.set_xlabel('Period [s]')
+ax.set_ylabel('PSD [degC**2/Hz')
+ax.set_xscale('log')
+ax.set_ylim([1e-1,1e11])
+ax.set_yscale('log')
+ax.set_xticks(xtk)
+ax.set_xticklabels(xtklabel)
+ax.set_title("Stochastic Model Area-Average SST Anomaly Periodogram")
+plt.legend()
+
+# Make Secondary xAxis
+secax = ax.secondary_xaxis('top')
+secax.set_xscale('log')
+secax.set_xlabel('Frequency [Hz]')
+secax.set_xticks(xtk)
+secax.set_xticklabels(xtk)
+
+plt.tight_layout()
+plt.savefig("%sPeriodogram_Stochmod_NoEntrain.png"%outpath,dpi=200)
+
+
+
+
+
+
+
 
 #%%
 # -------------------------------
@@ -631,7 +790,7 @@ clab = cint
 fig,ax = plt.subplots(1,1,figsize=(8,4))
 plt.style.use("ggplot")
 
-varin = np.transpose(h_regr,(1,0))
+varin = np.transpose(h_regr1,(1,0))
 
 plt.subplot(1,1,1)
 plot_AMV_spatial(varin,hlon,hlatnew,bbox,cmap,cint,clab)
