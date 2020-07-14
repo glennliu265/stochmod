@@ -108,7 +108,7 @@ Dependencies:
     
 """
 def stochmod_noentrain(t_end,lbd,T0,F):
-    debugmode = 0 # Set to 1 to also save noise and damping time series
+    debugmode = 1 # Set to 1 to also save noise and damping time series
     
     # Preallocate
     temp_ts = np.zeros(t_end)
@@ -180,7 +180,7 @@ Dependencies:
     
 """
 def stochmod_entrain(t_end,lbd,T0,F,beta,h,kprev,FAC):
-    debugmode = 0 # Set to 1 to also save noise,damping,entrain, and Td time series
+    debugmode = 1 # Set to 1 to also save noise,damping,entrain, and Td time series
     linterp   = 1 # Set to 1 to use the kprev variable and linearly interpolate variables
     
     # Preallocate
@@ -429,13 +429,13 @@ detrendopt = 0  # Option to detrend before calculations
 
 
 # White Noise Options
-genrand    = 1   #
+genrand    = 0   #
 
 #Set Paths
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath = projpath + '03_Scripts/stochmod/'
 datpath = projpath + '01_Data/'
-outpath = projpath + '02_Figures/20200617/'
+outpath = projpath + '02_Figures/20200707/'
 
 
 # Set up some strings for labeling
@@ -616,13 +616,16 @@ if useeta == 1:
     F = np.copy(eta)
     F = np.squeeze(F)
 
+
+
+
 # -------------------------
 #%% Prepare Entrainment Terms --------------------------------------------------
 # -------------------------
 
 
 # Calculate Reduction Factor
-FAC      = (1-np.exp(-lbd))/lbd # I dont think this will be used...
+#FAC      = (1-np.exp(-lbd))/lbd # I dont think this will be used...
 FAC_entr = (1-np.exp(-lbd_entr))/lbd_entr
 
 
@@ -668,16 +671,24 @@ FAC_entr = (1-np.exp(-lbd_entr))/lbd_entr
 # plt.title("FAC")
 # plt.legend()
 
-
+# Plot to compare the lambda terms and reduction factor
+plt.style.use("ggplot")
+fig,ax = plt.subplots(1,1)
+ax.plot(mons3,lbd,label='no-entrain')
+ax.plot(mons3,lbd_entr,label='entrain')
+ax.plot(mons3,FAC_entr,label='Reduction Factor')
+plt.legend()
+ax.set_title("Lambda Comparison")
 # ----------
 #%% RUN MODELS -----------------------------------------------------------------
 # ----------
 
+# For debug mode, set debug to 1 in fuction scripts and write the outputs
 
 # Run Model Without Entrainment
 start = time.time()
 #temp_ts,noise_ts,damp_ts = stochmod_noentrain(t_end,lbd,T0,F)
-T_entr0,_,_ = stochmod_noentrain(t_end,lbd,T0,F)
+T_entr0,npise_ts0,damp_ts0 = stochmod_noentrain(t_end,lbd,T0,F)
 elapsed = time.time() - start
 tprint = "No Entrain Model ran in %.2fs" % (elapsed)
 print(tprint)
@@ -686,11 +697,14 @@ print(tprint)
 # Run model with entrainment
 start = time.time()
 #temp_ts,noise_ts,damp_ts,entrain_ts,Td_ts=stochmod_entrain(t_end,lbd_entr,T0,F,beta,h)
-T_entr1,_,_,_,_=stochmod_entrain(t_end,lbd_entr,T0,F,beta,h,kprev,FAC_entr)
+T_entr1,noise_ts1,damp_ts1,entrain_ts,Td_ts=stochmod_entrain(t_end,lbd_entr,T0,F,beta,h,kprev,FAC_entr)
 elapsed = time.time() - start
 tprint = "Entrain Model ran in %.2fs" % (elapsed)
 print(tprint)
 
+#
+# %% Debug visualziations
+#
 
 # ------------------------------------
 #%% Prepare for Correlation Calculations----------------------------------------
@@ -784,28 +798,38 @@ corr_noise = calc_lagcovar(F_ts,F_ts,lags,kmonth,detrendopt)
 #
 #%% Do some Power Spectral Analysis...
 from scipy import signal
-fs = 1/(3600*24*30) # Sampling Frequency in seconds
-freqs,pxx = signal.periodogram(T_entr1,fs)
+fs = 1/(3600*24*30) # Sampling Frequency (1 month in seconds0
+#xtk     = [fs/1200,fs/120,fs/12,fs,fs*30]
+#xtklabel = ['century','decade','year','mon',"day"]
+
+xtk     = [fs/1200,fs/120,fs/12,fs]
+xtklabel = ['century','decade','year','mon']
+freqs,pxx_Tentr1 = signal.periodogram(noise_ts1,fs)
                               
-plt.plot(freqs, pxx)
+plt.plot(freqs, pxx_Tentr1)
 #plt.ylim([1e-7, 1e2])
 plt.xlabel('frequency [Hz]')
 plt.ylabel('PSD [degC**2/Hz]')
 plt.xscale('log')
-#plt.yscale('log')
+plt.yscale('log')
 #plt.ylim([1e1,1e6])
-xtk     = [fs/1200,fs/120,fs/12,fs,fs*30]
-xtklabel = ['century','decade','year','mon',"day"]
+plt.ylim([1e-1,1e11])
 plt.xticks(xtk,xtklabel)
 plt.show()
 
 
+
+plt.title("HadlISST Area-Average SST Anomaly Periodogram")
 # --------------
 #%% Make Figures  --------------------------------------------------------------
 # --------------
 
+
+
+
+
 # *********************
-# Autocorrelation Plots
+#%% Autocorrelation Plots
 # ********************* 
 f1 = plt.figure()
 ax = plt.axes()
@@ -972,7 +996,34 @@ savetau = 1/(damping[oid,aid,:] / (rho*cp0*h) * dt)
 matdict = {"lambdaastau":savetau}
 savemat(outpath+"lambdaastau.mat",matdict)
 
+# ******************************
+#%% Plot for a lambda comparison
+# ******************************
 
+f3 = plt.figure()
+ax = plt.axes()
+sns.set('paper','whitegrid','bright')
+# Plot each ensemble member, then 1 for labeling
+for e in range(1,np.shape(tauall)[1]):
+    #print(e)
+    ax.plot(np.arange(1,13,1),(rho*cp0*h)/tauall[:,e]/dt,color=(.75,.75,.75))
+ln0 = ax.plot(np.arange(1,13,1),(rho*cp0*h)/tauall[:,-1]/dt,color=(.75,.75,.75),label=r'$-1/\tau$ (Indv. Member)')
+
+
+ax.plot(np.arange(1,13,1),damping[oid,aid,:],color='r',label=r'$\lambda_{net}$')
+ax.plot(np.arange(1,13,1),(rho*cp0*h) / np.mean(tauall, axis=1)/dt,color='k',label=r'$ 1/\tau (ensemble mean)$')
+ax.legend(loc='best',)
+titlestr = 'Seasonal Values for Damping Term'
+ax.set(xticks=np.arange(1,13,1),
+       xlabel='Month',
+       ylabel='Value ($W/m^{-2}K^{-1}$)',
+       title=titlestr )
+outname = outpath+'tauaslambda_Damping.png'
+plt.savefig(outname, bbox_inches="tight",dpi=200)
+
+savetau = 1/(damping[oid,aid,:] / (rho*cp0*h) * dt)
+matdict = {"lambdaastau":savetau}
+savemat(outpath+"tauaslambda.mat",matdict)
 # **********************
 #%% Twin Axis Damping Plot
 # **********************
@@ -1089,3 +1140,9 @@ plt.savefig(outname, bbox_inches="tight",dpi=200)
 # Save files
 np.savetxt(datpath+"T_entr0.csv",T_entr0,delimiter=",")
 np.savetxt(datpath+"T_entr1.csv",T_entr1,delimiter=",")
+
+
+
+#
+# %% Visualize some variables
+#
