@@ -446,10 +446,15 @@ dt       = 60*60*24*30 # Timestep size (Will be used to multiply lambda)
 usetau   = 0          # Use tau (estimated damping timescale)
 useeta   = 0          # Use eta from YO's model run
 usesst   = 0
-funiform = 1        # Spatially uniform forcing
+
+# Forcing Type
+# 0 = completely random in space time
+# 1 = spatially unform forcing, temporally varying
+# 2 = NAO-like NHFLX Forcing, temporally varying 
+funiform = 2        
 
 # hvarmode
-hvarmode = 0 # hvar modes (0 - fixe mld, 1 - effective mld, 2 - seasonally varying mld)
+hvarmode = 2 # hvar modes (0 - fixe mld, 1 - effective mld, 2 - seasonally varying mld)
 hfix     = 50 # Fixed MLD (meters)
 
 # Region options
@@ -463,8 +468,8 @@ latN = 90
 detrendopt = 0  # Option to detrend before calculations
 
 
-# White Noise Options
-genrand   = 0  #
+# White Noise Options. Set to 1 to load data
+genrand   = 1  #
 
 #Set Paths
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
@@ -493,6 +498,8 @@ loaddamp = loadmat(damppath+dampmat)
 LON = loaddamp['LON1']
 LAT = loaddamp['LAT']
 damping = loaddamp['ensavg']
+
+
 
 # Load Mixed layer variables
 mldnc = "HMXL_HTR_clim.nc"
@@ -535,11 +542,38 @@ np.save(datpath+"lon.npy",lonr)
 
 # Generate Random White Noise Series (or load existing)
 if genrand == 1:
-    print("Making New Forcing Data")
+    print("Making New Forcing Data in mode %i"% (funiform))
+    # Spatially uniform, temporally varying
     if funiform == 1:
         randts = np.random.normal(0,1,size=t_end)/4
         F      = np.ones((lonsize,latsize,t_end))
         F      = np.multiply(F,randts[None,None,:])
+    
+    # NAO-like forcing
+    elif funiform == 2:
+        # Load data [PC x ENS x Lat x Lon]
+        F = np.load(datpath+"NAO_NHFLX_Forcing.npy")
+        
+        
+        
+        # Take Ensemble Average and PC1. Change to Lon x Lat
+        F = np.transpose(np.nanmean(F[0,:,:,:],axis=0),(1,0))
+        
+        # Remap Longitude
+        lon360 =  np.load(datpath+"CESM_lon360.npy")
+        kw = np.where(lon360 >= 180)[0]
+        ke = np.where(lon360 < 180)[0]
+        lon180 = np.concatenate((lon360[kw]-360,lon360[ke]),0)
+        F = np.concatenate((F[kw,:],F[ke,:]),0)
+        
+        
+        # Restrict to Region
+        F = F[klon[:,None],klat[None,:]]
+        
+        
+        # Scale by a time series
+        F = F[:,:,None] * (np.random.normal(0,1,size=t_end)/4)
+        
         
     else:
         F = np.random.normal(0,1,size=(lonsize,latsize,t_end))
@@ -670,7 +704,7 @@ elif hvarmode == 2:
 
 
 # ----------------
-# %% Calculate Lambda ------------------------------------------------------------
+# %% Calculate Lambda ---------------------------------------------hvar---------------
 # ----------------
 
 
@@ -782,9 +816,13 @@ if hvarmode == 2:
 
 
 # %% save output
-np.save(datpath+"stoch_output_1000yr_funiform%i_entrain1_hvar%i.npy"%(funiform,hvarmode),T_entr1)
+
 np.save(datpath+"stoch_output_1000yr_funiform%i_entrain0_hvar%i.npy"%(funiform,hvarmode),T_entr0)
-np.save(datpath+"stoch_output_1000yr_funiform%i_Forcing_hvar%i.npy"%(funiform,hvarmode),F)
+
+if hvarmode == 2:
+    np.save(datpath+"stoch_output_1000yr_funiform%i_entrain1_hvar%i.npy"%(funiform,hvarmode),T_entr1)
+
+np.save(datpath+"stoch_output_1000yr_funiform%i_Forcing.npy"%(funiform),F)
 
 
 #%% Find and calculate autocorrelation at a single point
