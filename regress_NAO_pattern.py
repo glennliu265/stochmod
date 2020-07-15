@@ -137,8 +137,10 @@ for n in range(npc):
 # Reshape variable [pc, ens, lat, lon]
 varout = np.reshape(varpattern,(npc,nens,nlat,nlon))
 
+F = np.copy(varout)
 
-
+outname = datpath+"NAO_NHFLX_Forcing.npy"
+np.save(outname,F)
 
 #%%
 # Try Plotting ensemble average
