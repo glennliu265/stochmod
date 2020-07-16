@@ -106,24 +106,49 @@ def area_avg(data,bbox,lon,lat,wgt):
     and corresponding lon/lat variables
 
     """
-    
-    # If wgt == 1, apply area-weighting 
-    if wgt == 1:
-        wgt = np.cos(np.radians(lat))
         
-        data = data * wgt[None,:,None]
-    
     # Find lat/lon indices 
     kw = np.abs(lon - bbox[0]).argmin()
     ke = np.abs(lon - bbox[1]).argmin()
     ks = np.abs(lat - bbox[2]).argmin()
     kn = np.abs(lat - bbox[3]).argmin()
     
+        
     # Select the region
     sel_data = data[kw:ke+1,ks:kn+1,:]
     
+    # If wgt == 1, apply area-weighting 
+    if wgt == 1:
+        
+        # Make Meshgrid
+        _,yy = np.meshgrid(lon[kw:ke+1],lat[ks:kn+1])
+        
+        
+        # Calculate Area Weights (cosine of latitude)
+        wgtm = np.cos(np.radians(lat))
+        wgta = np.cos(np.radians(yy)).T
+        
+        # Remove nanpts from weight
+        nansearch = np.sum(sel_data,2) # Sum along time
+        wgta[np.isnan(nansearch)] = 0
+        
+        
+        # Apply area weights
+        #data = data * wgtm[None,:,None]
+        sel_data  = sel_data * wgta[:,:,None]
+
+    
     # Take average over lon and lat
-    data_aa = np.nanmean(sel_data,(0,1))
+    if wgt ==1:
+
+        # Sum weights to get total area
+        sel_lat  = np.sum(wgta,(0,1))
+        
+        # Sum weighted values
+        data_aa = np.nansum(sel_data/sel_lat,axis=(0,1))
+    else:
+        # Take explicit average
+        data_aa = np.nanmean(sel_data,(0,1))
     
     return data_aa
 
@@ -283,6 +308,7 @@ def regress2ts(var,ts,normalizeall,method):
     latdim = var.shape[1]
     
     
+    
 
 
 
@@ -294,6 +320,19 @@ def regress2ts(var,ts,normalizeall,method):
         # Combine the spatial dimensions 
 
         var = np.reshape(var,(londim*latdim,var.shape[2]))
+        
+        
+        # Find Nan Points
+        # sumvar = np.sum(var,1)
+        
+        # # Find indices of nan pts and non-nan (ok) pts
+        # nanpts = np.isnan(sumvar)
+        # okpts  = np.invert(nanpts)
+    
+        # # Drop nan pts and reshape again to separate space and time dimensions
+        # var_ok = var[okpts,:]
+        #var[np.isnan(var)] = 0
+        
         
         # Perform regression
         #var_reg = np.matmul(np.ma.anomalies(var,axis=1),np.ma.anomalies(ts,axis=0))/len(ts)
@@ -392,14 +431,60 @@ def regress_2d(A,B):
         
     return beta
 
+"""
+Multidimensional detrend along each dimension, ignoring nans
+
+Detrend is performed along first dimension
+
+Input:
+    1. var_in: N-D array with dim to detrend along on axis=0
+
+Dependencies:
+    numpy as np
+    detrendlin function
+
+"""
+def detrendlin_nd(var_in):
+    
+    
+    # Reshape to combine all other dimensions
+    alldims = var_in.shape[1:]
+    combinedims = 1
+    for ele in alldims:
+        combinedims *= ele
+    var_rs     = np.reshape(var_in,(var_in.shape[0],combinedims))
+    var_dt = np.zeros(var_rs.shape)
+    
+    
+    # Loop over each dimension
+    for i in range(0,combinedims):
+        
+        # Select timeseries for that point
+        vloop = np.copy(var_rs[:,i])
+        
+        # Skip if all values are nan
+        if np.all(np.isnan(vloop)):
+            
+            # Assign values to nan
+            var_dt[:,i] = np.ones(vloop.shape)*np.nan
+            
+        else:
+            
+            # Detrend using 1d function
+            var_dt[:,i] = detrendlin(vloop)
+            
+    
+    var_dt = np.reshape(var_dt,var_in.shape)
+    
+    return var_dt
 
 
 #%% ----------------------------------------------------------------------------
 # Set data paths
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
-scriptpath = projpath + '03_Scripts/stochmod/'
+scriptpath = projpath + '03_Scripts/stochmod/'  
 datpath = projpath + '01_Data/'
-outpath = projpath + '02_Figures/20200714/'
+outpath = projpath + '02_Figures/20200716/'
 
 # Path to SST data from obsv
 datpath2 = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/"
@@ -424,7 +509,7 @@ cutofftime = 120
 
 # Other options
 
-funiform = 1
+funiform = 2
  
 
 # ----------------------------------------------------------------------------
@@ -477,7 +562,7 @@ for mode in hvarmode:
     
 sstentrain  = np.load(datpath+"stoch_output_1000yr_funiform%i_entrain1_hvar2.npy"%(funiform))    
 amventrain,aaentrain= calc_AMV(lon,lat,sstentrain,bbox,order,cutofftime,1)
-regrentrain0 = regress2ts(sstentrain,amventrain,0,1)
+regrentrain = regress2ts(sstentrain,amventrain,0,1)
 
 
 #regrentrain = regress_2d()
@@ -522,15 +607,37 @@ hlatnew = np.squeeze(np.concatenate((hlat[hsouth][::-1],hlat[hnorth][::-1])))
 hsstnew = np.concatenate((hsstsouth,hsstnorth),axis=1)
 
 
-# Take average from amv
-h_amv,aa_hsst = calc_AMV(hlon,hlatnew,hsstnew,bbox,order,cutofftime,1)  
 
-# Restrict to time domain
 
+# Detrend and anomalize the global sst
+hsstnew = np.reshape(hsstnew,(360*180,1176))
+hsstnew = np.transpose(hsstnew,(1,0))
+
+# Detrend (need to come up with vectorized form....)
+hsstnew_dt = detrendlin_nd(hsstnew)
+
+# Deseasonalize
+hsstnew_dt = np.reshape(hsstnew_dt,(int(hsstnew_dt.shape[0]/12),12,360,180))
+hsstnew_dt = hsstnew_dt - np.nanmean(hsstnew_dt,axis=1)[:,None,:,:]
+hsstnew_dt = np.reshape(hsstnew,(hsstnew.shape[0],360,180))
+hsstnew_dt = np.transpose(hsstnew_dt,(1,2,0))
+
+
+#hsstnew = np.transpose(hsstnew,(1,0))
+#hsstnew_dt = np.reshape(hsstnew_dt,(360,180,1176))
 # Regress back to SST (Note: Normalizing seems to remove canonical AMV pattern)
-h_regr=regress2ts(hsstnew,h_amv,0,1)
+
+# Take average from amv
+h_amv,aa_hsst = calc_AMV(hlon,hlatnew,hsstnew_dt,bbox,order,cutofftime,1)  
+
+h_regr=regress2ts(hsstnew_dt,h_amv,0,1)
+
+
 #h_regr1 =regress2ts(hsstnew,h_amv,0,1)
 
+fig,ax = plt.subplots(1,1)
+ax.plot(aa_new,color='k')
+ax.plot(h_amv,color='r')
 
 
 # %% Perform psd
@@ -756,12 +863,12 @@ def plot_AMV_spatial(var,lon,lat,bbox,cmap,cint=[0,],clab=[0,],ax=None):
 # Set up plot
 # Set colormaps and contour intervals
 cmap = cmocean.cm.balance
-cint = np.arange(-4,4.5,0.5)
+cint = np.arange(-50,55,5)
 #clab = np.arange(-0.50,0.60,0.10)
 #cint = np.arange(-1,1.2,0.2)
 #cint = np.arange(-2,2.5,0.5)
 
-#clab = cint
+clab = cint
 for mode in hvarmode:
     print(mode)
     fig,ax = plt.subplots(1,1,figsize=(8,4))
@@ -771,7 +878,7 @@ for mode in hvarmode:
     
     plt.subplot(1,3,mode+1)
     #plot_AMV_spatial(varin,lon,lat,bbox,cmap,cint,clab)
-    plot_AMV_spatial(varin,lon,lat,bbox,cmap)
+    plot_AMV_spatial(varin,lon,lat,bbox,cmap,cint,clab)
     plt.title("AMV Spatial Pattern \n MLD %s" % hvarnames[mode],fontsize=14)
     outname = outpath+'AMVpattern_funiform%i_hvar%i.png' % (funiform,mode)
     plt.savefig(outname, bbox_inches="tight",dpi=200)
@@ -790,7 +897,7 @@ clab = cint
 fig,ax = plt.subplots(1,1,figsize=(8,4))
 plt.style.use("ggplot")
 
-varin = np.transpose(h_regr1,(1,0))
+varin = np.transpose(h_regr,(1,0))
 
 plt.subplot(1,1,1)
 plot_AMV_spatial(varin,hlon,hlatnew,bbox,cmap,cint,clab)
@@ -802,10 +909,12 @@ plt.savefig(outname, bbox_inches="tight",dpi=200)
 
 cmap = cmocean.cm.balance
 #cint = np.arange(-3.5,3.25,0.25)
-cint = np.arange(-8,9,1)
+#cint = np.arange(-3,3.25,0.25)
 #clab = np.arange(-0.50,0.60,0.10)
 #cint = np.arange(-1,1.2,0.2)
+cint=np.arange(-50,55,5)
 clab = cint
+
 
 fig,ax = plt.subplots(1,1,figsize=(8,4))
 plt.style.use("ggplot")
@@ -842,8 +951,8 @@ import matplotlib.animation as animation
 
 
 # Prepare variables
-invar = np.transpose(np.copy(sst[2]),(1,0,2))
-frames = 10 #Indicate number of frames
+invar = np.transpose(np.copy(sstentrain),(1,0,2))
+frames = 100 #Indicate number of frames
 
 # Define Figure to create base map for plotting
 def make_figure(bbox):
@@ -875,7 +984,7 @@ fig,ax = make_figure(bbox) # Make the basemap
 def draw(lon,lat,invar,frame,add_colorbar):
     ax = plt.gca()
     plotvar = invar[...,frame] # Assume dims [lonxlatxtime]
-    pcm     = plt.pcolormesh(lon,lat,plotvar)
+    pcm     = plt.pcolormesh(lon,lat,plotvar,cmap=cmocean.cm.balance)
     title   = "t = %i" % frame
     ax.set_title(title)
     if add_colorbar==True:
@@ -893,10 +1002,94 @@ def animate(frame):
 
 ani = animation.FuncAnimation(fig, animate,frames,interval=0.1,blit=False,init_func=drawinit,repeat=False)
 
-ani.save("%stestanim.mp4"%(outpath),writer=animation.FFMpegWriter(fps=8))
+ani.save("%stest_anim_sstentrain.mp4"%(outpath),writer=animation.FFMpegWriter(fps=8))
 plt.close(fig)
 
 
+#%% Annual Average Plots
+
+
+def ann_avg(ts):
+    """
+    # Take Annual Average of a time series
+    where time is the first dimension (in months)
+    
+    """
+    nyrs   = ts.shape[0] 
+    annavg = np.reshape(ts,(int(nyrs/12),12))
+    #annavg = np.reshape(ts,(12,int(nyrs/12)))
+    annavg = np.nanmean(annavg,axis=1)
+    return annavg
+
+
+anav_entrain      = ann_avg(aaentrain)
+anav_forcing      = ann_avg(aaforcing)
+anav_noentrain_h2 = ann_avg(aa[2])
+pltyr = np.arange(0,anav_entrain.shape[0])
+
+
+# Add forcing as first plot
+fig,ax = plt.subplots(3,1,sharex=True,sharey=False,figsize=(14,8))
+plt.style.use("ggplot")
+plt.subplot(3,1,1)
+plt.plot(pltyr,anav_forcing)
+plt.xlim(0,1000)
+#plt.xticks(np.arange(0,),hticks,fontsize=16)
+#plt.xticks(np.arange(0,len(amv[1])+1200,1200),hticks,fontsize=16)
+#plt.yticks(np.arange(-0.25,0.50,0.25),fontsize=16)
+plt.title("Forcing, Ann. Avg",fontsize=20)
+plt.ylabel("Forcing Term K/s",fontsize=16)
+
+
+plt.subplot(3,1,2)
+model = 2
+plt.plot(pltyr,anav_noentrain_h2)
+plt.ylim([-5,5])
+plt.xlim(0,1000)
+plt.title("No Entrain, Seasonally Varying h",fontsize=20)
+plt.ylabel("degC",fontsize=16)
 
 
 
+plt.subplot(3,1,3)
+model = 2
+plt.plot(pltyr,anav_entrain)
+plt.ylim([-5,5])
+plt.xlim(0,1000)
+plt.title("Entrain",fontsize=20)
+plt.ylabel("degC",fontsize=16)
+
+
+plt.tight_layout()
+outname = outpath+"AnnAvgComparison_funiform%i.png" % (funiform)
+plt.savefig(outname, bbox_inches="tight",dpi=200)
+
+#%% Mean Spatial Plots
+
+entrainmean = np.transpose(np.nanmean(sst[2],axis=2),(1,0))
+
+fig = plt.figure(figsize=(12,8))
+ax = fig.add_subplot(1,1,1,projection=ccrs.PlateCarree())
+
+# Set extent
+ax.set_extent(bbox)
+
+# Add filled coastline
+ax.add_feature(cfeature.COASTLINE,facecolor='k')
+
+# Add Gridlines
+gl = ax.gridlines(draw_labels=True,linewidth=0.75,color='gray',linestyle=':')
+
+gl.xlabels_top = gl.ylabels_right = False
+gl.xformatter = LONGITUDE_FORMATTER
+gl.yformatter = LATITUDE_FORMATTER
+
+pcm     = plt.contourf(lon,lat,entrainmean,cmap=cmocean.cm.balance)
+plt.colorbar(pcm)
+plt.title("Mean SST Anomaly from Entrain Model")
+outname = outpath+"AvgSST_Entrain_funiform%i.png" % (funiform)
+plt.savefig(outname, bbox_inches="tight",dpi=200)
+
+
+
+# Write function to plot a point when you indicate it
