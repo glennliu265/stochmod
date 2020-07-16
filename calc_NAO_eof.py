@@ -111,10 +111,6 @@ def regress_2d(A,B):
         
     return beta
 
-    
-
-
-
 # Path to data
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 datpath  = projpath + '01_Data/'
@@ -122,18 +118,51 @@ ncother = datpath+"PSL_NAOproc.nc"
 ds = xr.open_dataset(ncother)
 outpath = projpath+'/02_Figures/20200709/'
 
+# Cut region if it hasnt been cut
+lonW = -90
+lonE = 40
+latS = 20
+latN = 80
+lonname = 'lon'
+latname = 'lat'
+
+# Check longitude
+if ds.lon.shape[0] == 288:
+    print("Cutting variable to to region!")
+    # Convert to degrees East
+    if lonW < 0:
+        lonW += 360
+    if lonE < 0:
+        lonE += 360
+    
+    # Select North Atlantic Region for NAO Calculation...
+    if lonW > lonE: # Cases crossing the prime meridian
+        #print("Crossing Prime Meridian!")
+        dsna = ds.where((ds[lonname]>=lonW) | (ds[lonname]<=lonE),drop=True).sel(lat=slice(latS,latN))
+    else:
+        dsna = ds.sel(lon=slice(lonW,lonE),lat=slice(latS,latN))
+else:
+    dsna = ds
+
+
 # Read to numpy arrays
-slp = ds.PSL.values # ens x year x lat x lon
-lat = ds.lat.values
+slp = dsna.PSL.values # ens x year x lat x lon
+lat = ds.lat.values # Get full Lat/Lon
 lon = ds.lon.values
-year = ds.year.values
+latr = dsna.lat.values
+lonr = dsna.lon.values
+year = dsna.year.values
 
 # Get respective dimension sizes
 lonsize = len(lon)
 latsize = len(lat)
 tsize   = len(year)
-latpos  = slp.shape.index(latsize)
-lonpos  = slp.shape.index(lonsize)
+
+lonrsize = len(lonr)
+latrsize = len(latr)
+
+latpos  = slp.shape.index(latrsize)
+lonpos  = slp.shape.index(lonrsize)
 
 # EOF options
 N_mode = 3
@@ -149,7 +178,6 @@ tol = 5 # in degrees
 # Regression method
 method = 3 # 1 = pt by pt loop with polyfit, #2 = just take raw eof, #3 = regress2d function (vectorized)
 
-
 # Find box indices
 oidr = np.abs((lon - lonReykjavik)).argmin() 
 aidr = np.abs((lat - latReykjavik)).argmin()
@@ -160,10 +188,12 @@ aidl = np.abs((lat - latLisbon)).argmin()
 slp = slp - np.mean(slp,axis=0)
 
 # Compute area weights and apply to vvariable
-wgt = np.sqrt(np.cos(np.radians(lat)))
+wgt = np.sqrt(np.cos(np.radians(latr)))
 plt.plot(wgt)
+wgt2 = np.sqrt(np.cos(np.radians(lat)))
 
 slp = slp * wgt[None,None,:,None]
+
 
 # Preallocate
 pcall  = np.zeros((slp.shape[0],tsize,N_mode)) * np.nan
@@ -171,16 +201,19 @@ eofall = np.zeros((slp.shape[0],latsize,lonsize,N_mode)) * np.nan
 varexpall = np.zeros((slp.shape[0],N_mode)) * np.nan
 
 
-# Loop by ensemble...
+#%% Loop by ensemble...
 for e in range(slp.shape[0]):
     startloop = time.time()
-    # Get data for ensemble member
+    
+    # Get data for ensemble memberm ------------------------------------------
     data = slp[e,...] # year x lat x lon
+    dataregress = ds.PSL.values[e,...]  #* wgt2[None,:,None]
     
     # Combine spatial dimensions
-    data = np.reshape(data,(tsize,latsize*lonsize))
+    data = np.reshape(data,(tsize,latrsize*lonrsize))
+    dataregress = np.reshape(dataregress,(tsize,latsize*lonsize))
     
-    #%% Get non-nan indices ....
+    #% Get non-nan indices ....
     # Find indices of nan pts and non-nan (ok) pts
     nanpts = np.isnan(data)
     okpts  = np.invert(nanpts)
@@ -196,34 +229,26 @@ for e in range(slp.shape[0]):
     inotnan = np.prod(okpts,axis=0) # take product along time dimension
     inotnan = np.where(inotnan==True)
     
-    #%% Detrend data
+    #% Detrend data -------------
     data_dt = signal.detrend(data_ok,axis=0)
     
     # Prepare data
     datain = np.transpose(data_dt,(1,0))
     
-    #%% Perform EOF
+    #% Perform EOF -------------
     eofs,pcs,varexpall[e,:]=eof_simple(datain,N_mode,1)
     
-    #%% Standardize Pcs
+    #% Standardize Pcs -------------
     #pcall[e,:,:] = pcs / np.std(pcs,axis=0)
     pcraw = pcs / np.std(pcs,axis=0)
-    
-    #%% Reshape EOFs
-    
-    #varfill = np.zeros((data.shape[1],N_mode))
-    #varfill[inotnan,:] = eofs
-    
-    # if lonpos > latpos:
-    #     eofall[e,:,:,:] = np.reshape(eofrs,(latsize,lonsize,N_mode))
-    # elif lonpos < latpos:
-    #     eofall[e,:,:,:] = np.reshape(eofrs,(lonsize,latsize,N_mode))
-        
-    #%% Regress Pcs back to variable...
+            
+    #% Regress Pcs back to variable...-------------
+    N_pts = dataregress.shape[1]
     
     # Explicit Regression step
     if method == 1:
-        eofrs = np.zeros((data.shape[1],N_mode))
+        
+        eofrs = np.zeros((N_pts,N_mode))
         for pc in range(pcs.shape[1]):
             
             # Get corresponding PC times series
@@ -231,9 +256,9 @@ for e in range(slp.shape[0]):
             i = 0
             
             # Loop thru each pt
-            for pt in range(data.shape[1]):
+            for pt in range(N_pts):
                 
-                vartime = data[:,pt]
+                vartime = dataregress[:,pt]
                 
                 # Skip nan points
                 if np.any(np.isnan(vartime)):
@@ -247,21 +272,23 @@ for e in range(slp.shape[0]):
                 
                 eofrs[pt,pc] = r[0]
                 i += 1
-                msg = '\rCompleted Regression for %i of %i points for PC %i' % (i,data.shape[1],pc+1)
+                msg = '\rCompleted Regression for %i of %i points for PC %i' % (i,N_pts,pc+1)
                 print(msg,end="\r",flush=True)
             #print('\n')
+            
     elif method == 2:
                 
-        eofrs = np.zeros((data.shape[1],N_mode))
+        eofrs = np.zeros((N_pts,N_mode))
         eofrs[inotnan,:] = eofs
+        
     elif method == 3:
         
-        eofrs = np.zeros((data.shape[1],N_mode))
+        eofrs = np.zeros((N_pts,N_mode))
         for pc in range(pcs.shape[1]):
-            eofrs[:,pc] = regress_2d(pcs[:,pc],data) 
+            eofrs[:,pc] = regress_2d(pcs[:,pc],dataregress) 
         
         
-    #%% Flip EOFs based on boxes...
+    #% Flip EOFs based on boxes...-------------
     if flipeof == 1:
         # EOF 1 only (need to figure out the other EOFs..)
         # First check using reykjavik
@@ -289,7 +316,7 @@ for e in range(slp.shape[0]):
             print("\t Flipping sign based on Lisbon, Ens%i" % (e+1))
             eofraw *= -1
             pcraw *= -1
-        #%% Assign to outside variable
+        #% Assign to outside variable -------------
         eofall[e,:,:,:] = eofraw
         pcall[e,:,:] = pcraw
             
@@ -297,9 +324,30 @@ for e in range(slp.shape[0]):
     else:
         eofall[e,:,:,:] = np.reshape(eofrs,(latsize,lonsize,N_mode))
         pcall[e,:,:] = pcraw
-    
 
-#%% 
+
+
+#%% quick test plot
+
+
+plotvar = eofall[0,:,:,0]
+
+fig = plt.figure(figsize=(6,4))
+ax = fig.add_subplot(1,1,1,projection=ccrs.PlateCarree())
+
+
+# Add filled coastline
+ax.add_feature(cfeature.COASTLINE)
+cmap = cmocean.cm.balance
+# Add contours
+
+cs = plt.contourf(lon,lat,plotvar)
+plt.colorbar(cs)
+#%% Save Data 
+# 
+# Convert to mb
+eofall /= 100
+
 np.savez(datpath+"Manual_EOF_Calc_NAO.npz",eofall=eofall,pcall=pcall,varexpall=varexpall)
 
 
@@ -339,7 +387,7 @@ def plot_nao_eof(N,e):
     
     #cint = np.arange(-0.5,0.55,0.05)
     if N == 0:
-        cint = np.arange(-3,3.5,0.5)
+        cint = np.arange(-5,6,1)
     elif N == 1:
         cint = np.arange(-1,1.2,0.2)
     elif N == 2:
@@ -347,7 +395,7 @@ def plot_nao_eof(N,e):
     
     
     # Plot the EOF
-    #var1,lon1 = add_cyclic_point(var,lon) 
+    var1,lon1 = add_cyclic_point(var,lon) 
     plt.style.use('ggplot')
     fig,ax= plt.subplots(1,1,figsize=(6,4))
     
@@ -358,9 +406,10 @@ def plot_nao_eof(N,e):
     ax.add_feature(cfeature.COASTLINE)
     
     # Add contours
-    cs = ax.contourf(lon,lat,var,cint,cmap=cmap,transform=ccrs.PlateCarree())
+    cs = ax.contourf(lon1,lat,var1,cint,cmap=cmap,transform=ccrs.PlateCarree())
+    
     # Negative contours
-    cln = ax.contour(lon,lat,var,
+    cln = ax.contour(lon1,lat,var1,
                 cint[cint<0],
                 linestyles='dashed',
                 colors='k',
@@ -368,7 +417,7 @@ def plot_nao_eof(N,e):
                 transform=ccrs.PlateCarree())
     
     # Positive Contours
-    clp = ax.contour(lon,lat,var,
+    clp = ax.contour(lon1,lat,var1,
                 cint[cint>=0],
                 colors='k',
                 linewidths=0.5,
@@ -379,7 +428,7 @@ def plot_nao_eof(N,e):
     gl.xlabels_top = gl.ylabels_right = False
     gl.xformatter = LONGITUDE_FORMATTER
     gl.yformatter = LATITUDE_FORMATTER
-    bc = plt.colorbar(cs,orientation='horizontal')
+    cb = plt.colorbar(cs,ax=ax,orientation='horizontal')
     
     ax.set_title("EOF %i, Variance Explained: %.02f%% " %(N+1,pexplained),fontsize=16)
     plt.savefig(outpath+"NAO_EOF%i_Ens%s.png"%(N+1,estring), bbox_inches="tight",dpi=200)
@@ -387,7 +436,7 @@ def plot_nao_eof(N,e):
 
 plot_nao_eof(0,"avg")
 
-
+#%%
 for N in range(2):
     for e in range(42):
         plot_nao_eof(N,e)
