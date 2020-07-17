@@ -5,8 +5,6 @@ stochmod_sst, Python Version
 
 This is a temporary script file.
 """
-
-
 from scipy.io import loadmat
 import numpy as np
 import matplotlib.pyplot as plt
@@ -342,91 +340,6 @@ Dependencies:
 """
 
 
-def find_kprev(h):
-    
-    # Preallocate
-    kprev = np.zeros(12)
-    hout = np.zeros(12)
-    
-    # Month Array
-    monthx = np.arange(1,13,1)  
-    
-    # Determine if the mixed layer is deepening (true) or shoaling (false)--
-    dz = h / np.roll(h,1) 
-    dz = dz > 1
-    #dz = dz.values
-    
-        
-        
-        
-    for m in monthx:
-        
-        
-        # Quick Indexing Fixes ------------------
-        im = m-1 # Month Index (Pythonic)
-        m0 = m-1 # Previous month
-        im0 = m0-1 # M-1 Index
-        
-        # Fix settings for january
-        if m0 < 1:
-            m0 = 12
-            im0 = m0-1
-        
-        # Set values for minimun/maximum -----------------------------------------
-        if im == h.argmax() or im== h.argmin():
-            #print("Ignoring %i, max/min" % m)
-            kprev[im] = m
-            hout[im] = h[im]
-            continue
-        
-    
-        
-        # Ignore detrainment months
-        if dz[im] == False:
-            #print("Ignoring %i, shoaling month" % m)
-            continue
-        
-        # For all other entraining months.., search backwards
-        findmld = h[im]  # Target MLD   
-        hdiff = h - findmld
-          
-        searchflag = 0
-        ifindm = im0
-        
-        
-        while searchflag == 0:
-                
-            hfind= hdiff[ifindm]
-            
-            # For the first month greater than the target MLD,
-            # grab this value and the value before it
-            if hfind > 0:
-                # Set searchflag to 1 to prepare for exit
-                searchflag = 1
-                
-                # record MLD values
-                h_before = h[ifindm+1]
-                h_after  = h[ifindm]
-                m_before = monthx[ifindm+1]
-                m_after =  monthx[ifindm]
-                
-                # For months between Dec/Jan, assign value between 0 and 1
-                if ifindm < 0 and ifindm == -1:
-                    m_after = ifindm+1
-                
-                # For even more negative indices
-                
-                #print("Found kprev for month %i it is %f!" % (m,np.interp(findmld,[h_before,h_after],[m_before,m_after])))
-                kprev[im] = np.interp(findmld,[h_before,h_after],[m_before,m_after])
-                hout[im] = findmld
-            
-            # Go back one month
-            ifindm -= 1
-    
-    return kprev, hout
-
-    
-
 #%% User Edits -----------------------------------------------------------------           
 
 # Set Point and month
@@ -499,17 +412,13 @@ LON = loaddamp['LON1']
 LAT = loaddamp['LAT']
 damping = loaddamp['ensavg']
 
-
-
 # Load Mixed layer variables
-mldnc = "HMXL_HTR_clim.nc"
-ds = xr.open_dataset(datpath+mldnc)
-
+mld = np.load(datpath+"HMXL_hclim.npy") # Climatological MLD
+kprevall = np.load(datpath+"HMXL_kprev.npy") # Entraining Month
 
 # ------------------
 # %% Restrict to region ---------------------------------------------------------
 # ------------------
-
 
 # Note: what is the second dimension for?
 klat = np.where((LAT >= latS) & (LAT <= latN))[0]
@@ -524,7 +433,9 @@ dampingr = damping[klon[:,None],klat[None,:],:]
 lonr = np.squeeze(LON[klon])
 latr = np.squeeze(LAT[klat])
 
-# Further restrict to non-nan locations
+# Restrict MLD variables to region
+hclim = mld[klon[:,None],klat[None,:],:]
+kprev = kprevall[klon[:,None],klat[None,:],:]
 
 # Get lat and long sizes
 lonsize = lonr.shape[0]
@@ -551,13 +462,13 @@ if genrand == 1:
     
     # NAO-like forcing
     elif funiform == 2:
+        
         # Load data [PC x ENS x Lat x Lon]
         F = np.load(datpath+"NAO_NHFLX_Forcing.npy")
-        
-        
-        
+         
         # Take Ensemble Average and PC1. Change to Lon x Lat
-        F = np.transpose(np.nanmean(F[0,:,:,:],axis=0),(1,0))
+        #F = np.transpose(np.nanmean(F[0,:,:,:],axis=0),(1,0))
+        F = np.nanmean(F[0,:,:,:],axis=0).T
         
         # Remap Longitude
         lon360 =  np.load(datpath+"CESM_lon360.npy")
@@ -570,7 +481,6 @@ if genrand == 1:
         # Restrict to Region
         F = F[klon[:,None],klat[None,:]]
         
-        
         # Scale by a time series
         F = F[:,:,None] * (np.random.normal(0,1,size=t_end)/4)
         
@@ -579,106 +489,11 @@ if genrand == 1:
         F = np.random.normal(0,1,size=(lonsize,latsize,t_end))
         
         
-    np.save(datpath+"randts_2d_uniform%s.npy"%(funiform),F)
+    np.save(datpath+"stoch_output_1000yr_funiform%i_Forcing.npy"%(funiform),F)
     
 else:
     print("Loading Old Data")
-    F = np.load(datpath+"randts_2d_uniform%s.npy"%(funiform))
-
-
-
-# ---------------------------------------
-# %% Calc Ens Avg Mixed Layer Seasonal Cycle-------------------------------------
-# ---------------------------------------
-
-# Preallocate and specify search tolerance 
-hclim = np.zeros((lonsize,latsize,12),dtype=float)
-kprev = np.zeros((lonsize,latsize,12),dtype=float)
-
-stol  = 0.75 # Search tolerance for curivilinear grid (degrees) <Note there is sensitivity to this>....
-
-# Take ensemble mean
-h_ensmean = ds.HMXL.mean('ensemble')/100
-
-# This portion of the data unfortunately has an ensemble dimension
-tlon = ds.TLONG.mean('ensemble')
-tlat = ds.TLAT.mean('ensemble')
-
-h_ensmean = h_ensmean.assign_coords(TLONG=tlon)
-h_ensmean = h_ensmean.assign_coords(TLAT=tlat)
-
-def getpt_pop(lonf,latf,ds,searchdeg=0.5,returnarray=1):
-    """ Quick script to read in a xr.Dataset (ds)
-        and return the value for the point specified by lonf,latf
-        
-    
-    """
-    
-    
-    # Do same for curivilinear grid
-    if lonf < 0:
-        lonfc = lonf + 360 # Convert to 0-360 if using negative coordinates
-    else:
-        lonfc = lonf
-        
-    # Find the specified point on curvilinear grid and average values
-    selectmld = ds.where((lonfc-searchdeg < ds.TLONG) & (ds.TLONG < lonfc+searchdeg)
-                    & (latf-searchdeg < ds.TLAT) & (ds.TLAT < latf+searchdeg),drop=True)
-    
-    pmean = selectmld.mean(('nlon','nlat'))
-    
-    if returnarray ==1:
-        h = np.squeeze(pmean.values)
-        return h
-    else:
-        return pmean
-    
-
-
-start = time.time()
-for o in range(0,lonsize):
-    # Get Longitude Value
-    lonf = lonr[o]
-    
-    # Convert to degrees East
-    if lonf < 0:
-        lonf = lonf + 360
-    
-    for a in range(0,latsize):
-        
-        
-        # Get latitude indices
-        latf = latr[a]
-        
-        
-        # Skip if the point is land
-        if np.isnan(np.mean(dampingr[o,a,:])):
-            msg = "Land Point @ lon %f lat %f" % (lonf,latf)
-            #print(msg)
-            hclim[o,a,:] = np.ones(12)*np.nan
-            kprev[o,a,:] = np.ones(12)*np.nan
-            continue
-        
-        
-        # Get point
-        hclim[o,a,:] = getpt_pop(lonf,latf,h_ensmean,searchdeg=stol)
-        
-
-        
-        # Find Entraining Months
-        kprev[o,a,:],_ = find_kprev(hclim[o,a,:])
-        
-
-
-print("Finished in %f seconds" % (time.time()-start))
-
-# Quick visualization to check
-cs = plt.contourf(lonr,latr,np.transpose(np.squeeze(hclim[:,:,2])),cmap = cmocean.cm.balance)
-plt.colorbar(cs)
-
-#plt.contourf(lonr,latr,np.transpose(np.squeeze(kprev[:,:,5])))
-
-
+    F = np.load(datpath+"stoch_output_1000yr_funiform%i_Forcing.npy"%(funiform))
 
 
 # ----------------
@@ -706,10 +521,6 @@ elif hvarmode == 2:
 # ----------------
 # %% Calculate Lambda ---------------------------------------------hvar---------------
 # ----------------
-
-
-
-
 
 if usetau == 1:
     lbd = 1/np.mean(tauall,axis=1)
@@ -822,111 +633,5 @@ np.save(datpath+"stoch_output_1000yr_funiform%i_entrain0_hvar%i.npy"%(funiform,h
 if hvarmode == 2:
     np.save(datpath+"stoch_output_1000yr_funiform%i_entrain1_hvar%i.npy"%(funiform,hvarmode),T_entr1)
 
-np.save(datpath+"stoch_output_1000yr_funiform%i_Forcing.npy"%(funiform),F)
+#np.save(datpath+"stoch_output_1000yr_funiform%i_Forcing.npy"%(funiform),F)
 
-
-#%% Find and calculate autocorrelation at a single point
-# Set Point and month
-lonf    = -30
-latf    = 50
-kmon    = hclim[klon,klat,:].argmax()
-lags    = np.arange(0,61,1)
-
-
-
-# Load data if it hasnt been
-loaddata = 1
-if loaddata == 1:
-    dataname = datpath+"stoch_output_1000yr_entrain1_hvar2.npy"
-    noentrain = np.load(dataname)
-
-# Find Lat/Lon (can write this into a function)
-klon = np.abs(lonr - lonf).argmin()
-klat = np.abs(latr - latf).argmin()
-msg1 = "For Longitude %.02f, I found %.02f" % (lonf,lonr[klon])
-msg2 = "For Latitude %.02f, I found %.02f" % (latf,latr[klat])
-print(msg1)
-print(msg2)
-
-#Get data for a single point
-hcycle_pt = hclim[klon,klat,:]
-
-temp_ts = noentrain[klon,klat,:]
-temp_ts = np.reshape(temp_ts,(int(np.ceil(len(temp_ts)/12)),12))
-temp_ts = np.transpose(temp_ts,(1,0))
-
-# Calculate Lag Autocorrelation
-corr_ts = calc_lagcovar(temp_ts,temp_ts,lags,kmon,0)
-    
-    
-# Plot Correlation
-f1 = plt.figure()
-ax = plt.axes()
-plt.style.use('seaborn')
-ax.plot(lags,corr_ts,'c',lw=3,label='Stochastic (No-Entrain)')
-ax.legend(prop=dict(size=16))
-titlestr = 'SST Anomaly Autocorrelation; \n Month: '+monsfull[kmon-1] + ' | Lon: ' + \
-    str(lonf) + ' | Lat: '+ str(latf)
-    
-ax.set_ylabel('Correlation',fontsize=14)
-ax.set_ylim(-0.2,1.1)
-ax.set_xlabel('Lag (months)',fontsize=14)
-ax.set_title(titlestr,fontsize=20)
-
-# Plot Seasonal MLD
-fmx = plt.figure()
-ax = plt.axes()
-ax.plot(range(1,13),hcycle_pt)
-ax.legend()
-ax.set(xlim=(1,12),ylim=(0,200),xlabel='Months',ylabel='MLD(m)')
-
-
-
-# Plot a map of the climatological MLD
-mon = 12
-cmap = cmocean.cm.balance
-bbox = [-75,5,0,65]
-hplot = hclim[:,:,mon-1]
-var = np.transpose(np.copy(hplot),(1,0))
-
-
-# Add cyclic point to avoid the gap
-var,lon1 = add_cyclic_point(var,coord=lonr)
-
-
-# Set up projections and extent
-ax = plt.axes(projection=ccrs.PlateCarree())
-ax.set_extent(bbox)
-
-# Add filled coastline
-ax.add_feature(cfeature.COASTLINE,facecolor='k')
-
-
-# Draw contours
-cs = ax.contourf(lon1,latr,var,cmap=cmap)            
-# Add Gridlines
-gl = ax.gridlines(draw_labels=True,linewidth=0.75,color='gray',linestyle=':')
-gl.xlabels_top = gl.ylabels_right = False
-gl.xformatter = LONGITUDE_FORMATTER
-gl.yformatter = LATITUDE_FORMATTER
-bc = plt.colorbar(cs)
-
-
-
-#%% Attempt at animation....
-
-import matplotlib.animation as animation
-
-animationname = outpath + "test.mp4"
-
-
-fig,ax = make_figure()
-
-frames    = t_end # Number of frames
-min_value =# Lowest Value
-max_value = # Highest Value
-
-def draw(frame,add_colorbar):
-    grid = 
-
-    
