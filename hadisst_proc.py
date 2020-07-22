@@ -12,6 +12,8 @@ from scipy import stats
 import seaborn as sns
 import xarray as xr
 import time
+from scipy.signal import butter, lfilter, freqz, filtfilt, detrend
+
 
 from cartopy import config
 import cartopy.feature as cfeature
@@ -91,7 +93,205 @@ def detrendlin(var_in):
     
     return var_detrend
 
-# Functions
+
+
+def area_avg(data,bbox,lon,lat,wgt):
+    """
+    Function to find the area average of data [lon x lat x otherdim]
+    
+    Given a bounding box [lonW, lonE, latS, latN]
+    
+    and corresponding lon/lat variables
+
+    """
+        
+    # Find lat/lon indices 
+    kw = np.abs(lon - bbox[0]).argmin()
+    ke = np.abs(lon - bbox[1]).argmin()
+    ks = np.abs(lat - bbox[2]).argmin()
+    kn = np.abs(lat - bbox[3]).argmin()
+    
+        
+    # Select the region
+    sel_data = data[kw:ke+1,ks:kn+1,:]
+    
+    # If wgt == 1, apply area-weighting 
+    if wgt == 1:
+        
+        # Make Meshgrid
+        _,yy = np.meshgrid(lon[kw:ke+1],lat[ks:kn+1])
+        
+        
+        # Calculate Area Weights (cosine of latitude)
+        wgtm = np.cos(np.radians(lat))
+        wgta = np.cos(np.radians(yy)).T
+        
+        # Remove nanpts from weight
+        nansearch = np.sum(sel_data,2) # Sum along time
+        wgta[np.isnan(nansearch)] = 0
+        
+        
+        # Apply area weights
+        #data = data * wgtm[None,:,None]
+        sel_data  = sel_data * wgta[:,:,None]
+
+    
+    # Take average over lon and lat
+    if wgt ==1:
+
+        # Sum weights to get total area
+        sel_lat  = np.sum(wgta,(0,1))
+        
+        # Sum weighted values
+        data_aa = np.nansum(sel_data/sel_lat,axis=(0,1))
+    else:
+        # Take explicit average
+        data_aa = np.nanmean(sel_data,(0,1))
+    
+    return data_aa
+
+
+
+
+def calc_AMV(lon,lat,sst,bbox,order,cutofftime,awgt):
+    """
+    
+
+    Parameters
+    ----------
+    lon : TYPE
+        DESCRIPTION.
+    lat : TYPE
+        DESCRIPTION.
+    sst : TYPE
+        DESCRIPTION.
+    bbox : TYPE
+        DESCRIPTION.
+    order : TYPE
+        DESCRIPTION.
+    cutofftime : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    amv
+
+    """
+    
+    """
+    
+    # Dependencies
+    functions: area_avg, detrendlin
+    
+    numpy as np
+    from scipy.signal import butter,filtfilt
+    """
+    
+    
+    # Take the weighted area average
+    aa_sst = area_avg(sst,bbox,lon,lat,awgt)
+    
+    # Linearly detrend the data
+    aa_sst = detrendlin(aa_sst)
+    
+    # Normalize the data
+    #sstmean = np.nanmean(aa_sst)
+    #sststd  = np.nanstd(aa_sst)
+    #sstanom = (aa_sst - sstmean) / sststd
+    
+    sstanom = aa_sst
+    
+    
+    # Design Butterworth Lowpass Filter
+    filtfreq = len(aa_sst)/cutofftime
+    nyquist  = len(aa_sst)/2
+    cutoff = filtfreq/nyquist
+    b,a    = butter(order,cutoff,btype="lowpass")
+    
+    # Compute AMV Index
+    amv = filtfilt(b,a,sstanom)
+    
+    return amv,aa_sst
+    
+def regress2ts(var,ts,normalizeall,method):
+    
+    
+    # Anomalize and normalize the data (time series is assumed to have been normalized)
+    if normalizeall == 1:
+        varmean = np.nanmean(var,2)
+        varstd  = np.nanstd(var,2)
+        var = (var - varmean[:,:,None]) /varstd[:,:,None]
+        
+    # Get variable shapes
+    londim = var.shape[0]
+    latdim = var.shape[1]
+    
+    
+    
+
+
+
+    
+    
+    # 1st method is matrix multiplication
+    if method == 1:
+        
+        # Combine the spatial dimensions 
+
+        var = np.reshape(var,(londim*latdim,var.shape[2]))
+        
+        
+        # Find Nan Points
+        # sumvar = np.sum(var,1)
+        
+        # # Find indices of nan pts and non-nan (ok) pts
+        # nanpts = np.isnan(sumvar)
+        # okpts  = np.invert(nanpts)
+    
+        # # Drop nan pts and reshape again to separate space and time dimensions
+        # var_ok = var[okpts,:]
+        #var[np.isnan(var)] = 0
+        
+        
+        # Perform regression
+        #var_reg = np.matmul(np.ma.anomalies(var,axis=1),np.ma.anomalies(ts,axis=0))/len(ts)
+        var_reg,_ = regress_2d(ts,var)
+        
+        
+        # Reshape to match lon x lat dim
+        var_reg = np.reshape(var_reg,(londim,latdim))
+    
+    
+    
+    
+    # 2nd method is looping point by poin  t
+    elif method == 2:
+        
+        
+        # Preallocate       
+        var_reg = np.zeros((londim,latdim))
+        
+        # Loop lat and long
+        for o in range(londim):
+            for a in range(latdim):
+                
+                # Get time series for that period
+                vartime = np.squeeze(var[o,a,:])
+                
+                # Skip nan points
+                if any(np.isnan(vartime)):
+                    var_reg[o,a]=np.nan
+                    continue
+                
+                # Perform regression 
+                r = np.polyfit(ts,vartime,1)
+                #r=stats.linregress(vartime,ts)
+                var_reg[o,a] = r[0]
+                #var_reg[o,a]=stats.pearsonr(vartime,ts)[0]
+    
+    return var_reg
+
+
 def regress_2d(A,B):
     """
     Regresses A (independent variable) onto B (dependent variable), where
@@ -105,48 +305,95 @@ def regress_2d(A,B):
     """
     # Determine if A or B is 2D and find anomalies
     
-    # 2D Matrix is in A [MxN]
-    if len(A.shape) > len(B.shape):
-        
-        # Tranpose A so that A = [MxN]
-        if A.shape[1] != B.shape[0]:
-            A = A.T
-        
-        
-        # Set axis for summing/averaging
-        a_axis = 1
-        b_axis = 0
-        
-        # Compute anomalies along appropriate axis
-        Aanom = A - np.nanmean(A,axis=a_axis)[:,None]
-        Banom = B - np.nanmean(B,axis=b_axis)
-        
+    # Compute using nan functions (slower)
+    if np.any(np.isnan(A)) or np.any(np.isnan(B)):
+        print("NaN Values Detected...")
     
+        # 2D Matrix is in A [MxN]
+        if len(A.shape) > len(B.shape):
+            
+            # Tranpose A so that A = [MxN]
+            if A.shape[1] != B.shape[0]:
+                A = A.T
+            
+            
+            # Set axis for summing/averaging
+            a_axis = 1
+            b_axis = 0
+            
+            # Compute anomalies along appropriate axis
+            Aanom = A - np.nanmean(A,axis=a_axis)[:,None]
+            Banom = B - np.nanmean(B,axis=b_axis)
+            
         
-    # 2D matrix is B [N x M]
-    elif len(A.shape) < len(B.shape):
+            
+        # 2D matrix is B [N x M]
+        elif len(A.shape) < len(B.shape):
+            
+            # Tranpose B so that it is [N x M]
+            if B.shape[0] != A.shape[0]:
+                B = B.T
+            
+            # Set axis for summing/averaging
+            a_axis = 0
+            b_axis = 0
+            
+            # Compute anomalies along appropriate axis        
+            Aanom = A - np.nanmean(A,axis=a_axis)
+            Banom = B - np.nanmean(B,axis=b_axis)[None,:]
         
-        # Tranpose B so that it is [N x M]
-        if B.shape[0] != A.shape[0]:
-            B = B.T
+        # Calculate denominator, summing over N
+        Aanom2 = np.power(Aanom,2)
+        denom = np.nansum(Aanom2,axis=a_axis)    
         
-        # Set axis for summing/averaging
-        a_axis = 0
-        b_axis = 0
+        # Calculate Beta
+        beta = Aanom @ Banom / denom
+            
         
-        # Compute anomalies along appropriate axis        
-        Aanom = A - np.nanmean(A,axis=a_axis)
-        Banom = B - np.nanmean(B,axis=b_axis)[None,:]
-    
-    # Calculate denominator, summing over N
-    Aanom2 = np.power(Aanom,2)
-    denom = np.nansum(Aanom2,axis=a_axis)    
-    
-    # Calculate Beta
-    beta = Aanom @ Banom / denom
+        b = (np.nansum(B,axis=b_axis) - beta * np.nansum(A,axis=a_axis))/A.shape[a_axis]
+    else:
+        # 2D Matrix is in A [MxN]
+        if len(A.shape) > len(B.shape):
+            
+            # Tranpose A so that A = [MxN]
+            if A.shape[1] != B.shape[0]:
+                A = A.T
+            
+            
+            # Set axis for summing/averaging
+            a_axis = 1
+            b_axis = 0
+            
+            # Compute anomalies along appropriate axis
+            Aanom = A - np.mean(A,axis=a_axis)[:,None]
+            Banom = B - np.mean(B,axis=b_axis)
+            
         
-    
-    b = (np.nansum(B,axis=b_axis) - beta * np.nansum(A,axis=a_axis))/A.shape[a_axis]
+            
+        # 2D matrix is B [N x M]
+        elif len(A.shape) < len(B.shape):
+            
+            # Tranpose B so that it is [N x M]
+            if B.shape[0] != A.shape[0]:
+                B = B.T
+            
+            # Set axis for summing/averaging
+            a_axis = 0
+            b_axis = 0
+            
+            # Compute anomalies along appropriate axis        
+            Aanom = A - np.mean(A,axis=a_axis)
+            Banom = B - np.mean(B,axis=b_axis)[None,:]
+        
+        # Calculate denominator, summing over N
+        Aanom2 = np.power(Aanom,2)
+        denom = np.sum(Aanom2,axis=a_axis)    
+        
+        # Calculate Beta
+        beta = Aanom @ Banom / denom
+            
+        
+        b = (np.sum(B,axis=b_axis) - beta * np.sum(A,axis=a_axis))/A.shape[a_axis]
     
     
     return beta,b
@@ -190,7 +437,189 @@ def year2mon(ts):
     ts = ts.T
     return ts
     
+def ann_avg(ts,dim):
+    """
+    # Take Annual Average of a monthly time series
+    where time is axis "dim"
+    
+    """
+    tsshape = ts.shape
+    ntime   = ts.shape[dim] 
+    newshape =    tsshape[:dim:] +(int(ntime/12),12) + tsshape[dim+1::]
+    annavg = np.reshape(ts,newshape)
+    annavg = np.nanmean(annavg,axis=dim+1)
+    return annavg
 
+
+def plot_AMV_spatial(var,lon,lat,bbox,cmap,cint=[0,],clab=[0,],ax=None):
+
+    
+    if ax is None:
+        ax = plt.gca()
+        
+        
+        
+    # Add cyclic point to avoid the gap
+    var,lon1 = add_cyclic_point(var,coord=lon)
+    
+
+    # Set up projections and extent
+    ax = plt.axes(projection=ccrs.PlateCarree())
+    ax.set_extent(bbox)
+    
+    # Add filled coastline
+    ax.add_feature(cfeature.COASTLINE,facecolor='k')
+    
+    if len(cint) == 1:
+        # Draw contours
+        cs = ax.contourf(lon1,lat,var,cmap=cmap)
+    
+    else:
+        # Draw contours
+        cs = ax.contourf(lon1,lat,var,cint,cmap=cmap)
+    
+    
+    
+        # Negative contours
+        cln = ax.contour(lon1,lat,var,
+                    cint[cint<0],
+                    linestyles='dashed',
+                    colors='k',
+                    linewidths=0.5,
+                    transform=ccrs.PlateCarree())
+    
+        # Positive Contours
+        clp = ax.contour(lon1,lat,var,
+                    cint[cint>=0],
+                    colors='k',
+                    linewidths=0.5,
+                    transform=ccrs.PlateCarree())    
+                      
+        #ax.clabel(cln,colors=None)
+                                
+                
+    # Add Gridlines
+    gl = ax.gridlines(draw_labels=True,linewidth=0.75,color='gray',linestyle=':')
+
+    gl.xlabels_top = gl.ylabels_right = False
+    gl.xformatter = LONGITUDE_FORMATTER
+    gl.yformatter = LATITUDE_FORMATTER
+    if len(clab) == 1:
+        bc = plt.colorbar(cs)
+    else:
+        bc = plt.colorbar(cs,ticks=clab)
+    
+    
+    return ax
+
+    
+def plot_AMV(amv,ax=None):
+    
+    """
+    
+    Dependencies:
+        
+    matplotlib.pyplot as plt
+    numpy as np
+    """
+    if ax is None:
+        ax = plt.gca()
+    
+    
+    htimefull = np.arange(len(amv))
+    
+    ax.plot(htimefull,amv,color='k')
+    ax.fill_between(htimefull,0,amv,where=amv>0,facecolor='red',interpolate=True,alpha=0.5)
+    ax.fill_between(htimefull,0,amv,where=amv<0,facecolor='blue',interpolate=True,alpha=0.5)
+
+    return ax
+
+def array_nan_equal(a, b):
+    """
+    Check if two arrays are equal ignoring nans
+    source: https://stackoverflow.com/questions/49245963/how-to-compare-numpy-arrays-ignoring-nans
+    """
+    m = np.isfinite(a) & np.isfinite(b)
+    return np.array_equal(a[m], b[m])
+
+
+def detrend_dim(invar,dim):
+    
+    """
+    Detrends n-dimensional variable [invar] at each point along axis [dim].
+    Performs appropriate reshaping and NaN removal, and returns
+    variable in the same shape+order. Assumes equal spacing along [dim] for 
+    detrending
+    
+    Also outputs linear model and coefficients.
+    
+    Dependencies: 
+        numpy as np
+        find_nan (function)
+        regress_2d (function)
+    
+    Inputs:
+        1) invar: variable to detrend
+        2) dim: dimension of axis to detrend along
+        
+    Outputs:
+        1) dtvar: detrended variable
+        2) linmod: computed trend at each point
+        3) beta: regression coefficient (slope) at each point
+        4) interept: y intercept at each point
+    
+    
+    """
+    
+    # Reshape variable
+    varshape = invar.shape
+    
+    # Reshape to move time to first dim
+    newshape = np.hstack([dim,np.arange(0,dim,1),np.arange(dim+1,len(varshape),1)])
+    newvar = np.transpose(invar,newshape)
+    
+    # Combine all other dims and reshape to [time x otherdims]
+    tdim = newvar.shape[0]
+    otherdims = newvar.shape[1::]
+    proddims = np.prod(otherdims)
+    newvar = np.reshape(newvar,(tdim,proddims))
+    
+    # Find non nan points
+    varok,knan,okpts = find_nan(newvar,0)
+    
+    # Ordinary Least Squares Regression
+    tper = np.arange(0,tdim)
+    m,b = regress_2d(tper,varok)
+    
+    # Detrend
+    ymod = (m[:,None]*tper + b[:,None]).T
+    dtvarok = varok - ymod
+    
+    # Replace into variable of original size
+    dtvar  = np.zeros(newvar.shape) * np.nan
+    linmod = np.copy(dtvar)
+    beta   = np.zeros(okpts.shape) * np.nan
+    intercept = np.copy(beta)
+    
+    dtvar[:,okpts] = dtvarok
+    linmod[:,okpts] = ymod
+    beta[okpts] = m
+    intercept[okpts] = b
+    
+    # Reshape to original size
+    dtvar  = np.reshape(dtvar,((tdim,)+otherdims))
+    linmod = np.reshape(linmod,((tdim,)+otherdims))
+    beta = np.reshape(beta,(otherdims))
+    intercept = np.reshape(beta,(otherdims))
+    
+    # Tranpose to original order
+    oldshape = [dtvar.shape.index(x) for x in varshape]
+    dtvar = np.transpose(dtvar,oldshape)
+    linmod = np.transpose(linmod,oldshape)
+    
+    return dtvar,linmod,beta,intercept
+    
+   
 #%%
 
 
@@ -231,33 +660,48 @@ hlatnew = np.squeeze(np.concatenate((hlat[hsouth][::-1],hlat[hnorth][::-1])))
 hsstnew = np.concatenate((hsstsouth,hsstnorth),axis=1)
 
 
-# Reshape to [Time x Space] and remove NaN Points
-hsstnew = np.reshape(hsstnew,(360*180,1176)).T
-hsstok,knan,okpts = find_nan(hsstnew,0)
 
 
-#%% Perform Linear Detrend on SST
 
-start= time.time()
-tper = np.arange(0,hsstok.shape[0])
-beta,b = regress_2d(tper,hsstok) # Perform regression
+#%% Perform Linear Detrend on SST and annually averaged sst
+usedtfunction = 1  # Set to 1 to use the new detrending function
 
-# Detrend
-dt_hsst = hsstnew[:,okpts] - (beta[:,None] * tper + b[:,None]).T
+if usedtfunction == 1:
+    
+    start= time.time()
+    dt_hsst,ymodall,_,_ = detrend_dim(hsstnew,2)
+    print("Detrended in %.2fs" % (time.time()-start))
+else:
+    
+    # Reshape to [Time x Space] and remove NaN Points
+    start= time.time()
+    hsstnew = np.reshape(hsstnew,(360*180,1176)).T
+    hsstok,knan,okpts = find_nan(hsstnew,0)
+    
+    
+    
+    tper = np.arange(0,hsstok.shape[0])
+    beta,b = regress_2d(tper,hsstok) # Perform regression
+    
+    # Detrend
+    dt_hsst = hsstnew[:,okpts] - (beta[:,None] * tper + b[:,None]).T
+    
+    # Replace NaN vaues back into the system
+    hsstall = np.zeros(hsstnew.shape) * np.nan
+    hsstall[:,okpts] = dt_hsst
+    
+    # Also save the linear model
+    ymodall = np.zeros(hsstnew.shape) * np.nan
+    ymodall[:,okpts] = (beta[:,None] * tper + b[:,None]).T
+    
+    # Reshape again
+    dt_hsst = np.reshape(hsstall.T,(360,180,1176))
+    hsstnew = np.reshape(hsstnew.T,(360,180,1176))
+    ymodall = np.reshape(ymodall.T,(360,180,1176))
+    print("Detrended in %.2fs" % (time.time()-start))
 
-# Replace NaN vaues back into the system
-hsstall = np.zeros(hsstnew.shape) * np.nan
-hsstall[:,okpts] = dt_hsst
 
-# Also save the linear model
-ymodall = np.zeros(hsstnew.shape) * np.nan
-ymodall[:,okpts] = (beta[:,None] * tper + b[:,None]).T
 
-# Reshape again
-dt_hsst = np.reshape(hsstall.T,(360,180,1176))
-hsstnew = np.reshape(hsstnew.T,(360,180,1176))
-ymodall = np.reshape(ymodall.T,(360,180,1176))
-print("Detrended in %.2fs" % (time.time()-start))
 
 #%% Visualize detrending for point [lonf,latf]
 
@@ -270,10 +714,16 @@ tempts = hsstnew[klon,klat,:]
 dtts = dt_hsst[klon,klat,:]
 ymodts = ymodall[klon,klat,:]
 
+olddt = detrendlin(tempts)
+from scipy import signal
+scidt = signal.detrend(tempts)
+
 #% Plot Detrended and undetrended lines
 fig,ax = plt.subplots(1,1,figsize=(8,4))
 ax.plot(tper,tempts,color='k',label="raw")
 ax.plot(tper,dtts,color='b',label="detrended")
+#ax.plot(tper,olddt,color='r',label="olddetrending")
+ax.plot(tper,scidt,color='g',label="scipy")
 plt.legend()
 
 #% Plot Scatter and fitted model...
@@ -287,7 +737,7 @@ plt.legend()
 
 # Deseasonalize [lon x lat x yr x mon]
 ahsst = np.reshape(dt_hsst,(360,180,int(dt_hsst.shape[2]/12),12))
-ahsst = ahsst - np.mean(ahsst,axis=3)[:,:,:,None]
+ahsst = ahsst - np.mean(ahsst,axis=2)[:,:,None,:]
 ahsst = np.reshape(ahsst,(360,180,dt_hsst.shape[2]))
 
 
@@ -314,3 +764,95 @@ da.name = 'SST'
 da.to_netcdf("%sHadISST_Detrended_Deanomalized_1920_2018.nc" % (datpath2))
 
 aa = xr.open_dataset("%sHadISST_Detrended_Deanomalized_1920_2018.nc" % (datpath2))
+
+
+#%% Sample AMV Calculations....
+
+bbox  = [-80,0,0,60]
+order = 5
+cutofftime = 120 
+cmap = cmocean.cm.balance
+cint = np.arange(-1,1.1,0.1)
+clab = cint
+# Detrended, Deseasonalized
+dtamv,dtaa = calc_AMV(hlon,hlatnew,ahsst,bbox,order,cutofftime,1)
+
+dtr = regress2ts(ahsst,dtamv,0,1)
+
+plot_AMV_spatial(dtr.T,hlon,hlatnew,bbox,cmap,cint=cint,clab=clab)
+plt.title("Detrended, Deanomalized, Monthly SST")
+
+#%%  Detrended only
+dtamv,dtaa = calc_AMV(hlon,hlatnew,dt_hsst,bbox,order,cutofftime,1)
+
+dtr = regress2ts(dt_hsst,dtamv,0,1)
+
+plot_AMV_spatial(dtr.T,hlon,hlatnew,bbox,cmap)
+plt.title("Detrended Monthly SST")
+
+#%% Raw
+
+dtamv,dtaa = calc_AMV(hlon,hlatnew,hsstnew,bbox,order,cutofftime,1)
+
+dtr = regress2ts(hsstnew,dtamv,0,1)
+
+plot_AMV_spatial(dtr.T,hlon,hlatnew,bbox,cmap)
+plt.title("Raw Monthly SST")
+
+
+
+#%% Trying annually averaged data
+
+
+
+aaraw = ann_avg(hsstnew,2)
+#dtraw = ann_avg(dt_hsst,2)
+#adtraw = ann_avg(ahsst,2)
+
+
+
+# Detrend annual data
+
+
+invar = aaraw
+cutofftime = 10
+dtamv,dtaa = calc_AMV(hlon,hlatnew,invar,bbox,order,cutofftime,1)
+dtr = regress2ts(invar,dtamv,0,1)
+xtk = np.arange(1,101,10)
+xlbs = np.arange(1920,2020,10)
+
+
+
+#plt.subplots(211)
+plot_AMV_spatial(dtr.T,hlon,hlatnew,bbox,cmap,cint=cint,clab=clab)
+#plot_AMV_spatial(dtr.T,hlon,hlatnew,bbox,cmap)
+#plt.title("Detrended, Deanomalized, Monthly SST")
+
+plot_AMV(dtamv)
+plt.xticks(xtk,xlbs)
+
+#%% Perform detrend on annually averaged sst (raw)  and try calculation from there
+
+annsst = ann_avg(hsstnew,2)
+
+start= time.time()
+dtann,ymodann,_,_ = detrend_dim(annsst,2)
+print("Detrended in %.2fs" % (time.time()-start))
+
+
+invar = dtann
+cutofftime = 10
+dtamv,dtaa = calc_AMV(hlon,hlatnew,invar,bbox,order,cutofftime,1)
+dtr = regress2ts(invar,dtamv/np.std(dtamv),0,1)
+xtk = np.arange(1,101,10)
+xlbs = np.arange(1920,2020,10)
+
+
+cint = np.arange(-0.5,0.6,0.1)
+#plt.subplots(211)
+plot_AMV_spatial(dtr.T,hlon,hlatnew,bbox,cmap,cint=cint,clab=cint)
+plot_AMV_spatial(dtr.T,hlon,hlatnew,bbox,cmap)
+#plt.title("Detrended, Deanomalized, Monthly SST")
+
+plot_AMV(dtamv)
+plt.xticks(xtk,xlbs)
