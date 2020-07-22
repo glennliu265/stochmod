@@ -404,7 +404,7 @@ def regress_2d(A,B):
         Aanom = A - np.nanmean(A,axis=a_axis)[:,None]
         Banom = B - np.nanmean(B,axis=b_axis)
         
-
+    
         
     # 2D matrix is B [N x M]
     elif len(A.shape) < len(B.shape):
@@ -427,9 +427,12 @@ def regress_2d(A,B):
     
     # Calculate Beta
     beta = Aanom @ Banom / denom
-    
         
-    return beta
+    
+    b = (np.nansum(B,axis=b_axis) - beta * np.nansum(A,axis=a_axis))/A.shape[a_axis]
+    
+    
+    return beta,b
 
 """
 Multidimensional detrend along each dimension, ignoring nans
@@ -484,7 +487,7 @@ def detrendlin_nd(var_in):
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath = projpath + '03_Scripts/stochmod/'  
 datpath = projpath + '01_Data/'
-outpath = projpath + '02_Figures/20200716/'
+outpath = projpath + '02_Figures/20200721/'
 
 # Path to SST data from obsv
 datpath2 = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/"
@@ -635,9 +638,6 @@ h_regr=regress2ts(hsstnew_dt,h_amv,0,1)
 
 #h_regr1 =regress2ts(hsstnew,h_amv,0,1)
 
-fig,ax = plt.subplots(1,1)
-ax.plot(aa_new,color='k')
-ax.plot(h_amv,color='r')
 
 
 # %% Perform psd
@@ -863,7 +863,7 @@ def plot_AMV_spatial(var,lon,lat,bbox,cmap,cint=[0,],clab=[0,],ax=None):
 # Set up plot
 # Set colormaps and contour intervals
 cmap = cmocean.cm.balance
-cint = np.arange(-50,55,5)
+cint = np.arange(-10,11,1)
 #clab = np.arange(-0.50,0.60,0.10)
 #cint = np.arange(-1,1.2,0.2)
 #cint = np.arange(-2,2.5,0.5)
@@ -912,7 +912,8 @@ cmap = cmocean.cm.balance
 #cint = np.arange(-3,3.25,0.25)
 #clab = np.arange(-0.50,0.60,0.10)
 #cint = np.arange(-1,1.2,0.2)
-cint=np.arange(-50,55,5)
+cint=np.arange(-1,1.1,0.1)
+#cint = [0]
 clab = cint
 
 
@@ -1066,7 +1067,10 @@ plt.savefig(outname, bbox_inches="tight",dpi=200)
 
 #%% Mean Spatial Plots
 
-entrainmean = np.transpose(np.nanmean(sst[2],axis=2),(1,0))
+#entrainmean =np.nanmean(sst[2],axis=2).T # Stochmod Hvar
+entrainmean = np.nanmean(sstentrain,axis=2).T
+emmax = np.nanmax(np.abs(entrainmean))
+
 
 fig = plt.figure(figsize=(12,8))
 ax = fig.add_subplot(1,1,1,projection=ccrs.PlateCarree())
@@ -1084,7 +1088,7 @@ gl.xlabels_top = gl.ylabels_right = False
 gl.xformatter = LONGITUDE_FORMATTER
 gl.yformatter = LATITUDE_FORMATTER
 
-pcm     = plt.contourf(lon,lat,entrainmean,cmap=cmocean.cm.balance)
+pcm     = plt.pcolormesh(lon,lat,entrainmean,cmap=cmocean.cm.balance,vmax=emmax,vmin=-1*emmax)
 plt.colorbar(pcm)
 plt.title("Mean SST Anomaly from Entrain Model")
 outname = outpath+"AvgSST_Entrain_funiform%i.png" % (funiform)
