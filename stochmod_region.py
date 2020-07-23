@@ -346,11 +346,11 @@ Dependencies:
 kmon    = 3
 
 # Set Variables
-cp0     = 3850 # Specific Heat [J/(kg*C)]
-rho     = 1025 # Density of Seawater [kg/m3]
+cp0      = 4218 # Specific Heat [J/(kg*C)]
+rho      = 1000 # Density of Seawater [kg/m3]
 
 # Initial Conditions/Presets
-T0      = 0   # Initial Temp [degC]
+T0       = 0   # Initial Temp [degC]
 
 # Integration Options
 nyr      = 1000    # Number of years to integrate over
@@ -364,7 +364,8 @@ usesst   = 0
 # 0 = completely random in space time
 # 1 = spatially unform forcing, temporally varying
 # 2 = NAO-like NHFLX Forcing, temporally varying 
-funiform = 2        
+funiform = 2     
+fscale   = 10   
 
 # hvarmode
 hvarmode = 2 # hvar modes (0 - fixe mld, 1 - effective mld, 2 - seasonally varying mld)
@@ -481,8 +482,19 @@ if genrand == 1:
         # Restrict to Region
         F = F[klon[:,None],klat[None,:]]
         
+        # Find Heff
+        #hmax = np.amax(hclim,axis=2) # Maximum MLD
+        hmax = np.amax(hclim[:,:,[11,0,1,2]],axis=2) # DJFM Mean
+        
+        
+        
+        # Convert Forcing to K/S
+        F = F * dt / (rho*cp0*hmax)# Unit Conversion
+        #F = F/np.nanmax(F) # Scale to 1
+        
+        
         # Scale by a time series
-        F = F[:,:,None] * (np.random.normal(0,1,size=t_end)/4)
+        F = F[:,:,None] * (np.random.normal(0,1,size=t_end))
         
         
     else:
@@ -495,15 +507,19 @@ else:
     print("Loading Old Data")
     F = np.load(datpath+"stoch_output_1000yr_funiform%i_Forcing.npy"%(funiform))
 
+# cint= np.arange(-.4,.45,0.05)
+# pcm = plt.contourf(lonr,latr,F.T,cint,cmap=cmocean.cm.balance)
+# plt.colorbar(pcm)
 
 # ----------------
-# %% Set H based on mode------------------------------------------------------------
+## %% Set H based on mode------------------------------------------------------------
 # ----------------
 
 if hvarmode == 0:
     
     # Use fixed mixed layer depth for the whole basin
     h = hfix
+    
     
 elif hvarmode == 1:
     
