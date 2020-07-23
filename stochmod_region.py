@@ -340,14 +340,90 @@ Dependencies:
 """
 
 
+
+def set_stochparams(h,damping,dt,ND=True,rho=1000,cp0=4218,hfix=50):
+    """
+    Given MLD and Heat Flux Feedback, Calculate Parameters
+    
+    Inputs:
+        1) h: Array [Lon x Lat x Mon]
+            Mixed Layer depths (climatological)
+        2) damping: Array [Lon x Lat x Mon]
+            Heat Flux Feedbacks (W/m2)
+        3) dt: INT
+            Model timestep in seconds
+        4) ND: Boolean
+            Set to 1 to process 2D data, rather than data at 1 point
+        Optional Arguments:
+            rho   - density of water [kg/m3]
+            cp0   - specific heat of water [J/(K*kg)]
+            hfix  - fixed mixed layer depth [m]
+    
+    
+    Outputs:
+        1) lbd: DICT [hvarmode] [Lon x Lat x Mon]
+            Dictionary of damping values for each MLD treatment 
+        2) lbd_entr: Array [Lon x Lat x Mon]
+            Damping for entraining model
+        3) FAC: Array [Lon x Lat x Mon]
+            Seasonal Reduction Factor
+        4) Beta: Array [Lon x Lat x Mon]
+            Entraining Term
+    
+    """    
+    
+    # Calculate Beta
+    if ND == True:
+        beta = np.log( h / np.roll(h,1,axis=2) ) # Roll along time axis
+        
+        
+        # Find Maximum MLD during the year
+        hmax = np.nanmax(np.abs(h),axis=2)
+    
+    else:
+        beta1 = np.log( h / np.roll(h,1,axis=0) )
+        
+        # Find Maximum MLD during the year
+        hmax = np.nanmax(np.abs(h))
+    
+    
+    # Set non-entraining months to zero
+    beta[beta<0] = 0
+    
+    # Replace Nans with Zeros in beta
+    beta = np.nan_to_num(beta)
+    
+    # Preallocate lambda variable
+    lbd = {}
+    
+    # Fixed MLD
+    lbd[0] = damping / (rho*cp0*hfix) * dt
+    
+    # Maximum MLD
+    lbd[1] = damping / (rho*cp0*hmax[:,:,None]) * dt
+    
+    # Seasonal MLD
+    lbd[2] = damping / (rho*cp0*h) * dt
+    
+    # Calculate Damping (with entrainment)
+    lbd_entr = np.copy(lbd[2]) + beta    
+    
+    # Compute reduction factor
+    FAC = np.nan_to_num((1-np.exp(-lbd_entr))/lbd_entr)
+    
+    return lbd,lbd_entr,FAC,beta
+
 #%% User Edits -----------------------------------------------------------------           
 
+
+runid = "000"
 # Set Point and month
 kmon    = 3
 
 # Set Variables
 cp0      = 4218 # Specific Heat [J/(kg*C)]
 rho      = 1000 # Density of Seawater [kg/m3]
+
 
 # Initial Conditions/Presets
 T0       = 0   # Initial Temp [degC]
@@ -381,7 +457,6 @@ latN = 90
 # Correlation Options
 detrendopt = 0  # Option to detrend before calculations
 
-
 # White Noise Options. Set to 1 to load data
 genrand   = 1  #
 
@@ -389,7 +464,7 @@ genrand   = 1  #
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath = projpath + '03_Scripts/stochmod/'
 datpath = projpath + '01_Data/'
-outpath = projpath + '02_Figures/20200617/'
+outpath = projpath + '02_Figures/20200723/'
 
 
 # Set up some strings for labeling
@@ -404,8 +479,7 @@ monsfull=('January','Febuary','March','April','May','June','July','August','Sept
 # %% Load Variables -------------------------------------------------------------
 # --------------
 
-
-# Load damping variables
+# Load damping variables (calculated in hfdamping matlab scripts...)
 damppath = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/'
 dampmat = 'ensavg_nhflxdamping_monwin3_sig020_dof082_mode4.mat'
 loaddamp = loadmat(damppath+dampmat)
@@ -413,9 +487,10 @@ LON = loaddamp['LON1']
 LAT = loaddamp['LAT']
 damping = loaddamp['ensavg']
 
-# Load Mixed layer variables
+# Load Mixed layer variables (preprocessed in prep_mld.py)
 mld = np.load(datpath+"HMXL_hclim.npy") # Climatological MLD
 kprevall = np.load(datpath+"HMXL_kprev.npy") # Entraining Month
+
 
 # ------------------
 # %% Restrict to region ---------------------------------------------------------
@@ -443,164 +518,152 @@ lonsize = lonr.shape[0]
 latsize = latr.shape[0]
 np.save(datpath+"lat.npy",latr)
 np.save(datpath+"lon.npy",lonr)
-# ----------------------
-# Select non-nan points ------------------------------------------------------
-# ----------------------
 
+# %% Load and Prep NAO Forcing... <Move to separate script?>
+#
 
-# ----------------------------
-# %% Generate White Noise Forcing------------------------------------------------
-# ----------------------------
+# Load NAO Forcing and prepare (Prepared in regress_NAO_pattern.py)
+naoforcing = np.load(datpath+"NAO_NHFLX_Forcing.npy") #[PC x Ens x Lat x Lon]
+NAO1 = np.nanmean(naoforcing[0,:,:,:],axis=0).T # Take PC1, Ens Mean and Transpose
 
-# Generate Random White Noise Series (or load existing)
-if genrand == 1:
-    print("Making New Forcing Data in mode %i"% (funiform))
-    # Spatially uniform, temporally varying
-    if funiform == 1:
-        randts = np.random.normal(0,1,size=t_end)/4
-        F      = np.ones((lonsize,latsize,t_end))
-        F      = np.multiply(F,randts[None,None,:])
+# Convert Longitude from degrees East
+lon360 =  np.load(datpath+"CESM_lon360.npy")
+kw = np.where(lon360 >= 180)[0]
+ke = np.where(lon360 < 180)[0]
+lon180 = np.concatenate((lon360[kw]-360,lon360[ke]),0)
+NAO1 = np.concatenate((NAO1[kw,:],NAO1[ke,:]),0)
+
+# Convert from W/m2 to C/S for the three different mld options
+NAOF = {}#np.zeros((NAO1.shape)+(3,)) * np.nan # [Lon x Lat x Hvarmode]
+for i in range(3):
+
+    # Fixed MLD
+    if i == 0:
+        hchoose = hfix
+    # Max MLD
+    elif i == 1:
+        hchoose = np.nanmax(np.abs(hclim),axis=2)
+    # Varying MLD
+    elif i == 2:
+        hchoose = np.copy(hclim)
     
-    # NAO-like forcing
-    elif funiform == 2:
-        
-        # Load data [PC x ENS x Lat x Lon]
-        F = np.load(datpath+"NAO_NHFLX_Forcing.npy")
-         
-        # Take Ensemble Average and PC1. Change to Lon x Lat
-        #F = np.transpose(np.nanmean(F[0,:,:,:],axis=0),(1,0))
-        F = np.nanmean(F[0,:,:,:],axis=0).T
-        
-        # Remap Longitude
-        lon360 =  np.load(datpath+"CESM_lon360.npy")
-        kw = np.where(lon360 >= 180)[0]
-        ke = np.where(lon360 < 180)[0]
-        lon180 = np.concatenate((lon360[kw]-360,lon360[ke]),0)
-        F = np.concatenate((F[kw,:],F[ke,:]),0)
-        
-        
-        # Restrict to Region
-        F = F[klon[:,None],klat[None,:]]
-        
-        # Find Heff
-        #hmax = np.amax(hclim,axis=2) # Maximum MLD
-        hmax = np.amax(hclim[:,:,[11,0,1,2]],axis=2) # DJFM Mean
-        
-        
-        
-        # Convert Forcing to K/S
-        F = F * dt / (rho*cp0*hmax)# Unit Conversion
-        #F = F/np.nanmax(F) # Scale to 1
-        
-        
-        # Scale by a time series
-        F = F[:,:,None] * (np.random.normal(0,1,size=t_end))
-        
-        
+    # Compute and restrict to region
+    if i == 2:
+        # Monthly Varying Forcing [Lon x Lat x Mon]
+        NAOF[i] = NAO1[klon[:,None],klat[None,:],None] * dt / cp0 / rho / hchoose
     else:
-        F = np.random.normal(0,1,size=(lonsize,latsize,t_end))
+        NAOF[i] = NAO1[klon[:,None],klat[None,:]] * dt / cp0 / rho / hchoose
+
+
+# ----------------------------
+# %% Set-up damping parameters
+# ----------------------------
+
+lbd,lbd_entr,FAC,beta = set_stochparams(hclim,dampingr,dt,ND=1,rho=rho,cp0=cp0,hfix=hfix)
+
+# ----------------------------
+# %% Set Up Forcing           ------------------------------------------------
+# ----------------------------
+
+# Load in timeseries or full forcing (for funiform == 0)
+if genrand == 1:
+    print("Generating New Time Series")
+    if funiform == 0:
+        # Generate nonuniform forcing [lon x lat x time]
+        F = np.random.normal(0,1,size=(lonsize,latsize,t_end)) * fscale
         
+        # Save Forcing
+        np.save(datpath+"stoch_output_%iyr_run%s_funiform%i_Forcing.npy"%(nyr,runid,funiform),F)
+    
+    else:
         
-    np.save(datpath+"stoch_output_1000yr_funiform%i_Forcing.npy"%(funiform),F)
+        randts = np.random.normal(0,1,size=t_end) * fscale
+        np.save(datpath+"stoch_output_%iyr_run%s_randts.npy"%(nyr,runid),randts)
     
 else:
     print("Loading Old Data")
-    F = np.load(datpath+"stoch_output_1000yr_funiform%i_Forcing.npy"%(funiform))
+    if funiform == 0:
+        # Directly load forcing
+        F = np.load(datpath+"stoch_output_%iyr_run%s_funiform%i_Forcing.npy"%(nyr,runid,funiform))
+    else:
+        randts = np.load(datpath+"stoch_output_%iyr_run%s_randts.npy"%(nyr,runid),F)
 
-# cint= np.arange(-.4,.45,0.05)
-# pcm = plt.contourf(lonr,latr,F.T,cint,cmap=cmocean.cm.balance)
-# plt.colorbar(pcm)
 
-# ----------------
-## %% Set H based on mode------------------------------------------------------------
-# ----------------
-
-if hvarmode == 0:
+# Make forcing
+if funiform != 0:
     
-    # Use fixed mixed layer depth for the whole basin
-    h = hfix
+    # Spatially Uniform Forcing
+    if funiform == 1:
+        F      = np.ones((lonsize,latsize,t_end))
+        F      = np.multiply(F,randts[None,None,:])
+        
+    # NAO Like Forcing...
+    elif funiform == 2:
+        
+        F = {}
+        
+        # Fixed MLD 
+        F[0] = NAOF[0][:,:,None]*randts[None,None,:]
+        
+        # Max MLD
+        F[1] = NAOF[1][:,:,None]*randts[None,None,:]
+        
+        # Seasonally varying mld...
+        F[2] = np.tile(NAOF[2],nyr) * randts[None,None,:]
     
-    
-elif hvarmode == 1:
-    
-    
-    # Find maximum mld for each point in basin
-    hmax = np.amax(hclim,axis=2)
-    h = hmax[:,:,None]
-    
-elif hvarmode == 2:
-    
-    # Use spatially and temporally varying h
-    h = np.copy(hclim)
-
-
-# ----------------
-# %% Calculate Lambda ---------------------------------------------hvar---------------
-# ----------------
-
-if usetau == 1:
-    lbd = 1/np.mean(tauall,axis=1)
-    
-    # DDD try last ensemble
-    #lbd = 1 / tauall[:,39]
-
-else:
-    lbd = dampingr/ (rho*cp0*h) * dt
-
-# Calculate Entrainment Portion
-if hvarmode == 2:
-    beta = np.nan_to_num(np.log( h / np.roll(h,1) )) # Currently replacing Nans with zero
-    beta[beta<0] = 0
-    lbd_entr = lbd + beta
-
-
-    # -------------------------
-    # Prepare Reduction Factor --------------------------------------------------
-    # -------------------------
-    
-    # Calculate Reduction Factor
-    FAC_entr = np.nan_to_num((1-np.exp(-lbd_entr))/lbd_entr)
-
-
+    # Save Forcing
+    np.save(datpath+"stoch_output_%iyr_run%s_funiform%i_Forcing.npy"%(nyr,runid,funiform),F)
+      
 # ----------
 # %%RUN MODELS -----------------------------------------------------------------
 # ----------
 
 # Run Model Without Entrainment
-start = time.time()
-T_entr0 = np.zeros((lonsize,latsize,t_end))
-icount = 0
-for o in range(0,lonsize):
-    # Get Longitude Value
-    lonf = lonr[o]
+T_entr0_all = {}
+for hi in range(3):
     
-    # Convert to degrees East
-    if lonf < 0:
-        lonf = lonf + 360
+    lbdh = lbd[hi]
+    if funiform == 2:
+        Fh = F[hi]
+    else:
+        Fh = F
     
-    for a in range(0,latsize):
+    
+    start = time.time()
+    T_entr0 = np.zeros((lonsize,latsize,t_end))
+    icount = 0
+    for o in range(0,lonsize):
+        # Get Longitude Value
+        lonf = lonr[o]
         
+        # Convert to degrees East
+        if lonf < 0:
+            lonf = lonf + 360
         
-        # Get latitude indices
-        latf = latr[a]
-        
-        
-        # Skip if the point is land
-        if np.isnan(np.mean(dampingr[o,a,:])):
-            msg = "Land Point @ lon %f lat %f" % (lonf,latf)
-            #print(msg)
-            T_entr0[o,a,:] = np.zeros(t_end)*np.nan
-        else:
-            T_entr0[o,a,:],_,_ = stochmod_noentrain(t_end,lbd[o,a,:],T0,F[o,a,:])
-        icount += 1
-        msg = '\rCompleted No Entrain Run for %i of %i points' % (icount,lonsize*latsize)
-        print(msg,end="\r",flush=True)
-#
-        
-elapsed = time.time() - start
-tprint = "\nNo Entrain Model ran in %.2fs" % (elapsed)
-print(tprint)    
-        
+        for a in range(0,latsize):
+            
+            
+            # Get latitude indices
+            latf = latr[a]
+            
+            
+            # Skip if the point is land
+            if np.isnan(np.mean(dampingr[o,a,:])):
+                msg = "Land Point @ lon %f lat %f" % (lonf,latf)
+                #print(msg)
+                T_entr0[o,a,:] = np.zeros(t_end)*np.nan
+            else:
+                T_entr0[o,a,:],_,_ = stochmod_noentrain(t_end,lbdh[o,a,:],T0,Fh[o,a,:])
+            icount += 1
+            msg = '\rCompleted No Entrain Run for %i of %i points' % (icount,lonsize*latsize)
+            print(msg,end="\r",flush=True)
+    
+    T_entr0_all[hi] = np.copy(T_entr0)
+    
+    elapsed = time.time() - start
+    tprint = "\nNo Entrain Model, hvarmode %i, ran in %.2fs" % (hi,elapsed)
+    print(tprint)    
+            
         
 
 
@@ -609,6 +672,9 @@ if hvarmode == 2:
     start = time.time()
     T_entr1 = np.zeros((lonsize,latsize,t_end))
     icount = 0
+    
+    Fh = np.copy(F[2])
+    
     for o in range(0,lonsize):
         # Get Longitude Value
         lonf = lonr[o]
@@ -630,7 +696,7 @@ if hvarmode == 2:
                 #print(msg)
                 T_entr1[o,a,:] = np.zeros(t_end)*np.nan
             else:
-                T_entr1[o,a,:],_,_,_,_ = stochmod_entrain(t_end,lbd_entr[o,a,:],T0,F[o,a,:],beta[o,a,:],hclim[o,a,:],kprev[o,a,:],FAC_entr[o,a,:])
+                T_entr1[o,a,:],_,_,_,_ = stochmod_entrain(t_end,lbd_entr[o,a,:],T0,Fh[o,a,:],beta[o,a,:],hclim[o,a,:],kprev[o,a,:],FAC[o,a,:])
             icount += 1
             msg = '\rCompleted Entrain Run for %i of %i points' % (icount,lonsize*latsize)
             print(msg,end="\r",flush=True)
@@ -644,10 +710,8 @@ if hvarmode == 2:
 
 # %% save output
 
-np.save(datpath+"stoch_output_1000yr_funiform%i_entrain0_hvar%i.npy"%(funiform,hvarmode),T_entr0)
-
-if hvarmode == 2:
-    np.save(datpath+"stoch_output_1000yr_funiform%i_entrain1_hvar%i.npy"%(funiform,hvarmode),T_entr1)
+np.save(datpath+"stoch_output_1000yr_funiform%i_entrain0_hvar%i.npy"%(funiform,hvarmode),T_entr0_all)
+np.save(datpath+"stoch_output_1000yr_funiform%i_entrain1_hvar%i.npy"%(funiform,hvarmode),T_entr1)
 
 #np.save(datpath+"stoch_output_1000yr_funiform%i_Forcing.npy"%(funiform),F)
 
