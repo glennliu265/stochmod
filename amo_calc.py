@@ -13,6 +13,7 @@ from scipy.signal import butter, lfilter, freqz, filtfilt, detrend
 from scipy import stats
 from scipy.io import loadmat
 from scipy import signal
+import xarray as xr
 
 from cartopy import config
 import cartopy.feature as cfeature
@@ -259,6 +260,9 @@ def calc_AMV(lon,lat,sst,bbox,order,cutofftime,awgt):
     sststd  = np.nanstd(aa_sst)
     sstanom = (aa_sst - sstmean) / sststd
     
+    
+    
+    
     # Design Butterworth Lowpass Filter
     filtfreq = len(aa_sst)/cutofftime
     nyquist  = len(aa_sst)/2
@@ -336,7 +340,7 @@ def regress2ts(var,ts,normalizeall,method):
         
         # Perform regression
         #var_reg = np.matmul(np.ma.anomalies(var,axis=1),np.ma.anomalies(ts,axis=0))/len(ts)
-        var_reg = regress_2d(ts,var)
+        var_reg,_ = regress_2d(ts,var)
         
         
         # Reshape to match lon x lat dim
@@ -345,7 +349,7 @@ def regress2ts(var,ts,normalizeall,method):
     
     
     
-    # 2nd method is looping point by poin  
+    # 2nd method is looping point by poin  t
     elif method == 2:
         
         
@@ -580,6 +584,14 @@ datpath2 = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_D
 
 # Load in observation SST data to compare
 obvhad = loadmat(datpath2+"hadisst.1870_2018.mat")
+
+hyr  = obvhad['YR']
+
+
+#----------------------------------------
+# # Old way
+# Load in observation SST data to compare
+obvhad = loadmat(datpath2+"hadisst.1870_2018.mat")
 hlat = np.squeeze(obvhad['LAT'])
 hlon = np.squeeze(obvhad['LON'])
 hyr  = obvhad['YR']
@@ -592,10 +604,6 @@ hsst = np.transpose(hsst,(2,1,0))
 startyr = 1920
 monstart = (1920+1-hyr[0,0])*12
 hsst = hsst[:,:,monstart::]
-
-
-# For hsst, flip the latitude axis
-# currently it is arranged 90:-90, need to flip to south first
 
 # Find north and south latitude points
 hsouth = np.where(hlat <= 0)
@@ -610,35 +618,27 @@ hlatnew = np.squeeze(np.concatenate((hlat[hsouth][::-1],hlat[hnorth][::-1])))
 hsstnew = np.concatenate((hsstsouth,hsstnorth),axis=1)
 
 
+# Reshape to [Time x Space] and remove NaN Points
+hsstnew = np.reshape(hsstnew,(360*180,1176)).T
+hsstok,knan,okpts = find_nan(hsstnew,0)
 
 
-# Detrend and anomalize the global sst
-hsstnew = np.reshape(hsstnew,(360*180,1176))
-hsstnew = np.transpose(hsstnew,(1,0))
-
-# Detrend (need to come up with vectorized form....)
-hsstnew_dt = detrendlin_nd(hsstnew)
-
-# Deseasonalize
-hsstnew_dt = np.reshape(hsstnew_dt,(int(hsstnew_dt.shape[0]/12),12,360,180))
-hsstnew_dt = hsstnew_dt - np.nanmean(hsstnew_dt,axis=1)[:,None,:,:]
-hsstnew_dt = np.reshape(hsstnew,(hsstnew.shape[0],360,180))
-hsstnew_dt = np.transpose(hsstnew_dt,(1,2,0))
+#----------------------------------------
+# Load in data (calculated with hadisst proc)
+hadnc = xr.open_dataset(datpath2+"HadISST_Detrended_Deanomalized_1920_2018.nc")
+hlon = hadnc.lon.values
+hlat = hadnc.lat.values
+hsst = hadnc.SST.values
 
 
-#hsstnew = np.transpose(hsstnew,(1,0))
-#hsstnew_dt = np.reshape(hsstnew_dt,(360,180,1176))
-# Regress back to SST (Note: Normalizing seems to remove canonical AMV pattern)
 
 # Take average from amv
-h_amv,aa_hsst = calc_AMV(hlon,hlatnew,hsstnew_dt,bbox,order,cutofftime,1)  
-
-h_regr=regress2ts(hsstnew_dt,h_amv,0,1)
-
-
-#h_regr1 =regress2ts(hsstnew,h_amv,0,1)
+h_amv,aa_hsst = calc_AMV(hlon,hlat,hsst,bbox,order,cutofftime,1)  
+h_amvo,aa_hssto = calc_AMV(hlon,hlatnew,hsstnew,bbox,order,cutofftime,1)  
 
 
+h_regr=regress2ts(hsst,h_amv,0,1)
+h_regro = regress2ts(hsstnew,h_amvo,0,1)
 
 # %% Perform psd
 
@@ -889,7 +889,7 @@ for mode in hvarmode:
 # Same plot, but for HadlISST
 cmap = cmocean.cm.balance
 #cint = np.arange(-3.5,3.25,0.25)
-cint = np.arange(-4,4.5,0.5)
+cint = np.arange(-1,1.1,0.1)
 #clab = np.arange(-0.50,0.60,0.10)
 #cint = np.arange(-1,1.2,0.2)
 clab = cint
@@ -900,10 +900,17 @@ plt.style.use("ggplot")
 varin = np.transpose(h_regr,(1,0))
 
 plt.subplot(1,1,1)
-plot_AMV_spatial(varin,hlon,hlatnew,bbox,cmap,cint,clab)
+plot_AMV_spatial(varin,hlon,hlat,bbox,cmap,cint,clab)
 plt.title("AMV-related SST Pattern from HadISST, %i-%i"%(startyr,hyr[0,-1]),fontsize=14)
 outname = outpath+'AMVpattern_HADLISST.png' 
 plt.savefig(outname, bbox_inches="tight",dpi=200)
+
+
+#%% Plot observation AMV time series
+
+plot_AMV(h_amv)
+
+
 #%% Plot AMV FFor entrain case
 
 
