@@ -7,19 +7,13 @@ This is a temporary script file.
 """
 from scipy.io import loadmat
 import numpy as np
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 from scipy import stats
-import seaborn as sns
+#import seaborn as sns
 import xarray as xr
 import time
 
-from cartopy import config
-import cartopy.feature as cfeature
-import cartopy.crs as ccrs
-from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
-import cmocean
-import matplotlib.ticker as mticker
-from cartopy.util import add_cyclic_point
+
 
 # %% Functions --------------------------------------------------
 # Function to calculate lag correlation
@@ -379,9 +373,10 @@ def set_stochparams(h,damping,dt,ND=True,rho=1000,cp0=4218,hfix=50):
         
         # Find Maximum MLD during the year
         hmax = np.nanmax(np.abs(h),axis=2)
+        hmax = hmax[:,:,None]
     
     else:
-        beta1 = np.log( h / np.roll(h,1,axis=0) )
+        beta = np.log( h / np.roll(h,1,axis=0) )
         
         # Find Maximum MLD during the year
         hmax = np.nanmax(np.abs(h))
@@ -400,7 +395,7 @@ def set_stochparams(h,damping,dt,ND=True,rho=1000,cp0=4218,hfix=50):
     lbd[0] = damping / (rho*cp0*hfix) * dt
     
     # Maximum MLD
-    lbd[1] = damping / (rho*cp0*hmax[:,:,None]) * dt
+    lbd[1] = damping / (rho*cp0*hmax) * dt
     
     # Seasonal MLD
     lbd[2] = damping / (rho*cp0*h) * dt
@@ -480,12 +475,12 @@ monsfull=('January','Febuary','March','April','May','June','July','August','Sept
 # --------------
 
 # Load damping variables (calculated in hfdamping matlab scripts...)
-damppath = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/'
-dampmat = 'ensavg_nhflxdamping_monwin3_sig020_dof082_mode4.mat'
-loaddamp = loadmat(damppath+dampmat)
-LON = loaddamp['LON1']
-LAT = loaddamp['LAT']
-damping = loaddamp['ensavg']
+damppath    = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/'
+dampmat     = 'ensavg_nhflxdamping_monwin3_sig020_dof082_mode4.mat'
+loaddamp    = loadmat(damppath+dampmat)
+LON         = loaddamp['LON1']
+LAT         = loaddamp['LAT']
+damping     = loaddamp['ensavg']
 
 # Load Mixed layer variables (preprocessed in prep_mld.py)
 mld = np.load(datpath+"HMXL_hclim.npy") # Climatological MLD
@@ -533,6 +528,10 @@ ke = np.where(lon360 < 180)[0]
 lon180 = np.concatenate((lon360[kw]-360,lon360[ke]),0)
 NAO1 = np.concatenate((NAO1[kw,:],NAO1[ke,:]),0)
 
+# Restrict to region
+NAO1 = NAO1[klon[:,None],klat[None,:]]
+
+
 # Convert from W/m2 to C/S for the three different mld options
 NAOF = {}#np.zeros((NAO1.shape)+(3,)) * np.nan # [Lon x Lat x Hvarmode]
 for i in range(3):
@@ -553,8 +552,11 @@ for i in range(3):
         NAOF[i] = NAO1[klon[:,None],klat[None,:],None] * dt / cp0 / rho / hchoose
     else:
         NAOF[i] = NAO1[klon[:,None],klat[None,:]] * dt / cp0 / rho / hchoose
-
-
+        
+        
+        
+FNAOF = convert_NAO(hclim,naopattern,fscale,dt,rho=1000,cp0=4218,hfix=50)
+        
 # ----------------------------
 # %% Set-up damping parameters
 # ----------------------------
@@ -570,14 +572,14 @@ if genrand == 1:
     print("Generating New Time Series")
     if funiform == 0:
         # Generate nonuniform forcing [lon x lat x time]
-        F = np.random.normal(0,1,size=(lonsize,latsize,t_end)) * fscale
+        F = np.random.normal(0,1,size=(lonsize,latsize,t_end))/4 # Divide by 4 to scale between -1 and 1
         
         # Save Forcing
-        np.save(datpath+"stoch_output_%iyr_run%s_funiform%i_Forcing.npy"%(nyr,runid,funiform),F)
+        np.save(datpath+"stoch_output_%iyr_funiform%i_run%s_Forcing.npy"%(nyr,funiform,runid),F)
     
     else:
         
-        randts = np.random.normal(0,1,size=t_end) * fscale
+        randts = np.random.normal(0,1,size=t_end)/4 # Divide by 4 to scale between -1 and 1
         np.save(datpath+"stoch_output_%iyr_run%s_randts.npy"%(nyr,runid),randts)
     
 else:
@@ -586,7 +588,99 @@ else:
         # Directly load forcing
         F = np.load(datpath+"stoch_output_%iyr_run%s_funiform%i_Forcing.npy"%(nyr,runid,funiform))
     else:
-        randts = np.load(datpath+"stoch_output_%iyr_run%s_randts.npy"%(nyr,runid),F)
+        randts = np.load(datpath+"stoch_output_%iyr_run%s_randts.npy"%(nyr,runid))
+
+
+
+
+def convert_NAO(hclim,naopattern,fscale,dt,rho=1000,cp0=4218,hfix=50):
+    """
+    Convert NAO forcing pattern [naopattern] from (W/m2) to (degC/S) 
+    given seasonal MLD (hclim)
+    
+    Inputs:
+        1) hclim          - climatological MLD [Mons]
+        2) NAOF   [Array] - NAO forcing [Lon x Lat] in Watts/m2
+        3) fscale         - multiplier to scale white noise forcing\
+        4) dt             - timestep in seconds
+        5) rho            - Density of water [kg/m3]
+        6) cp0            - Specific Heat of water [J/(K*kg)]
+        7) hfix           - Fixed Mixed layer Depth
+    
+    """
+    
+    # Convert NAO to correct units...
+    NAOF = {}
+    for i in range(3):
+    
+        # Fixed MLD
+        if i == 0:
+            hchoose = hfix
+        # Max MLD
+        elif i == 1:
+            hchoose = np.nanmax(np.abs(hclim),axis=2)
+        # Varying MLD
+        elif i == 2:
+            hchoose = np.copy(hclim)
+        
+        # Compute and restrict to region
+        if i == 2:
+            # Monthly Varying Forcing [Lon x Lat x Mon]
+            NAOF[i] = naopattern[:,:,None] * dt / cp0 / rho / hchoose
+        else:
+            NAOF[i] = naopattern * dt / cp0 / rho / hchoose
+        
+    return NAOF
+    
+
+
+def make_naoforcing(randts,):
+    """
+    Makes NAO forcing timeseries, given seasonal MLD (hclim), NAO forcing
+    pattern in Watts/m2 (naopattern)
+    
+    Inputs:
+        1) randts [Array] - white noise timeseries varying between -1 and 1
+        2) hclim          - climatological MLD [Mons]
+        3) NAOF   [Array] - NAO forcing [Lon x Lat] in Watts/m2
+        4) fscale         - multiplier to scale white noise forcing\
+        5) dt             - timestep in seconds
+        6) rho            - Density of water [kg/m3]
+        7) cp0            - Specific Heat of water [J/(K*kg)]
+        8) hfix           - Fixed Mixed layer Depth
+    
+    Dependencies: 
+        1) 
+    
+    """
+    
+    # Convert NAO to correct units...
+    for i in range(3):
+    
+        # Fixed MLD
+        if i == 0:
+            hchoose = hfix
+        # Max MLD
+        elif i == 1:
+            hchoose = np.nanmax(np.abs(hclim),axis=2)
+        # Varying MLD
+        elif i == 2:
+            hchoose = np.copy(hclim)
+        
+        # Compute and restrict to region
+        if i == 2:
+            # Monthly Varying Forcing [Lon x Lat x Mon]
+            NAOF[i] = naopattern[klon[:,None],klat[None,:],None] * dt / cp0 / rho / hchoose
+        else:
+            NAOF[i] = naopattern[klon[:,None],klat[None,:]] * dt / cp0 / rho / hchoose
+
+    
+    
+    
+    
+    
+    
+    return F
 
 
 # Make forcing
@@ -609,10 +703,10 @@ if funiform != 0:
         F[1] = NAOF[1][:,:,None]*randts[None,None,:]
         
         # Seasonally varying mld...
-        F[2] = np.tile(NAOF[2],nyr) * randts[None,None,:]
+        F[2] = np.tile(NAOF[2],nyr) * randts[None,None,:] * fscale
     
     # Save Forcing
-    np.save(datpath+"stoch_output_%iyr_run%s_funiform%i_Forcing.npy"%(nyr,runid,funiform),F)
+    np.save(datpath+"stoch_output_%iyr_funiform%i_run%s_Forcing.npy"%(nyr,funiform,runid),F)
       
 # ----------
 # %%RUN MODELS -----------------------------------------------------------------
@@ -710,8 +804,7 @@ if hvarmode == 2:
 
 # %% save output
 
-np.save(datpath+"stoch_output_1000yr_funiform%i_entrain0_hvar%i.npy"%(funiform,hvarmode),T_entr0_all)
-np.save(datpath+"stoch_output_1000yr_funiform%i_entrain1_hvar%i.npy"%(funiform,hvarmode),T_entr1)
-
+np.save(datpath+"stoch_output_%iyr_funiform%i_entrain0_run%s.npy"%(nyr,funiform,runid),T_entr0_all)
+np.save(datpath+"stoch_output_%iyr_funiform%i_entrain1_run%s.npy"%(nyr,funiform,runid),T_entr1)
 #np.save(datpath+"stoch_output_1000yr_funiform%i_Forcing.npy"%(funiform),F)
 
