@@ -22,6 +22,8 @@ from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
 import cmocean
 import matplotlib.ticker as mticker
 from cartopy.util import add_cyclic_point
+import matplotlib.gridspec as gridspec
+
 
 #%% Functions
 def calc_lagcovar(var1,var2,lags,basemonth,detrendopt):
@@ -126,7 +128,6 @@ def area_avg(data,bbox,lon,lat,wgt):
         
         
         # Calculate Area Weights (cosine of latitude)
-        wgtm = np.cos(np.radians(lat))
         wgta = np.cos(np.radians(yy)).T
         
         # Remove nanpts from weight
@@ -212,30 +213,34 @@ def detrendlin(var_in):
     
     return var_detrend
 
-
-
 def calc_AMV(lon,lat,sst,bbox,order,cutofftime,awgt):
     """
+    Calculate AMV Index for detrended/anomalized SST data [LON x LAT x Time]
+    given bounding box [bbox]. Applies cosine area weighing
     
 
     Parameters
     ----------
-    lon : TYPE
-        DESCRIPTION.
-    lat : TYPE
-        DESCRIPTION.
-    sst : TYPE
-        DESCRIPTION.
-    bbox : TYPE
-        DESCRIPTION.
-    order : TYPE
-        DESCRIPTION.
-    cutofftime : TYPE
-        DESCRIPTION.
-
+    lon : ARRAY [LON]
+        Longitude values
+    lat : ARRAY [LAT]
+        Latitude Values
+    sst : ARRAY [LON x LAT x TIME]
+        Sea Surface Temperature
+    bbox : ARRAY [LonW,LonE,LonS,LonN]
+        Bounding Box for Area Average
+    order : INT
+        Butterworth Filter Order
+    cutofftime : INT
+        Filter Cutoff, expressed in same timesteps as input data
+        
     Returns
     -------
-    amv
+    amv: ARRAY [TIME]
+        AMV Index (Not Standardized)
+    
+    aa_sst: ARRAY [TIME]
+        Area Averaged SST
 
     """
     
@@ -248,29 +253,35 @@ def calc_AMV(lon,lat,sst,bbox,order,cutofftime,awgt):
     from scipy.signal import butter,filtfilt
     """
     
-    
     # Take the weighted area average
     aa_sst = area_avg(sst,bbox,lon,lat,awgt)
-    
-    # Linearly detrend the data
-    aa_sst = detrendlin(aa_sst)
-    
-    # Normalize the data
-    sstmean = np.nanmean(aa_sst)
-    sststd  = np.nanstd(aa_sst)
-    sstanom = (aa_sst - sstmean) / sststd
-    
-    
-    
-    
+
+
     # Design Butterworth Lowpass Filter
     filtfreq = len(aa_sst)/cutofftime
     nyquist  = len(aa_sst)/2
     cutoff = filtfreq/nyquist
     b,a    = butter(order,cutoff,btype="lowpass")
     
+    # fs = 1/(12*30*24*3600)
+    # xtk     = [fs/100,fs/10,fs,fs*12,fs*12*30]
+    # xtklabel = ['century','decade','year','mon',"day"]
+
+    # w, h = freqz(b, a, worN=1000)
+    # plt.subplot(2, 1, 1)
+    # plt.plot(0.5*fs*w/np.pi, np.abs(h), 'b')
+    # plt.plot(cutoff, 0.5*np.sqrt(2), 'ko')
+    # plt.axvline(cutoff, color='k')
+    # plt.xlim(fs/1200, 0.5*fs)
+    # plt.xscale('log')
+    # plt.xticks(xtk,xtklabel)
+    # plt.title("Lowpass Filter Frequency Response")
+    # plt.xlabel('Frequency [Hz]')
+    # plt.grid()
+
+    
     # Compute AMV Index
-    amv = filtfilt(b,a,sstanom)
+    amv = filtfilt(b,a,aa_sst)
     
     return amv,aa_sst
     
@@ -391,49 +402,95 @@ def regress_2d(A,B):
     """
     # Determine if A or B is 2D and find anomalies
     
+    # Compute using nan functions (slower)
+    if np.any(np.isnan(A)) or np.any(np.isnan(B)):
+        print("NaN Values Detected...")
     
-    # 2D Matrix is in A [MxN]
-    if len(A.shape) > len(B.shape):
+        # 2D Matrix is in A [MxN]
+        if len(A.shape) > len(B.shape):
+            
+            # Tranpose A so that A = [MxN]
+            if A.shape[1] != B.shape[0]:
+                A = A.T
+            
+            
+            # Set axis for summing/averaging
+            a_axis = 1
+            b_axis = 0
+            
+            # Compute anomalies along appropriate axis
+            Aanom = A - np.nanmean(A,axis=a_axis)[:,None]
+            Banom = B - np.nanmean(B,axis=b_axis)
+            
         
-        # Tranpose A so that A = [MxN]
-        if A.shape[1] != B.shape[0]:
-            A = A.T
+            
+        # 2D matrix is B [N x M]
+        elif len(A.shape) < len(B.shape):
+            
+            # Tranpose B so that it is [N x M]
+            if B.shape[0] != A.shape[0]:
+                B = B.T
+            
+            # Set axis for summing/averaging
+            a_axis = 0
+            b_axis = 0
+            
+            # Compute anomalies along appropriate axis        
+            Aanom = A - np.nanmean(A,axis=a_axis)
+            Banom = B - np.nanmean(B,axis=b_axis)[None,:]
         
+        # Calculate denominator, summing over N
+        Aanom2 = np.power(Aanom,2)
+        denom = np.nansum(Aanom2,axis=a_axis)    
         
-        # Set axis for summing/averaging
-        a_axis = 1
-        b_axis = 0
+        # Calculate Beta
+        beta = Aanom @ Banom / denom
+            
         
-        # Compute anomalies along appropriate axis
-        Aanom = A - np.nanmean(A,axis=a_axis)[:,None]
-        Banom = B - np.nanmean(B,axis=b_axis)
+        b = (np.nansum(B,axis=b_axis) - beta * np.nansum(A,axis=a_axis))/A.shape[a_axis]
+    else:
+        # 2D Matrix is in A [MxN]
+        if len(A.shape) > len(B.shape):
+            
+            # Tranpose A so that A = [MxN]
+            if A.shape[1] != B.shape[0]:
+                A = A.T
+            
+            
+            # Set axis for summing/averaging
+            a_axis = 1
+            b_axis = 0
+            
+            # Compute anomalies along appropriate axis
+            Aanom = A - np.mean(A,axis=a_axis)[:,None]
+            Banom = B - np.mean(B,axis=b_axis)
+            
         
-    
+            
+        # 2D matrix is B [N x M]
+        elif len(A.shape) < len(B.shape):
+            
+            # Tranpose B so that it is [N x M]
+            if B.shape[0] != A.shape[0]:
+                B = B.T
+            
+            # Set axis for summing/averaging
+            a_axis = 0
+            b_axis = 0
+            
+            # Compute anomalies along appropriate axis        
+            Aanom = A - np.mean(A,axis=a_axis)
+            Banom = B - np.mean(B,axis=b_axis)[None,:]
         
-    # 2D matrix is B [N x M]
-    elif len(A.shape) < len(B.shape):
+        # Calculate denominator, summing over N
+        Aanom2 = np.power(Aanom,2)
+        denom = np.sum(Aanom2,axis=a_axis)    
         
-        # Tranpose B so that it is [N x M]
-        if B.shape[0] != A.shape[0]:
-            B = B.T
+        # Calculate Beta
+        beta = Aanom @ Banom / denom
+            
         
-        # Set axis for summing/averaging
-        a_axis = 0
-        b_axis = 0
-        
-        # Compute anomalies along appropriate axis        
-        Aanom = A - np.nanmean(A,axis=a_axis)
-        Banom = B - np.nanmean(B,axis=b_axis)[None,:]
-    
-    # Calculate denominator, summing over N
-    Aanom2 = np.power(Aanom,2)
-    denom = np.sum(Aanom2,axis=a_axis)    
-    
-    # Calculate Beta
-    beta = Aanom @ Banom / denom
-        
-    
-    b = (np.nansum(B,axis=b_axis) - beta * np.nansum(A,axis=a_axis))/A.shape[a_axis]
+        b = (np.sum(B,axis=b_axis) - beta * np.sum(A,axis=a_axis))/A.shape[a_axis]
     
     
     return beta,b
@@ -485,20 +542,267 @@ def detrendlin_nd(var_in):
     
     return var_dt
 
+def find_nan(data,dim):
+    """
+    For a 2D array, remove any point if there is a nan in dimension [dim]
+    
+    Inputs:
+        1) data: 2d array, which will be summed along last dimension
+        2) dim: dimension to search along. 0 or 1.
+    Outputs:
+        1) okdata: data with nan points removed
+        2) knan: boolean array with indices of nan points
+        
+
+    """
+    
+    # Sum along select dimension
+    datasum = np.sum(data,axis=dim)
+    
+    
+    # Find non nan pts
+    knan  = np.isnan(datasum)
+    okpts = np.invert(knan)
+    
+    if dim == 0:
+        okdata = data[:,okpts]
+    elif dim == 1:    
+        okdata = data[okpts,:]
+    
+    return okdata,knan,okpts
+    
+    
+def year2mon(ts):
+    """
+    Separate mon x year from a 1D timeseries of monthly data
+    """
+    ts = np.reshape(ts,(int(np.ceil(ts.size/12)),12))
+    ts = ts.T
+    return ts
+    
+def ann_avg(ts,dim):
+    """
+    # Take Annual Average of a monthly time series
+    where time is axis "dim"
+    
+    """
+    tsshape = ts.shape
+    ntime   = ts.shape[dim] 
+    newshape =    tsshape[:dim:] +(int(ntime/12),12) + tsshape[dim+1::]
+    annavg = np.reshape(ts,newshape)
+    annavg = np.nanmean(annavg,axis=dim+1)
+    return annavg
+
+def plot_AMV_spatial(var,lon,lat,bbox,cmap,cint=[0,],clab=[0,],ax=None):
+
+    
+    if ax is None:
+        ax = plt.gca()
+        
+        
+        
+    # Add cyclic point to avoid the gap
+    var,lon1 = add_cyclic_point(var,coord=lon)
+    
+
+    # Set up projections and extent
+    ax = plt.axes(projection=ccrs.PlateCarree())
+    ax.set_extent(bbox)
+    
+    # Add filled coastline
+    ax.add_feature(cfeature.COASTLINE,facecolor='k')
+    
+    if len(cint) == 1:
+        # Draw contours
+        cs = ax.contourf(lon1,lat,var,cmap=cmap)
+    
+    else:
+        # Draw contours
+        cs = ax.contourf(lon1,lat,var,cint,cmap=cmap)
+    
+    
+    
+        # Negative contours
+        cln = ax.contour(lon1,lat,var,
+                    cint[cint<0],
+                    linestyles='dashed',
+                    colors='k',
+                    linewidths=0.5,
+                    transform=ccrs.PlateCarree())
+    
+        # Positive Contours
+        clp = ax.contour(lon1,lat,var,
+                    cint[cint>=0],
+                    colors='k',
+                    linewidths=0.5,
+                    transform=ccrs.PlateCarree())    
+                      
+        #ax.clabel(cln,colors=None)
+                                
+                
+    # Add Gridlines
+    gl = ax.gridlines(draw_labels=True,linewidth=0.75,color='gray',linestyle=':')
+
+    gl.xlabels_top = gl.ylabels_right = False
+    gl.xformatter = LONGITUDE_FORMATTER
+    gl.yformatter = LATITUDE_FORMATTER
+    if len(clab) == 1:
+        bc = plt.colorbar(cs)
+    else:
+        bc = plt.colorbar(cs,ticks=clab)
+    
+    
+    return ax
+
+    
+def plot_AMV(amv,ax=None):
+    
+    """
+    
+    Dependencies:
+        
+    matplotlib.pyplot as plt
+    numpy as np
+    """
+    if ax is None:
+        ax = plt.gca()
+    
+    
+    htimefull = np.arange(len(amv))
+    
+    ax.plot(htimefull,amv,color='k')
+    ax.fill_between(htimefull,0,amv,where=amv>0,facecolor='red',interpolate=True,alpha=0.5)
+    ax.fill_between(htimefull,0,amv,where=amv<0,facecolor='blue',interpolate=True,alpha=0.5)
+
+    return ax
+
+def array_nan_equal(a, b):
+    """
+    Check if two arrays are equal ignoring nans
+    source: https://stackoverflow.com/questions/49245963/how-to-compare-numpy-arrays-ignoring-nans
+    """
+    m = np.isfinite(a) & np.isfinite(b)
+    return np.array_equal(a[m], b[m])
+
+
+def detrend_dim(invar,dim):
+    
+    """
+    Detrends n-dimensional variable [invar] at each point along axis [dim].
+    Performs appropriate reshaping and NaN removal, and returns
+    variable in the same shape+order. Assumes equal spacing along [dim] for 
+    detrending
+    
+    Also outputs linear model and coefficients.
+    
+    Dependencies: 
+        numpy as np
+        find_nan (function)
+        regress_2d (function)
+    
+    Inputs:
+        1) invar: variable to detrend
+        2) dim: dimension of axis to detrend along
+        
+    Outputs:
+        1) dtvar: detrended variable
+        2) linmod: computed trend at each point
+        3) beta: regression coefficient (slope) at each point
+        4) interept: y intercept at each point
+    
+    
+    """
+    
+    # Reshape variable
+    varshape = invar.shape
+    
+    # Reshape to move time to first dim
+    newshape = np.hstack([dim,np.arange(0,dim,1),np.arange(dim+1,len(varshape),1)])
+    newvar = np.transpose(invar,newshape)
+    
+    # Combine all other dims and reshape to [time x otherdims]
+    tdim = newvar.shape[0]
+    otherdims = newvar.shape[1::]
+    proddims = np.prod(otherdims)
+    newvar = np.reshape(newvar,(tdim,proddims))
+    
+    # Find non nan points
+    varok,knan,okpts = find_nan(newvar,0)
+    
+    # Ordinary Least Squares Regression
+    tper = np.arange(0,tdim)
+    m,b = regress_2d(tper,varok)
+    
+    # Detrend
+    ymod = (m[:,None]*tper + b[:,None]).T
+    dtvarok = varok - ymod
+    
+    # Replace into variable of original size
+    dtvar  = np.zeros(newvar.shape) * np.nan
+    linmod = np.copy(dtvar)
+    beta   = np.zeros(okpts.shape) * np.nan
+    intercept = np.copy(beta)
+    
+    dtvar[:,okpts] = dtvarok
+    linmod[:,okpts] = ymod
+    beta[okpts] = m
+    intercept[okpts] = b
+    
+    # Reshape to original size
+    dtvar  = np.reshape(dtvar,((tdim,)+otherdims))
+    linmod = np.reshape(linmod,((tdim,)+otherdims))
+    beta = np.reshape(beta,(otherdims))
+    intercept = np.reshape(beta,(otherdims))
+    
+    # Tranpose to original order
+    oldshape = [dtvar.shape.index(x) for x in varshape]
+    dtvar = np.transpose(dtvar,oldshape)
+    linmod = np.transpose(linmod,oldshape)
+    
+    return dtvar,linmod,beta,intercept
+    
+def init_map(bbox,ax=None):
+    """
+    Quickly initialize a map for plotting
+    """
+    # Create Figure/axes
+    #fig = plt.gcf() 
+    
+    #ax = fig.add_subplot(1,1,1,projection=ccrs.PlateCarree())
+    if ax is None:
+        ax = plt.gca()
+    #ax = plt.axes(projection=ccrs.PlateCarree())
+        
+    
+    ax.set_extent(bbox)
+    
+    # Add Filled Coastline
+    ax.add_feature(cfeature.COASTLINE,facecolor='k')
+    
+    # Add Gridlines
+    gl = ax.gridlines(draw_labels=True,linewidth=0.5,color='gray',linestyle=':')
+    gl.xlabels_top = gl.ylabels_right = False
+    gl.xformatter = LONGITUDE_FORMATTER
+    gl.yformatter = LATITUDE_FORMATTER
+    
+    return ax
 
 #%% ----------------------------------------------------------------------------
 # Set data paths
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath = projpath + '03_Scripts/stochmod/'  
 datpath = projpath + '01_Data/'
-outpath = projpath + '02_Figures/20200721/'
+outpath = projpath + '02_Figures/20200728/'
 
 # Path to SST data from obsv
 datpath2 = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/"
 
 
 # User settings (note, need to select better region that ignores stuff in the pacific)
-bbox = [-75,5,0,65]
+bbox  = [-80,0,0,60]
+
+# Mapping Box size
+mbbox = [-100,0,0,90]
 
 # # Filter settings: https://iescoders.com/time-series-analysis-filtering-or-smoothing-the-data/
 # order   = 5
@@ -510,14 +814,16 @@ bbox = [-75,5,0,65]
 
 # More filter settings rewritten (based on old matlab code)
 order = 5
-cutofftime = 120
+cutofftime = 10
 
 #print('cutoff = ',1/cutoff*nyquist*30*24*3600,' months')
 
-# Other options
 
+# Experiment Options
 funiform = 2
- 
+runid = "000"
+nyrs = 1000
+
 
 # ----------------------------------------------------------------------------
 #%% Script Start 
@@ -527,7 +833,11 @@ hvarmode = np.arange(0,3,1)
 hvarnames = ("Fixed (50m)","Maximum","Seasonal")
 
 # Load in forcing and lat/lon
-F        = np.load(datpath+"stoch_output_1000yr_funiform%i_Forcing.npy"%(funiform))
+if funiform == 2:
+    F        = np.load(datpath+"stoch_output_%iyr_funiform%i_run%s_Forcing.npy"%(nyrs,funiform,runid),allow_pickle=True).item()
+else:
+    F        = np.load(datpath+"stoch_output_%iyr_funiform%i_run%s_Forcing.npy"%(nyrs,funiform,runid),allow_pickle=True)
+sst      = np.load(datpath+"stoch_output_%iyr_funiform%i_entrain0_run%s.npy"%(nyrs,funiform,runid),allow_pickle=True).item()
 lon      = np.load(datpath+"lon.npy")
 lat      = np.load(datpath+"lat.npy")
 
@@ -535,44 +845,54 @@ lat      = np.load(datpath+"lat.npy")
 
 
 #%% Calculate AMV Index
-sst = {}
+#sst = {}
 amv = {}
 aa = {}
+annsst = {}
 # Load in dat for each mode and compute amv index
 for mode in hvarmode:
-    
-    sst[mode] = np.load(datpath+"stoch_output_1000yr_funiform%i_entrain0_hvar%i.npy" % (funiform,mode))
-
+    print(mode)
+    #sst[mode] = np.load(datpath+"stoch_output_1000yr_funiform%i_entrain0_hvar%i.npy" % (funiform,mode))
+    annsst[mode] = ann_avg(sst[mode],2)
 
     # Calculate AMV Index
-    amv[mode],aa[mode] = calc_AMV(lon,lat,sst[mode],bbox,order,cutofftime,1)
+    amv[mode],aa[mode] = calc_AMV(lon,lat,annsst[mode],bbox,order,cutofftime,1)
+
 
 # Repeat, but for forcing
-lpforcing,aaforcing = calc_AMV(lon,lat,F,bbox,order,cutofftime,1)
-    
-    
-    
-    
+if funiform == 2:
+    lpforcing = {}
+    aaforcing = {}
+    for mode in hvarmode:
+        
+        annforcing = ann_avg(F[mode],2)
+        lpforcing[mode],aaforcing[mode] = calc_AMV(lon,lat,annforcing,bbox,order,cutofftime,1)
+else:
+    annforcing = ann_avg(F,2)
+    lpforcing,aaforcing = calc_AMV(lon,lat,annforcing,bbox,order,cutofftime,1)
 
 #%% Regress back to SST
-regr_meth1 = {}
 regr_meth2 = {}
+
 # Perform regression for each mode
 for mode in hvarmode:
-    #regr_meth1[mode]=regress2ts(sst[mode],amv[mode],0,1)
     
-    regr_meth2[mode]=regress2ts(sst[mode],amv[mode],0,1)
+    regr_meth2[mode]=regress2ts(annsst[mode],amv[mode]/np.nanstd(amv[mode]),0,1)
  
 
 
 #%% Repeat for entrainment case
-    
-sstentrain  = np.load(datpath+"stoch_output_1000yr_funiform%i_entrain1_hvar2.npy"%(funiform))    
-amventrain,aaentrain= calc_AMV(lon,lat,sstentrain,bbox,order,cutofftime,1)
-regrentrain = regress2ts(sstentrain,amventrain,0,1)
 
 
-#regrentrain = regress_2d()
+# Load in Data and find annual average
+sstentrain  = np.load(datpath+"stoch_output_%iyr_funiform%i_entrain1_run%s.npy"%(nyrs,funiform,runid))  
+annsst[3]  = ann_avg(sstentrain,2)  
+
+# Calculate AMV
+amv[3],aa[3]= calc_AMV(lon,lat,annsst[3],bbox,order,cutofftime,1)
+
+# Regress back to get spatial pattern
+regr_meth2[3] = regress2ts(annsst[3],amv[3]/np.nanstd(amv[3]),0,1)
 
 
 
@@ -590,37 +910,37 @@ hyr  = obvhad['YR']
 
 #----------------------------------------
 # # Old way
-# Load in observation SST data to compare
-obvhad = loadmat(datpath2+"hadisst.1870_2018.mat")
-hlat = np.squeeze(obvhad['LAT'])
-hlon = np.squeeze(obvhad['LON'])
-hyr  = obvhad['YR']
-hsst = obvhad['SST']
+# # Load in observation SST data to compare
+# obvhad = loadmat(datpath2+"hadisst.1870_2018.mat")
+# hlat = np.squeeze(obvhad['LAT'])
+# hlon = np.squeeze(obvhad['LON'])
+# hyr  = obvhad['YR']
+# hsst = obvhad['SST']
 
-# Change hsst to lon x lat x time
-hsst = np.transpose(hsst,(2,1,0))
+# # Change hsst to lon x lat x time
+# hsst = np.transpose(hsst,(2,1,0))
 
-# Take the set time period
-startyr = 1920
-monstart = (1920+1-hyr[0,0])*12
-hsst = hsst[:,:,monstart::]
+# # Take the set time period
+# startyr = 1920
+# monstart = (1920+1-hyr[0,0])*12
+# hsst = hsst[:,:,monstart::]
 
-# Find north and south latitude points
-hsouth = np.where(hlat <= 0)
-hnorth = np.where(hlat > 0)
+# # Find north and south latitude points
+# hsouth = np.where(hlat <= 0)
+# hnorth = np.where(hlat > 0)
 
-# Find corresponding points in data
-hsstsouth = np.squeeze(hsst[:,hsouth,:])[:,::-1,:]
-hsstnorth = np.squeeze(hsst[:,hnorth,:])[:,::-1,:]
+# # Find corresponding points in data
+# hsstsouth = np.squeeze(hsst[:,hsouth,:])[:,::-1,:]
+# hsstnorth = np.squeeze(hsst[:,hnorth,:])[:,::-1,:]
 
-# Stitch things together, reversing the order 
-hlatnew = np.squeeze(np.concatenate((hlat[hsouth][::-1],hlat[hnorth][::-1])))
-hsstnew = np.concatenate((hsstsouth,hsstnorth),axis=1)
+# # Stitch things together, reversing the order 
+# hlatnew = np.squeeze(np.concatenate((hlat[hsouth][::-1],hlat[hnorth][::-1])))
+# hsstnew = np.concatenate((hsstsouth,hsstnorth),axis=1)
 
 
-# Reshape to [Time x Space] and remove NaN Points
-hsstnew = np.reshape(hsstnew,(360*180,1176)).T
-hsstok,knan,okpts = find_nan(hsstnew,0)
+# # Reshape to [Time x Space] and remove NaN Points
+# hsstnew = np.reshape(hsstnew,(360*180,1176)).T
+# hsstok,knan,okpts = find_nan(hsstnew,0)
 
 
 #----------------------------------------
@@ -630,15 +950,17 @@ hlon = hadnc.lon.values
 hlat = hadnc.lat.values
 hsst = hadnc.SST.values
 
+# Take annual average
+annhsst = ann_avg(hsst,2)
 
 
 # Take average from amv
-h_amv,aa_hsst = calc_AMV(hlon,hlat,hsst,bbox,order,cutofftime,1)  
-h_amvo,aa_hssto = calc_AMV(hlon,hlatnew,hsstnew,bbox,order,cutofftime,1)  
+h_amv,aa_hsst = calc_AMV(hlon,hlat,annhsst,bbox,order,cutofftime,1)  
+#h_amvo,aa_hssto = calc_AMV(hlon,hlatnew,hsstnew,bbox,order,cutofftime,1)  
 
 
-h_regr=regress2ts(hsst,h_amv,0,1)
-h_regro = regress2ts(hsstnew,h_amvo,0,1)
+h_regr=regress2ts(annhsst,h_amv/np.nanstd(h_amv),0,1)
+#h_regro = regress2ts(hsstnew,h_amvo,0,1)
 
 # %% Perform psd
 
@@ -733,7 +1055,7 @@ plt.savefig("%sPeriodogram_Stochmod_NoEntrain.png"%outpath,dpi=200)
 htimeall = np.arange(0,len(amv[1]))
 hticks = np.arange(0,1100,100)
 fig,ax = plt.subplots(3,1,sharex=True,sharey=True,figsize=(14,8))
-for mode in hvarmode:
+for mode in range(3):
     plt.style.use("ggplot")
     
     plt.subplot(4,1,mode+1)
@@ -743,9 +1065,9 @@ for mode in hvarmode:
     
     
     
-    plt.ylim([-2,2])
-    plt.xticks(np.arange(0,len(amv[1])+1200,1200),hticks,fontsize=16)
-    plt.yticks(np.arange(-2,2.5,0.5),fontsize=16)
+    #plt.ylim([-1.5,1.5])
+    #plt.xticks(np.arange(0,len(amv[1])+1200,1200),hticks,fontsize=16)
+    #plt.yticks(np.arange(-1.5,2.0,0.5),fontsize=16)
     plt.title("AMV Index for MLD %s" % hvarnames[mode],fontsize=20)
     #ax[mode+1].tick_params(labelsize=16)
 
@@ -765,24 +1087,30 @@ plt.savefig(outname, bbox_inches="tight",dpi=200)
 # -------------------------------
 # %%Compare AMV to forcing
 # -------------------------------
+
+
+
 # Add forcing as first plot
 fig,ax = plt.subplots(2,1,sharex=True,sharey=False,figsize=(14,6))
 plt.style.use("ggplot")
 plt.subplot(2,1,1)
-plot_AMV(lpforcing)
-plt.xticks(np.arange(0,len(amv[1])+1200,1200),hticks,fontsize=16)
-plt.xticks(np.arange(0,len(amv[1])+1200,1200),hticks,fontsize=16)
-plt.yticks(np.arange(-0.25,0.50,0.25),fontsize=16)
-plt.title("Forcing",fontsize=20)
+if funiform == 2:
+    plot_AMV(lpforcing[2])
+else:
+    plot_AMV(lpforcing)
+#plt.xticks(np.arange(0,len(amv[1])+1200,1200),hticks,fontsize=16)
+#plt.xticks(np.arange(0,len(amv[1])+1200,1200),hticks,fontsize=16)
+#plt.yticks(np.arange(-1.5,2.0,0.5),fontsize=16)
+plt.title("Forcing (LP-Filtered)",fontsize=20)
 plt.ylabel("Forcing Term K/s",fontsize=16)
 
 
 plt.subplot(2,1,2)
 model = 2
 plot_AMV(amv[2])
-plt.ylim([-2,2])
-plt.xticks(np.arange(0,len(amv[1])+1200,1200),hticks,fontsize=16)
-plt.yticks(np.arange(-2,2.5,0.5),fontsize=16)
+#plt.ylim([-1,1])
+#plt.xticks(np.arange(0,len(amv[1])+1200,1200),hticks,fontsize=16)
+#plt.yticks(np.arange(-1,1.5,0.5),fontsize=16)
 plt.title("AMV Index for MLD %s" % hvarnames[mode],fontsize=20)
 plt.ylabel("AMV Index",fontsize=16)
 plt.tight_layout()
@@ -799,18 +1127,18 @@ plt.savefig(outname, bbox_inches="tight",dpi=200)
 
 def plot_AMV_spatial(var,lon,lat,bbox,cmap,cint=[0,],clab=[0,],ax=None):
 
+    fig = plt.gcf()
     
     if ax is None:
         ax = plt.gca()
-        
-        
+        ax = plt.axes(projection=ccrs.PlateCarree())
         
     # Add cyclic point to avoid the gap
     var,lon1 = add_cyclic_point(var,coord=lon)
     
 
-    # Set up projections and extent
-    ax = plt.axes(projection=ccrs.PlateCarree())
+    
+    # Set  extent
     ax.set_extent(bbox)
     
     # Add filled coastline
@@ -851,9 +1179,9 @@ def plot_AMV_spatial(var,lon,lat,bbox,cmap,cint=[0,],clab=[0,],ax=None):
     gl.xformatter = LONGITUDE_FORMATTER
     gl.yformatter = LATITUDE_FORMATTER
     if len(clab) == 1:
-        bc = plt.colorbar(cs)
+        fig.colorbar(cs,ax=ax,fraction=0.046, pad=0.04)
     else:
-        bc = plt.colorbar(cs,ticks=clab)
+        fig.colorbar(cs,ax=ax,ticks=clab,fraction=0.046, pad=0.04)
     
     
     return ax
@@ -863,7 +1191,9 @@ def plot_AMV_spatial(var,lon,lat,bbox,cmap,cint=[0,],clab=[0,],ax=None):
 # Set up plot
 # Set colormaps and contour intervals
 cmap = cmocean.cm.balance
-cint = np.arange(-10,11,1)
+cmap.set_bad(color='yellow')
+#cint = np.arange(-1,1.1,0.1)
+cint = np.arange(-10,10,1)
 #clab = np.arange(-0.50,0.60,0.10)
 #cint = np.arange(-1,1.2,0.2)
 #cint = np.arange(-2,2.5,0.5)
@@ -878,18 +1208,20 @@ for mode in hvarmode:
     
     plt.subplot(1,3,mode+1)
     #plot_AMV_spatial(varin,lon,lat,bbox,cmap,cint,clab)
-    plot_AMV_spatial(varin,lon,lat,bbox,cmap,cint,clab)
+    plot_AMV_spatial(varin,lon,lat,mbbox,cmap,cint,clab)
     plt.title("AMV Spatial Pattern \n MLD %s" % hvarnames[mode],fontsize=14)
-    outname = outpath+'AMVpattern_funiform%i_hvar%i.png' % (funiform,mode)
+    outname = outpath+'AMVpattern_funiform%i_hvar%i_run%s.png' % (funiform,mode,runid)
     plt.savefig(outname, bbox_inches="tight",dpi=200)
     
 
 
 #%% Plot AMV FFor HADLISST
+
+startyr = 1900
 # Same plot, but for HadlISST
 cmap = cmocean.cm.balance
 #cint = np.arange(-3.5,3.25,0.25)
-cint = np.arange(-1,1.1,0.1)
+cint = np.arange(-0.8,0.9,0.1)
 #clab = np.arange(-0.50,0.60,0.10)
 #cint = np.arange(-1,1.2,0.2)
 clab = cint
@@ -900,7 +1232,7 @@ plt.style.use("ggplot")
 varin = np.transpose(h_regr,(1,0))
 
 plt.subplot(1,1,1)
-plot_AMV_spatial(varin,hlon,hlat,bbox,cmap,cint,clab)
+plot_AMV_spatial(varin,hlon,hlat,mbbox,cmap,cint,clab)
 plt.title("AMV-related SST Pattern from HadISST, %i-%i"%(startyr,hyr[0,-1]),fontsize=14)
 outname = outpath+'AMVpattern_HADLISST.png' 
 plt.savefig(outname, bbox_inches="tight",dpi=200)
@@ -927,26 +1259,33 @@ clab = cint
 fig,ax = plt.subplots(1,1,figsize=(8,4))
 plt.style.use("ggplot")
 
-varin = np.transpose(regrentrain,(1,0))
+varin =regr_meth2[3].T
 
 plt.subplot(1,1,1)
-plot_AMV_spatial(varin,lon,lat,bbox,cmap,cint,clab)
+plot_AMV_spatial(varin,lon,lat,mbbox,cmap,cint,clab)
 plt.title("AMV-related SST Pattern, Entrain Case")
-outname = outpath+'AMVpattern_funiform%i_entrain.png'  % (funiform)
+outname = outpath+'AMVpattern_funiform%i_entrain_run%s.png'  % (funiform,runid)
 plt.savefig(outname, bbox_inches="tight",dpi=200)
 
+#%% Spatial AMV Pattern and AMV Time Series Plots...
 
-#%% Load Matlab Data for Comparison
-# Load matlab data for debugging
-matlabver = loadmat(datpath+"test30W50N.mat")
-SSTpt = matlabver['SSTpt']
-MLamv = matlabver['AnomSSTfilt_DT']
-fig,ax = plt.subplots(1,1)
-#ax.plot(MLamv)
-#ax.plot(amv)
-ax.plot(SSTpt,color='k')
-ax.plot(vartime,color='b')
+fig = plt.figure(constrained_layout=True,figsize=(8,6))
+gs  = fig.add_gridspec(3,3)
 
+# Make AMV Spatial Pattern Map
+ax1 = fig.add_subplot(gs[0:2,:],projection=ccrs.PlateCarree())
+plot_AMV_spatial(varin,lon,lat,mbbox,cmap,cint,clab,ax=ax1)
+#ax1.set_title("AMV-related SST Pattern, Entrain Case")
+
+
+ax2 = fig.add_subplot(gs[2,:])
+plot_AMV(amv[3],ax=ax2)
+ax2.set_title("AMV Index")
+ax2.set_xlabel("Years")
+
+
+
+#%% Havent Fixed Things Below this line..
 
 
 #%% Try to animate a forcing map
