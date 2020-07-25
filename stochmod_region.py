@@ -512,8 +512,8 @@ usesst   = 0
 # 0 = completely random in space time
 # 1 = spatially unform forcing, temporally varying
 # 2 = NAO-like NHFLX Forcing, temporally varying 
-funiform = 2     
-fscale   = 10   
+funiform = 1     
+fscale   = 10
 
 # hvarmode
 hvarmode = 2 # hvar modes (0 - fixe mld, 1 - effective mld, 2 - seasonally varying mld)
@@ -530,7 +530,7 @@ latN = 90
 detrendopt = 0  # Option to detrend before calculations
 
 # White Noise Options. Set to 1 to load data
-genrand   = 1  #
+genrand   = 0  #
 
 #Set Paths
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
@@ -665,7 +665,7 @@ if funiform != 0:
         
         F = make_naoforcing(NAOF,randts,fscale)
     # Save Forcing
-    #np.save(datpath+"stoch_output_%iyr_funiform%i_run%s_Forcing.npy"%(nyr,funiform,runid),F)
+    np.save(datpath+"stoch_output_%iyr_funiform%i_run%s_Forcing.npy"%(nyr,funiform,runid),F)
       
 # ----------
 # %%RUN MODELS -----------------------------------------------------------------
@@ -726,7 +726,10 @@ if hvarmode == 2:
     T_entr1 = np.zeros((lonsize,latsize,t_end))
     icount = 0
     
-    Fh = np.copy(F[2])
+    if funiform == 2:
+        Fh = np.copy(F[2])
+    else:
+        Fh = np.copy(F)
     
     for o in range(0,lonsize):
         # Get Longitude Value
@@ -737,8 +740,7 @@ if hvarmode == 2:
             lonf = lonf + 360
         
         for a in range(0,latsize):
-            
-            
+
             # Get latitude indices
             latf = latr[a]
             
