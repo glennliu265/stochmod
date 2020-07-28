@@ -152,7 +152,31 @@ def year2mon(ts):
     ts = ts.T
     return ts
 
+def ann_avg(ts,dim):
+    """
+    # Take Annual Average of a monthly time series
+    where time is axis "dim"
+    
+    """
+    tsshape = ts.shape
+    ntime   = ts.shape[dim] 
+    newshape =    tsshape[:dim:] +(int(ntime/12),12) + tsshape[dim+1::]
+    annavg = np.reshape(ts,newshape)
+    annavg = np.nanmean(annavg,axis=dim+1)
+    return annavg
 
+
+def calc_clim(ts,dim):
+    """
+    Given monthly timeseries in axis [dim], calculate the climatology...
+    """
+
+    tsshape = ts.shape
+    ntime   = ts.shape[dim] 
+    newshape =    tsshape[:dim:] +(int(ntime/12),12) + tsshape[dim+1::]
+    climavg = np.reshape(ts,newshape)
+    climavg = np.nanmean(climavg,axis=dim)
+    return climavg
 
 
 #%% User Edits -----------------------------------------------------------------     
@@ -417,45 +441,57 @@ else:
 
 # Run models
 sst = {}
-
+noise = {}
+dampts = {}
  # Loop nonentraining model
 for l in range(3):
     start = time.time()
-    sst[l],_,_ = scm.noentrain(t_end,lbd[l],T0,F)
+    sst[l],noise[l],dampts[l] = scm.noentrain(t_end,lbd[l],T0,F)
     elapsed = time.time() - start
     tprint = "No Entrain Model, mode %i, ran in %.2fs" % (l,elapsed)
     print(tprint)
 
 # Loop for entrain model
-start = time.time()
-sst[3],_,_,_,_=scm.entrain(t_end,lbd_entr,T0,F,beta,hpt,kprev,FAC)
-elapsed = time.time() - start
-tprint = "Entrain Model ran in %.2fs" % (elapsed)
-print(tprint)
+if hvarmode == 2:
+    start = time.time()
+    sst[3],noise[3],dampts[3],eentrain,td=scm.entrain(t_end,lbd_entr,T0,F,beta,hpt,kprev,FAC)
+    elapsed = time.time() - start
+    tprint = "Entrain Model ran in %.2fs" % (elapsed)
+    print(tprint)
 
 
 
-# Plot Point
+#%% Plot Point
 
-hvarmode = 3
+#hvarmode = 1
+# Set hvarmode = 3 for entrain
+hvarmode = 0
 sstpt = sst[hvarmode]
 
-tper = np.arange(0,t_end)
-fig,ax = plt.subplots(2,1,figsize=(6,4))
-plt.style.use('ggplot')
 
+sstptann = ann_avg(sstpt,0)
+Fptann   = ann_avg(F,0)
+
+tper = np.arange(0,t_end)
+yper = np.arange(0,t_end,12)
+fig,ax = plt.subplots(2,1,figsize=(8,6))
+plt.style.use('ggplot')
 
 plt.subplot(2,1,1)
 plt.plot(tper,F)
+plt.plot(yper,Fptann,color='k',label='Ann. Avg')
 plt.ylabel("Forcing ($^{\circ}C/s$)",fontsize=10)
+plt.legend()
 plt.title("Forcing at LON: %02d LAT: %02d \n Mean: %.2f || Std: %.2f || Max: %.2f" % (lonf,latf,np.nanmean(F),np.nanstd(F),np.nanmax(np.abs(F))))
 
 
 
 plt.subplot(2,1,2)
 plt.plot(tper,sstpt)
+plt.plot(yper,sstptann,color='k',label='Ann. Avg')
 plt.ylabel("SST ($^{\circ}C$)",fontsize=10)
 plt.xlabel("Time(Months)",fontsize=10)
+plt.legend()
 #plt.title("Detrended, Deseasonalized SST at LON: %02d LAT: %02d \n Mean: %.2f || Std: %.2f || Max: %.2f" % (lonf,latf,np.nanmean(sstpt),np.nanstd(sstpt),np.nanmax(np.abs(sstpt))))
 plt.title("Detrended, Deseasonalized SST \n Mean: %.2f || Std: %.2f || Max: %.2f" % (np.nanmean(sstpt),np.nanstd(sstpt),np.nanmax(np.abs(sstpt))))
 
@@ -463,4 +499,106 @@ plt.title("Detrended, Deseasonalized SST \n Mean: %.2f || Std: %.2f || Max: %.2f
 plt.tight_layout()
 
 plt.savefig(outpath+"Stochmodpt_dsdt_SST_lon%02d_lat%02d_hvarmode%i_fscale%i.png"%(lonf,latf,hvarmode,fscale),dpi=200)
+
+
+#%% # Plot Each Term in Model To compare
+hvarmode = 0
+
+sstpt   = sst[hvarmode]
+noisept = noise[hvarmode]
+damptspt = dampts[hvarmode]
+
+# Append zero to end
+noisept = np.pad(noisept,(0,1),'constant')
+damptspt = np.pad(damptspt,(0,1),'constant')
+
+
+# Plot for no-entrain model
+fig,ax = plt.subplots(3,1,figsize=(10,6)) 
+
+var = noisept
+plt.subplot(3,1,1)
+plt.plot(tper,var)
+plt.plot(yper,ann_avg(var,0),color='k',label='Ann. Avg')
+plt.ylabel("Forcing ($^{\circ}C/s$)",fontsize=8)
+plt.legend()
+plt.title("Noise Term at LON: %02d LAT: %02d (Mean: %.2f || Std: %.2f || Max: %.2f)" % (lonf,latf,np.nanmean(var),np.nanstd(var),np.nanmax(np.abs(var))))
+
+var = damptspt
+plt.subplot(3,1,2)
+plt.plot(tper,var)
+plt.plot(yper,ann_avg(var,0),color='k',label='Ann. Avg')
+plt.ylabel("Damping ($^{\circ}C/s$)",fontsize=8)
+plt.legend()
+plt.title("Damping Term Hvarmode %i (Mean: %.2f || Std: %.2f || Max: %.2f)" % (hvarmode,np.nanmean(var),np.nanstd(var),np.nanmax(np.abs(var))))
+
+plt.subplot(3,1,3)
+plt.plot(tper,sstpt)
+plt.plot(yper,ann_avg(sstpt,0),color='k',label='Ann. Avg')
+plt.ylabel("SST ($^{\circ}C$)",fontsize=10)
+plt.xlabel("Time(Months)",fontsize=10)
+plt.legend()
+#plt.title("Detrended, Deseasonalized SST at LON: %02d LAT: %02d \n Mean: %.2f || Std: %.2f || Max: %.2f" % (lonf,latf,np.nanmean(sstpt),np.nanstd(sstpt),np.nanmax(np.abs(sstpt))))
+plt.title("No-Entrain SST (Mean: %.2f || Std: %.2f || Max: %.2f)" % (np.nanmean(sstpt),np.nanstd(sstpt),np.nanmax(np.abs(sstpt))))
+
+plt.tight_layout()
+plt.savefig(outpath+"Stochmodpt_dsdt_ModelParamComp_lon%02d_lat%02d_hvarmode%i_fscale%i.png"%(lonf,latf,hvarmode,fscale),dpi=200)
+
+
+#%% Do same for entraining model
+
+hvarmode = 3
+sstpt   = sst[hvarmode]
+noisept = noise[hvarmode]
+damptspt = dampts[hvarmode]
+
+# Append zero to end
+noisept = np.pad(noisept,(0,1),'constant')
+damptspt = np.pad(damptspt,(0,1),'constant')
+eentrainpt = np.pad(eentrain,(0,1),'constant')
+
+# Plot for no-entrain model
+fig,ax = plt.subplots(4,1,figsize=(12,6)) 
+
+var = noisept
+plt.subplot(4,1,1)
+plt.plot(tper,var)
+plt.plot(yper,ann_avg(var,0),color='k',label='Ann. Avg')
+plt.ylabel("Forcing ($^{\circ}C/s$)",fontsize=8)
+plt.legend()
+plt.title("Noise Term at LON: %02d LAT: %02d (Mean: %.2f || Std: %.2f || Max: %.2f)" % (lonf,latf,np.nanmean(var),np.nanstd(var),np.nanmax(np.abs(var))))
+
+var = damptspt
+plt.subplot(4,1,2)
+plt.plot(tper,var)
+plt.plot(yper,ann_avg(var,0),color='k',label='Ann. Avg')
+plt.ylabel("Damping ($^{\circ}C/s$)",fontsize=8)
+plt.legend()
+plt.title("Damping Term Hvarmode %i (Mean: %.2f || Std: %.2f || Max: %.2f)" % (hvarmode,np.nanmean(var),np.nanstd(var),np.nanmax(np.abs(var))))
+
+var = eentrainpt
+plt.subplot(4,1,3)
+plt.plot(tper,var)
+plt.plot(yper,ann_avg(var,0),color='k',label='Ann. Avg')
+plt.ylabel("Damping ($^{\circ}C/s$)",fontsize=8)
+plt.legend()
+plt.title("Entrain Term (Mean: %.2f || Std: %.2f || Max: %.2f)" % (np.nanmean(var),np.nanstd(var),np.nanmax(np.abs(var))))
+ 
+plt.subplot(4,1,4)
+plt.plot(tper,sstpt)
+plt.plot(yper,ann_avg(sstpt,0),color='k',label='Ann. Avg')
+plt.ylabel("SST ($^{\circ}C$)",fontsize=10)
+plt.xlabel("Time(Months)",fontsize=10)
+plt.legend()
+#plt.title("Detrended, Deseasonalized SST at LON: %02d LAT: %02d \n Mean: %.2f || Std: %.2f || Max: %.2f" % (lonf,latf,np.nanmean(sstpt),np.nanstd(sstpt),np.nanmax(np.abs(sstpt))))
+plt.title("Entrain SST (Mean: %.2f || Std: %.2f || Max: %.2f)" % (np.nanmean(sstpt),np.nanstd(sstpt),np.nanmax(np.abs(sstpt))))
+
+plt.tight_layout()
+plt.savefig(outpath+"Stochmodpt_dsdt_ModelParamComp_lon%02d_lat%02d_hvarmode%i_fscale%i.png"%(lonf,latf,hvarmode,fscale),dpi=200)
+
+
+
+#%%
+
+
 
