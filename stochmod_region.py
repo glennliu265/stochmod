@@ -14,6 +14,10 @@ import xarray as xr
 import time
 
 
+# Add Module to search path
+import sys
+sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/")
+import scm
 
 # %% Functions --------------------------------------------------
 # Function to calculate lag correlation
@@ -91,404 +95,11 @@ def calc_lagcovar(var1,var2,lags,basemonth,detrendopt):
             
     return corr_ts
 
-"""
-SST Stochastic Model, no Entrainment
-Integrated with the forward method
-assuming lambda at a constant monthly timestep
-
-Dependencies: 
-    - numpy as np
-
- Inputs
- 1) t_end : timestep to integrate until (monthly)
- 2) lbd   : seasonally varying decay term (lambda)
- 3) T0    : Initial temperature
- 4) F     : Forcing term
-    
-"""
-def stochmod_noentrain(t_end,lbd,T0,F):
-    debugmode = 0 # Set to 1 to also save noise and damping time series
-    
-    # Preallocate
-    temp_ts = np.zeros(t_end)
-    
-    if debugmode == 1:
-        damp_ts = np.zeros(t_end)
-        noise_ts = np.zeros(t_end)
-    else:
-        noise_ts = []
-        damp_ts = []
-        
-    
-    # Prepare the entrainment term
-    explbd = np.exp(-lbd)
-
-    # Loop for integration period (indexing convention from matlab)
-    for t in range(1,t_end):
-        
-        # Get the month
-        m = t%12
-        if m == 0:
-            m = 12
-    
-    
-        # Get the temperature from the previous step
-        if t == 1:
-            T = T0
-        else:
-            T = temp_ts[t-1]
-    
-        # Get Noise/Forcing Term
-        noise_term = F[t-1]
-        
-        # Form the damping term
-        damp_term = explbd[m-1]*T
-        
-    
-        # Compute the temperature
-        temp_ts[t] = damp_term + noise_term  
-    
-        # Save other variables
-        if debugmode == 1:
-            noise_ts[t] = np.copy(noise_term)
-            damp_ts[t] = np.copy(damp_term)
-
-
-    # Quick indexing fix
-    temp_ts[0] = T0
-    if debugmode == 1:
-        noise_ts = np.delete(noise_ts,0)
-        damp_ts = np.delete(damp_ts,0)
-    
-    return temp_ts,noise_ts,damp_ts if debugmode ==1 else temp_ts
-
-
-"""
-SST Stochastic Model, with Entrainment
-Integrated with the forward method
-assuming lambda at a constant monthly timestep
-
-Dependencies: 
-    - numpy as np
-
- Inputs
- 1) t_end : timestep to integrate until (monthly)
- 2) lbd   : seasonally varying decay term (lambda)
- 3) T0    : Initial temperature
- 4) F     : Forcing term
-    
-"""
-
-def stochmod_entrain(t_end,lbd,T0,F,beta,h,kprev,FAC):
-    debugmode = 0 # Set to 1 to also save noise,damping,entrain, and Td time series
-    linterp   = 1 # Set to 1 to use the kprev variable and linearly interpolate variables
-    
-    # Preallocate
-    temp_ts = np.zeros(t_end)
-    if debugmode == 1:
-        noise_ts = np.zeros(t_end)
-        damp_ts = np.zeros(t_end)
-        entrain_ts = np.zeros(t_end)
-        Td_ts   = np.zeros(t_end)
-    else:
-        noise_ts = []
-        damp_ts = []
-        entrain_ts = []
-        Td_ts = []
-    
-    
-    # Prepare the entrainment term
-    explbd = np.exp(-lbd)
-    
-    # Create MLD arrays
-    if linterp == 0:
-        mlddepths = np.arange(0,np.max(h)+1,1)
-        mldtemps = np.zeros(mlddepths.shape)
-
-    # Loop for integration period (indexing convention from matlab)
-    for t in range(1,t_end):
-        
-        
-        # Get the month
-        m  = t%12
-
-        if m == 0:
-            m = 12
-        
-        # Get the temperature from the previous step
-        if t == 1:
-            T = T0
-        else:
-            T = temp_ts[t-1]
-            
-        
-        
-        # Calculate entrainment term
-        if t<13:
-            entrain_term = 0
-        else:
-            
-            # If not an entraining month, skip this step
-            if beta[m-1] == 0:
-                entrain_term = 0
-            else:
-                
-                
-                # Calculate Td
-                if linterp == 1:
-                    
-
-                    
-                    # Get information about the last month
-                    m0 = m - 1
-                    if m0 == 0:
-                        m0 = 12
-                    
-                    
-                    
-                    # Find # of months since the anomaly was formed
-                    k1m = (m - np.floor(kprev[m-1])) % 12
-                    k0m = (m - np.floor(kprev[m0-1])) % 12
-                    if k1m == 0:
-                        k1m = 12
-                    if k0m == 0:
-                        k0m = 12
-                        
-                    
-                    
-                    
-                    # Get the corresponding index month, shifting back for zero indexing
-                    kp1 = int(t - k1m)
-                    kp0 = int(t - k0m)
-    
-                                    
-                    # Get points (rememebering to shift backwards to account for indexing)
-                    # To save computing power, store the Td1 as Td0 for next step?
-                    Td1 = np.interp(kprev[m-1],[kp1,kp1+1],[temp_ts[kp1],temp_ts[kp1+1]])
-                    if m0-1 == h.argmin():
-                        Td0 = Td1
-                    else:        
-                        Td0 = np.interp(kprev[m0-1],[kp0,kp0+1],[temp_ts[kp0],temp_ts[kp0+1]])
-                    
-                elif linterp == 0:
-                    Td1 = mldtemps[round(h.item(m-1))]
-                    Td0 = mldtemps[round(h.item(m0-1))]           
-                
-                Td = (Td1+Td0)/2
-                
-
-                
-                # Calculate entrainment term
-                entrain_term = beta[m-1]*Td*FAC[m-1]
-                
-                if debugmode == 1:
-                    Td_ts[t] = Td
-
-        
-    
-        # Get Noise/Forcing Term
-        noise_term = F[t-1]
-        
-        
-        # Form the damping term
-        damp_term = explbd[m-1]*T
-        
-        # Compute the temperature
-        temp_ts[t] = damp_term + noise_term + entrain_term
-
-        # Save other variables
-        if debugmode == 1:
-            noise_ts[t] = noise_term
-            damp_ts[t] = damp_term
-            entrain_ts[t] = entrain_term
-        
-        
-        # Set mixed layer depth tempertures
-        if linterp == 0:
-            mldtemps[mlddepths<=h.item(m-1)] = temp_ts[t]
-
-    # Quick indexing fix
-    temp_ts[0] = T0
-    if debugmode == 1:
-        noise_ts = np.delete(noise_ts,0)
-        damp_ts = np.delete(damp_ts,0)
-        entrain_ts = np.delete(entrain_ts,0)
-    
-    return temp_ts,noise_ts,damp_ts,entrain_ts,Td_ts
-
-
-"""
-SST Stochastic Model, with/wo Entrainment
-Integrated with the forward method
-assuming lambda at a constant monthly timestep
-
-Dependencies: 
-    - numpy as np
-
- Inputs
- 1) t_end : [scalar]      Timestep to integrate until (monthly)
- 2) lbd   : [m x n x 12]  Seasonally varying decay term (lambda)
- 3) T0    : [m x n]       Initial temperature
- 4) F     : [m x n x t ]  Forcing term
-    
-"""
-
-
-
-def set_stochparams(h,damping,dt,ND=True,rho=1000,cp0=4218,hfix=50):
-    """
-    Given MLD and Heat Flux Feedback, Calculate Parameters
-    
-    Inputs:
-        1) h: Array [Lon x Lat x Mon]
-            Mixed Layer depths (climatological)
-        2) damping: Array [Lon x Lat x Mon]
-            Heat Flux Feedbacks (W/m2)
-        3) dt: INT
-            Model timestep in seconds
-        4) ND: Boolean
-            Set to 1 to process 2D data, rather than data at 1 point
-        Optional Arguments:
-            rho   - density of water [kg/m3]
-            cp0   - specific heat of water [J/(K*kg)]
-            hfix  - fixed mixed layer depth [m]
-    
-    
-    Outputs:
-        1) lbd: DICT [hvarmode] [Lon x Lat x Mon]
-            Dictionary of damping values for each MLD treatment 
-        2) lbd_entr: Array [Lon x Lat x Mon]
-            Damping for entraining model
-        3) FAC: Array [Lon x Lat x Mon]
-            Seasonal Reduction Factor
-        4) Beta: Array [Lon x Lat x Mon]
-            Entraining Term
-    
-    """    
-    
-    # Calculate Beta
-    if ND == True:
-        beta = np.log( h / np.roll(h,1,axis=2) ) # Roll along time axis
-        
-        
-        # Find Maximum MLD during the year
-        hmax = np.nanmax(np.abs(h),axis=2)
-        hmax = hmax[:,:,None]
-    
-    else:
-        beta = np.log( h / np.roll(h,1,axis=0) )
-        
-        # Find Maximum MLD during the year
-        hmax = np.nanmax(np.abs(h))
-    
-    
-    # Set non-entraining months to zero
-    beta[beta<0] = 0
-    
-    # Replace Nans with Zeros in beta
-    beta = np.nan_to_num(beta)
-    
-    # Preallocate lambda variable
-    lbd = {}
-    
-    # Fixed MLD
-    lbd[0] = damping / (rho*cp0*hfix) * dt
-    
-    # Maximum MLD
-    lbd[1] = damping / (rho*cp0*hmax) * dt
-    
-    # Seasonal MLD
-    lbd[2] = damping / (rho*cp0*h) * dt
-    
-    # Calculate Damping (with entrainment)
-    lbd_entr = np.copy(lbd[2]) + beta    
-    
-    # Compute reduction factor
-    FAC = np.nan_to_num((1-np.exp(-lbd_entr))/lbd_entr)
-    
-    return lbd,lbd_entr,FAC,beta
-
-
-def convert_NAO(hclim,naopattern,dt,rho=1000,cp0=4218,hfix=50):
-    """
-    Convert NAO forcing pattern [naopattern] from (W/m2) to (degC/S) 
-    given seasonal MLD (hclim)
-    
-    Inputs:
-        1) hclim          - climatological MLD [Mons]
-        2) NAOF   [Array] - NAO forcing [Lon x Lat] in Watts/m2
-        3) dt             - timestep in seconds
-        4) rho            - Density of water [kg/m3]
-        5) cp0            - Specific Heat of water [J/(K*kg)]
-        6) hfix           - Fixed Mixed layer Depth
-    
-    Output:
-        1) NAOF [dict]    - Dictionary of arrays, where 
-            0 = fixed MLD
-            1 = maximum MLD
-            2 = seasonal MLD
-    
-    """
-    
-    # Convert NAO to correct units...
-    NAOF = {}
-    for i in range(3):
-    
-        # Fixed MLD
-        if i == 0:
-            hchoose = hfix
-        # Max MLD
-        elif i == 1:
-            hchoose = np.nanmax(np.abs(hclim),axis=2)
-        # Varying MLD
-        elif i == 2:
-            hchoose = np.copy(hclim)
-        
-        # Compute and restrict to region
-        if i == 2:
-            # Monthly Varying Forcing [Lon x Lat x Mon]
-            NAOF[i] = naopattern[:,:,None] * dt / cp0 / rho / hchoose
-        else:
-            NAOF[i] = naopattern * dt / cp0 / rho / hchoose
-        
-    return NAOF
-    
-
-
-def make_naoforcing(NAOF,randts,fscale):
-    """
-    Makes forcing timeseries, given NAO Forcing Pattern for 3 different
-    treatments of MLD (NAOF), a whiite noise time series, and an scaling 
-    parameter
-    
-    Inputs:
-        1) randts [Array] - white noise timeseries varying between -1 and 1
-        3) NAOF   [Array] - NAO forcing [Lon x Lat] in Watts/m2
-        4) fscale         - multiplier to scale white noise forcing\
-    
-    Dependencies: 
-        1) 
-    
-    """
-    
-    # CMake dictionary
-    F = {}
-    
-    # Fixed MLD 
-    F[0] = NAOF[0][:,:,None]*randts[None,None,:] * fscale
-    
-    # Max MLD
-    F[1] = NAOF[1][:,:,None]*randts[None,None,:] * fscale
-    
-    # Seasonally varying mld...
-    F[2] = np.tile(NAOF[2],nyr) * randts[None,None,:] * fscale
-    
-    return F
 
 #%% User Edits -----------------------------------------------------------------           
 
 
-runid = "000"
+runid = "001"
 # Set Point and month
 kmon    = 3
 
@@ -511,8 +122,10 @@ usesst   = 0
 # Forcing Type
 # 0 = completely random in space time
 # 1 = spatially unform forcing, temporally varying
-# 2 = NAO-like NHFLX Forcing, temporally varying 
-funiform = 1     
+# 2 = NAO-like NHFLX Forcing (DJFM), temporally varying 
+# 3 = NAO-like NHFLX Forcing, Monthly
+
+funiform = 2     
 fscale   = 10
 
 # hvarmode
@@ -520,7 +133,7 @@ hvarmode = 2 # hvar modes (0 - fixe mld, 1 - effective mld, 2 - seasonally varyi
 hfix     = 50 # Fixed MLD (meters)
 
 # Region options
-lonW = -80
+lonW = -100
 lonE = 20
 latS = -20
 latN = 90
@@ -594,29 +207,48 @@ np.save(datpath+"lon.npy",lonr)
 # %% Load and Prep NAO Forcing... <Move to separate script?>
 #
 
-# Load NAO Forcing and prepare (Prepared in regress_NAO_pattern.py)
-naoforcing = np.load(datpath+"NAO_NHFLX_Forcing.npy") #[PC x Ens x Lat x Lon]
-NAO1 = np.nanmean(naoforcing[0,:,:,:],axis=0).T # Take PC1, Ens Mean and Transpose
+if funiform == 2:
+    # Load NAO Forcing and prepare (Prepared in regress_NAO_pattern.py)
+    naoforcing = np.load(datpath+"NAO_NHFLX_Forcing.npy") #[PC x Ens x Lat x Lon]
+    NAO1 = np.nanmean(naoforcing[0,:,:,:],axis=0).T # Take PC1, Ens Mean and Transpose
+    
+    # Convert Longitude from degrees East
+    lon360 =  np.load(datpath+"CESM_lon360.npy")
+    kw = np.where(lon360 >= 180)[0]
+    ke = np.where(lon360 < 180)[0]
+    lon180 = np.concatenate((lon360[kw]-360,lon360[ke]),0)
+    NAO1 = np.concatenate((NAO1[kw,:],NAO1[ke,:]),0)
+    
+    # Restrict to region
+    NAO1 = NAO1[klon[:,None],klat[None,:]]
+    
 
-# Convert Longitude from degrees East
-lon360 =  np.load(datpath+"CESM_lon360.npy")
-kw = np.where(lon360 >= 180)[0]
-ke = np.where(lon360 < 180)[0]
-lon180 = np.concatenate((lon360[kw]-360,lon360[ke]),0)
-NAO1 = np.concatenate((NAO1[kw,:],NAO1[ke,:]),0)
 
-# Restrict to region
-NAO1 = NAO1[klon[:,None],klat[None,:]]
-
-
+elif funiform == 3:
+    # Load NAO Forcing (Monthly)
+    naoforcing = np.load(datpath+"Monthly_NAO_Regression.npy") #[Ens x Mon x Lat x Lon]
+    NAO1 = np.nanmean(naoforcing,axis=0) # Take PC1, Ens Mean and Transpose
+    NAO1 = np.transpose(NAO1,(2,1,0))
+    
+    # Convert Longitude from degrees East
+    lon360 =  np.load(datpath+"CESM_lon360.npy")
+    kw = np.where(lon360 >= 180)[0]
+    ke = np.where(lon360 < 180)[0]
+    lon180 = np.concatenate((lon360[kw]-360,lon360[ke]),0)
+    NAO1 = np.concatenate((NAO1[kw,:,:],NAO1[ke,:,:]),0)
+    
+    # Restrict to region
+    NAO1 = NAO1[klon[:,None],klat[None,:],:]
+    
 # Convert from W/m2 to C/S for the three different mld options
-NAOF = convert_NAO(hclim,NAO1,dt,rho=rho,cp0=cp0,hfix=hfix)
+NAOF = scm.convert_NAO(hclim,NAO1,dt,rho=rho,cp0=cp0,hfix=hfix)
+
         
 # ----------------------------
 # %% Set-up damping parameters
 # ----------------------------
 
-lbd,lbd_entr,FAC,beta = set_stochparams(hclim,dampingr,dt,ND=1,rho=rho,cp0=cp0,hfix=hfix)
+lbd,lbd_entr,FAC,beta = scm.set_stochparams(hclim,dampingr,dt,ND=1,rho=rho,cp0=cp0,hfix=hfix)
 
 # ----------------------------
 # %% Set Up Forcing           ------------------------------------------------
@@ -661,9 +293,11 @@ if funiform != 0:
         F      = np.multiply(F,randts[None,None,:])
         
     # NAO Like Forcing...
-    elif funiform == 2:
+    else:
         
-        F = make_naoforcing(NAOF,randts,fscale)
+        F = scm.make_naoforcing(NAOF,randts,fscale,nyr)
+        
+        
     # Save Forcing
     np.save(datpath+"stoch_output_%iyr_funiform%i_run%s_Forcing.npy"%(nyr,funiform,runid),F)
       
@@ -676,7 +310,7 @@ T_entr0_all = {}
 for hi in range(3):
     
     lbdh = lbd[hi]
-    if funiform == 2:
+    if (funiform == 2) | (funiform == 3):
         Fh = F[hi]
     else:
         Fh = F
@@ -706,7 +340,7 @@ for hi in range(3):
                 #print(msg)
                 T_entr0[o,a,:] = np.zeros(t_end)*np.nan
             else:
-                T_entr0[o,a,:],_,_ = stochmod_noentrain(t_end,lbdh[o,a,:],T0,Fh[o,a,:])
+                T_entr0[o,a,:],_,_ = scm.noentrain(t_end,lbdh[o,a,:],T0,Fh[o,a,:])
             icount += 1
             msg = '\rCompleted No Entrain Run for %i of %i points' % (icount,lonsize*latsize)
             print(msg,end="\r",flush=True)
@@ -720,13 +354,13 @@ for hi in range(3):
         
 
 
-# %% Run Model With Entrainment
+# Run Model With Entrainment
 if hvarmode == 2:
     start = time.time()
     T_entr1 = np.zeros((lonsize,latsize,t_end))
     icount = 0
     
-    if funiform == 2:
+    if (funiform == 2) | (funiform == 3):
         Fh = np.copy(F[2])
     else:
         Fh = np.copy(F)
@@ -751,7 +385,7 @@ if hvarmode == 2:
                 #print(msg)
                 T_entr1[o,a,:] = np.zeros(t_end)*np.nan
             else:
-                T_entr1[o,a,:],_,_,_,_ = stochmod_entrain(t_end,lbd_entr[o,a,:],T0,Fh[o,a,:],beta[o,a,:],hclim[o,a,:],kprev[o,a,:],FAC[o,a,:])
+                T_entr1[o,a,:],_,_,_,_ = scm.entrain(t_end,lbd_entr[o,a,:],T0,Fh[o,a,:],beta[o,a,:],hclim[o,a,:],kprev[o,a,:],FAC[o,a,:])
             icount += 1
             msg = '\rCompleted Entrain Run for %i of %i points' % (icount,lonsize*latsize)
             print(msg,end="\r",flush=True)
