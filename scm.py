@@ -102,7 +102,7 @@ Dependencies:
     
 """
 def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC):
-    debugmode = 0 # Set to 1 to also save noise,damping,entrain, and Td time series
+    debugmode = 1 # Set to 1 to also save noise,damping,entrain, and Td time series
     linterp   = 1 # Set to 1 to use the kprev variable and linearly interpolate variables
     
     # Preallocate
@@ -395,3 +395,95 @@ def find_kprev(h):
             ifindm -= 1
     
     return kprev, hout
+
+
+
+def convert_NAO(hclim,naopattern,dt,rho=1000,cp0=4218,hfix=50):
+    """
+    Convert NAO forcing pattern [naopattern] from (W/m2) to (degC/S) 
+    given seasonal MLD (hclim)
+    
+    Inputs:
+        1) hclim          - climatological MLD [Mons]
+        2) NAOF   [Array] - NAO forcing [Lon x Lat] in Watts/m2
+        3) dt             - timestep in seconds
+        4) rho            - Density of water [kg/m3]
+        5) cp0            - Specific Heat of water [J/(K*kg)]
+        6) hfix           - Fixed Mixed layer Depth
+    
+    Output:
+        1) NAOF [dict]    - Dictionary of arrays, where 
+            0 = fixed MLD
+            1 = maximum MLD
+            2 = seasonal MLD
+    
+    """
+    
+    # Convert NAO to correct units...
+    NAOF = {}
+    for i in range(3):
+    
+        # Fixed MLD
+        if i == 0:
+            hchoose = hfix
+        # Max MLD
+        elif i == 1:
+            hchoose = np.nanmax(np.abs(hclim),axis=2)
+        # Varying MLD
+        elif i == 2:
+            hchoose = np.copy(hclim)
+        
+        # Compute and restrict to region
+        if i == 2:
+            
+            if len(naopattern.shape) == 2:
+                # Monthly Varying Forcing [Lon x Lat x Mon]
+                NAOF[i] = naopattern[:,:,None] * dt / cp0 / rho / hchoose
+            elif len(naopattern.shape) == 3: # For seasonally varying NAO pattern
+                # Monthly Varying Forcing [Lon x Lat x Mon]
+                NAOF[i] = naopattern * dt / cp0 / rho / hchoose
+        else:
+            
+            if (len(naopattern.shape) == 3) & (i == 1):
+                 NAOF[i] = naopattern * dt / cp0 / rho / hchoose[:,:,None]
+            else:
+                NAOF[i] = naopattern * dt / cp0 / rho / hchoose
+        
+    return NAOF
+    
+
+
+def make_naoforcing(NAOF,randts,fscale,nyr):
+    """
+    Makes forcing timeseries, given NAO Forcing Pattern for 3 different
+    treatments of MLD (NAOF), a whiite noise time series, and an scaling 
+    parameter
+    
+    Inputs:
+        1) randts [Array] - white noise timeseries varying between -1 and 1
+        3) NAOF   [Array] - NAO forcing [Lon x Lat] in Watts/m2
+        4) fscale         - multiplier to scale white noise forcing\
+        5) nyr    [int]   - Number of years to tile the forcing
+    Dependencies: 
+        1) 
+    
+    """
+    
+    # CMake dictionary
+    F = {}
+    
+    if len(NAOF[0].shape) == 2:
+        # Fixed MLD 
+        F[0] = NAOF[0][:,:,None]*randts[None,None,:] * fscale
+        
+        # Max MLD
+        F[1] = NAOF[1][:,:,None]*randts[None,None,:] * fscale
+        
+        # Seasonally varying mld...
+        F[2] = np.tile(NAOF[2],nyr) * randts[None,None,:] * fscale
+    else:
+        for i in range(3):
+            
+            F[i] = np.tile(NAOF[i],nyr) * randts[None,None,:] * fscale
+            
+    return F
