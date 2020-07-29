@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+HADISST
+
+# Process and calculates AMV related variables for HADISST
+Also contains useful visualizations for detrending, etc that might
+be recyclable
+Has some visualizations at the end for stochmod that I need to move..
 Created on Tue Jul 21 17:04:03 2020
 
 @author: gliu
@@ -14,7 +20,6 @@ import xarray as xr
 import time
 from scipy.signal import butter, lfilter, freqz, filtfilt, detrend
 
-
 from cartopy import config
 import cartopy.feature as cfeature
 import cartopy.crs as ccrs
@@ -23,23 +28,12 @@ import cmocean
 import matplotlib.ticker as mticker
 from cartopy.util import add_cyclic_point
 
+import sys
+sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
+from amv import proc
+
 #%% Functions
-def find_latlon(lonf,latf,lon,lat):
-    """
-    Find lat and lon indices
-    """
-    if((np.any(np.where(lon>180)) & (lonf < 0)) or (np.any(np.where(lon<0)) & (lonf > 180))):
-        print("Potential mis-match detected between lonf and longitude coordinates")
-    
-    klon = np.abs(lon - lonf).argmin()
-    klat = np.abs(lat - latf).argmin()
-    
-    msg1 = "Closest lon to %.2f was %.2f" % (lonf,lon[klon])
-    msg2 = "Closest lat to %.2f was %.2f" % (latf,lat[klat])
-    print(msg1)
-    print(msg2)
-    
-    return klon,klat
+
 
 def detrendlin_nd(var_in):
     
@@ -205,242 +199,6 @@ def calc_AMV(lon,lat,sst,bbox,order,cutofftime,awgt):
     
     return amv,aa_sst
     
-def regress2ts(var,ts,normalizeall,method):
-    
-    
-    # Anomalize and normalize the data (time series is assumed to have been normalized)
-    if normalizeall == 1:
-        varmean = np.nanmean(var,2)
-        varstd  = np.nanstd(var,2)
-        var = (var - varmean[:,:,None]) /varstd[:,:,None]
-        
-    # Get variable shapes
-    londim = var.shape[0]
-    latdim = var.shape[1]
-    
-    
-    
-
-
-
-    
-    
-    # 1st method is matrix multiplication
-    if method == 1:
-        
-        # Combine the spatial dimensions 
-
-        var = np.reshape(var,(londim*latdim,var.shape[2]))
-        
-        
-        # Find Nan Points
-        # sumvar = np.sum(var,1)
-        
-        # # Find indices of nan pts and non-nan (ok) pts
-        # nanpts = np.isnan(sumvar)
-        # okpts  = np.invert(nanpts)
-    
-        # # Drop nan pts and reshape again to separate space and time dimensions
-        # var_ok = var[okpts,:]
-        #var[np.isnan(var)] = 0
-        
-        
-        # Perform regression
-        #var_reg = np.matmul(np.ma.anomalies(var,axis=1),np.ma.anomalies(ts,axis=0))/len(ts)
-        var_reg,_ = regress_2d(ts,var)
-        
-        
-        # Reshape to match lon x lat dim
-        var_reg = np.reshape(var_reg,(londim,latdim))
-    
-    
-    
-    
-    # 2nd method is looping point by poin  t
-    elif method == 2:
-        
-        
-        # Preallocate       
-        var_reg = np.zeros((londim,latdim))
-        
-        # Loop lat and long
-        for o in range(londim):
-            for a in range(latdim):
-                
-                # Get time series for that period
-                vartime = np.squeeze(var[o,a,:])
-                
-                # Skip nan points
-                if any(np.isnan(vartime)):
-                    var_reg[o,a]=np.nan
-                    continue
-                
-                # Perform regression 
-                r = np.polyfit(ts,vartime,1)
-                #r=stats.linregress(vartime,ts)
-                var_reg[o,a] = r[0]
-                #var_reg[o,a]=stats.pearsonr(vartime,ts)[0]
-    
-    return var_reg
-
-
-def regress_2d(A,B):
-    """
-    Regresses A (independent variable) onto B (dependent variable), where
-    either A or B can be a timeseries [N-dimensions] or a space x time matrix 
-    [N x M]. Script automatically detects this and permutes to allow for matrix
-    multiplication.
-    
-    Returns the slope (beta) for each point, array of size [M]
-    
-    
-    """
-    # Determine if A or B is 2D and find anomalies
-    
-    # Compute using nan functions (slower)
-    if np.any(np.isnan(A)) or np.any(np.isnan(B)):
-        print("NaN Values Detected...")
-    
-        # 2D Matrix is in A [MxN]
-        if len(A.shape) > len(B.shape):
-            
-            # Tranpose A so that A = [MxN]
-            if A.shape[1] != B.shape[0]:
-                A = A.T
-            
-            
-            # Set axis for summing/averaging
-            a_axis = 1
-            b_axis = 0
-            
-            # Compute anomalies along appropriate axis
-            Aanom = A - np.nanmean(A,axis=a_axis)[:,None]
-            Banom = B - np.nanmean(B,axis=b_axis)
-            
-        
-            
-        # 2D matrix is B [N x M]
-        elif len(A.shape) < len(B.shape):
-            
-            # Tranpose B so that it is [N x M]
-            if B.shape[0] != A.shape[0]:
-                B = B.T
-            
-            # Set axis for summing/averaging
-            a_axis = 0
-            b_axis = 0
-            
-            # Compute anomalies along appropriate axis        
-            Aanom = A - np.nanmean(A,axis=a_axis)
-            Banom = B - np.nanmean(B,axis=b_axis)[None,:]
-        
-        # Calculate denominator, summing over N
-        Aanom2 = np.power(Aanom,2)
-        denom = np.nansum(Aanom2,axis=a_axis)    
-        
-        # Calculate Beta
-        beta = Aanom @ Banom / denom
-            
-        
-        b = (np.nansum(B,axis=b_axis) - beta * np.nansum(A,axis=a_axis))/A.shape[a_axis]
-    else:
-        # 2D Matrix is in A [MxN]
-        if len(A.shape) > len(B.shape):
-            
-            # Tranpose A so that A = [MxN]
-            if A.shape[1] != B.shape[0]:
-                A = A.T
-            
-            
-            # Set axis for summing/averaging
-            a_axis = 1
-            b_axis = 0
-            
-            # Compute anomalies along appropriate axis
-            Aanom = A - np.mean(A,axis=a_axis)[:,None]
-            Banom = B - np.mean(B,axis=b_axis)
-            
-        
-            
-        # 2D matrix is B [N x M]
-        elif len(A.shape) < len(B.shape):
-            
-            # Tranpose B so that it is [N x M]
-            if B.shape[0] != A.shape[0]:
-                B = B.T
-            
-            # Set axis for summing/averaging
-            a_axis = 0
-            b_axis = 0
-            
-            # Compute anomalies along appropriate axis        
-            Aanom = A - np.mean(A,axis=a_axis)
-            Banom = B - np.mean(B,axis=b_axis)[None,:]
-        
-        # Calculate denominator, summing over N
-        Aanom2 = np.power(Aanom,2)
-        denom = np.sum(Aanom2,axis=a_axis)    
-        
-        # Calculate Beta
-        beta = Aanom @ Banom / denom
-            
-        
-        b = (np.sum(B,axis=b_axis) - beta * np.sum(A,axis=a_axis))/A.shape[a_axis]
-    
-    
-    return beta,b
-
-
-def find_nan(data,dim):
-    """
-    For a 2D array, remove any point if there is a nan in dimension [dim]
-    
-    Inputs:
-        1) data: 2d array, which will be summed along last dimension
-        2) dim: dimension to search along. 0 or 1.
-    Outputs:
-        1) okdata: data with nan points removed
-        2) knan: boolean array with indices of nan points
-        
-
-    """
-    
-    # Sum along select dimension
-    datasum = np.sum(data,axis=dim)
-    
-    
-    # Find non nan pts
-    knan  = np.isnan(datasum)
-    okpts = np.invert(knan)
-    
-    if dim == 0:
-        okdata = data[:,okpts]
-    elif dim == 1:    
-        okdata = data[okpts,:]
-    
-    return okdata,knan,okpts
-    
-    
-def year2mon(ts):
-    """
-    Separate mon x year from a 1D timeseries of monthly data
-    """
-    ts = np.reshape(ts,(int(np.ceil(ts.size/12)),12))
-    ts = ts.T
-    return ts
-    
-def ann_avg(ts,dim):
-    """
-    # Take Annual Average of a monthly time series
-    where time is axis "dim"
-    
-    """
-    tsshape = ts.shape
-    ntime   = ts.shape[dim] 
-    newshape =    tsshape[:dim:] +(int(ntime/12),12) + tsshape[dim+1::]
-    annavg = np.reshape(ts,newshape)
-    annavg = np.nanmean(annavg,axis=dim+1)
-    return annavg
 
 
 def plot_AMV_spatial(var,lon,lat,bbox,cmap,cint=[0,],clab=[0,],ax=None):
@@ -535,81 +293,6 @@ def array_nan_equal(a, b):
     return np.array_equal(a[m], b[m])
 
 
-def detrend_dim(invar,dim):
-    
-    """
-    Detrends n-dimensional variable [invar] at each point along axis [dim].
-    Performs appropriate reshaping and NaN removal, and returns
-    variable in the same shape+order. Assumes equal spacing along [dim] for 
-    detrending
-    
-    Also outputs linear model and coefficients.
-    
-    Dependencies: 
-        numpy as np
-        find_nan (function)
-        regress_2d (function)
-    
-    Inputs:
-        1) invar: variable to detrend
-        2) dim: dimension of axis to detrend along
-        
-    Outputs:
-        1) dtvar: detrended variable
-        2) linmod: computed trend at each point
-        3) beta: regression coefficient (slope) at each point
-        4) interept: y intercept at each point
-    
-    
-    """
-    
-    # Reshape variable
-    varshape = invar.shape
-    
-    # Reshape to move time to first dim
-    newshape = np.hstack([dim,np.arange(0,dim,1),np.arange(dim+1,len(varshape),1)])
-    newvar = np.transpose(invar,newshape)
-    
-    # Combine all other dims and reshape to [time x otherdims]
-    tdim = newvar.shape[0]
-    otherdims = newvar.shape[1::]
-    proddims = np.prod(otherdims)
-    newvar = np.reshape(newvar,(tdim,proddims))
-    
-    # Find non nan points
-    varok,knan,okpts = find_nan(newvar,0)
-    
-    # Ordinary Least Squares Regression
-    tper = np.arange(0,tdim)
-    m,b = regress_2d(tper,varok)
-    
-    # Detrend
-    ymod = (m[:,None]*tper + b[:,None]).T
-    dtvarok = varok - ymod
-    
-    # Replace into variable of original size
-    dtvar  = np.zeros(newvar.shape) * np.nan
-    linmod = np.copy(dtvar)
-    beta   = np.zeros(okpts.shape) * np.nan
-    intercept = np.copy(beta)
-    
-    dtvar[:,okpts] = dtvarok
-    linmod[:,okpts] = ymod
-    beta[okpts] = m
-    intercept[okpts] = b
-    
-    # Reshape to original size
-    dtvar  = np.reshape(dtvar,((tdim,)+otherdims))
-    linmod = np.reshape(linmod,((tdim,)+otherdims))
-    beta = np.reshape(beta,(otherdims))
-    intercept = np.reshape(beta,(otherdims))
-    
-    # Tranpose to original order
-    oldshape = [dtvar.shape.index(x) for x in varshape]
-    dtvar = np.transpose(dtvar,oldshape)
-    linmod = np.transpose(linmod,oldshape)
-    
-    return dtvar,linmod,beta,intercept
     
 def init_map(bbox,ax=None):
     """
@@ -639,7 +322,7 @@ def init_map(bbox,ax=None):
 #%% Load in HadISST Data
 # Path to SST data from obsv
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
-outpath = projpath + '02_Figures/20200723/'
+outpath = projpath + '02_Figures/20200730/'
 datpath = projpath + '01_Data/'
 datpath2 = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/"
 
@@ -656,8 +339,8 @@ hsst = obvhad['SST']
 hsst = np.transpose(hsst,(2,1,0))
 
 # Take the set time period
-startyr = 1920
-monstart = (1920+1-hyr[0,0])*12
+startyr = 1900
+monstart = (startyr+1-hyr[0,0])*12
 hsst = hsst[:,:,monstart::]
 
 
@@ -687,19 +370,19 @@ usedtfunction = 1  # Set to 1 to use the new detrending function
 if usedtfunction == 1:
     
     start= time.time()
-    dt_hsst,ymodall,_,_ = detrend_dim(hsstnew,2)
+    dt_hsst,ymodall,_,_ = proc.detrend_dim(hsstnew,2)
     print("Detrended in %.2fs" % (time.time()-start))
 else:
     
     # Reshape to [Time x Space] and remove NaN Points
     start= time.time()
     hsstnew = np.reshape(hsstnew,(360*180,1176)).T
-    hsstok,knan,okpts = find_nan(hsstnew,0)
+    hsstok,knan,okpts = proc.find_nan(hsstnew,0)
     
     
     
     tper = np.arange(0,hsstok.shape[0])
-    beta,b = regress_2d(tper,hsstok) # Perform regression
+    beta,b = proc.regress_2d(tper,hsstok) # Perform regression
     
     # Detrend
     dt_hsst = hsstnew[:,okpts] - (beta[:,None] * tper + b[:,None]).T
@@ -726,15 +409,20 @@ else:
 # Find Point
 lonf = -30
 latf = 64
-klon,klat = find_latlon(lonf,latf,hlon,hlatnew)
+klon,klat = proc.find_latlon(lonf,latf,hlon,hlatnew)
 
+# Get values at point
 tempts = hsstnew[klon,klat,:]
 dtts = dt_hsst[klon,klat,:]
 ymodts = ymodall[klon,klat,:]
 
+# Test other ways of detrending
 olddt = detrendlin(tempts)
 from scipy import signal
 scidt = signal.detrend(tempts)
+
+# Make time eriod
+tper = np.arange(0,len(tempts),1)
 
 #% Plot Detrended and undetrended lines
 fig,ax = plt.subplots(1,1,figsize=(8,4))
@@ -772,7 +460,11 @@ plt.legend()
 
 #%% Save Data (Detrended First, then deseasonalized)
 
-timecft = xr.cftime_range(start="1920-01-01",end="2017-12-01",freq="MS") 
+
+
+starttime = "%i-01-01" % startyr
+
+timecft = xr.cftime_range(start=starttime,end="2017-12-01",freq="MS") 
 
 da = xr.DataArray(ahsst,
                   dims=["lon","lat","time"],
@@ -793,14 +485,14 @@ dsfirst = np.reshape(dsfirst,(360,180,hsstnew.shape[2]))
 
 # Detrend
 start= time.time()
-dtdsfirst,dsymodall,_,_ = detrend_dim(dsfirst,2)
+dtdsfirst,dsymodall,_,_ = proc.detrend_dim(dsfirst,2)
 print("Detrended in %.2fs" % (time.time()-start))
 
 # Plot Seasonal Cycle Removal and Detrended
 lonf = -30
 latf = 64
 tper = np.arange(0,hsstnew.shape[2])
-klon,klat = find_latlon(lonf,latf,hlon,hlatnew)
+klon,klat = proc.find_latlon(lonf,latf,hlon,hlatnew)
 fig,ax = plt.subplots(1,1,figsize=(8,4))
 ax.plot(tper,hsstnew[klon,klat,:],color='k',label="raw")
 ax.plot(tper,dsfirst[klon,klat,:],color='b',label="deseasonalized")
@@ -819,7 +511,7 @@ clab = cint
 # Detrended, Deseasonalized
 dtamv,dtaa = calc_AMV(hlon,hlatnew,ahsst,bbox,order,cutofftime,1)
 
-dtr = regress2ts(ahsst,dtamv/np.std(dtamv),0,1)
+dtr = proc.regress2ts(ahsst,dtamv/np.std(dtamv),0,1)
 
 plot_AMV_spatial(dtr.T,hlon,hlatnew,bbox,cmap,cint=cint,clab=clab)
 plt.title("Detrended, Deanomalized, Monthly SST")
@@ -827,7 +519,7 @@ plt.title("Detrended, Deanomalized, Monthly SST")
 #%%  AMV, <Detrended Only>
 dtamv,dtaa = calc_AMV(hlon,hlatnew,dt_hsst,bbox,order,cutofftime,1)
 
-dtr = regress2ts(dt_hsst,dtamv,0,1)
+dtr = proc.regress2ts(dt_hsst,dtamv,0,1)
 
 plot_AMV_spatial(dtr.T,hlon,hlatnew,bbox,cmap)
 plt.title("Detrended Monthly SST")
@@ -836,14 +528,14 @@ plt.title("Detrended Monthly SST")
 
 dtamv,dtaa = calc_AMV(hlon,hlatnew,hsstnew,bbox,order,cutofftime,1)
 
-dtr = regress2ts(hsstnew,dtamv,0,1)
+dtr = proc.regress2ts(hsstnew,dtamv,0,1)
 
 plot_AMV_spatial(dtr.T,hlon,hlatnew,bbox,cmap)
 plt.title("Raw Monthly SST")
 
 #%% Trying annually averaged data
 
-aaraw = ann_avg(hsstnew,2)
+aaraw = proc.ann_avg(hsstnew,2)
 #dtraw = ann_avg(dt_hsst,2)
 #adtraw = ann_avg(ahsst,2)
 
@@ -851,7 +543,7 @@ aaraw = ann_avg(hsstnew,2)
 invar = ahsst
 cutofftime = 120
 dtamv,dtaa = calc_AMV(hlon,hlatnew,invar,bbox,order,cutofftime,1)
-dtr = regress2ts(invar,dtamv,0,1)
+dtr = proc.regress2ts(invar,dtamv/np.std(dtamv),0,1)
 xtk = np.arange(1,101,10)
 xlbs = np.arange(1920,2020,10)
 
@@ -865,20 +557,21 @@ plt.xticks(xtk,xlbs)
 
 #%% Perform detrend on annually averaged sst and try calculation from there
 
-
+order = 5
+cmap = cmocean.cm.balance
 
 selvar = dtdsfirst
-annsst = ann_avg(selvar,2)
+annsst = proc.ann_avg(selvar,2)
 
 start= time.time()
-dtann,ymodann,_,_ = detrend_dim(annsst,2)
+dtann,ymodann,_,_ = proc.detrend_dim(annsst,2)
 print("Detrended in %.2fs" % (time.time()-start))
 
 
 invar = dtann
 cutofftime = 10
 dtamv,dtaa = calc_AMV(hlon,hlatnew,invar,bbox,order,cutofftime,1)
-dtr = regress2ts(invar,dtamv/np.std(dtamv),0,1)
+dtr = proc.regress2ts(invar,dtamv/np.std(dtamv),0,1)
 xtk = np.arange(1,101,10)
 xlbs = np.arange(1920,2020,10)
 
@@ -912,12 +605,12 @@ plt.savefig(outpath+"HADISST_Differences_dtfirst.png",dpi=200)
 
 #%% Explore Differences between if you use monthly versus annual data
 
-annsst = ann_avg(dtdsfirst,2)
+annsst = proc.ann_avg(dtdsfirst,2)
 annamv,annaa = calc_AMV(hlon,hlatnew,annsst,bbox,order,cutofftime,1)
-annregr = regress2ts(annsst,annamv/np.nanstd(annamv),0,1)
+annregr = proc.regress2ts(annsst,annamv/np.nanstd(annamv),0,1)
 
 monamv,monaa = calc_AMV(hlon,hlatnew,dtdsfirst,bbox,order,cutofftime,1)
-monregr = regress2ts(dtdsfirst,monamv/np.nanstd(monamv),0,1)
+monregr = proc.regress2ts(dtdsfirst,monamv/np.nanstd(monamv),0,1)
 
 diff = annregr - monregr
 
@@ -935,10 +628,11 @@ plt.savefig(outpath+"HADISST_AMV_Ann_vs_Mon_dsfirst.png",dpi=200)
 
 
 maxanom = np.max(np.abs(dtdsfirst),axis=2)
+bbox = [-100,0,0,60]
 
 fig,axs = plt.subplots(1,1,figsize=(12,8),subplot_kw={'projection': ccrs.PlateCarree()})
 axs = init_map(bbox,ax=axs)
-cint=np.arange(0,11,1)
+cint=np.arange(0,10.5,0.5)
 pcm=axs.contourf(hlon,hlatnew,maxanom.T,cint,cmap=cmocean.cm.dense)
 axs.set_title("HadISST (1920-2018), Max SST Anomaly",fontsize=20)
 
@@ -950,7 +644,7 @@ plt.savefig(outpath+"HADISST_AMV_MaxAnom_dsfirst.png",dpi=200)
 lonf = -50
 latf = 12
 
-klon,klat = find_latlon(lonf,latf,hlon,hlatnew)
+klon,klat = proc.find_latlon(lonf,latf,hlon,hlatnew)
 
 #sstpt = dtdsfirst[klon,klat,:]
 sstpt = dtdsfirst[klon,klat,:]
@@ -968,10 +662,20 @@ plt.savefig(outpath+"HadISST_dsdt_SST_lon%02d_lat%02d.png"%(lonf,latf),dpi=200)
 
 
 #%% Try with entrain data
+
+bbox  = [-100,0,0,60]
+
 # Load data and plot
 funiform = 2
-entraint = np.load(datpath+"stoch_output_1000yr_funiform2_entrain1_hvar2.npy")
+hvarmode = 2
+entrain  = 1
+runid = "000"
+entraint = np.load(datpath+"stoch_output_%iyr_funiform%i_entrain%i_run%s.npy"%(nyr,funiform,entrain,runid))
 Fn =np.load(datpath+"stoch_output_1000yr_run000_funiform2_Forcing.npy",allow_pickle=True)
+
+
+
+
 #forcing = np.load(datpath+"stoch_output_1000yr_funiform%i_Forcing.npy"%(funiform))
 lonr = np.load(datpath+"lon.npy")
 latr = np.load(datpath+"lat.npy")
@@ -991,13 +695,12 @@ plt.savefig(outpath+"Entrain_MaxAnom_dsfirst.png",dpi=200)
 
 
 lonf = -30
-latf = 50
-
+latf = 65
 klon,klat = find_latlon(lonf,latf,lonr,latr)
 
 
 sstpt = entraint[klon,klat,:]
-F=Fn.item().get(0)[klon,klat,:]
+F=Fn.item().get(hvarmode)[klon,klat,:]
 
 
 tper = np.arange(0,entraint.shape[2])
