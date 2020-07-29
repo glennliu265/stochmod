@@ -20,85 +20,18 @@ import cmocean
 import matplotlib.ticker as mticker
 from cartopy.util import add_cyclic_point
 
-
-
-# Functions
-def regress_2d(A,B):
-    """
-    Regresses A (independent variable) onto B (dependent variable), where
-    either A or B can be a timeseries [N-dimensions] or a space x time matrix 
-    [N x M]. Script automatically detects this and permutes to allow for matrix
-    multiplication.
-    
-    Returns the slope (beta) for each point, array of size [M]
-    
-    
-    """
-    # Determine if A or B is 2D and find anomalies
-    
-    
-    # 2D Matrix is in A [MxN]
-    if len(A.shape) > len(B.shape):
-        
-        # Tranpose A so that A = [MxN]
-        if A.shape[1] != B.shape[0]:
-            A = A.T
-        
-        
-        # Set axis for summing/averaging
-        a_axis = 1
-        b_axis = 0
-        
-        # Compute anomalies along appropriate axis
-        Aanom = A - np.nanmean(A,axis=a_axis)[:,None]
-        Banom = B - np.nanmean(B,axis=b_axis)
-        
-
-        
-    # 2D matrix is B [N x M]
-    elif len(A.shape) < len(B.shape):
-        
-        # Tranpose B so that it is [N x M]
-        if B.shape[0] != A.shape[0]:
-            B = B.T
-        
-        # Set axis for summing/averaging
-        a_axis = 0
-        b_axis = 0
-        
-        # Compute anomalies along appropriate axis        
-        Aanom = A - np.nanmean(A,axis=a_axis)
-        Banom = B - np.nanmean(B,axis=b_axis)[None,:]
-    
-    # Calculate denominator, summing over N
-    Aanom2 = np.power(Aanom,2)
-    denom = np.sum(Aanom2,axis=a_axis)    
-    
-    # Calculate Beta
-    beta = Aanom @ Banom / denom
-    
-        
-    return beta
-
-    
-
+import sys
+sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
+from amv import proc
 
 
 # Path to data
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 datpath  = projpath + '01_Data/'
-outpath = projpath+'/02_Figures/20200716/'
+outpath = projpath+'/02_Figures/20200730/'
 flux = 'NHFLX' # [ 'FLNS','FSNS','LHFLX','SHFLX','RHFLX','THFLX','NHFLX','PSL']
 
-#ncname = "NHFLX_NAOproc.nc"
-
-#
-
-
-
-
 # %% Load data
-
 
 # Load Data (NAO Index)
 npzdata = np.load(datpath+"Manual_EOF_Calc_NAO.npz")
@@ -151,7 +84,6 @@ time = flx['year'].values
 flx = flx.values
 
 # %% Prepare data
-
 var = np.copy(flx)*-1 # Note, multiply by negative 1 to convert to upwards negative
 
 # Get dimension sizes
@@ -161,15 +93,14 @@ npc = pcall.shape[2]
 # Combine lat and lon dimensions
 var = np.reshape(var,(nens,nyr,nlat*nlon))
 
-# Regress for each mode and ensemble member
+#%% Regress for each mode and ensemble member
 varpattern = np.zeros((npc,nens,nlat*nlon))
 for n in range(npc):
     for e in range(nens):
         
         pcin = pcall[e,:,n]
         datain = var[e,...]
-
-        varpattern[n,e,:] = regress_2d(pcin,datain)
+        varpattern[n,e,:],_ = proc.regress_2d(pcin,datain)
         
         msg = '\rCompleted Regression for PC %02i/%02i, ENS %02i/%02i' % (n+1,npc,e+1,nens)
         print(msg,end="\r",flush=True)
