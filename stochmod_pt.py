@@ -29,168 +29,32 @@ sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons
 import scm
 from amv import viz,proc
 
-#%% Functions --------------------------------------------------
-# Function to calculate lag correlation
-# Dependencies: numpy, scipy
-# def calc_lagcovar(var1,var2,lags,basemonth,detrendopt):
-    
-#     debug = 0
-    
-#     if debug == 1:
-#         basemonth = kmonth
-#         lags = lags
-#         var1 = temps
-#         var2 = temps
-#         detrendopt = 1
-    
-#     # Get total number of lags
-#     lagdim = len(lags)
-    
-#     # Get timeseries length
-#     totyr = var1.shape[1]
-    
-#     # Get lag and lead sizes (in years)
-#     leadsize = int(np.ceil(len(np.where(lags < 0)[0])/12))
-#     lagsize = int(np.ceil(len(np.where(lags > 0)[0])/12))
-    
-    
-#     # Detrend variables if option is set
-#     if detrendopt == 1:
-#         var1 = signal.detrend(var1,1,type='linear')
-#         var2 = signal.detrend(var2,1,type='linear')
-    
-#     # Get base timeseries to perform the autocorrelation on
-#     base_ts = np.arange(0+leadsize,totyr-lagsize)
-#     varbase = var1[basemonth-1,base_ts]
-        
-#     # Preallocate Variable to store correlations
-#     corr_ts = np.zeros(lagdim)
-    
-#     # Set some counters
-#     nxtyr = 0
-#     addyr = 0
-#     modswitch = 0
-    
-#     for i in lags:
-        
-#         lagm = (basemonth + i)%12
-        
-#         if lagm == 0:
-#             lagm = 12
-#             addyr = 1         # Flag to add to nxtyr
-#             modswitch = i+1   # Add year on lag = modswitch
-            
-#         if addyr == 1 and i == modswitch:
-#             print('adding year on '+ str(i))
-#             addyr = 0         # Reset counter
-#             nxtyr = nxtyr + 1 # Shift window forward
-            
-#         # Index the other variable
-#         lag_ts = np.arange(0+nxtyr,len(varbase)+nxtyr)
-#         varlag = var2[lagm-1,lag_ts]
-        
-#         # Calculate correlation
-#         corr_ts[i] = stats.pearsonr(varbase,varlag)[0]
-            
-            
-#     return corr_ts
-
-# def find_latlon(lonf,latf,lon,lat):
-#     """
-#     Find lat and lon indices
-#     """
-#     if((np.any(np.where(lon>180)) & (lonf < 0)) or (np.any(np.where(lon<0)) & (lonf > 180))):
-#         print("Potential mis-match detected between lonf and longitude coordinates")
-    
-#     klon = np.abs(lon - lonf).argmin()
-#     klat = np.abs(lat - latf).argmin()
-    
-#     msg1 = "Closest lon to %.2f was %.2f" % (lonf,lon[klon])
-#     msg2 = "Closest lat to %.2f was %.2f" % (latf,lat[klat])
-#     print(msg1)
-#     print(msg2)
-    
-#     return klon,klat
-
-
-
-    
-    
-#     # Calculate Beta
-#     beta = np.log( h / np.roll(h,1) )
-#     beta[beta<0] = 0
-    
-#     # Find Maximum MLD during the year
-#     hmax = np.amax(h)
-    
-    
-#     # Preallocate lambda variable
-#     lbd = {}
-    
-    
-#     # Fixed MLD
-#     lbd[0] = damping / (rho*cp0*hfix) * dt
-    
-#     # Maximum MLD
-#     lbd[1] = damping / (rho*cp0*hmax) * dt
-    
-#     # Seasonal MLD
-#     lbd[2] = damping / (rho*cp0*h) * dt
-    
-#     # Calculate Damping (with entrainment)
-#     lbd_entr = lbd[2] + beta    
-    
-#     # Compute reduction factor
-#     FAC = (1-np.exp(-lbd_entr))/lbd_entr
-    
-#     return lbd,lbd_entr,FAC,beta
-
-# def year2mon(ts):
-#     """
-#     Separate mon x year from a 1D timeseries of monthly data
-#     """
-#     ts = np.reshape(ts,(int(np.ceil(ts.size/12)),12))
-#     ts = ts.T
-#     return ts
-
-# def ann_avg(ts,dim):
-#     """
-#     # Take Annual Average of a monthly time series
-#     where time is axis "dim"
-    
-#     """
-#     tsshape = ts.shape
-#     ntime   = ts.shape[dim] 
-#     newshape =    tsshape[:dim:] +(int(ntime/12),12) + tsshape[dim+1::]
-#     annavg = np.reshape(ts,newshape)
-#     annavg = np.nanmean(annavg,axis=dim+1)
-#     return annavg
-
-
-# def calc_clim(ts,dim):
-#     """
-#     Given monthly timeseries in axis [dim], calculate the climatology...
-#     """
-
-#     tsshape = ts.shape
-#     ntime   = ts.shape[dim] 
-#     newshape =    tsshape[:dim:] +(int(ntime/12),12) + tsshape[dim+1::]
-#     climavg = np.reshape(ts,newshape)
-#     climavg = np.nanmean(climavg,axis=dim)
-#     return climavg
-
-
 #%% User Edits -----------------------------------------------------------------     
 
-# Set Points
-pts = [[-30,50],[-30,60],[-50,12]]
-lonf    = -30
-latf    = 50
+# Point Selection
+lonf      = -30
+latf      = 65
 
 # Experiment Settings
-entrain  = 1 # 0 = no entrain; 1 = entrain
-hvarmode = 2 # 0 = fixed mld ; 1 = max mld; 2 = clim mld 
-funiform = 2 # 0 = nonuniform; 1 = uniform; 2 = NAO-like
+funiform = 4 # 0 = nonuniform; 1 = uniform; 2 = NAO-like (DJFM); 3 = NAO DJFM- Monthly Flx; 4 = NAO+Flx Monthly
+
+# Model Parameters...
+nyr = 10000
+t_end = 12*nyr
+dt = 3600*24*30
+T0 = 0
+
+# Forcing Parameters
+runid = "002"
+genrand = 1
+fscale   = 10
+
+# Ocean Parameters
+hfix     = 50
+
+# Other settings
+cp0      = 4218
+rho      = 1000
 
 # Autocorrelation Parameters#
 kmon       = 2                 # Lag 0 base month
@@ -208,20 +72,13 @@ bbox = [lonW,lonE,latS,latN]
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath = projpath + '03_Scripts/stochmod/'
 datpath = projpath + '01_Data/'
-outpath = projpath + '02_Figures/20200728/'
+outpath = projpath + '02_Figures/20200730/'
 
+# plotting strings
+modelname = ("MLD Fixed","MLD Max", "MLD Clim", "Entrain")
+forcingname = ("All Random","Uniform","$(NAO & NHFLX)_{DJFM}$","$NAO_{DJFM}  &  NHFLX_{Mon}$","$(NAO  &  NHFLX)_{Mon}$")
 
-# Model Parameters
-nyrs = 1000
-t_end = 12*nyrs
-genrand = 1
-hvarmode = 2
-funiform = 4
-dt = 3600*24*30
-T0 = 0
-runid = "002"
-
-#%% Load Data
+#%% Load Damping and MLD Data
 
 # Load Damping Data
 damppath = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/'
@@ -233,15 +90,15 @@ damping = loaddamp['ensavg']
 
 # Load MLD data
 hclim      = np.load(datpath+"HMXL_hclim.npy") # Climatological MLD
-kprevall = np.load(datpath+"HMXL_kprev.npy") # Entraining Month
+kprevall   = np.load(datpath+"HMXL_kprev.npy") # Entraining Month
 
 
-# Load Random Time Series...
+#%% Load Random Time Series...
 if genrand == 1:
-    randts = np.random.normal(0,1,size=t_end)
-    np.savetxt(datpath+"stoch_output_%iyr_run%s_randts.npy"%(nyrs,runid),randts,delimiter=",")
+    randts = np.random.normal(0,1,size=t_end)/4
+    np.save(datpath+"stoch_output_%iyr_run%s_randts.npy"%(nyr,runid),randts)
 else:
-    randts = np.load(datpath+"stoch_output_%iyr_run%s_randts.npy"%(nyrs,runid))
+    randts = np.load(datpath+"stoch_output_%iyr_run%s_randts.npy"%(nyr,runid))
     
 #%% Load NAO-like forcing
 
@@ -273,166 +130,10 @@ elif funiform == 4:
     naomon = np.transpose(naomon,(2,1,0))
     _,naoforce = proc.lon360to180(lon360,naomon) #lon x lat x mon
 
-#%% Forcing Sensitivity Experiments
-
-fscale = [2.5,1/4,1/40]
-ftext = ("10x","1x","0.1x")
-
-
-
-# Loop through each selected point
-allsst={}
-allcorr={}
-i = 0
-for pt in pts:
-    allstart = time.time()
     
-    # Find latitude longitude indices
-    lonf = pt[0]
-    latf = pt[1]
-    klon,klat = find_latlon(lonf,latf,lon,lat)
-    
-    # Get terms for the point
-    damppt = damping[klon,klat,:]
-    hpt = hclim[klon,klat,:]
-    kprev = kprevall[klon,klat,:]
-    kmon = hpt.argmax()
-    
-    
-    # Set Damping Parameters
-    lbd,lbd_entr,FAC,beta = set_stochparams(hpt,damppt,dt)
-
-    
-    
-
-    expsst = {}
-    expcorr = {}
-    sst={}
-    corr={}
-    # Loop for each forcing experiment
-    for f in range(len(fscale)):
-        ff  = fscale[f]
-        ftx = ftext[f]
-        
-        F = randts * ff
-        
-        
-        # Loop nonentraining model
-        for l in range(3):
-            start = time.time()
-            sst[l],_,_ = stochmod_noentrain(t_end,lbd[l],T0,F)
-            elapsed = time.time() - start
-            tprint = "No Entrain Model, mode %i, ran in %.2fs" % (l,elapsed)
-            print(tprint)
-        
-        # Loop for entrain model
-        start = time.time()
-        sst[3],_,_,_,_=stochmod_entrain(t_end,lbd_entr,T0,F,beta,hpt,kprev,FAC)
-        elapsed = time.time() - start
-        tprint = "Entrain Model ran in %.2fs" % (elapsed)
-        print(tprint)
-       
-        # Compute correlation
-        for l in range(4):
-           
-            ts = sst[l]
-            ts = year2mon(ts)
-           
-            corr[l] = calc_lagcovar(ts,ts,lags,kmon+1,detrendopt)
-           
-        # Store into forcing variable
-        expsst[f] = sst
-        expcorr[f] = corr
-    
-       
-        
-        
-        
-        
-    
-    # Save sst based on point
-    allsst[i] = expsst
-    allcorr[i] = expcorr 
-    i += 1
-    elapsed = time.time() - allstart
-    tprint = "Experiments for pt %i ran in %.2fs" % (i,elapsed)
-    print(tprint)
-        
-    
-#%% Forcing Sensitivity Plots
+#%% Run model 4 times, once for each treatment of the ocean....
 
 
-#%% Forcing Plots
-
-tper = np.arange(0,t_end)
-fig,ax = plt.subplots(3,1,sharex=True,sharey=False,figsize=(8,6))
-plt.style.use("ggplot")
-
-for i in range(len(fscale)):
-    
-    plt.subplot(3,1,i+1)
-    plt.plot(tper,randts*fscale[i])
-    plt.title("Forcing %s" %  (ftext[i]))
-plt.tight_layout()
-
-
-#%% Temperature Plots
-
-lname = ("h-fixed","h-max","h-var","entrain")
-
-
-
-for pt in range(len(pts)):
-    
-    
-    locstring = "Lon: %i, Lat: %i" % (pts[pt][0],pts[pt][1]) 
-    locfname  = "lon%02d_lat%02d" % (pts[pt][0],pts[pt][1]) 
-    
-    
-    for l in range(4):
-        ln = lname[l]
-        
-        # Set up figure
-        fig,ax = plt.subplots(3,1,sharex=True,sharey=False,figsize=(8,6))
-        plt.style.use("ggplot")
-        
-        for exp in range(len(fscale)):
-            plt.subplot(3,1,exp+1)
-            
-            
-            ts = allsst[pt][exp][i]
-            
-            plt.plot(tper,ts)
-            plt.title("SST at %s for Forcing %s: %s" % (locstring,ftext[exp],ln))
-        
-        
-        # Save Figure
-        plt.tight_layout()
-        figname = "%s_ldb%s.png" % (locfname,ln)
-        plt.savefig(outpath+figname,dpi=200)
-            
-            
-            
-    
-#%% Testing + Debugging NAO Forcing   
-
-# Other settings
-cp0      = 4218
-rho      = 1000
-dt       = 3600*24*30
-T0       = 0
-nyr      = 1000
-t_end    = nyr*12
-fscale   = 10
-hvarmode = 2
-hfix     = 50
-runid    = '000'
-genrand  = 0
-
-
-# Set and Find latitude longitude indices
-lonf      = -30
-latf      = 65
 klon,klat = proc.find_latlon(lonf,latf,lon,lat)
 
 
@@ -446,27 +147,28 @@ naopt  = naoforce[klon,klat,:]
 # Set Damping Parameters
 lbd,lbd_entr,FAC,beta = scm.set_stochparams(hpt,damppt,dt,ND=False)
      
-# Load Random Time Series...
-if genrand == 1:
-    randts = np.random.normal(0,1,size=t_end)/4
-    np.savetxt(datpath+"randts.csv",randts,delimiter=",")
-else:
-    randts = np.load(datpath+"stoch_output_%iyr_run%s_randts.npy"%(nyr,runid))
 
-# Set up forcing term
-if hvarmode == 0:
-    hchoose = 50
-elif hvarmode == 1:
-    hchoose = np.max(np.abs(hpt))
-elif hvarmode == 2:
-    hchoose = hpt
 
-Fmag = naopt*dt/cp0/rho/hchoose
+F = {}
+for l in range(3):
+    
+    hvarmode = l
+    
+    # Set up forcing term
+    if hvarmode == 0:
+        hchoose = 50
+    elif hvarmode == 1:
+        hchoose = np.max(np.abs(hpt))
+    elif hvarmode == 2:
+        hchoose = hpt
+    
+    Fmag = naopt*dt/cp0/rho/hchoose
+    
+    if (hvarmode == 2) | (funiform > 2):
+        F[l] = randts * np.tile(Fmag,nyr) * fscale
+    else:
+        F[l] = randts * Fmag * fscale
 
-if hvarmode == 2:
-    F = randts * np.tile(Fmag,nyr) * fscale
-else:
-    F = randts * Fmag * fscale
 
 # Run models
 sst = {}
@@ -475,7 +177,7 @@ dampts = {}
  # Loop nonentraining model
 for l in range(3):
     start = time.time()
-    sst[l],noise[l],dampts[l] = scm.noentrain(t_end,lbd[l],T0,F)
+    sst[l],noise[l],dampts[l] = scm.noentrain(t_end,lbd[l],T0,F[l])
     elapsed = time.time() - start
     tprint = "No Entrain Model, mode %i, ran in %.2fs" % (l,elapsed)
     print(tprint)
@@ -483,7 +185,7 @@ for l in range(3):
 # Loop for entrain model
 if hvarmode == 2:
     start = time.time()
-    sst[3],noise[3],dampts[3],eentrain,td=scm.entrain(t_end,lbd_entr,T0,F,beta,hpt,kprev,FAC)
+    sst[3],noise[3],dampts[3],eentrain,td=scm.entrain(t_end,lbd_entr,T0,F[2],beta,hpt,kprev,FAC)
     elapsed = time.time() - start
     tprint = "Entrain Model ran in %.2fs" % (elapsed)
     print(tprint)
@@ -492,26 +194,36 @@ if hvarmode == 2:
 
 #%% Plot Point
 
-#hvarmode = 1
-# Set hvarmode = 3 for entrain
-hvarmode = 0
-sstpt = sst[hvarmode]
+model = 0 # Select Model( 0:hfix || 1:hmax || 2:hvar || 3: entrain)
 
 
-sstptann = ann_avg(sstpt,0)
-Fptann   = ann_avg(F,0)
 
+sstpt = sst[model]
+if model == 3:
+    Fpt = F[2]
+else:
+    Fpt = F[model]
+
+# Calculate Annual Averages
+sstptann = proc.ann_avg(sstpt,0)
+Fptann   = proc.ann_avg(Fpt,0)
+
+# Set plotting parameters and text
 tper = np.arange(0,t_end)
 yper = np.arange(0,t_end,12)
+fstats = viz.quickstatslabel(Fpt)
+tstats = viz.quickstatslabel(sstpt)
+
+# Start plot
 fig,ax = plt.subplots(2,1,figsize=(8,6))
 plt.style.use('ggplot')
 
 plt.subplot(2,1,1)
-plt.plot(tper,F)
+plt.plot(tper,Fpt)
 plt.plot(yper,Fptann,color='k',label='Ann. Avg')
 plt.ylabel("Forcing ($^{\circ}C/s$)",fontsize=10)
 plt.legend()
-plt.title("Forcing at LON: %02d LAT: %02d \n Mean: %.2f || Std: %.2f || Max: %.2f" % (lonf,latf,np.nanmean(F),np.nanstd(F),np.nanmax(np.abs(F))))
+plt.title("%s Forcing at LON: %02d LAT: %02d \n %s" % (forcingname[funiform],lonf,latf,fstats))
 
 
 
@@ -522,108 +234,128 @@ plt.ylabel("SST ($^{\circ}C$)",fontsize=10)
 plt.xlabel("Time(Months)",fontsize=10)
 plt.legend()
 #plt.title("Detrended, Deseasonalized SST at LON: %02d LAT: %02d \n Mean: %.2f || Std: %.2f || Max: %.2f" % (lonf,latf,np.nanmean(sstpt),np.nanstd(sstpt),np.nanmax(np.abs(sstpt))))
-plt.title("Detrended, Deseasonalized SST \n Mean: %.2f || Std: %.2f || Max: %.2f" % (np.nanmean(sstpt),np.nanstd(sstpt),np.nanmax(np.abs(sstpt))))
+plt.title("SST (%s) \n %s" % (modelname[model],tstats))
 
 
 plt.tight_layout()
 
-plt.savefig(outpath+"Stochmodpt_dsdt_SST_lon%02d_lat%02d_hvarmode%i_fscale%i.png"%(lonf,latf,hvarmode,fscale),dpi=200)
+plt.savefig(outpath+"Stochmodpt_dsdt_SST_run%s_lon%02d_lat%02d_model%i_funiform%i_fscale%i.png"%(runid,lonf,latf,model,funiform,fscale),dpi=200)
 
 
-#%% # Plot Each Term in Model To compare
-hvarmode = 0
+#%% # Plot Each Term in Model To compare < NO ENTRAIN > 
+#model =  0# 0-2
+yrstart = 0
+yrstop  = nyr
 
-sstpt   = sst[hvarmode]
-noisept = noise[hvarmode]
-damptspt = dampts[hvarmode]
 
-# Append zero to end
-noisept = np.pad(noisept,(0,1),'constant')
-damptspt = np.pad(damptspt,(0,1),'constant')
+for model in range(3):
 
+    locstringfig = "LON: %02d LAT: %02d" % (lonf,latf)
+    
+    
+    monrange = np.arange(12*yrstart,12*yrstop)
+    
+    
+    sstpt   = sst[model][monrange]
+    noisept = np.pad(noise[model],(1,0),'constant')[monrange]
+    damptspt = np.pad(dampts[model],(1,0),'constant')[monrange]
+    Fpt = F[model][monrange]
+     
+    # Append zero to end
+    # noisept = np.pad(noisept,(1,0),'constant')
+    # damptspt = np.pad(damptspt,(1,0),'constant')
+    
+    
+    # Find maximum
+    maxvals = [np.nanmax(np.abs(sstpt)),
+               np.nanmax(np.abs(noisept)),
+               np.nanmax(np.abs(damptspt))
+               ]
+    maxval = np.around(np.max(maxvals))
+    
+    
+    units = "$^{\circ}C$"
+    
+    
+    # Plot for no-entrain model
+    fig,ax = plt.subplots(3,1,figsize=(8,6)) 
+    
+    
+    plt.subplot(3,1,1)
+    figtitle="Forcing %s" % forcingname[funiform]
+    viz.plot_annavg(noisept,units,figtitle,ymax=maxval)
+    
+    plt.subplot(3,1,2)
+    figtitle = "Damping"
+    viz.plot_annavg(damptspt,units,figtitle,ymax=maxval)
+    
+    plt.subplot(3,1,3)
+    figtitle = "SST %s"%  modelname[model]
+    viz.plot_annavg(sstpt,units,figtitle,ymax=maxval)
+    
+    title = "Model [%s] at %s (Yrs %i - %i)" % (modelname[model],locstringfig,yrstart,yrstop,)
+    plt.suptitle(title,fontsize=16)
+    
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+    plt.savefig(outpath+"Stochmodpt_dsdt_ModelParamComp_run%s_lon%02d_lat%02d_model%i_funiform%i_fscale%i.png"%(runid,lonf,latf,model,funiform,fscale),dpi=200)
+
+
+#%% Repeat plot for the no-entraining model
+
+
+
+
+model = 3
+yrstart = 0
+yrstop  = nyr
+
+
+monrange = np.arange(12*yrstart,12*yrstop)
+
+
+
+# Get points and append zeros where necessary
+sstpt   = sst[model][monrange]
+noisept = np.pad(noise[model],(1,0),'constant')[monrange]
+damptspt = np.pad(dampts[model],(1,0),'constant')[monrange]
+entrainpt = np.pad(eentrain,(1,0),'constant')[monrange]
+
+
+# Find maximum
+maxvals = [np.nanmax(np.abs(sstpt)),
+           np.nanmax(np.abs(noisept)),
+           np.nanmax(np.abs(damptspt)),
+           np.nanmax(np.abs(entrainpt)),
+           ]
+maxval = np.around(np.max(maxvals))
+ymax =None
 
 # Plot for no-entrain model
-fig,ax = plt.subplots(3,1,figsize=(10,6)) 
-
-var = noisept
-plt.subplot(3,1,1)
-plt.plot(tper,var)
-plt.plot(yper,ann_avg(var,0),color='k',label='Ann. Avg')
-plt.ylabel("Forcing ($^{\circ}C/s$)",fontsize=8)
-plt.legend()
-plt.title("Noise Term at LON: %02d LAT: %02d (Mean: %.2f || Std: %.2f || Max: %.2f)" % (lonf,latf,np.nanmean(var),np.nanstd(var),np.nanmax(np.abs(var))))
-
-var = damptspt
-plt.subplot(3,1,2)
-plt.plot(tper,var)
-plt.plot(yper,ann_avg(var,0),color='k',label='Ann. Avg')
-plt.ylabel("Damping ($^{\circ}C/s$)",fontsize=8)
-plt.legend()
-plt.title("Damping Term Hvarmode %i (Mean: %.2f || Std: %.2f || Max: %.2f)" % (hvarmode,np.nanmean(var),np.nanstd(var),np.nanmax(np.abs(var))))
-
-plt.subplot(3,1,3)
-plt.plot(tper,sstpt)
-plt.plot(yper,ann_avg(sstpt,0),color='k',label='Ann. Avg')
-plt.ylabel("SST ($^{\circ}C$)",fontsize=10)
-plt.xlabel("Time(Months)",fontsize=10)
-plt.legend()
-#plt.title("Detrended, Deseasonalized SST at LON: %02d LAT: %02d \n Mean: %.2f || Std: %.2f || Max: %.2f" % (lonf,latf,np.nanmean(sstpt),np.nanstd(sstpt),np.nanmax(np.abs(sstpt))))
-plt.title("No-Entrain SST (Mean: %.2f || Std: %.2f || Max: %.2f)" % (np.nanmean(sstpt),np.nanstd(sstpt),np.nanmax(np.abs(sstpt))))
-
-plt.tight_layout()
-plt.savefig(outpath+"Stochmodpt_dsdt_ModelParamComp_lon%02d_lat%02d_hvarmode%i_fscale%i.png"%(lonf,latf,hvarmode,fscale),dpi=200)
+fig,ax = plt.subplots(4,1,figsize=(8,8)) 
 
 
-#%% Do same for entraining model
-
-hvarmode = 3
-sstpt   = sst[hvarmode]
-noisept = noise[hvarmode]
-damptspt = dampts[hvarmode]
-
-# Append zero to end
-noisept = np.pad(noisept,(0,1),'constant')
-damptspt = np.pad(damptspt,(0,1),'constant')
-eentrainpt = np.pad(eentrain,(0,1),'constant')
-
-# Plot for no-entrain model
-fig,ax = plt.subplots(4,1,figsize=(12,6)) 
-
-var = noisept
 plt.subplot(4,1,1)
-plt.plot(tper,var)
-plt.plot(yper,ann_avg(var,0),color='k',label='Ann. Avg')
-plt.ylabel("Forcing ($^{\circ}C/s$)",fontsize=8)
-plt.legend()
-plt.title("Noise Term at LON: %02d LAT: %02d (Mean: %.2f || Std: %.2f || Max: %.2f)" % (lonf,latf,np.nanmean(var),np.nanstd(var),np.nanmax(np.abs(var))))
-
-var = damptspt
+figtitle="Forcing %s" % forcingname[funiform]
+viz.plot_annavg(noisept,units,figtitle,ymax=ymax)
+    
 plt.subplot(4,1,2)
-plt.plot(tper,var)
-plt.plot(yper,ann_avg(var,0),color='k',label='Ann. Avg')
-plt.ylabel("Damping ($^{\circ}C/s$)",fontsize=8)
-plt.legend()
-plt.title("Damping Term Hvarmode %i (Mean: %.2f || Std: %.2f || Max: %.2f)" % (hvarmode,np.nanmean(var),np.nanstd(var),np.nanmax(np.abs(var))))
+figtitle = "Damping"
+viz.plot_annavg(damptspt,units,figtitle,ymax=ymax)
 
-var = eentrainpt
 plt.subplot(4,1,3)
-plt.plot(tper,var)
-plt.plot(yper,ann_avg(var,0),color='k',label='Ann. Avg')
-plt.ylabel("Damping ($^{\circ}C/s$)",fontsize=8)
-plt.legend()
-plt.title("Entrain Term (Mean: %.2f || Std: %.2f || Max: %.2f)" % (np.nanmean(var),np.nanstd(var),np.nanmax(np.abs(var))))
- 
-plt.subplot(4,1,4)
-plt.plot(tper,sstpt)
-plt.plot(yper,ann_avg(sstpt,0),color='k',label='Ann. Avg')
-plt.ylabel("SST ($^{\circ}C$)",fontsize=10)
-plt.xlabel("Time(Months)",fontsize=10)
-plt.legend()
-#plt.title("Detrended, Deseasonalized SST at LON: %02d LAT: %02d \n Mean: %.2f || Std: %.2f || Max: %.2f" % (lonf,latf,np.nanmean(sstpt),np.nanstd(sstpt),np.nanmax(np.abs(sstpt))))
-plt.title("Entrain SST (Mean: %.2f || Std: %.2f || Max: %.2f)" % (np.nanmean(sstpt),np.nanstd(sstpt),np.nanmax(np.abs(sstpt))))
+figtitle = "Entain"
+viz.plot_annavg(entrainpt,units,figtitle,ymax=ymax)
 
-plt.tight_layout()
-plt.savefig(outpath+"Stochmodpt_dsdt_ModelParamComp_lon%02d_lat%02d_hvarmode%i_fscale%i.png"%(lonf,latf,hvarmode,fscale),dpi=200)
+
+plt.subplot(4,1,4)
+figtitle = "SST %s"%  modelname[model]
+viz.plot_annavg(sstpt,units,figtitle,ymax=ymax)
+    
+title = "Model [%s] at %s (Yrs %i - %i)" % (modelname[model],locstringfig,yrstart,yrstop,)
+plt.suptitle(title,fontsize=16)
+
+plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+plt.savefig(outpath+"Stochmodpt_dsdt_ModelParamComp_run%s_lon%02d_lat%02d_model%i_funiform%i_fscale%i.png"%(runid,lonf,latf,model,funiform,fscale),dpi=200)
 
 
 
