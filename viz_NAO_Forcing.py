@@ -27,35 +27,35 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 import sys
 sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
-from amv import proc
+from amv import proc,viz
 
 #%% Functions
 
-def init_map(bbox,ax=None):
-    """
-    Quickly initialize a map for plotting
-    """
-    # Create Figure/axes
-    #fig = plt.gcf() 
+# def init_map(bbox,ax=None):
+#     """
+#     Quickly initialize a map for plotting
+#     """
+#     # Create Figure/axes
+#     #fig = plt.gcf() 
     
-    #ax = fig.add_subplot(1,1,1,projection=ccrs.PlateCarree())
-    if ax is None:
-        ax = plt.gca()
-    #ax = plt.axes(projection=ccrs.PlateCarree())
+#     #ax = fig.add_subplot(1,1,1,projection=ccrs.PlateCarree())
+#     if ax is None:
+#         ax = plt.gca()
+#     #ax = plt.axes(projection=ccrs.PlateCarree())
         
     
-    ax.set_extent(bbox)
+#     ax.set_extent(bbox)
     
-    # Add Filled Coastline
-    ax.add_feature(cfeature.COASTLINE,facecolor='k')
+#     # Add Filled Coastline
+#     ax.add_feature(cfeature.COASTLINE,facecolor='k')
     
-    # Add Gridlines
-    gl = ax.gridlines(draw_labels=True,linewidth=0.5,color='gray',linestyle=':')
-    gl.xlabels_top = gl.ylabels_right = False
-    gl.xformatter = LONGITUDE_FORMATTER
-    gl.yformatter = LATITUDE_FORMATTER
+#     # Add Gridlines
+#     gl = ax.gridlines(draw_labels=True,linewidth=0.5,color='gray',linestyle=':')
+#     gl.xlabels_top = gl.ylabels_right = False
+#     gl.xformatter = LONGITUDE_FORMATTER
+#     gl.yformatter = LATITUDE_FORMATTER
     
-    return ax
+#     return ax
     
 def div_cint(var):
     """
@@ -96,7 +96,9 @@ lon180,NAO1 = proc.lon360to180(lon360,NAO1)
 
 # Load NAO Forcing Seasonally Varying
 naomon = np.load(datpath+"NAO_Monthly_Regression_PC.npz")
+pcs    = naomon['pcall']
 naomon = naomon['eofall']
+
 naomon = np.nanmean(naomon,0) # Take ens mean
 naomon = np.transpose(naomon,(2,1,0))
 _,naomon = proc.lon360to180(lon360,naomon)
@@ -105,6 +107,9 @@ _,naomon = proc.lon360to180(lon360,naomon)
 nanmask = np.sum(naomon,2)
 nanmask = np.where(~np.isnan(nanmask),np.ones(nanmask.shape),np.nan)
 NAO1 = NAO1 * nanmask[:,:,None]
+
+# Flip so that downwards is positive
+NAO1 *= -1
 
 
 # Load lat/lon arrays for plotting, from damping dataset
@@ -164,7 +169,7 @@ def seasonalplots(var,cints,bbox,cmap,figtitle,outname):
         i = 0
         for s in seasonid:
             ax = axs[i]
-            axs[0] = init_map(bbox,ax=ax)
+            axs[0] = viz.init_map(bbox,ax=ax)
     
             pcm = ax.pcolormesh(lon,lat,var[:,:,s].T,cmap=cmap,vmax=vmax,vmin=vmin)
             ax.set_title("Month %i" % (s+1),fontsize=12)
@@ -187,3 +192,68 @@ bbox= [-100,20,-20,90]
 outname = "%sNHFLX-NAO_Monthly_regression" % outpath
 figtitle = "NAO-NHFLX Regression (Monthly Varying, $W/m^{2}/\sigma_{NAO}$)"
 seasonalplots(naomon,cints,bbox,cmap,figtitle,outname)
+
+#%% Create same plots, but with the difference
+
+diffNAO = naomon - NAO1
+cmap = cmocean.cm.balance
+bbox= [-100,20,-20,90]
+value = [-20,20]
+cints = {key: value for key in ['winter','spring','summer','fall']}
+
+#cints = {'winter':[-60,60],'spring':[-60,60],'summer':[-60,60],'fall':[-60,60]}
+outname = "%sNHFLX-NAO_Monthly-DJFM_regression" % outpath
+figtitle = "NAO-NHFLX Regression (Monthly minus DJFM, $W/m^{2}/\sigma_{NAO}$)"
+seasonalplots(diffNAO,cints,bbox,cmap,figtitle,outname)
+
+
+#%% Plot PCs for a specific month
+
+m = 0
+
+pcm = pcs[:,m,:]
+
+
+fig,ax = plt.subplots(1,1,figsize=(6,4))
+plt.style.use("seaborn")
+ax = viz.ensemble_plot(pcm,0,ax=ax,ialpha=0.05)
+
+#%% Plot PCs for each season
+
+
+
+"""
+Makes seasonal plots of var [lon x lat x month]
+
+Dependencies: init_map
+"""
+
+outname = outpath + "NAO_Index"
+figtitle = "NAO Index "
+# Set up seasons and indexing
+sids = {'winter':[11,0,1],'spring':[2,3,4],'summer':[5,6,7],'fall':[8,9,10]}
+seasons = ['winter','spring','summer','fall']
+
+
+for season in seasons:
+    
+    seasonid = sids[season]  # Set season name
+    
+    # Initialize Figure
+    fig1,axs = plt.subplots(3,1,figsize=(6,6))
+    #fig1.subplots_adjust(top=0.95)
+    
+    
+    # Loop by month
+    i = 0
+    for s in seasonid:
+        ax = axs[i]
+        ax = viz.ensemble_plot(pcs[:,s],0,ax=ax,ialpha=0.05)
+        ax.set_title("Month %i" % (s+1),fontsize=12)
+        i+= 1
+    axs[1].set_ylabel("NAO Index")
+    axs[2].set_xlabel("Years")
+    
+    plt.suptitle(figtitle + season,x=0.10)
+    plt.tight_layout()
+    plt.savefig("%s_%s.png"%(outname,season),dpi=200)
