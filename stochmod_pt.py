@@ -25,158 +25,159 @@ from scipy import stats
 # Add Module to search path
 import sys
 sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/")
+sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
 import scm
+from amv import viz,proc
 
 #%% Functions --------------------------------------------------
 # Function to calculate lag correlation
 # Dependencies: numpy, scipy
-def calc_lagcovar(var1,var2,lags,basemonth,detrendopt):
+# def calc_lagcovar(var1,var2,lags,basemonth,detrendopt):
     
-    debug = 0
+#     debug = 0
     
-    if debug == 1:
-        basemonth = kmonth
-        lags = lags
-        var1 = temps
-        var2 = temps
-        detrendopt = 1
+#     if debug == 1:
+#         basemonth = kmonth
+#         lags = lags
+#         var1 = temps
+#         var2 = temps
+#         detrendopt = 1
     
-    # Get total number of lags
-    lagdim = len(lags)
+#     # Get total number of lags
+#     lagdim = len(lags)
     
-    # Get timeseries length
-    totyr = var1.shape[1]
+#     # Get timeseries length
+#     totyr = var1.shape[1]
     
-    # Get lag and lead sizes (in years)
-    leadsize = int(np.ceil(len(np.where(lags < 0)[0])/12))
-    lagsize = int(np.ceil(len(np.where(lags > 0)[0])/12))
+#     # Get lag and lead sizes (in years)
+#     leadsize = int(np.ceil(len(np.where(lags < 0)[0])/12))
+#     lagsize = int(np.ceil(len(np.where(lags > 0)[0])/12))
     
     
-    # Detrend variables if option is set
-    if detrendopt == 1:
-        var1 = signal.detrend(var1,1,type='linear')
-        var2 = signal.detrend(var2,1,type='linear')
+#     # Detrend variables if option is set
+#     if detrendopt == 1:
+#         var1 = signal.detrend(var1,1,type='linear')
+#         var2 = signal.detrend(var2,1,type='linear')
     
-    # Get base timeseries to perform the autocorrelation on
-    base_ts = np.arange(0+leadsize,totyr-lagsize)
-    varbase = var1[basemonth-1,base_ts]
+#     # Get base timeseries to perform the autocorrelation on
+#     base_ts = np.arange(0+leadsize,totyr-lagsize)
+#     varbase = var1[basemonth-1,base_ts]
         
-    # Preallocate Variable to store correlations
-    corr_ts = np.zeros(lagdim)
+#     # Preallocate Variable to store correlations
+#     corr_ts = np.zeros(lagdim)
     
-    # Set some counters
-    nxtyr = 0
-    addyr = 0
-    modswitch = 0
+#     # Set some counters
+#     nxtyr = 0
+#     addyr = 0
+#     modswitch = 0
     
-    for i in lags:
+#     for i in lags:
         
-        lagm = (basemonth + i)%12
+#         lagm = (basemonth + i)%12
         
-        if lagm == 0:
-            lagm = 12
-            addyr = 1         # Flag to add to nxtyr
-            modswitch = i+1   # Add year on lag = modswitch
+#         if lagm == 0:
+#             lagm = 12
+#             addyr = 1         # Flag to add to nxtyr
+#             modswitch = i+1   # Add year on lag = modswitch
             
-        if addyr == 1 and i == modswitch:
-            print('adding year on '+ str(i))
-            addyr = 0         # Reset counter
-            nxtyr = nxtyr + 1 # Shift window forward
+#         if addyr == 1 and i == modswitch:
+#             print('adding year on '+ str(i))
+#             addyr = 0         # Reset counter
+#             nxtyr = nxtyr + 1 # Shift window forward
             
-        # Index the other variable
-        lag_ts = np.arange(0+nxtyr,len(varbase)+nxtyr)
-        varlag = var2[lagm-1,lag_ts]
+#         # Index the other variable
+#         lag_ts = np.arange(0+nxtyr,len(varbase)+nxtyr)
+#         varlag = var2[lagm-1,lag_ts]
         
-        # Calculate correlation
-        corr_ts[i] = stats.pearsonr(varbase,varlag)[0]
+#         # Calculate correlation
+#         corr_ts[i] = stats.pearsonr(varbase,varlag)[0]
             
             
-    return corr_ts
+#     return corr_ts
 
-def find_latlon(lonf,latf,lon,lat):
-    """
-    Find lat and lon indices
-    """
-    if((np.any(np.where(lon>180)) & (lonf < 0)) or (np.any(np.where(lon<0)) & (lonf > 180))):
-        print("Potential mis-match detected between lonf and longitude coordinates")
+# def find_latlon(lonf,latf,lon,lat):
+#     """
+#     Find lat and lon indices
+#     """
+#     if((np.any(np.where(lon>180)) & (lonf < 0)) or (np.any(np.where(lon<0)) & (lonf > 180))):
+#         print("Potential mis-match detected between lonf and longitude coordinates")
     
-    klon = np.abs(lon - lonf).argmin()
-    klat = np.abs(lat - latf).argmin()
+#     klon = np.abs(lon - lonf).argmin()
+#     klat = np.abs(lat - latf).argmin()
     
-    msg1 = "Closest lon to %.2f was %.2f" % (lonf,lon[klon])
-    msg2 = "Closest lat to %.2f was %.2f" % (latf,lat[klat])
-    print(msg1)
-    print(msg2)
+#     msg1 = "Closest lon to %.2f was %.2f" % (lonf,lon[klon])
+#     msg2 = "Closest lat to %.2f was %.2f" % (latf,lat[klat])
+#     print(msg1)
+#     print(msg2)
     
-    return klon,klat
-
-
-
-    
-    
-    
-    # Calculate Beta
-    beta = np.log( h / np.roll(h,1) )
-    beta[beta<0] = 0
-    
-    # Find Maximum MLD during the year
-    hmax = np.amax(h)
-    
-    
-    # Preallocate lambda variable
-    lbd = {}
-    
-    
-    # Fixed MLD
-    lbd[0] = damping / (rho*cp0*hfix) * dt
-    
-    # Maximum MLD
-    lbd[1] = damping / (rho*cp0*hmax) * dt
-    
-    # Seasonal MLD
-    lbd[2] = damping / (rho*cp0*h) * dt
-    
-    # Calculate Damping (with entrainment)
-    lbd_entr = lbd[2] + beta    
-    
-    # Compute reduction factor
-    FAC = (1-np.exp(-lbd_entr))/lbd_entr
-    
-    return lbd,lbd_entr,FAC,beta
-
-def year2mon(ts):
-    """
-    Separate mon x year from a 1D timeseries of monthly data
-    """
-    ts = np.reshape(ts,(int(np.ceil(ts.size/12)),12))
-    ts = ts.T
-    return ts
-
-def ann_avg(ts,dim):
-    """
-    # Take Annual Average of a monthly time series
-    where time is axis "dim"
-    
-    """
-    tsshape = ts.shape
-    ntime   = ts.shape[dim] 
-    newshape =    tsshape[:dim:] +(int(ntime/12),12) + tsshape[dim+1::]
-    annavg = np.reshape(ts,newshape)
-    annavg = np.nanmean(annavg,axis=dim+1)
-    return annavg
+#     return klon,klat
 
 
-def calc_clim(ts,dim):
-    """
-    Given monthly timeseries in axis [dim], calculate the climatology...
-    """
 
-    tsshape = ts.shape
-    ntime   = ts.shape[dim] 
-    newshape =    tsshape[:dim:] +(int(ntime/12),12) + tsshape[dim+1::]
-    climavg = np.reshape(ts,newshape)
-    climavg = np.nanmean(climavg,axis=dim)
-    return climavg
+    
+    
+#     # Calculate Beta
+#     beta = np.log( h / np.roll(h,1) )
+#     beta[beta<0] = 0
+    
+#     # Find Maximum MLD during the year
+#     hmax = np.amax(h)
+    
+    
+#     # Preallocate lambda variable
+#     lbd = {}
+    
+    
+#     # Fixed MLD
+#     lbd[0] = damping / (rho*cp0*hfix) * dt
+    
+#     # Maximum MLD
+#     lbd[1] = damping / (rho*cp0*hmax) * dt
+    
+#     # Seasonal MLD
+#     lbd[2] = damping / (rho*cp0*h) * dt
+    
+#     # Calculate Damping (with entrainment)
+#     lbd_entr = lbd[2] + beta    
+    
+#     # Compute reduction factor
+#     FAC = (1-np.exp(-lbd_entr))/lbd_entr
+    
+#     return lbd,lbd_entr,FAC,beta
+
+# def year2mon(ts):
+#     """
+#     Separate mon x year from a 1D timeseries of monthly data
+#     """
+#     ts = np.reshape(ts,(int(np.ceil(ts.size/12)),12))
+#     ts = ts.T
+#     return ts
+
+# def ann_avg(ts,dim):
+#     """
+#     # Take Annual Average of a monthly time series
+#     where time is axis "dim"
+    
+#     """
+#     tsshape = ts.shape
+#     ntime   = ts.shape[dim] 
+#     newshape =    tsshape[:dim:] +(int(ntime/12),12) + tsshape[dim+1::]
+#     annavg = np.reshape(ts,newshape)
+#     annavg = np.nanmean(annavg,axis=dim+1)
+#     return annavg
+
+
+# def calc_clim(ts,dim):
+#     """
+#     Given monthly timeseries in axis [dim], calculate the climatology...
+#     """
+
+#     tsshape = ts.shape
+#     ntime   = ts.shape[dim] 
+#     newshape =    tsshape[:dim:] +(int(ntime/12),12) + tsshape[dim+1::]
+#     climavg = np.reshape(ts,newshape)
+#     climavg = np.nanmean(climavg,axis=dim)
+#     return climavg
 
 
 #%% User Edits -----------------------------------------------------------------     
@@ -215,9 +216,10 @@ nyrs = 1000
 t_end = 12*nyrs
 genrand = 1
 hvarmode = 2
-funiform = 2
+funiform = 4
 dt = 3600*24*30
 T0 = 0
+runid = "002"
 
 #%% Load Data
 
@@ -237,12 +239,39 @@ kprevall = np.load(datpath+"HMXL_kprev.npy") # Entraining Month
 # Load Random Time Series...
 if genrand == 1:
     randts = np.random.normal(0,1,size=t_end)
-    np.savetxt(datpath+"randts.csv",randts,delimiter=",")
+    np.savetxt(datpath+"stoch_output_%iyr_run%s_randts.npy"%(nyrs,runid),randts,delimiter=",")
 else:
-    randts = np.loadtxt(datpath+"randts.csv",delimiter=",")
+    randts = np.load(datpath+"stoch_output_%iyr_run%s_randts.npy"%(nyrs,runid))
     
-# Load NAO-like forcing
-naoforce = np.load(datpath+"NAO_Forcing_EnsAvg.npy")
+#%% Load NAO-like forcing
+
+# DJFM NHFLX Regressed to DJFM NAOIndex
+if funiform == 2:
+    
+    naoforce = np.load(datpath+"NAO_Forcing_EnsAvg.npy") #lon x lat
+
+# Monthly NHFLX regressed to DJFM NAOIndex
+elif funiform == 3:
+
+    naoforcing = np.load(datpath+"Monthly_NAO_Regression.npy") #[Ens x Mon x Lat x Lon]
+    NAO1 = np.nanmean(naoforcing,axis=0) # Take PC1, Ens Mean and Transpose
+    NAO1 = np.transpose(NAO1,(2,1,0))
+    
+    # Convert Longitude from degrees East
+    lon360 =  np.load(datpath+"CESM_lon360.npy")
+    lon180,NAO1 = proc.lon360to180(lon360,NAO1)
+
+    naoforce = NAO1 * -1     #lon x lat x mon
+
+# Monthly NHFLX regressed to Monthly NAOIndex
+elif funiform == 4:
+    
+    lon360 =  np.load(datpath+"CESM_lon360.npy")
+    naomon = np.load(datpath+"NAO_Monthly_Regression_PC.npz")
+    naomon = naomon['eofall']
+    naomon = np.nanmean(naomon,0) # Take ens mean
+    naomon = np.transpose(naomon,(2,1,0))
+    _,naoforce = proc.lon360to180(lon360,naomon) #lon x lat x mon
 
 #%% Forcing Sensitivity Experiments
 
@@ -404,7 +433,7 @@ genrand  = 0
 # Set and Find latitude longitude indices
 lonf      = -30
 latf      = 65
-klon,klat = find_latlon(lonf,latf,lon,lat)
+klon,klat = proc.find_latlon(lonf,latf,lon,lat)
 
 
 # Get terms for the point
@@ -412,7 +441,7 @@ damppt = damping[klon,klat,:]
 hpt    = hclim[klon,klat,:]
 kprev  = kprevall[klon,klat,:]
 kmon   = hpt.argmax()
-naopt  = naoforce[klon,klat]
+naopt  = naoforce[klon,klat,:]
 
 # Set Damping Parameters
 lbd,lbd_entr,FAC,beta = scm.set_stochparams(hpt,damppt,dt,ND=False)
