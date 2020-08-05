@@ -67,6 +67,10 @@ def noentrain(t_end,lbd,T0,F):
         # Form the damping term
         damp_term = explbd[m-1]*T
         
+        # Set damping term to zero if damping is insignificant...
+        if damp_term == T:
+            damp_term=0
+        
     
         # Compute the temperature
         temp_ts[t] = damp_term + noise_term  
@@ -214,6 +218,10 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC):
         
         # Form the damping term
         damp_term = explbd[m-1]*T
+        
+        # Set Damping term to zero if feedback is insignificant
+        if damp_term == T:
+            damp_term = 0
         
         # Compute the temperature
         temp_ts[t] = damp_term + noise_term + entrain_term
