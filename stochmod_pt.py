@@ -36,7 +36,7 @@ lonf      = -30
 latf      = 50
 
 # Experiment Settings
-funiform = 1 # 0 = nonuniform; 1 = uniform; 2 = NAO-like (DJFM); 3 = NAO DJFM- Monthly Flx; 4 = NAO+Flx Monthly
+funiform = 2 # 0 = nonuniform; 1 = uniform; 2 = NAO-like (DJFM); 3 = NAO DJFM- Monthly Flx; 4 = NAO+Flx Monthly
 
 # Model Parameters...
 nyr = 10000
@@ -148,8 +148,10 @@ damppt = damping[klon,klat,:]
 hpt    = hclim[klon,klat,:]
 kprev  = kprevall[klon,klat,:]
 kmon   = hpt.argmax()
-if funiform > 1:
+if funiform > 2:
     naopt  = naoforce[klon,klat,:]
+elif funiform == 2:
+    naopt = naoforce[klon,klat]
 
 # Set Damping Parameters
 lbd,lbd_entr,FAC,beta = scm.set_stochparams(hpt,damppt,dt,ND=False)
@@ -173,8 +175,8 @@ for l in range(3):
     Fmag = naopt*dt/cp0/rho/hchoose
     Fmagall[l] = np.copy(Fmag)
     
-    if (hvarmode == 2) & (funiform > 2):
-        F[l] = randts * np.tile(Fmag,nyr) * fscale
+    if (hvarmode == 2) & (funiform >= 2):
+        F[l] = randts * np.tile(Fmag,nyr) * fscale * np.tile(FAC,nyr)
     elif funiform < 2:
         F[l] = randts
     else:
