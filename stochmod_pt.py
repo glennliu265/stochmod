@@ -33,10 +33,10 @@ from amv import viz,proc
 
 # Point Selection
 lonf      = -30
-latf      = 65
+latf      = 50
 
 # Experiment Settings
-funiform = 4 # 0 = nonuniform; 1 = uniform; 2 = NAO-like (DJFM); 3 = NAO DJFM- Monthly Flx; 4 = NAO+Flx Monthly
+funiform = 1 # 0 = nonuniform; 1 = uniform; 2 = NAO-like (DJFM); 3 = NAO DJFM- Monthly Flx; 4 = NAO+Flx Monthly
 
 # Model Parameters...
 nyr = 10000
@@ -46,7 +46,7 @@ T0 = 0
 
 # Forcing Parameters
 runid = "002"
-genrand = 1
+genrand = 0
 fscale   = 10
 
 # Ocean Parameters
@@ -72,12 +72,12 @@ bbox = [lonW,lonE,latS,latN]
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath = projpath + '03_Scripts/stochmod/'
 datpath = projpath + '01_Data/'
-outpath = projpath + '02_Figures/20200730/'
+outpath = projpath + '02_Figures/20200803/'
 
 # plotting strings
 modelname = ("MLD Fixed","MLD Max", "MLD Clim", "Entrain")
 forcingname = ("All Random","Uniform","$(NAO & NHFLX)_{DJFM}$","$NAO_{DJFM}  &  NHFLX_{Mon}$","$(NAO  &  NHFLX)_{Mon}$")
-
+mons3=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
 #%% Load Damping and MLD Data
 
 # Load Damping Data
@@ -91,6 +91,7 @@ damping = loaddamp['ensavg']
 # Load MLD data
 hclim      = np.load(datpath+"HMXL_hclim.npy") # Climatological MLD
 kprevall   = np.load(datpath+"HMXL_kprev.npy") # Entraining Month
+
 
 
 #%% Load Random Time Series...
@@ -129,6 +130,11 @@ elif funiform == 4:
     naomon = np.nanmean(naomon,0) # Take ens mean
     naomon = np.transpose(naomon,(2,1,0))
     _,naoforce = proc.lon360to180(lon360,naomon) #lon x lat x mon
+else:
+    naopt = 1
+
+
+    
 
     
 #%% Run model 4 times, once for each treatment of the ocean....
@@ -142,7 +148,8 @@ damppt = damping[klon,klat,:]
 hpt    = hclim[klon,klat,:]
 kprev  = kprevall[klon,klat,:]
 kmon   = hpt.argmax()
-naopt  = naoforce[klon,klat,:]
+if funiform > 1:
+    naopt  = naoforce[klon,klat,:]
 
 # Set Damping Parameters
 lbd,lbd_entr,FAC,beta = scm.set_stochparams(hpt,damppt,dt,ND=False)
@@ -150,6 +157,7 @@ lbd,lbd_entr,FAC,beta = scm.set_stochparams(hpt,damppt,dt,ND=False)
 
 
 F = {}
+Fmagall = {}
 for l in range(3):
     
     hvarmode = l
@@ -161,11 +169,14 @@ for l in range(3):
         hchoose = np.max(np.abs(hpt))
     elif hvarmode == 2:
         hchoose = hpt
-    
+
     Fmag = naopt*dt/cp0/rho/hchoose
+    Fmagall[l] = np.copy(Fmag)
     
-    if (hvarmode == 2) | (funiform > 2):
+    if (hvarmode == 2) & (funiform > 2):
         F[l] = randts * np.tile(Fmag,nyr) * fscale
+    elif funiform < 2:
+        F[l] = randts
     else:
         F[l] = randts * Fmag * fscale
 
@@ -194,9 +205,7 @@ if hvarmode == 2:
 
 #%% Plot Point
 
-model = 0 # Select Model( 0:hfix || 1:hmax || 2:hvar || 3: entrain)
-
-
+model = 3 # Select Model( 0:hfix || 1:hmax || 2:hvar || 3: entrain)
 
 sstpt = sst[model]
 if model == 3:
@@ -226,7 +235,6 @@ plt.legend()
 plt.title("%s Forcing at LON: %02d LAT: %02d \n %s" % (forcingname[funiform],lonf,latf,fstats))
 
 
-
 plt.subplot(2,1,2)
 plt.plot(tper,sstpt)
 plt.plot(yper,sstptann,color='k',label='Ann. Avg')
@@ -251,8 +259,6 @@ yrstop  = nyr
 for model in range(3):
 
     locstringfig = "LON: %02d LAT: %02d" % (lonf,latf)
-    
-    
     monrange = np.arange(12*yrstart,12*yrstop)
     
     
@@ -271,7 +277,7 @@ for model in range(3):
                np.nanmax(np.abs(noisept)),
                np.nanmax(np.abs(damptspt))
                ]
-    maxval = np.around(np.max(maxvals))
+    maxval = np.max(maxvals)
     
     
     units = "$^{\circ}C$"
@@ -279,7 +285,7 @@ for model in range(3):
     
     # Plot for no-entrain model
     fig,ax = plt.subplots(3,1,figsize=(8,6)) 
-    
+    plt.style.use('ggplot')
     
     plt.subplot(3,1,1)
     figtitle="Forcing %s" % forcingname[funiform]
@@ -300,7 +306,7 @@ for model in range(3):
     plt.savefig(outpath+"Stochmodpt_dsdt_ModelParamComp_run%s_lon%02d_lat%02d_model%i_funiform%i_fscale%i.png"%(runid,lonf,latf,model,funiform,fscale),dpi=200)
 
 
-#%% Repeat plot for the no-entraining model
+#%% Repeat plot for the entraining model
 
 
 
@@ -327,12 +333,12 @@ maxvals = [np.nanmax(np.abs(sstpt)),
            np.nanmax(np.abs(damptspt)),
            np.nanmax(np.abs(entrainpt)),
            ]
-maxval = np.around(np.max(maxvals))
-ymax =None
+maxval = np.ceil(np.max(maxvals))
+ymax = None
 
 # Plot for no-entrain model
 fig,ax = plt.subplots(4,1,figsize=(8,8)) 
-
+plt.style.use("ggplot")
 
 plt.subplot(4,1,1)
 figtitle="Forcing %s" % forcingname[funiform]
@@ -343,7 +349,7 @@ figtitle = "Damping"
 viz.plot_annavg(damptspt,units,figtitle,ymax=ymax)
 
 plt.subplot(4,1,3)
-figtitle = "Entain"
+figtitle = "Entrain"
 viz.plot_annavg(entrainpt,units,figtitle,ymax=ymax)
 
 
@@ -359,7 +365,199 @@ plt.savefig(outpath+"Stochmodpt_dsdt_ModelParamComp_run%s_lon%02d_lat%02d_model%
 
 
 
-#%%
+#%% Plot forcing magnitude, before scaling
+
+fig,ax = plt.subplots(1,1,figsize=(5,3))
+plt.style.use("seaborn-bright")
+for l in range(3):
+    ax.plot(Fmagall[l]*fscale,label=modelname[l])
+plt.xticks(np.arange(0,12,1),mons3)
+plt.legend()
+plt.title("%s Forcing Magnitude Comparison %ix" %(forcingname[funiform],fscale))
+plt.savefig(outpath+"Fmag_Comparison_funiform%i_fscale_%i_Fac0.png"%(funiform,fscale),dpi=200)
 
 
+# Plot with application of reduction factor (without hfixed/max version, much less...)
+fig,ax = plt.subplots(1,1,figsize=(5,3))
+plt.style.use("seaborn-bright")
+for l in range(3):
+    ax.plot(Fmagall[l]*fscale*FAC,label=modelname[l])
+plt.xticks(np.arange(0,12,1),mons3)
+plt.legend()
+plt.title("%s Forcing Magnitude Comparison %ix" %(forcingname[funiform],fscale))
+plt.savefig(outpath+"Fmag_Comparison_funiform%i_fscale_%i_Fac1.png"%(funiform,fscale),dpi=200)
+
+#%% Plot MLD and Damping parameter to compare
+
+
+fig,ax1=plt.subplots(1,1,figsize=(5,3))
+plt.style.use("seaborn-bright")
+color = 'tab:red'
+ax1.set_xlabel('Month')
+ax1.set_ylabel('$\lambda_{net} (W m^{-2} K^{-1}$)')
+ln1 = ax1.plot(mons3,damppt,color='r',label=r'$\lambda_{net}$')
+ax1.tick_params(axis='y',labelcolor=color)
+ax1.grid(None)
+
+ax2 = ax1.twinx()
+color = 'tab:blue'
+ax2.set_ylabel('Mixed Layer Depth (m)',color=color)
+
+ln2 = ax2.plot(mons3,hpt,color='b',label=r'HMXL')
+ax2.tick_params(axis='y',labelcolor=color)
+ax2.grid(None)
+
+# Set Legend
+lns = ln1 + ln2
+labs = [l.get_label() for l in lns]
+ax1.legend(lns,labs,loc=0)
+
+# Set Title
+titlestr = 'MLD and $\lambda$ (Ensemble Average) \n Lon: ' + str(lonf) + ' Lat: '+ str(latf)
+plt.title(titlestr)
+plt.tight_layout()
+#plt.grid(True)
+plt.savefig(outpath+"Damping_MLD_Compare_lon%02d_lat%02d.png"%(lonf,latf),dpi=200)
+
+#%% Plot the sst autocorrelation
+
+
+
+xlim = [0,24]
+xtk =  np.arange(xlim[0],xlim[1]+2,2)
+
+kmonth = hpt.argmax()
+autocorr = {}
+for model in range(4):
+    
+    # Get the data
+    tsmodel = sst[model]
+    tsmodel = proc.year2mon(tsmodel) # mon x year
+    
+    # Deseason (No Seasonal Cycle to Remove)
+    tsmodel2 = tsmodel - np.mean(tsmodel,1)[:,None]
+    
+    # Plot
+    autocorr[model] = proc.calc_lagcovar(tsmodel,tsmodel,lags,kmonth,0)
+    
+
+
+
+
+
+# plot results
+fig,ax = plt.subplots(1,1,figsize=(6,4))
+plt.style.use("seaborn-bright")
+for model in range(4):
+    ax.plot(lags,autocorr[model],label=modelname[model])
+plt.title("Month %i SST Autocorrelation at LON:%i Lat:%i \n Forcing %s" % (kmonth+1,lonf,latf,forcingname[funiform]))
+plt.xticks(xtk)
+plt.legend()
+plt.grid(True)
+plt.xlim(xlim)
+plt.style.use("seaborn-bright")
+plt.savefig(outpath+"SST_Autocorrelation_Mon%02d_run%s_lon%02d_lat%02d_funiform%i_fscale%i.png"%(kmonth+1,runid,lonf,latf,funiform,fscale),dpi=200)
+
+
+#%% Repeat, calculating autocorrelation for forcing
+
+xlim = [0,36]
+
+kmonth = hpt.argmax()
+fautocorr = {}
+for model in range(3):
+    
+    # Get the data
+    tsmodel = F[model]
+    tsmodel = proc.year2mon(tsmodel) # mon x year
+    
+    # Deseason (No Seasonal Cycle to Remove)
+    tsmodel2 = tsmodel - np.mean(tsmodel,1)[:,None]
+    
+    # Plot
+    fautocorr[model] = proc.calc_lagcovar(tsmodel,tsmodel,lags,kmonth,0)
+
+
+# plot results
+fig,ax = plt.subplots(1,1,figsize=(6,4))
+plt.style.use("seaborn-bright")
+for model in range(3):
+    ax.plot(lags,fautocorr[model],label=modelname[model])
+plt.title("Month %i Forcing Autocorrelation at LON:%i Lat:%i \n Forcing %s" % (kmonth+1,lonf,latf,forcingname[funiform]))
+plt.legend()
+plt.xlim(xlim)
+plt.style.use("seaborn-bright")
+plt.savefig(outpath+"Forcing_Autocorrelation_Mon%02d_run%s_lon%02d_lat%02d_funiform%i_fscale%i.png"%(kmonth+1,runid,lonf,latf,funiform,fscale),dpi=200)
+
+
+
+#%% Plot NAO Forcing at this point
+
+
+fig,ax = plt.subplots(1,1,figsize=(5,3))
+ax.plot(mons3,naopt)
+ax.set_title("NAO Forcing (Monthly), Ensemble Mean")
+ax.set_ylabel("$Wm^{-1}\sigma^{-1}$")
+plt.savefig(outpath+"NAOForcing_funiform%i.png"%funiform,dpi=200)
+
+#%% Plot NAO Forcing and hclim
+fig,ax1=plt.subplots(1,1,figsize=(6,4))
+plt.style.use("seaborn-bright")
+color = 'tab:red'
+ax1.set_xlabel('Month')
+ax1.set_ylabel('Depth(m)')
+ln1 = ax1.plot(mons3,hpt,color='r',label=r'HMXL')
+ax1.tick_params(axis='y',labelcolor=color)
+ax1.grid(None)
+#ax1.set_xticks(np.arange(1,13,1),mons3)
+
+ax2 = ax1.twinx()
+color = 'tab:blue'
+ax2.set_ylabel("$Wm^{-1}\sigma^{-1}$",color='blue')
+
+ln2 = ax2.plot(mons3,naopt,color='b',label=r'NAO Forcing')
+ax2.tick_params(axis='y',labelcolor=color)
+ax2.grid(None)
+
+# Set Legend
+lns = ln1 + ln2
+labs = [l.get_label() for l in lns]
+ax1.legend(lns,labs,loc=0)
+
+# Set Title
+titlestr = ' MLD and NAO Forcing (Ensemble Average) \n Lon: ' + str(lonf) + ' Lat: '+ str(latf)
+plt.title(titlestr)
+plt.tight_layout()
+plt.savefig(outpath+"NAOForcing_MLD_funiform%i.png"%funiform,dpi=200)
+
+
+#%% Plot Beta and hclim
+fig,ax1=plt.subplots(1,1,figsize=(6,4))
+plt.style.use("seaborn-bright")
+color = 'tab:red'
+ax1.set_xlabel('Month')
+ax1.set_ylabel('Depth(m)')
+ln1 = ax1.plot(mons3,hpt,color='r',label=r'HMXL')
+ax1.tick_params(axis='y',labelcolor=color)
+ax1.grid(None)
+#ax1.set_xticks(np.arange(1,13,1),mons3)
+
+ax2 = ax1.twinx()
+color = 'tab:blue'
+ax2.set_ylabel("$log(h/h^{t+1})$",color='blue')
+
+ln2 = ax2.plot(mons3,beta,color='b',label=r'Beta')
+ax2.tick_params(axis='y',labelcolor=color)
+ax2.grid(None)
+
+# Set Legend
+lns = ln1 + ln2
+labs = [l.get_label() for l in lns]
+ax1.legend(lns,labs,loc=0)
+
+# Set Title
+titlestr = ' MLD and NAO Forcing (Ensemble Average) \n Lon: ' + str(lonf) + ' Lat: '+ str(latf)
+plt.title(titlestr)
+plt.tight_layout()
+plt.savefig(outpath+"NAOForcing_MLD_funiform%i.png"%funiform,dpi=200)
 
