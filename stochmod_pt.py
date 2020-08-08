@@ -36,7 +36,7 @@ lonf      = -30
 latf      = 50
 
 # Experiment Settings
-funiform = 2 # 0 = nonuniform; 1 = uniform; 2 = NAO-like (DJFM); 3 = NAO DJFM- Monthly Flx; 4 = NAO+Flx Monthly
+funiform = 4 # 0 = nonuniform; 1 = uniform; 2 = NAO-like (DJFM); 3 = NAO DJFM- Monthly Flx; 4 = NAO+Flx Monthly
 
 # Model Parameters...
 nyr = 10000
@@ -45,7 +45,7 @@ dt = 3600*24*30
 T0 = 0
 
 # Forcing Parameters
-runid = "002"
+runid = "001"
 genrand = 0
 fscale   = 10
 
@@ -171,14 +171,23 @@ for l in range(3):
         hchoose = np.max(np.abs(hpt))
     elif hvarmode == 2:
         hchoose = hpt
-
-    Fmag = naopt*dt/cp0/rho/hchoose
+    
+    
+    if funiform >=2:
+        Fmag = naopt*dt/cp0/rho/hchoose
+    else:
+        Fmag = np.array([1]) # No other forcing magnitude applied
+    
+    
+    if funiform == 2 & l < 2:
+        Fmag = np.array(Fmag)
+    
     Fmagall[l] = np.copy(Fmag)
     
-    if (hvarmode == 2) & (funiform >= 2):
-        F[l] = randts * np.tile(Fmag,nyr) * fscale * np.tile(FAC,nyr)
-    elif funiform < 2:
-        F[l] = randts
+    
+    # Tile forcing magnitude to repeat seasonal cycle    
+    if (hvarmode == 2) | (funiform > 2):
+        F[l] = randts * np.tile(Fmag,nyr) * fscale #* np.tile(FAC,nyr)
     else:
         F[l] = randts * Fmag * fscale
 
@@ -425,7 +434,7 @@ plt.savefig(outpath+"Damping_MLD_Compare_lon%02d_lat%02d.png"%(lonf,latf),dpi=20
 
 
 
-xlim = [0,24]
+xlim = [0,61]
 xtk =  np.arange(xlim[0],xlim[1]+2,2)
 
 kmonth = hpt.argmax()
@@ -442,10 +451,6 @@ for model in range(4):
     # Plot
     autocorr[model] = proc.calc_lagcovar(tsmodel,tsmodel,lags,kmonth,0)
     
-
-
-
-
 
 # plot results
 fig,ax = plt.subplots(1,1,figsize=(6,4))
@@ -490,6 +495,56 @@ plt.legend()
 plt.xlim(xlim)
 plt.style.use("seaborn-bright")
 plt.savefig(outpath+"Forcing_Autocorrelation_Mon%02d_run%s_lon%02d_lat%02d_funiform%i_fscale%i.png"%(kmonth+1,runid,lonf,latf,funiform,fscale),dpi=200)
+
+#%% Diagnostic Autocorrelation Plot and 
+
+
+
+# Plot Autocorrelation
+fig,ax = plt.subplots(1,1,figsize=(6,4))
+plt.style.use("seaborn-bright")
+for model in range(4):
+    ax.plot(lags,autocorr[model],label=modelname[model])
+plt.title("Month %i SST Autocorrelation at LON:%i Lat:%i \n Forcing %s" % (kmonth+1,lonf,latf,forcingname[funiform]))
+plt.xticks(xtk)
+plt.legend()
+plt.grid(True)
+plt.xlim(xlim)
+plt.style.use("seaborn-bright")
+
+# Plot seasonal autocorrelation
+
+choosevar = "Damping Term"
+
+if choosevar == "Damping":
+    invar = damppt
+    varname = "Damping Atm"
+elif choosevar == "Beta":
+    invar = beta
+    varname = "$ln(h(t+1)/h(t))$"
+elif choosevar == "MLD":
+    invar = hpt
+    varname = "Mixed Layer Depth"
+elif choosevar == "Damping Term":
+    invar = lbd_entr
+    varname = "Damping Term (Entrain)"
+    
+
+
+
+
+# Find index of maximum and roll so that it is now the first entry (currently set to only repeat for 5 years)
+kmonth = hpt.argmax()
+maxfirsttile = np.tile(np.roll(invar,-1*kmonth),5)
+maxfirsttile = np.concatenate((maxfirsttile,[maxfirsttile[0]]))
+
+# Twin axis and plot
+ax2 = ax.twinx()
+ax2.plot(lags,maxfirsttile,color=[0.6,0.6,0.6])
+ax2.grid(False)
+ax2.set_ylabel(varname)
+plt.savefig(outpath+"SST_Autocorrelationv%s_Mon%02d_run%s_lon%02d_lat%02d_funiform%i_fscale%i.png"%(choosevar,kmonth+1,runid,lonf,latf,funiform,fscale),dpi=200)
+
 
 
 
