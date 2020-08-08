@@ -298,7 +298,7 @@ def set_stochparams(h,damping,dt,ND=True,rho=1000,cp0=4218,hfix=50):
     beta[beta<0] = 0
     
     # Replace Nans with Zeros in beta
-    beta = np.nan_to_num(beta)
+    #beta = np.nan_to_num(beta)
     
     # Preallocate lambda variable
     lbd = {}
@@ -449,13 +449,13 @@ def convert_NAO(hclim,naopattern,dt,rho=1000,cp0=4218,hfix=50):
                 NAOF[i] = naopattern[:,:,None] * dt / cp0 / rho / hchoose
             elif len(naopattern.shape) == 3: # For seasonally varying NAO pattern
                 # Monthly Varying Forcing [Lon x Lat x Mon]
-                NAOF[i] = naopattern * dt / cp0 / rho / hchoose
+                NAOF[i] = naopattern           * dt / cp0 / rho / hchoose
         else:
             
             if (len(naopattern.shape) == 3) & (i == 1):
                  NAOF[i] = naopattern * dt / cp0 / rho / hchoose[:,:,None]
             else:
-                NAOF[i] = naopattern * dt / cp0 / rho / hchoose
+                NAOF[i]  = naopattern * dt / cp0 / rho / hchoose
         
     return NAOF
     
@@ -469,7 +469,7 @@ def make_naoforcing(NAOF,randts,fscale,nyr):
     
     Inputs:
         1) randts [Array] - white noise timeseries varying between -1 and 1
-        3) NAOF   [Array] - NAO forcing [Lon x Lat] in Watts/m2
+        3) NAOF   [Array] - NAO forcing [Lon x Lat x Mon] in Watts/m2
         4) fscale         - multiplier to scale white noise forcing\
         5) nyr    [int]   - Number of years to tile the forcing
     Dependencies: 
@@ -477,21 +477,30 @@ def make_naoforcing(NAOF,randts,fscale,nyr):
     
     """
     
-    # CMake dictionary
+    # Make dictionary
     F = {}
     
-    if len(NAOF[0].shape) == 2:
+    # Check if there is a month component
+    if len(NAOF[0]) > 2:
+        
+        # Fixed MLD
+        tilecount = int(12/NAOF[0].shape[2]*nyr)
+        F[0] = np.tile(NAOF[0],tilecount) *randts[None,None,:] * fscale
+            
+        # Max MLD
+        tilecount = int(12/NAOF[1].shape[2]*nyr)
+        F[1] = np.tile(NAOF[1],tilecount) *randts[None,None,:] * fscale
+    
+    else:
+        
         # Fixed MLD 
-        F[0] = NAOF[0][:,:,None]*randts[None,None,:] * fscale
+        F[0] = NAOF[0][:,:,None] *randts[None,None,:] * fscale
         
         # Max MLD
-        F[1] = NAOF[1][:,:,None]*randts[None,None,:] * fscale
-        
-        # Seasonally varying mld...
-        F[2] = np.tile(NAOF[2],nyr) * randts[None,None,:] * fscale
-    else:
-        for i in range(3):
-            
-            F[i] = np.tile(NAOF[i],nyr) * randts[None,None,:] * fscale
+        F[0] = NAOF[1][:,:,None] *randts[None,None,:] * fscale
+    
+    # Seasonally varying mld...
+    F[2] = np.tile(NAOF[2],nyr)    *randts[None,None,:] * fscale
+
             
     return F
