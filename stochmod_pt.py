@@ -499,7 +499,7 @@ plt.savefig(outpath+"Forcing_Autocorrelation_Mon%02d_run%s_lon%02d_lat%02d_funif
 #%% Diagnostic Autocorrelation Plot and 
 
 
-
+xlims = (0,24)
 # Plot Autocorrelation
 fig,ax = plt.subplots(1,1,figsize=(6,4))
 plt.style.use("seaborn-bright")
@@ -514,20 +514,36 @@ plt.style.use("seaborn-bright")
 
 # Plot seasonal autocorrelation
 
-choosevar = "Damping Term"
+choosevar = "Lambda Entrain"
+hm = 2
 
 if choosevar == "Damping":
     invar = damppt
-    varname = "Damping Atm"
+    varname = "Damping (ATMOSPHERIC)"
 elif choosevar == "Beta":
     invar = beta
     varname = "$ln(h(t+1)/h(t))$"
 elif choosevar == "MLD":
     invar = hpt
     varname = "Mixed Layer Depth"
-elif choosevar == "Damping Term":
+elif choosevar == "Lambda Entrain":
     invar = lbd_entr
-    varname = "Damping Term (Entrain)"
+    varname = "Lambda (Entrain)"
+elif choosevar == "Lambda":
+    invar = lbd[hm]
+    varnane = "Lambda Mode %i" % hm
+    
+elif choosevar == "Forcing":
+    invar = naopt
+    varname = "NAO Forcing"
+elif choosevar == "Fmag":
+    invar = Fmagall[hm]
+    varname = "Fmag Mode %i" % hm
+elif choosevar == "NAO":
+    invar = naopt
+    varname = "NAO Forcing"
+
+
     
 
 
@@ -543,6 +559,7 @@ ax2 = ax.twinx()
 ax2.plot(lags,maxfirsttile,color=[0.6,0.6,0.6])
 ax2.grid(False)
 ax2.set_ylabel(varname)
+plt.xlim(xlims)
 plt.savefig(outpath+"SST_Autocorrelationv%s_Mon%02d_run%s_lon%02d_lat%02d_funiform%i_fscale%i.png"%(choosevar,kmonth+1,runid,lonf,latf,funiform,fscale),dpi=200)
 
 
