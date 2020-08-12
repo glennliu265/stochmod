@@ -33,16 +33,18 @@ from amv import viz,proc
 
 # Point Selection
 lonf      = -30
-latf      = 50
+latf      = 65
 
 # Experiment Settings
-funiform = 2 # 0 = nonuniform; 1 = uniform; 2 = NAO-like (DJFM); 3 = NAO DJFM- Monthly Flx; 4 = NAO+Flx Monthly
+funiform = 4 # 0 = nonuniform; 1 = uniform; 2 = NAO-like (DJFM); 3 = NAO DJFM- Monthly Flx; 4 = NAO+Flx Monthly
 
 # Model Parameters...
 nyr = 10000
 t_end = 12*nyr
 dt = 3600*24*30
 T0 = 0
+seasonal_damping = 0
+seasonal_forcing = 0
 
 # Forcing Parameters
 runid = "001"
@@ -133,10 +135,6 @@ elif funiform == 4:
 else:
     naopt = 1
 
-
-    
-
-    
 #%% Run model 4 times, once for each treatment of the ocean....
 
 
@@ -153,10 +151,22 @@ if funiform > 2:
 elif funiform == 2:
     naopt = naoforce[klon,klat]
 
+# Introduce Artificial seasonal cycle in damping
+if seasonal_damping == 1:
+    scycle = np.nanmean(damppt) + np.sin(np.pi*np.arange(0,12)/11) * np.nanmax(np.abs(damppt))
+    damppt = np.roll(scycle,-1*int(4-np.abs(damppt).argmax()))
+    plt.plot(damppt)
+
+
+
 # Set Damping Parameters
 lbd,lbd_entr,FAC,beta = scm.set_stochparams(hpt,damppt,dt,ND=False)
-     
 
+# Introduce artificial seasonal cycle in forcing
+if seasonal_forcing == 1:
+    scycle = np.sin(np.pi*np.arange(0,12)/11) * np.nanmax(np.abs(naopt)) #+ np.nanmean(naopt) 
+    naopt = np.roll(scycle,-1*int(4-np.abs(naopt).argmax()))
+    plt.plot(naopt)
 
 F = {}
 Fmagall = {}
@@ -174,7 +184,7 @@ for l in range(3):
     
     
     if funiform >=2:
-        Fmag = naopt*dt/cp0/rho/hchoose
+        Fmag = naopt*dt/cp0/rho/hchoose * FAC
     else:
         Fmag = np.array([1]) # No other forcing magnitude applied
     
@@ -517,7 +527,7 @@ plt.style.use("seaborn-bright")
 # Plot seasonal autocorrelation
 
 choosevar = "Forcing"
-hm = 1
+hm = 0
 
 if choosevar == "Damping":
     invar = damppt
@@ -531,9 +541,10 @@ elif choosevar == "MLD":
 elif choosevar == "Lambda Entrain":
     invar = lbd_entr
     varname = "Lambda (Entrain)"
+    
 elif choosevar == "Lambda":
     invar = lbd[hm]
-    varnane = "Lambda Mode %i" % hm
+    varname = "Lambda Mode %i" % hm
     
 elif choosevar == "Forcing":
     invar = naopt
@@ -558,7 +569,7 @@ ax2.plot(lags,maxfirsttile,color=[0.6,0.6,0.6])
 ax2.grid(False)
 ax2.set_ylabel(varname)
 plt.xlim(xlims)
-plt.savefig(outpath+"Fixed_SST_Autocorrelationv%s_Mon%02d_run%s_lon%02d_lat%02d_funiform%i_fscale%i.png"%(choosevar,kmonth+1,runid,lonf,latf,funiform,fscale),dpi=200)
+plt.savefig(outpath+"scycle2Fixed_SST_Autocorrelationv%s_Mon%02d_run%s_lon%02d_lat%02d_funiform%i_fscale%i.png"%(choosevar,kmonth+1,runid,lonf,latf,funiform,fscale),dpi=200)
 
 
 
