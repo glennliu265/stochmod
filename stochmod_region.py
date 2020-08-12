@@ -25,7 +25,7 @@ from amv import proc
 #%% User Edits -----------------------------------------------------------------           
 
 # Point Mode
-pointmode = 1 # Set to 1 to output data for the point speficied below
+pointmode = 0 # Set to 1 to output data for the point speficied below
 lonf = -30
 latf = 50
 
@@ -33,7 +33,7 @@ latf = 50
 runid = "001"
 
 # White Noise Options. Set to 1 to load data
-genrand   = 1  # Set to 1 to regenerate white noise time series, with runid above
+genrand   = 0  # Set to 1 to regenerate white noise time series, with runid above
 
 # Forcing Type
 # 0 = completely random in space time
@@ -41,11 +41,11 @@ genrand   = 1  # Set to 1 to regenerate white noise time series, with runid abov
 # 2 = NAO-like NHFLX Forcing (DJFM), temporally varying 
 # 3 = NAO-like NHFLX Forcing, with NAO (DJFM) and NHFLX (Monthly)
 # 4 = NAO-like NHFLX Forcing, with NAO (Monthly) and NHFLX (Monthly)
-funiform = 4     # Forcing Mode (see options above)
-fscale   = 10    # Value to scale forcing by
+funiform = 1     # Forcing Mode (see options above)
+fscale   = 1    # Value to scale forcing by
 
 # Integration Options
-nyr      = 10000        # Number of years to integrate over
+nyr      = 1000        # Number of years to integrate over
 t_end    = 12*nyr      # Calculates Integration Period
 dt       = 60*60*24*30 # Timestep size (Will be used to multiply lambda)
 T0       = 0           # Initial temperature [degC]
@@ -126,48 +126,51 @@ np.save(datpath+"lon.npy",lonr)
 
 # %% Load and Prep NAO Forcing... <Move to separate script?>
 
-# Load Longitude for processing
-lon360 =  np.load(datpath+"CESM_lon360.npy")
 
-
-# Load (NAO-NHFLX)_DJFM Forcing
-if funiform == 2:
+if funiform > 1:
+    # Load Longitude for processing
+    lon360 =  np.load(datpath+"CESM_lon360.npy")
     
-    # Load NAO Forcing and prepare (Prepared in regress_NAO_pattern.py)
-    naoforcing = np.load(datpath+"NAO_NHFLX_Forcing.npy") #[PC x Ens x Lat x Lon]
+    # Load (NAO-NHFLX)_DJFM Forcing
+    if funiform == 2:
+        
+        # Load NAO Forcing and prepare (Prepared in regress_NAO_pattern.py)
+        naoforcing = np.load(datpath+"NAO_NHFLX_Forcing.npy") #[PC x Ens x Lat x Lon]
+        
+        # Select PC1 and take ensemble average
+        NAO1 = np.nanmean(naoforcing[0,:,:,:],0) # [Lat x Lon]
+        NAO1 = NAO1[None,:,:] # [1 x Lat x Lon]
+        
+    elif funiform == 3:
+        
+        # Load NAO Forcing and take ensemble average
+        naoforcing = np.load(datpath+"Monthly_NAO_Regression.npy") #[Ens x Mon x Lat x Lon]
+        NAO1 = np.nanmean(naoforcing,0) * -1  # Multiply by -1 to flip flux sign convention
+        
+        
+    elif funiform == 4:
+        
+        # Load Forcing and take ensemble average
+        naoforcing = np.load(datpath+"NAO_Monthly_Regression_PC.npz")['eofall'] #[Ens x Mon x Lat x Lon]
+        NAO1 = np.nanmean(naoforcing,0)
     
-    # Select PC1 and take ensemble average
-    NAO1 = np.nanmean(naoforcing[0,:,:,:],0) # [Lat x Lon]
-    NAO1 = NAO1[None,:,:] # [1 x Lat x Lon]
     
-elif funiform == 3:
+    # Transpose to [Lon x Lat x Time]
+    NAO1 = np.transpose(NAO1,(2,1,0))
     
-    # Load NAO Forcing and take ensemble average
-    naoforcing = np.load(datpath+"Monthly_NAO_Regression.npy") #[Ens x Mon x Lat x Lon]
-    NAO1 = np.nanmean(naoforcing,0) * -1  # Multiply by -1 to flip flux sign convention
+    # Convert Longitude to Degrees East
+    lon180,NAO1 = proc.lon360to180(lon360,NAO1)
     
+    # Test Plot
+    #plt.pcolormesh(NAO1[:,:,0].T)
     
-elif funiform == 4:
+    NAO1 = NAO1[klon[:,None],klat[None,:],:]
     
-    # Load Forcing and take ensemble average
-    naoforcing = np.load(datpath+"NAO_Monthly_Regression_PC.npz")['eofall'] #[Ens x Mon x Lat x Lon]
-    NAO1 = np.nanmean(naoforcing,0)
-
-
-# Transpose to [Lon x Lat x Time]
-NAO1 = np.transpose(NAO1,(2,1,0))
-
-# Convert Longitude to Degrees East
-lon180,NAO1 = proc.lon360to180(lon360,NAO1)
-
-# Test Plot
-#plt.pcolormesh(NAO1[:,:,0].T)
-
-# Restrict to Region
-NAO1 = NAO1[klon[:,None],klat[None,:],:]
-
-# Convert from W/m2 to C/S for the three different mld options
-NAOF = scm.convert_NAO(hclim,NAO1,dt,rho=rho,cp0=cp0,hfix=hfix)
+    # Convert from W/m2 to C/S for the three different mld options
+    NAOF = scm.convert_NAO(hclim,NAO1,dt,rho=rho,cp0=cp0,hfix=hfix)
+else:
+    NAOF = 1
+    
     
 # ----------------------------
 # %% Set-up damping parameters
@@ -280,7 +283,7 @@ for hi in range(3):
     elapsed = time.time() - start
     tprint = "\nNo Entrain Model, hvarmode %i, ran in %.2fs" % (hi,elapsed)
     print(tprint)    
-            
+            å
         
 
 
