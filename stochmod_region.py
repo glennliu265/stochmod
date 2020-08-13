@@ -33,7 +33,7 @@ latf = 50
 runid = "001"
 
 # White Noise Options. Set to 1 to load data
-genrand   = 0  # Set to 1 to regenerate white noise time series, with runid above
+genrand   = 1  # Set to 1 to regenerate white noise time series, with runid above
 
 # Forcing Type
 # 0 = completely random in space time
@@ -41,7 +41,7 @@ genrand   = 0  # Set to 1 to regenerate white noise time series, with runid abov
 # 2 = NAO-like NHFLX Forcing (DJFM), temporally varying 
 # 3 = NAO-like NHFLX Forcing, with NAO (DJFM) and NHFLX (Monthly)
 # 4 = NAO-like NHFLX Forcing, with NAO (Monthly) and NHFLX (Monthly)
-funiform = 1     # Forcing Mode (see options above)
+funiform = 0     # Forcing Mode (see options above)
 fscale   = 1    # Value to scale forcing by
 
 # Integration Options
@@ -52,7 +52,7 @@ T0       = 0           # Initial temperature [degC]
 hfix     = 50          # Fixed MLD value (meters)
 
 # Set Constants
-cp0      = 4218 # Specific Heat [J/(kg*C)]
+cp0      = 3850 # Specific Heat [J/(kg*C)]
 rho      = 1000 # Density of Seawater [kg/m3]
 
 # Set Integration Region
@@ -76,7 +76,14 @@ outpath    = projpath + '02_Figures/20200723/'
 #monsfull=('January','Febuary','March','April','May','June','July','August','September','October','November','December')
 
 ## ------------ Script Start -------------------------------------------------
-
+print("Now Running stochmod_region with the following settings: \n")
+print("funiform  = " + str(funiform))
+print("genrand   = " + str(genrand))
+print("runid     = " + runid)
+print("pointmode = " + str(pointmode))
+print("fscale    = " + str(fscale))
+print("nyr       = " + str(nyr))
+print("Data will be saved to %s" % datpath)
 # --------------
 # %% Load Variables -------------------------------------------------------------
 # --------------
@@ -85,8 +92,8 @@ outpath    = projpath + '02_Figures/20200723/'
 damppath    = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/'
 dampmat     = 'ensavg_nhflxdamping_monwin3_sig020_dof082_mode4.mat'
 loaddamp    = loadmat(damppath+dampmat)
-LON         = loaddamp['LON1']
-LAT         = loaddamp['LAT']
+LON         = np.squeeze(loaddamp['LON1'])
+LAT         = np.squeeze(loaddamp['LAT'])
 damping     = loaddamp['ensavg']
 
 # Load Mixed layer variables (preprocessed in prep_mld.py)
@@ -283,7 +290,7 @@ for hi in range(3):
     elapsed = time.time() - start
     tprint = "\nNo Entrain Model, hvarmode %i, ran in %.2fs" % (hi,elapsed)
     print(tprint)    
-            å
+
         
 
 
