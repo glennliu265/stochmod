@@ -317,6 +317,7 @@ def set_stochparams(h,damping,dt,ND=True,rho=1000,cp0=4218,hfix=50):
     
     # Compute reduction factor
     FAC = np.nan_to_num((1-np.exp(-lbd_entr))/lbd_entr)
+    FAC[FAC==0] = 1 # Change all zero FAC values to 1
     
     return lbd,lbd_entr,FAC,beta
 
