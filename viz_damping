@@ -21,6 +21,7 @@ from amv import viz,proc
 import cartopy.crs as ccrs
 import cmocean
 import cartopy
+import xarray as xr
 #%%
 
 
@@ -42,7 +43,7 @@ cmap = cmocean.cm.tempo
 
 # Set string for lagmax
 lagmax = lags[-1]
-
+save_allens = 1 # Option to save output that has been averaged for lags, but not ens
 #%% Load Necessary Data
 
 # Load Lat Lon
@@ -108,6 +109,20 @@ dampmasked = damping * mall
 
 # Select Lags
 dampchoose = dampmasked[:,:,:,:,lagidx]
+
+
+# Save allens data if set
+if save_allens == 1:
+    dampavged = np.nanmean(dampchoose,4)
+    dampavged = np.transpose(dampavged,(1,0,3,2))
+    da = xr.DataArray(dampavged,
+                       coords={ 'lat':lat, 'lon':lon,  'month':np.arange(1,13,1),'ensemble':np.arange(1,43,1) },
+                       dims  ={ 'lat':lat, 'lon':lon,  'month':np.arange(1,13,1),'ensemble':np.arange(1,43,1) },
+                       name="NHFLX_Damping"
+                       )
+    da.to_netcdf(datpath+"allens_nhflxdamping_monwin3_sig020_dof082_mode4.nc")
+    
+
 
 # Take ensemble and lag average
 if len(lags) > 1:
