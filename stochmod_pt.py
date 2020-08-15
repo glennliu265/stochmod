@@ -33,7 +33,7 @@ from amv import viz,proc
 
 # Point Selection
 lonf      = -30
-latf      = 65
+latf      = 50
 
 # Experiment Settings
 funiform = 4 # 0 = nonuniform; 1 = uniform; 2 = NAO-like (DJFM); 3 = NAO DJFM- Monthly Flx; 4 = NAO+Flx Monthly
@@ -55,7 +55,7 @@ fscale   = 10
 hfix     = 50
 
 # Other settings
-cp0      = 4218
+cp0      = 3850
 rho      = 1000
 
 # Autocorrelation Parameters#
@@ -85,6 +85,7 @@ mons3=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
 # Load Damping Data
 damppath = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/'
 dampmat = 'ensavg_nhflxdamping_monwin3_sig020_dof082_mode4.mat'
+#dampmat = 'ensavg_nhflxdamping_monwin3_sig005_dof082_mode2.mat'
 loaddamp = loadmat(damppath+dampmat)
 lon = np.squeeze(loaddamp['LON1'])
 lat = np.squeeze(loaddamp['LAT'])
@@ -153,8 +154,8 @@ elif funiform == 2:
 
 # Introduce Artificial seasonal cycle in damping
 if seasonal_damping == 1:
-    scycle = np.nanmean(damppt) + np.sin(np.pi*np.arange(0,12)/11) * np.nanmax(np.abs(damppt))
-    damppt = np.roll(scycle,-1*int(4-np.abs(damppt).argmax()))
+    scycle = np.nanmean(damppt) + np.sin(np.pi*(np.linspace(-.5,1.5,12))) * np.nanmax(np.abs(damppt))
+    damppt = np.roll(scycle,-1*int(5-np.abs(damppt).argmax())) * np.sign(damppt[np.abs(damppt).argmax()])
     plt.plot(damppt)
 
 
@@ -162,10 +163,14 @@ if seasonal_damping == 1:
 # Set Damping Parameters
 lbd,lbd_entr,FAC,beta = scm.set_stochparams(hpt,damppt,dt,ND=False)
 
+# Change FAC to 1 where it is zero
+FAC[FAC==0] = 1
+
+
 # Introduce artificial seasonal cycle in forcing
 if seasonal_forcing == 1:
-    scycle = np.sin(np.pi*np.arange(0,12)/11) * np.nanmax(np.abs(naopt)) #+ np.nanmean(naopt) 
-    naopt = np.roll(scycle,-1*int(4-np.abs(naopt).argmax()))
+    scycle = np.sin(np.pi*(np.linspace(-.5,1.5,12))) * np.nanmax(np.abs(naopt)) + np.nanmean(naopt) 
+    naopt = np.roll(scycle,-1*int(5-np.abs(naopt).argmax())) * np.sign(naopt[np.abs(naopt).argmax()])
     plt.plot(naopt)
 
 F = {}
@@ -278,6 +283,9 @@ plt.savefig(outpath+"Stochmodpt_dsdt_SST_run%s_lon%02d_lat%02d_model%i_funiform%
 yrstart = 0
 yrstop  = nyr
 
+xrange = [12,120]
+xrid = np.arange(xrange[0],xrange[-1]+1,1)
+xtk = np.arange(xrange[0],xrange[-1]+6,6)
 
 for model in range(3):
 
@@ -296,9 +304,9 @@ for model in range(3):
     
     
     # Find maximum
-    maxvals = [np.nanmax(np.abs(sstpt)),
-               np.nanmax(np.abs(noisept)),
-               np.nanmax(np.abs(damptspt))
+    maxvals = [np.nanmax(np.abs(sstpt[xrid])),
+               np.nanmax(np.abs(noisept[xrid])),
+               np.nanmax(np.abs(damptspt[xrid]))
                ]
     maxval = np.max(maxvals)
     
@@ -313,14 +321,20 @@ for model in range(3):
     plt.subplot(3,1,1)
     figtitle="Forcing %s" % forcingname[funiform]
     viz.plot_annavg(noisept,units,figtitle,ymax=maxval)
+    plt.xlim(xrange)
+    plt.xticks(xtk)
     
     plt.subplot(3,1,2)
     figtitle = "Damping"
     viz.plot_annavg(damptspt,units,figtitle,ymax=maxval)
+    plt.xlim(xrange)
+    plt.xticks(xtk)
     
     plt.subplot(3,1,3)
     figtitle = "SST %s"%  modelname[model]
     viz.plot_annavg(sstpt,units,figtitle,ymax=maxval)
+    plt.xlim(xrange)
+    plt.xticks(xtk)
     
     title = "Model [%s] at %s (Yrs %i - %i)" % (modelname[model],locstringfig,yrstart,yrstop,)
     plt.suptitle(title,fontsize=16)
@@ -526,19 +540,23 @@ plt.style.use("seaborn-bright")
 
 # Plot seasonal autocorrelation
 
-choosevar = "Forcing"
-hm = 0
+choosevar = "Damping Term"
+hm =1
 
 if choosevar == "Damping":
     invar = damppt
     varname = "Damping (ATMOSPHERIC)"
+    
 elif choosevar == "Beta":
     invar = beta
     varname = "$ln(h(t+1)/h(t))$"
+    
 elif choosevar == "MLD":
     invar = hpt
     varname = "Mixed Layer Depth"
+    
 elif choosevar == "Lambda Entrain":
+    #invar = np.exp(-lbd_entr*dt/(rho*cp0*hpt))
     invar = lbd_entr
     varname = "Lambda (Entrain)"
     
@@ -555,12 +573,28 @@ elif choosevar == "Fmag":
 elif choosevar == "NAO":
     invar = naopt
     varname = "NAO Forcing"
+elif choosevar == "Damping Term":
+
+    if hm == 0:
+        h = hfix
+    elif hm == 1:
+        h = np.max(hpt)
+    elif hm == 2:
+        h = hpt
+    
+    if hm < 3:
+        #invar = np.exp(-damppt*dt/(rho*cp0*h))
+        invar = np.exp(-lbd[hm])
+    else:
+        #invar = np.exp(-lbd_entr*dt/(rho*cp0*hpt))
+        invar = np.exp(-lbd_entr)
+    varname = "Damping Term (degC/mon) Mode %i" % hm
 
 
     
 # Find index of maximum and roll so that it is now the first entry (currently set to only repeat for 5 years)
 kmonth = hpt.argmax()
-maxfirsttile = np.tile(np.roll(invar,-1*kmonth),5)
+maxfirsttile = np.tile(np.roll(invar,-1*kmonth-1),5)
 maxfirsttile = np.concatenate((maxfirsttile,[maxfirsttile[0]]))
 
 # Twin axis and plot
