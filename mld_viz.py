@@ -26,7 +26,7 @@ dsource = 'cesm_hmxl'
 
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 ncpath   = projpath + "01_Data/"
-outpath = projpath + "02_Figures/20200605/'"
+outpath = projpath + "02_Figures/20200605/"
 
 if dsource == 'argo':
     # Argo MLD Climatology: http://mixedlayer.ucsd.edu/

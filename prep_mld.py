@@ -175,7 +175,7 @@ def getpt_pop(lonf,latf,ds,searchdeg=0.5,returnarray=1):
     else:
         return pmean
     
-
+#%%
 
 start = time.time()
 for o in range(0,lonsize):
@@ -208,13 +208,13 @@ for o in range(0,lonsize):
 
         
         # Find Entraining Months
-        kprev[o,a,:],_ = find_kprev(hclim[o,a,:])
+        #kprev[o,a,:],_ = find_kprev(hclim[o,a,:])
         
         
 
 
 print("Finished in %f seconds" % (time.time()-start))
-
+#%%
 np.save(datpath+hout,hclim)
 np.save(datpath+kprevout,kprev)
 

@@ -174,10 +174,10 @@ for e in range(nens):
         dsall = xr.concat([dsall,dswm],dim="ensemble")
     
     i += 1
-    print("Finished concatenating ensemble %i of %i in %.2fs" % (i,len(nclist),time.time()-startloop))
-    if np.any(np.isnan(dsall['NHFLX'].values)):
-        print("Error on %i"%i)
-        break
+    # print("Finished concatenating ensemble %i of %i in %.2fs" % (i,len(nclist),time.time()-startloop))
+    # if np.any(np.isnan(dsall['NHFLX'].values)):
+    #     print("Error on %i"%i)
+    #     break
 
 
 # Save output

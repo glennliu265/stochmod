@@ -13,7 +13,8 @@ from scipy.io import loadmat
 import numpy as np
 import time
 import matplotlib.pyplot as plt
-
+from scipy import signal
+from scipy import stats
 """
 Quick Function to linearly detrend, Ignore Nan
 
@@ -252,7 +253,7 @@ ensnum = np.arange(1,41,1)       # Ensemble members to process
 varnames = ("HMXL",'SST','SSS')  # Variables to load
 
 # Set Region Bounding Coordinates
-region = 'SAR'
+region = 'NEA'
 
 
 if region == 'NEA':
@@ -279,7 +280,7 @@ if lonE < 0:
 
 
 # Lag options
-lags = np.arange(-25,26,1)
+lags = np.arange(0,37,1)
 
 # Compute some sizes
 nens = len(ensnum)
@@ -403,8 +404,8 @@ sssnc = sssr - np.nanmean(sssr,axis=0)
 # ----------------
 # Calculate lag/lead
 # ----------------
-lags = np.arange(-25,26,1)
-nlags = len(lags)
+#lags = np.arange(-25,26,1)
+#nlags = len(lags)
 
 lagvars ={}
 lag_sss = np.zeros((nlags,nens))
@@ -476,7 +477,7 @@ for vn in ('SST','SSS'):
         
     #axs[n].set_ylabel('Correlation')
     axs[n].set_title(vn,pad=1)
-    axs[n].set_xticks(np.arange(-24,25,6))
+    axs[n].set_xticks(np.arange(0,42,6))
 
     n += 1
 f1.suptitle('Reemergence for '+region+': 1920-2005 (CESM1-LENS)',fontsize=20)

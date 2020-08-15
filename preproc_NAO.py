@@ -14,7 +14,7 @@ import numpy as np
 start = time.time()
 
 # Set variable names
-varname = 'FLNS'
+varname = 'PSL'
 lonname = "lon"
 latname = "lat"
 timename = "time"
