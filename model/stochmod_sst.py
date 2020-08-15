@@ -6,13 +6,15 @@ stochmod_sst, Python Version
 This is a temporary script file.
 """
 
-from scipy.io import loadmat, savemat
+# from scipy.io import loadmat, savemat
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import stats
 import seaborn as sns
 import xarray as xr
 import time
+
+from scipy.io import loadmat
 
 #%% Functions --------------------------------------------------
 # Function to calculate lag correlation
@@ -400,6 +402,24 @@ def find_kprev(h):
     
     return kprev, hout
 
+def find_latlon(lonf,latf,lon,lat):
+    """
+    Find lat and lon indices
+    """
+    if((np.any(np.where(lon>180)) & (lonf < 0)) or (np.any(np.where(lon<0)) & (lonf > 180))):
+        print("Potential mis-match detected between lonf and longitude coordinates")
+    
+    klon = np.abs(lon - lonf).argmin()
+    klat = np.abs(lat - latf).argmin()
+    
+    msg1 = "Closest lon to %.2f was %.2f" % (lonf,lon[klon])
+    msg2 = "Closest lat to %.2f was %.2f" % (latf,lat[klat])
+    print(msg1)
+    print(msg2)
+    
+    return klon,klat
+
+
 #%% User Edits -----------------------------------------------------------------           
 
 # Set Point and month
@@ -416,7 +436,7 @@ h       = 150 # Effective MLD [m]
 T0      = 0   # Initial Temp [degC]
 
 # Integration Options
-nyr     = 10000    # Number of years to integrate over
+nyr     = 1000    # Number of years to integrate over
 t_end   = 12*nyr      # Timestep to integrate up to
 dt      = 60*60*24*30 # Timestep size (Will be used to multiply lambda)
 usetau  = 0          # Use tau (estimated damping timescale)
@@ -427,15 +447,14 @@ hvar    = 1           # seasonally varying h
 # Correlation Options
 detrendopt = 0  # Option to detrend before calculations
 
-
 # White Noise Options
-genrand    = 0   #
+genrand    = 1   #
 
 #Set Paths
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath = projpath + '03_Scripts/stochmod/'
 datpath = projpath + '01_Data/'
-outpath = projpath + '02_Figures/20200707/'
+outpath = projpath + '02_Figures/20200721/'
 
 
 # Set up some strings for labeling
@@ -445,6 +464,8 @@ if lonf < 0:
 loc_fname    = "Lon%03d_Lat%03d"  % (lonstr,latf)
 mons3=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
 monsfull=('January','Febuary','March','April','May','June','July','August','September','October','November','December')
+fscale=1/4
+
 
 ## ------------ Script Start -------------------------------------------------
 
@@ -458,13 +479,13 @@ LON = loaddamp['LON1']
 LAT = loaddamp['LAT']
 damping = loaddamp['ensavg']
 
-# Load data from YO's model run
-loadmod = loadmat(datpath+"stochrun_"+loc_fname+".mat")
-eta = loadmod['eta']
-AVG0 = loadmod['AVG0']
-AVG1 = loadmod['AVG1']
-AVG2 = loadmod['AVG2']
-tauall = loadmod['TAUall']
+# # Load data from YO's model run
+# loadmod = loadmat(datpath+"stochrun_"+loc_fname+".mat")
+# eta = loadmod['eta']
+# AVG0 = loadmod['AVG0']
+# AVG1 = loadmod['AVG1']
+# AVG2 = loadmod['AVG2']
+# tauall = loadmod['TAUall']
 
 
 loadmld = loadmat(datpath+"mld_lon280_lat005.mat")
@@ -491,7 +512,7 @@ ds = xr.open_dataset(datpath+mldnc)
 if genrand == 1:
     
     # Mean = 0 , Std = 1, Draw from Gaussian Sample
-    F = np.random.normal(0,1,size=t_end)/4
+    F = np.random.normal(0,1,size=t_end)*fscale
     #plt.plot(F)
     
     np.savetxt(datpath+"randts.csv",F,delimiter=",")
@@ -512,7 +533,7 @@ aid = np.abs(LAT-latf).argmin()
 
 
 
-def getpt_pop(lonf,latf,ds,searchdeg=0.5,returnarray=1):
+def getpt_pop(lonf,latf,ds,searchdeg=0.75,returnarray=1):
     """ Quick script to read in a xr.Dataset (ds)
         and return the value for the point specified by lonf,latf
         
@@ -531,7 +552,7 @@ def getpt_pop(lonf,latf,ds,searchdeg=0.5,returnarray=1):
     pmean = selectmld.mean(('nlon','nlat'))
     
     if returnarray ==1:
-        h = np.squeeze(pmean.to_array())
+        h = np.squeeze(pmean)
         return h
     else:
         return pmean
@@ -544,6 +565,7 @@ if hvar == 1:
     
     # Get value at the point for all ensemble members 
     h = getpt_pop(lonf,latf,ds)
+    h2 =  getpt_pop(lonf,latf,h_ensmean)
     
     # Convert to meters and take ensemble average
     h = np.nanmean(h,axis=0)/100
@@ -861,7 +883,7 @@ plt.style.use('ggplot')
 #sns.set('paper','whitegrid','bright')
 
 
-ax.plot(lags,AVG0,color='b',lw=3,label='CESM1 (Fully Coupled)')
+#ax.plot(lags,AVG0,color='b',lw=3,label='CESM1 (Fully Coupled)')
 #ax.plot(lags,corr_noise,'k',lw=3,label='Forcing')
 ax.plot(lags,corr_e0,'c',lw=3,label='Stochastic (No-Entrain)')
 ax.plot(lags,corr_e1,'g',lw=3,label='Stochastic (Entrain)')
@@ -964,7 +986,7 @@ ax.set(xticks=np.arange(1,13,1),
 outname = outpath+'Damping.png'
 plt.savefig(outname, bbox_inches="tight",dpi=200)
 
-
+0
 
 
 # ******************************
@@ -1145,4 +1167,27 @@ np.savetxt(datpath+"T_entr1.csv",T_entr1,delimiter=",")
 
 #
 # %% Visualize some variables
-#
+
+
+tper= np.arange(0,t_end)
+fig,ax = plt.subplots(3,1,sharex=True,sharey=False,figsize=(8,6))
+plt.style.use("ggplot")
+
+
+plt.subplot(3,1,1)
+plt.plot(tper,F)
+plt.title("Forcing")
+
+plt.subplot(3,1,2)
+plt.plot(tper,T_entr0)
+plt.title("No Entrain")
+
+plt.subplot(3,1,3)
+plt.plot(tper,T_entr1)
+plt.title("Entrain")
+
+plt.tight_layout()
+plt.savefig(outpath+"ForcingSPG_1x.png",dpi=200)
+
+
+
