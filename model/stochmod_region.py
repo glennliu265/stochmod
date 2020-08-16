@@ -16,7 +16,7 @@ import time
 
 # Add Module to search path
 import sys
-sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/")
+sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
 sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
 import scm
 from amv import proc
@@ -33,7 +33,7 @@ latf = 50
 runid = "001"
 
 # White Noise Options. Set to 1 to load data
-genrand   = 1  # Set to 1 to regenerate white noise time series, with runid above
+genrand   = 0  # Set to 1 to regenerate white noise time series, with runid above
 
 # Forcing Type
 # 0 = completely random in space time
@@ -41,7 +41,7 @@ genrand   = 1  # Set to 1 to regenerate white noise time series, with runid abov
 # 2 = NAO-like NHFLX Forcing (DJFM), temporally varying 
 # 3 = NAO-like NHFLX Forcing, with NAO (DJFM) and NHFLX (Monthly)
 # 4 = NAO-like NHFLX Forcing, with NAO (Monthly) and NHFLX (Monthly)
-funiform = 0     # Forcing Mode (see options above)
+funiform = 1     # Forcing Mode (see options above)
 fscale   = 1    # Value to scale forcing by
 
 # Integration Options
@@ -189,6 +189,8 @@ lbd,lbd_entr,FAC,beta = scm.set_stochparams(hclim,dampingr,dt,ND=1,rho=rho,cp0=c
 # %% Set Up Forcing           ------------------------------------------------
 # ----------------------------
 
+startf = time.time()
+
 # Load in timeseries or full forcing (for funiform == 0)
 if genrand == 1:
     print("Generating New Time Series")
@@ -231,7 +233,69 @@ if funiform != 0:
     # Save Forcing
     if saveforcing == 1:
         np.save(datpath+"stoch_output_%iyr_funiform%i_run%s_Forcing.npy"%(nyr,funiform,runid),F)
-      
+
+print("Forcing Setup in %s" % (time.time() - startf))
+
+#
+#%% Scrap Zone for vectorization
+#
+
+def noentrain_2d(t_end,lbd,T0,F):
+    
+    """
+    Inputs:
+        1) randts: 1D ARRAY of random number time series
+        2) lbd   : 3D ARRAY [lon x lat x mon] of seasonal damping values, degC/mon
+        3) T0    : SCALAR Initial temperature throughout basin (usually 0 degC)
+        4) F     : 3D Array [lon x lat x mon] of seasonal forcing values
+    
+    
+    """
+    
+    # Determine settings
+    #t_end = len(randts)
+    
+    
+    # Preallocate
+    temp_ts = np.ones((lbd.shape[0],lbd.shape[1],t_end)) * np.nan
+    damp_term = np.ones((lbd.shape[0],lbd.shape[1],t_end)) * np.nan
+    #noise_term = np.ones((lbd.shape[0],lbd.shape[1],t_end)) * np.nan
+    
+    
+    # Prepare the entrainment term
+    explbd = np.exp(-lbd)
+
+    # Set the term to zero where damping is insignificant
+    explbd[explbd==1] =0
+    
+    # Set initial condition
+    temp_ts[:,:,0] = T0
+    
+    # Loop for each timestep (note: using 1 indexing. T0 is from dec pre-simulation)
+    for t in range(1,t_end):
+        
+        # Get the month
+        m = t%12
+        if m == 0:
+            m = 12
+        
+        # Form the damping term
+        damp_term[:,:,t] = explbd[:,:,m-1] * temp_ts[:,:,t-1]
+        
+        # Form the noise term
+        #noise_term[:,:,t]
+                
+        # Add with the corresponding forcing term to get the temp
+        temp_ts[:,:,t] = damp_term[:,:,t] + F[:,:,t-1]
+        
+        msg = '\rCompleted timestep %i of %i' % (t,t_end-1)
+        print(msg,end="\r",flush=True)
+    
+    return temp_ts,damp_term
+        
+
+
+
 # ----------
 # %%RUN MODELS -----------------------------------------------------------------
 # ----------
@@ -239,57 +303,48 @@ if funiform != 0:
 
 ko,ka = proc.find_latlon(lonf,latf,lonr,latr)
 
+
 # Run Model Without Entrainment
 T_entr0_all = {}
-
-for hi in range(3):
+if pointmode == 0:
+    for hi in range(3):
+            
+        lbdh = lbd[hi]
+        if funiform > 1:
+            Fh = F[hi]
+        else:
+            Fh = F
         
-    lbdh = lbd[hi]
-    if funiform > 1:
-        Fh = F[hi]
-    else:
-        Fh = F
-    
-    start = time.time()
-    T_entr0 = np.zeros((lonsize,latsize,t_end))
-    icount = 0
-    
-    
-    if pointmode == 1:
+        
+        start = time.time()
+        #T_entr0 = np.zeros((lonsize,latsize,t_end))
+        T_entr0_all[hi],_ =  scm.noentrain_2d(t_end,lbdh,T0,Fh)
+        
+        print("Simulation for No Entrain Model, hvarmode %s completed in %s" % (hi,time.time() - start))
+elif pointmode == 1:
+
+    for hi in range(3):
+            
+        lbdh = lbd[hi]
+        if funiform > 1:
+            Fh = F[hi]
+        else:
+            Fh = F
+        
+        start = time.time()
+        T_entr0 = np.zeros((lonsize,latsize,t_end))
+
+        
+        # Run Point Model
         T_entr0,_,_=scm.noentrain(t_end,lbdh[ko,ka,:],T0,Fh[ko,ka,:])
-    else:    
-        for o in range(0,lonsize):
-            # Get Longitude Value
-            lonf = lonr[o]
-            
-            # Convert to degrees East
-            if lonf < 0:
-                lonf = lonf + 360
-            
-            for a in range(0,latsize):
-                
-                
-                # Get latitude indices
-                latf = latr[a]
-                
-                
-                # Skip if the point is land
-                if np.isnan(np.mean(dampingr[o,a,:])):
-                    msg = "Land Point @ lon %f lat %f" % (lonf,latf)
-                    #print(msg)
-                    T_entr0[o,a,:] = np.zeros(t_end)*np.nan
-                else:
-                    
-                    T_entr0[o,a,:],_,_ = scm.noentrain(t_end,lbdh[o,a,:],T0,Fh[o,a,:])
-                icount += 1
-                msg = '\rCompleted No Entrain Run for %i of %i points' % (icount,lonsize*latsize)
-                print(msg,end="\r",flush=True)
-    
-    T_entr0_all[hi] = np.copy(T_entr0)
-    
-    elapsed = time.time() - start
-    tprint = "\nNo Entrain Model, hvarmode %i, ran in %.2fs" % (hi,elapsed)
-    print(tprint)    
+        
+        
+        # Assign to dictionary
+        T_entr0_all[hi] = np.copy(T_entr0)
+        
+        elapsed = time.time() - start
+        tprint = "\nNo Entrain Model, hvarmode %i, ran in %.2fs" % (hi,elapsed)
+        print(tprint)    
 
         
 

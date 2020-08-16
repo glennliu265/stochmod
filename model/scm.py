@@ -45,7 +45,7 @@ def noentrain(t_end,lbd,T0,F):
     
     # Prepare the entrainment term
     explbd = np.exp(-lbd)
-
+    explbd[explbd==1] = 0
     # Loop for integration period (indexing convention from matlab)
     for t in range(1,t_end):
         
@@ -68,8 +68,8 @@ def noentrain(t_end,lbd,T0,F):
         damp_term = explbd[m-1]*T
         
         # Set damping term to zero if damping is insignificant...
-        if damp_term == T:
-            damp_term=0
+        # if damp_term == T:
+        #     damp_term=0
         
     
         # Compute the temperature
@@ -125,6 +125,7 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC):
     
     # Prepare the entrainment term
     explbd = np.exp(-lbd)
+    explbd[explbd==1] = 0
     
     # Create MLD arrays
     if linterp == 0:
@@ -219,9 +220,9 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC):
         # Form the damping term
         damp_term = explbd[m-1]*T
         
-        # Set Damping term to zero if feedback is insignificant
-        if damp_term == T:
-            damp_term = 0
+        # # Set Damping term to zero if feedback is insignificant
+        # if damp_term == T:
+        #     damp_term = 0
         
         # Compute the temperature
         temp_ts[t] = damp_term + noise_term + entrain_term
