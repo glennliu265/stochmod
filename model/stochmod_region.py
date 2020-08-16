@@ -200,7 +200,7 @@ if genrand == 1:
         
         # Save Forcing
         np.save(datpath+"stoch_output_%iyr_funiform%i_run%s_Forcing.npy"%(nyr,funiform,runid),F)
-    
+
     else:
         
         randts = np.random.normal(0,1,size=t_end)/4 # Divide by 4 to scale between -1 and 1
@@ -223,11 +223,12 @@ if funiform != 0:
     if funiform == 1:
         F      = np.ones((lonsize,latsize,t_end))
         F      = np.multiply(F,randts[None,None,:])
+        Fseas  = np.ones((lonsize,latsize,12))
         
     # NAO Like Forcing...
     else:
         
-        F = scm.make_naoforcing(NAOF,randts,fscale,nyr)
+        F,Fseas = scm.make_naoforcing(NAOF,randts,fscale,nyr)
         
         
     # Save Forcing
@@ -236,11 +237,13 @@ if funiform != 0:
 
 print("Forcing Setup in %s" % (time.time() - startf))
 
+if funiform == 0:
+    randts = np.copy(t_end) # Just assign this for now since there is no randts which is a required input in the model code
 #
 #%% Scrap Zone for vectorization
 #
 
-def noentrain_2d(t_end,lbd,T0,F):
+def noentrain_2d(randts,lbd,T0,F):
     
     """
     Inputs:
@@ -252,15 +255,14 @@ def noentrain_2d(t_end,lbd,T0,F):
     
     """
     
-    # Determine settings
-    #t_end = len(randts)
-    
+    # Determine run length for uniform or patterned forcing
+
+    t_end = len(randts)
     
     # Preallocate
-    temp_ts = np.ones((lbd.shape[0],lbd.shape[1],t_end)) * np.nan
-    damp_term = np.ones((lbd.shape[0],lbd.shape[1],t_end)) * np.nan
-    #noise_term = np.ones((lbd.shape[0],lbd.shape[1],t_end)) * np.nan
-    
+    temp_ts = np.ones((lbd.shape[0],lbd.shape[1],t_end))    * np.nan
+    damp_term = np.ones((lbd.shape[0],lbd.shape[1],t_end))  * np.nan
+    noise_term = np.ones((lbd.shape[0],lbd.shape[1],t_end)) * np.nan
     
     # Prepare the entrainment term
     explbd = np.exp(-lbd)
@@ -283,10 +285,13 @@ def noentrain_2d(t_end,lbd,T0,F):
         damp_term[:,:,t] = explbd[:,:,m-1] * temp_ts[:,:,t-1]
         
         # Form the noise term
-        #noise_term[:,:,t]
+        if F.shape[2] == 12:
+            noise_term[:,:,t] = F[:,:,m-1] * randts[None,None,t]
+        else:
+            noise_term[:,:,t] = F[:,:,t-1] 
                 
         # Add with the corresponding forcing term to get the temp
-        temp_ts[:,:,t] = damp_term[:,:,t] + F[:,:,t-1]
+        temp_ts[:,:,t] = damp_term[:,:,t] + noise_term[:,:,t]
         
         msg = '\rCompleted timestep %i of %i' % (t,t_end-1)
         print(msg,end="\r",flush=True)
@@ -300,6 +305,7 @@ def noentrain_2d(t_end,lbd,T0,F):
 # %%RUN MODELS -----------------------------------------------------------------
 # ----------
 
+            
 
 ko,ka = proc.find_latlon(lonf,latf,lonr,latr)
 
@@ -308,19 +314,17 @@ ko,ka = proc.find_latlon(lonf,latf,lonr,latr)
 T_entr0_all = {}
 if pointmode == 0:
     for hi in range(3):
-            
-        lbdh = lbd[hi]
-        if funiform > 1:
-            Fh = F[hi]
-        else:
-            Fh = F
-        
         
         start = time.time()
-        #T_entr0 = np.zeros((lonsize,latsize,t_end))
-        T_entr0_all[hi],_ =  scm.noentrain_2d(t_end,lbdh,T0,Fh)
-        
+        lbdh = lbd[hi]
+        if funiform > 1:
+            Fh = Fseas[hi]
+        else:
+            Fh = F
+
+        T_entr0_all[hi],_ =  scm.noentrain_2d(randts,lbdh,T0,Fh)
         print("Simulation for No Entrain Model, hvarmode %s completed in %s" % (hi,time.time() - start))
+        
 elif pointmode == 1:
 
     for hi in range(3):

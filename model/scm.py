@@ -477,10 +477,14 @@ def make_naoforcing(NAOF,randts,fscale,nyr):
     Dependencies: 
         1) 
     
+    Outputs
+        1) F{} [DICT] - [lon x lat x t_end] - Full forcing time series
+        2) Fseas{} [DICT] - [lon x lat x 12 or 1] - seasonal forcing time series
     """
     
     # Make dictionary
     F = {}
+    Fseas = {}
     
     # Check if there is a month component
     if len(NAOF[0]) > 2:
@@ -492,17 +496,78 @@ def make_naoforcing(NAOF,randts,fscale,nyr):
         # Max MLD
         tilecount = int(12/NAOF[1].shape[2]*nyr)
         F[1] = np.tile(NAOF[1],tilecount) *randts[None,None,:] * fscale
-    
+        
+        Fseas[0] = NAOF[0] * fscale
+        Fseas[1] = NAOF[1] * fscale
+        
     else:
         
         # Fixed MLD 
         F[0] = NAOF[0][:,:,None] *randts[None,None,:] * fscale
+        Fseas[0] = NAOF[0][:,:,None] * fscale
         
         # Max MLD
         F[0] = NAOF[1][:,:,None] *randts[None,None,:] * fscale
+        Fseas[1] = NAOF[1][:,:,None] * fscale
     
     # Seasonally varying mld...
-    F[2] = np.tile(NAOF[2],nyr)    *randts[None,None,:] * fscale
+    F[2] = np.tile(NAOF[2],nyr) * randts[None,None,:] * fscale
+    Fseas[2] =  NAOF[2][:,:,:] * fscale
 
             
-    return F
+    return F,Fseas
+
+def noentrain_2d(randts,lbd,T0,F):
+    
+    """
+    Inputs:
+        1) randts: 1D ARRAY of random number time series
+        2) lbd   : 3D ARRAY [lon x lat x mon] of seasonal damping values, degC/mon
+        3) T0    : SCALAR Initial temperature throughout basin (usually 0 degC)
+        4) F     : 3D Array [lon x lat x mon] of seasonal forcing values
+    
+    
+    """
+    
+    # Determine run length for uniform or patterned forcing
+
+    t_end = len(randts)
+    
+    # Preallocate
+    temp_ts = np.ones((lbd.shape[0],lbd.shape[1],t_end))    * np.nan
+    damp_term = np.ones((lbd.shape[0],lbd.shape[1],t_end))  * np.nan
+    noise_term = np.ones((lbd.shape[0],lbd.shape[1],t_end)) * np.nan
+    
+    # Prepare the entrainment term
+    explbd = np.exp(-lbd)
+
+    # Set the term to zero where damping is insignificant
+    explbd[explbd==1] =0
+    
+    # Set initial condition
+    temp_ts[:,:,0] = T0
+    
+    # Loop for each timestep (note: using 1 indexing. T0 is from dec pre-simulation)
+    for t in range(1,t_end):
+        
+        # Get the month
+        m = t%12
+        if m == 0:
+            m = 12
+        
+        # Form the damping term
+        damp_term[:,:,t] = explbd[:,:,m-1] * temp_ts[:,:,t-1]
+        
+        # Form the noise term
+        if F.shape[2] == 12:
+            noise_term[:,:,t] = F[:,:,m-1] * randts[None,None,t]
+        else:
+            noise_term[:,:,t] = F[:,:,t-1] 
+                
+        # Add with the corresponding forcing term to get the temp
+        temp_ts[:,:,t] = damp_term[:,:,t] + noise_term[:,:,t]
+        
+        msg = '\rCompleted timestep %i of %i' % (t,t_end-1)
+        print(msg,end="\r",flush=True)
+    
+    return temp_ts,damp_term
