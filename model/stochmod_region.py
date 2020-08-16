@@ -42,7 +42,7 @@ genrand   = 0  # Set to 1 to regenerate white noise time series, with runid abov
 # 3 = NAO-like NHFLX Forcing, with NAO (DJFM) and NHFLX (Monthly)
 # 4 = NAO-like NHFLX Forcing, with NAO (Monthly) and NHFLX (Monthly)
 funiform = 1     # Forcing Mode (see options above)
-fscale   = 1    # Value to scale forcing by
+fscale   = 4    # Value to scale forcing by
 
 # Integration Options
 nyr      = 1000        # Number of years to integrate over
@@ -325,6 +325,9 @@ if pointmode == 0:
         T_entr0_all[hi],_ =  scm.noentrain_2d(randts,lbdh,T0,Fh)
         print("Simulation for No Entrain Model, hvarmode %s completed in %s" % (hi,time.time() - start))
         
+        # Scrap (delete later)
+        new_h0 = np.copy(T_entr0_all[hi][ko,ka,:])
+        
 elif pointmode == 1:
 
     for hi in range(3):
@@ -349,8 +352,26 @@ elif pointmode == 1:
         elapsed = time.time() - start
         tprint = "\nNo Entrain Model, hvarmode %i, ran in %.2fs" % (hi,elapsed)
         print(tprint)    
-
         
+        # Scrap (delete later)
+        old_h0 = np.copy(T_entr0_all[hi])
+        
+#%%
+# Scrap test
+
+from matplotlib.pyplot import pyplot
+
+diff_h0 = new_h0-old_h0
+fig,ax = plt.subplots(1,1)
+ax.plot(old_h0,color='k',linewidth=0.5,label='old-pt')
+ax.plot(new_h0,color='b',linewidth=0.5,label='new-region')
+ax.plot(diff_h0,label='diff')
+plt.legend()
+np.nanmax(np.abs(diff_h0))
+
+
+#%%
+
 
 
 # Run Model With Entrainment

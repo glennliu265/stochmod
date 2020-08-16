@@ -43,9 +43,13 @@ def noentrain(t_end,lbd,T0,F):
         damp_ts = []
         
     
+    temp_ts[0] = T0
+    
+    
     # Prepare the entrainment term
     explbd = np.exp(-lbd)
     explbd[explbd==1] = 0
+    
     # Loop for integration period (indexing convention from matlab)
     for t in range(1,t_end):
         
@@ -54,31 +58,20 @@ def noentrain(t_end,lbd,T0,F):
         if m == 0:
             m = 12
     
-    
-        # Get the temperature from the previous step
-        if t == 1:
-            T = T0
-        else:
-            T = temp_ts[t-1]
-    
+
         # Get Noise/Forcing Term
         noise_term = F[t-1]
         
-        # Form the damping term
-        damp_term = explbd[m-1]*T
+        # Form the damping term with temp from previous timestep
+        damp_term = explbd[m-1]*temp_ts[t-1]
         
-        # Set damping term to zero if damping is insignificant...
-        # if damp_term == T:
-        #     damp_term=0
-        
-    
         # Compute the temperature
         temp_ts[t] = damp_term + noise_term  
     
         # Save other variables
         if debugmode == 1:
             noise_ts[t] = np.copy(noise_term)
-            damp_ts[t] = np.copy(damp_term)
+            damp_ts[t]  = np.copy(damp_term)
 
 
     # Quick indexing fix
@@ -127,6 +120,9 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC):
     explbd = np.exp(-lbd)
     explbd[explbd==1] = 0
     
+    # Assign initial conditions
+    temp_ts[0] = T0
+    
     # Create MLD arrays
     if linterp == 0:
         mlddepths = np.arange(0,np.max(h)+1,1)
@@ -142,14 +138,7 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC):
         if m == 0:
             m = 12
         
-        # Get the temperature from the previous step
-        if t == 1:
-            T = T0
-        else:
-            T = temp_ts[t-1]
-            
-        
-        
+                            
         # Calculate entrainment term
         if t<13:
             entrain_term = 0
@@ -216,13 +205,8 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC):
         # Get Noise/Forcing Term
         noise_term = F[t-1]
         
-        
         # Form the damping term
-        damp_term = explbd[m-1]*T
-        
-        # # Set Damping term to zero if feedback is insignificant
-        # if damp_term == T:
-        #     damp_term = 0
+        damp_term = explbd[m-1]*temp_ts[t-1]
         
         # Compute the temperature
         temp_ts[t] = damp_term + noise_term + entrain_term
