@@ -118,8 +118,8 @@ stol  = 0.75 # Search tolerance for curivilinear grid (degrees) <Note there is s
 damppath = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/'
 dampmat = 'ensavg_nhflxdamping_monwin3_sig020_dof082_mode4.mat'
 loaddamp = loadmat(damppath+dampmat)
-lon = loaddamp['LON1']
-lat = loaddamp['LAT']
+lon = np.squeeze(loaddamp['LON1'])
+lat = np.squeeze(loaddamp['LAT'])
 lonsize = lon.shape[0]
 latsize = lat.shape[0]
 damping = loaddamp['ensavg']
@@ -178,6 +178,7 @@ def getpt_pop(lonf,latf,ds,searchdeg=0.5,returnarray=1):
 #%%
 
 start = time.time()
+icount= 0
 for o in range(0,lonsize):
     # Get Longitude Value
     lonf = lon[o]
@@ -208,8 +209,9 @@ for o in range(0,lonsize):
 
         
         # Find Entraining Months
-        #kprev[o,a,:],_ = find_kprev(hclim[o,a,:])
-        
+        kprev[o,a,:],_ = find_kprev(hclim[o,a,:])
+        icount +=1
+        print("Completed %i of %i" % (icount,lonsize*latsize))
         
 
 
