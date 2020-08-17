@@ -20,8 +20,8 @@ sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmo
 sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
 import scm
 from amv import proc
-
-
+from dask.distributed import Client,progress
+import dask
 #%% User Edits -----------------------------------------------------------------           
 
 # Point Mode
@@ -41,8 +41,8 @@ genrand   = 0  # Set to 1 to regenerate white noise time series, with runid abov
 # 2 = NAO-like NHFLX Forcing (DJFM), temporally varying 
 # 3 = NAO-like NHFLX Forcing, with NAO (DJFM) and NHFLX (Monthly)
 # 4 = NAO-like NHFLX Forcing, with NAO (Monthly) and NHFLX (Monthly)
-funiform = 1     # Forcing Mode (see options above)
-fscale   = 4    # Value to scale forcing by
+funiform = 4     # Forcing Mode (see options above)
+fscale   = 10    # Value to scale forcing by
 
 # Integration Options
 nyr      = 1000        # Number of years to integrate over
@@ -228,7 +228,7 @@ if funiform != 0:
     # NAO Like Forcing...
     else:
         
-        F,Fseas = scm.make_naoforcing(NAOF,randts,fscale,nyr)
+        F,Fseas = scm.make_naoforcing(NAOF,randts,fscale,nyr,FAC)
         
         
     # Save Forcing
@@ -242,62 +242,6 @@ if funiform == 0:
 #
 #%% Scrap Zone for vectorization
 #
-
-def noentrain_2d(randts,lbd,T0,F):
-    
-    """
-    Inputs:
-        1) randts: 1D ARRAY of random number time series
-        2) lbd   : 3D ARRAY [lon x lat x mon] of seasonal damping values, degC/mon
-        3) T0    : SCALAR Initial temperature throughout basin (usually 0 degC)
-        4) F     : 3D Array [lon x lat x mon] of seasonal forcing values
-    
-    
-    """
-    
-    # Determine run length for uniform or patterned forcing
-
-    t_end = len(randts)
-    
-    # Preallocate
-    temp_ts = np.ones((lbd.shape[0],lbd.shape[1],t_end))    * np.nan
-    damp_term = np.ones((lbd.shape[0],lbd.shape[1],t_end))  * np.nan
-    noise_term = np.ones((lbd.shape[0],lbd.shape[1],t_end)) * np.nan
-    
-    # Prepare the entrainment term
-    explbd = np.exp(-lbd)
-
-    # Set the term to zero where damping is insignificant
-    explbd[explbd==1] =0
-    
-    # Set initial condition
-    temp_ts[:,:,0] = T0
-    
-    # Loop for each timestep (note: using 1 indexing. T0 is from dec pre-simulation)
-    for t in range(1,t_end):
-        
-        # Get the month
-        m = t%12
-        if m == 0:
-            m = 12
-        
-        # Form the damping term
-        damp_term[:,:,t] = explbd[:,:,m-1] * temp_ts[:,:,t-1]
-        
-        # Form the noise term
-        if F.shape[2] == 12:
-            noise_term[:,:,t] = F[:,:,m-1] * randts[None,None,t]
-        else:
-            noise_term[:,:,t] = F[:,:,t-1] 
-                
-        # Add with the corresponding forcing term to get the temp
-        temp_ts[:,:,t] = damp_term[:,:,t] + noise_term[:,:,t]
-        
-        msg = '\rCompleted timestep %i of %i' % (t,t_end-1)
-        print(msg,end="\r",flush=True)
-    
-    return temp_ts,damp_term
-        
 
 
 
@@ -339,9 +283,8 @@ elif pointmode == 1:
             Fh = F
         
         start = time.time()
-        T_entr0 = np.zeros((lonsize,latsize,t_end))
+        #T_entr0 = np.zeros((lonsize,latsize,t_end))
 
-        
         # Run Point Model
         T_entr0,_,_=scm.noentrain(t_end,lbdh[ko,ka,:],T0,Fh[ko,ka,:])
         
@@ -359,7 +302,7 @@ elif pointmode == 1:
 #%%
 # Scrap test
 
-from matplotlib.pyplot import pyplot
+import matplotlib.pyplot as plt
 
 diff_h0 = new_h0-old_h0
 fig,ax = plt.subplots(1,1)
@@ -368,17 +311,23 @@ ax.plot(new_h0,color='b',linewidth=0.5,label='new-region')
 ax.plot(diff_h0,label='diff')
 plt.legend()
 np.nanmax(np.abs(diff_h0))
+plt.xlim(12,600)
 
+#%% Set up dask client
+client = Client(threads_per_worker=4,n_workers=1)
 
+#
 #%%
-
 
 
 # Run Model With Entrainment
 start = time.time()
-T_entr1 = np.zeros((lonsize,latsize,t_end))
-icount = 0
 
+
+#output = dask.delayed({})#= dask.delayed(np.ones((lonsize,latsize,t_end))*np.nan)
+
+
+icount = 0
 if funiform > 1:
     Fh = np.copy(F[2])
 else:
@@ -386,8 +335,10 @@ else:
 
 
 if pointmode == 1:
-    T_entr1,_,_,_,_ = scm.entrain(t_end,lbd_entr[ko,ka,:],T0,Fh[ko,ka,:],beta[ko,ka,:],hclim[ko,ka,:],kprev[ko,ka,:],FAC[ko,ka,:])
+    T_entr1= scm.entrain(t_end,lbd_entr[ko,ka,:],T0,Fh[ko,ka,:],beta[ko,ka,:],hclim[ko,ka,:],kprev[ko,ka,:],FAC[ko,ka,:])
 else:
+    
+    T_entr1 = np.ones((lonsize,latsize,t_end))*np.nan
     
     for o in range(0,lonsize):
         # Get Longitude Value
@@ -405,21 +356,77 @@ else:
             
             # Skip if the point is land
             if np.isnan(np.mean(dampingr[o,a,:])):
-                msg = "Land Point @ lon %f lat %f" % (lonf,latf)
+                #msg = "Land Point @ lon %f lat %f" % (lonf,latf)
+                icount += 1
+                continue
                 #print(msg)
-                T_entr1[o,a,:] = np.zeros(t_end)*np.nan
+
             else:
-                T_entr1[o,a,:],_,_,_,_ = scm.entrain(t_end,lbd_entr[o,a,:],T0,Fh[o,a,:],beta[o,a,:],hclim[o,a,:],kprev[o,a,:],FAC[o,a,:])
+                T_entr1[o,a,:] = scm.entrain(t_end,lbd_entr[o,a,:],T0,Fh[o,a,:],beta[o,a,:],hclim[o,a,:],kprev[o,a,:],FAC[o,a,:])
+                
+                # lbdin   = np.copy(lbd_entr[o,a,:])
+                # Fin     = np.copy(Fh[o,a,:])
+                # betain  = np.copy(beta[o,a,:])
+                # hclimin = np.copy(hclim[o,a,:])
+                # kprevin = np.copy(kprev[o,a,:])
+                # FACin   = np.copy(FAC[o,a,:])
+                # delayedtask = dask.delayed(scm.entrain)(t_end,lbdin,T0,Fin,betain,hclimin,kprevin,FACin)
+                # T_entr1[o,a,:] = delayedtask
             icount += 1
             msg = '\rCompleted Entrain Run for %i of %i points' % (icount,lonsize*latsize)
             print(msg,end="\r",flush=True)
-        # End Latitude Loop
-    # End Longitude Loop
-        
+        #End Latitude Loop
+    #End Longitude Loop
+
+#T_entr1 = dask.compute(*T_entr1)
+
 elapsed = time.time() - start
 tprint = "\nEntrain Model ran in %.2fs" % (elapsed)
 print(tprint)    
         
+#%% Combine dimensions
+
+
+def combine_spatial(var):
+    """
+    Assuming spatial dimensions are axis = 0,1, combine them.
+    Also assumes that the variable is 3d
+    """
+
+    spsize = var.shape[0] * var.shape[1]
+    varrs = np.reshape(var,(spsize,var.shape[2]))
+    return varrs
+
+
+lbd2d  =  combine_spatial(lbd_entr)
+if funiform > 1:
+    F2d    =  combine_spatial(F[2])
+else:
+    F2d    =  combine_spatial(F)
+beta2d =  combine_spatial(beta)
+h2d    =  combine_spatial(hclim)
+kprev2d = combine_spatial(kprev)
+FAC2d   = combine_spatial(FAC)
+spsize = lbd2d.shape[0]
+
+
+T_entr1 = dask.delayed([])
+for i in range(spsize):
+    lbdin   = np.copy(lbd2d[i,:])
+    Fin     = np.copy(F2d[i,:])
+    betain  = np.copy(beta2d[i,:])
+    hclimin = np.copy(h2d[i,:])
+    kprevin = np.copy(kprev2d[i,:])
+    FACin   = np.copy(FAC2d[i,:])
+    delayedtask = dask.delayed(scm.entrain)(t_end,lbdin,T0,Fin,betain,hclimin,kprevin,FACin)
+    T_entr1.append(delayedtask)
+
+
+start = time.time()
+dask.compute(*T_entr1)
+elapsed = time.time() - start
+tprint = "\nEntrain Model ran in %.2fs" % (elapsed)
+
 
 
 # %% save output
