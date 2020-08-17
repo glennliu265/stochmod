@@ -98,12 +98,14 @@ Dependencies:
  4) F     : Forcing term
     
 """
-def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC):
-    debugmode = 1 # Set to 1 to also save noise,damping,entrain, and Td time series
+def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,debugmode=0):
+    
+    # Set tdebugmode to 1 to also save noise,damping,entrain, and Td time series
     linterp   = 1 # Set to 1 to use the kprev variable and linearly interpolate variables
     
     # Preallocate
     temp_ts = np.zeros(t_end)
+    
     if debugmode == 1:
         noise_ts = np.zeros(t_end)
         damp_ts = np.zeros(t_end)
@@ -117,17 +119,22 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC):
     
     
     # Prepare the entrainment term
-    explbd = np.exp(-lbd)
+    explbd = np.exp(np.copy(-lbd))
     explbd[explbd==1] = 0
     
+    
+    # Combine terms where possible 
+    B = np.copy(beta*FAC)
+    
     # Assign initial conditions
-    temp_ts[0] = T0
+    temp_ts[0] = np.copy(T0)
     
     # Create MLD arrays
     if linterp == 0:
         mlddepths = np.arange(0,np.max(h)+1,1)
         mldtemps = np.zeros(mlddepths.shape)
 
+    Td0 = 0
     # Loop for integration period (indexing convention from matlab)
     for t in range(1,t_end):
         
@@ -171,8 +178,6 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC):
                         k0m = 12
                         
                     
-                    
-                    
                     # Get the corresponding index month, shifting back for zero indexing
                     kp1 = int(t - k1m)
                     kp0 = int(t - k0m)
@@ -181,10 +186,18 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC):
                     # Get points (rememebering to shift backwards to account for indexing)
                     # To save computing power, store the Td1 as Td0 for next step?
                     Td1 = np.interp(kprev[m-1],[kp1,kp1+1],[temp_ts[kp1],temp_ts[kp1+1]])
+                    
+                    
+                    
+                    #if Td0 == 0:
+                    #print("Calculating Td0 for loop %i"%t)
                     if m0-1 == h.argmin():
+                        #print("Assigning Td0 = Td1...")
                         Td0 = Td1
-                    else:        
+                    elif Td0 == 0:
+                        #print("Manually calculating Td0 for step %i month %i"%(t,m))      
                         Td0 = np.interp(kprev[m0-1],[kp0,kp0+1],[temp_ts[kp0],temp_ts[kp0+1]])
+                    
                     
                 elif linterp == 0:
                     Td1 = mldtemps[round(h.item(m-1))]
@@ -192,10 +205,10 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC):
                 
                 Td = (Td1+Td0)/2
                 
-
+                Td0 = np.copy(Td1)# Copy Td1 to Td0 for the next loop
                 
                 # Calculate entrainment term
-                entrain_term = beta[m-1]*Td*FAC[m-1]
+                entrain_term = B[m-1]*Td
                 
                 if debugmode == 1:
                     Td_ts[t] = Td
@@ -229,7 +242,9 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC):
         damp_ts = np.delete(damp_ts,0)
         entrain_ts = np.delete(entrain_ts,0)
     
-    return temp_ts,noise_ts,damp_ts,entrain_ts,Td_ts
+    if debugmode == 1:
+        return temp_ts,noise_ts,damp_ts,entrain_ts,Td_ts
+    return temp_ts
 
 
 def set_stochparams(h,damping,dt,ND=True,rho=1000,cp0=4218,hfix=50):
@@ -447,17 +462,18 @@ def convert_NAO(hclim,naopattern,dt,rho=1000,cp0=4218,hfix=50):
     
 
 
-def make_naoforcing(NAOF,randts,fscale,nyr):
+def make_naoforcing(NAOF,randts,fscale,nyr,FAC):
     """
     Makes forcing timeseries, given NAO Forcing Pattern for 3 different
     treatments of MLD (NAOF), a whiite noise time series, and an scaling 
-    parameter
+    parameter.
     
     Inputs:
         1) randts [Array] - white noise timeseries varying between -1 and 1
         3) NAOF   [Array] - NAO forcing [Lon x Lat x Mon] in Watts/m2
         4) fscale         - multiplier to scale white noise forcing\
         5) nyr    [int]   - Number of years to tile the forcing
+        6) FAC    [Array] - Reduction factor 
     Dependencies: 
         1) 
     
@@ -471,6 +487,8 @@ def make_naoforcing(NAOF,randts,fscale,nyr):
     Fseas = {}
     
     # Check if there is a month component
+
+    
     if len(NAOF[0]) > 2:
         
         # Fixed MLD
@@ -495,8 +513,8 @@ def make_naoforcing(NAOF,randts,fscale,nyr):
         Fseas[1] = NAOF[1][:,:,None] * fscale
     
     # Seasonally varying mld...
-    F[2] = np.tile(NAOF[2],nyr) * randts[None,None,:] * fscale
-    Fseas[2] =  NAOF[2][:,:,:] * fscale
+    F[2] = np.tile(NAOF[2],nyr) * randts[None,None,:] * fscale * np.tile(FAC,nyr)
+    Fseas[2] =  NAOF[2][:,:,:] * fscale * FAC
 
             
     return F,Fseas
@@ -544,7 +562,7 @@ def noentrain_2d(randts,lbd,T0,F):
         
         # Form the noise term
         if F.shape[2] == 12:
-            noise_term[:,:,t] = F[:,:,m-1] * randts[None,None,t]
+            noise_term[:,:,t] = F[:,:,m-1] * randts[None,None,t-1]
         else:
             noise_term[:,:,t] = F[:,:,t-1] 
                 
