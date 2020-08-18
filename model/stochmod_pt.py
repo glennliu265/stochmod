@@ -24,7 +24,7 @@ from scipy import stats
 
 # Add Module to search path
 import sys
-sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/")
+sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model")
 sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
 import scm
 from amv import viz,proc
@@ -47,9 +47,9 @@ seasonal_damping = 0
 seasonal_forcing = 0
 
 # Forcing Parameters
-runid = "001"
+runid = "002"
 genrand = 0
-fscale   = 10
+fscale   = 100
 
 # Ocean Parameters
 hfix     = 50
@@ -74,12 +74,25 @@ bbox = [lonW,lonE,latS,latN]
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath = projpath + '03_Scripts/stochmod/'
 datpath = projpath + '01_Data/'
-outpath = projpath + '02_Figures/20200811/'
+outpath = projpath + '02_Figures/20200818/'
 
 # plotting strings
 modelname = ("MLD Fixed","MLD Max", "MLD Clim", "Entrain")
 forcingname = ("All Random","Uniform","$(NAO & NHFLX)_{DJFM}$","$NAO_{DJFM}  &  NHFLX_{Mon}$","$(NAO  &  NHFLX)_{Mon}$")
 mons3=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
+
+# Regional Averages
+regionmode = 1 # Set to 1 to do a regional average
+rbbox = [-60,20,50,70]
+regionname = "SPG"
+#bbox_SP = [-60,20,50,70]
+#bbox_ST = [-80,20,10,45]
+#bbox_NA = [-80,20 ,0,65]#[-75,20,0,90]
+#regions = ("SPG","STG","NAT")
+
+
+
+
 #%% Load Damping and MLD Data
 
 # Load Damping Data
@@ -99,9 +112,11 @@ kprevall   = np.load(datpath+"HMXL_kprev.npy") # Entraining Month
 
 #%% Load Random Time Series...
 if genrand == 1:
-    randts = np.random.normal(0,1,size=t_end)/4
+    print("Generating new timeseries for run%s of length %i" % (runid,nyr))
+    randts = np.random.normal(0,1,size=t_end)
     np.save(datpath+"stoch_output_%iyr_run%s_randts.npy"%(nyr,runid),randts)
 else:
+    print("Loading old data...")
     randts = np.load(datpath+"stoch_output_%iyr_run%s_randts.npy"%(nyr,runid))
     
 #%% Load NAO-like forcing
@@ -110,7 +125,10 @@ else:
 if funiform == 2:
     
     naoforce = np.load(datpath+"NAO_Forcing_EnsAvg.npy") #lon x lat
+    
 
+    
+    
 # Monthly NHFLX regressed to DJFM NAOIndex
 elif funiform == 3:
 
@@ -136,43 +154,61 @@ elif funiform == 4:
 else:
     naopt = 1
 
-#%% Run model 4 times, once for each treatment of the ocean....
+#%% Set up parameters, either to the region or point
 
+if regionmode == 0:
+    klon,klat = proc.find_latlon(lonf,latf,lon,lat)
+    
+    # Get terms for the point
+    damppt = damping[klon,klat,:]
+    hpt    = hclim[klon,klat,:]
+    kprev  = kprevall[klon,klat,:]
 
-klon,klat = proc.find_latlon(lonf,latf,lon,lat)
-
-
-# Get terms for the point
-damppt = damping[klon,klat,:]
-hpt    = hclim[klon,klat,:]
-kprev  = kprevall[klon,klat,:]
-kmon   = hpt.argmax()
-if funiform > 2:
-    naopt  = naoforce[klon,klat,:]
-elif funiform == 2:
-    naopt = naoforce[klon,klat]
-
+    if funiform > 2:
+        naopt  = naoforce[klon,klat,:]
+    elif funiform == 2:
+        naopt = naoforce[klon,klat]
+    
+    # Set string labels
+    loctitle = "LON: %02d LAT: %02d" % (lonf,latf)
+    locfname = "LON%03d_LAT%03d" % (lonf,latf)
+    
+elif regionmode == 1:
+    
+    # Limit parameters to region and return average
+    hpt    = proc.sel_region(hclim,lon,lat,rbbox,reg_avg=1)
+    kprev  = proc.sel_region(kprevall,lon,lat,rbbox,reg_avg=1)
+    damppt = proc.sel_region(damping,lon,lat,rbbox,reg_avg=1)
+    
+    
+    if funiform >= 2:
+        naopt   = proc.sel_region(naoforce,lon,lat,rbbox,reg_avg=1)
+        
+    # Set string labels
+    loctitle = "%s (Avg.)" % (regionname)
+    locfname = regionname + "AVG"
+    
+    
+# Determine month for autocorrelation calculation
+kmon = hpt.argmax()  
+    
 # Introduce Artificial seasonal cycle in damping
 if seasonal_damping == 1:
     scycle = np.nanmean(damppt) + np.sin(np.pi*(np.linspace(-.5,1.5,12))) * np.nanmax(np.abs(damppt))
     damppt = np.roll(scycle,-1*int(5-np.abs(damppt).argmax())) * np.sign(damppt[np.abs(damppt).argmax()])
     plt.plot(damppt)
 
-
-
-# Set Damping Parameters
-lbd,lbd_entr,FAC,beta = scm.set_stochparams(hpt,damppt,dt,ND=False)
-
-# Change FAC to 1 where it is zero
-FAC[FAC==0] = 1
-
-
 # Introduce artificial seasonal cycle in forcing
 if seasonal_forcing == 1:
     scycle = np.sin(np.pi*(np.linspace(-.5,1.5,12))) * np.nanmax(np.abs(naopt)) + np.nanmean(naopt) 
     naopt = np.roll(scycle,-1*int(5-np.abs(naopt).argmax())) * np.sign(naopt[np.abs(naopt).argmax()])
     plt.plot(naopt)
+    
+# Set Damping Parameters
+lbd,lbd_entr,FAC,beta = scm.set_stochparams(hpt,damppt,dt,ND=False)
 
+ 
+# Set up forcing
 F = {}
 Fmagall = {}
 for l in range(3):
@@ -187,7 +223,6 @@ for l in range(3):
     elif hvarmode == 2:
         hchoose = hpt
     
-    
     if funiform >=2:
         Fmag = naopt*dt/cp0/rho/hchoose * FAC
     else:
@@ -199,20 +234,20 @@ for l in range(3):
     
     Fmagall[l] = np.copy(Fmag)
     
-    
     # Tile forcing magnitude to repeat seasonal cycle    
     if funiform <= 1:
         F[l] = randts * Fmag * fscale
     elif (hvarmode == 2) | (funiform > 2):
         F[l] = randts * np.tile(Fmag,nyr) * fscale #* np.tile(FAC,nyr)
-        
     else:
         F[l] = randts * Fmag * fscale
 
-# Run models
+# %% Run model 4 times, once for each treatment of the ocean....
+
 sst = {}
 noise = {}
 dampts = {}
+
  # Loop nonentraining model
 for l in range(3):
     start = time.time()
@@ -224,7 +259,7 @@ for l in range(3):
 # Loop for entrain model
 if hvarmode == 2:
     start = time.time()
-    sst[3],noise[3],dampts[3],eentrain,td=scm.entrain(t_end,lbd_entr,T0,F[2],beta,hpt,kprev,FAC)
+    sst[3],noise[3],dampts[3],eentrain,td=scm.entrain(t_end,lbd_entr,T0,F[2],beta,hpt,kprev,FAC,debugmode=1)
     elapsed = time.time() - start
     tprint = "Entrain Model ran in %.2fs" % (elapsed)
     print(tprint)
@@ -260,7 +295,7 @@ plt.plot(tper,Fpt)
 plt.plot(yper,Fptann,color='k',label='Ann. Avg')
 plt.ylabel("Forcing ($^{\circ}C/s$)",fontsize=10)
 plt.legend()
-plt.title("%s Forcing at LON: %02d LAT: %02d \n %s" % (forcingname[funiform],lonf,latf,fstats))
+plt.title("%s Forcing at %s with Fscale %.2e \n %s " % (forcingname[funiform],loctitle,fscale,fstats))
 
 
 plt.subplot(2,1,2)
@@ -275,7 +310,7 @@ plt.title("SST (%s) \n %s" % (modelname[model],tstats))
 
 plt.tight_layout()
 
-plt.savefig(outpath+"Stochmodpt_dsdt_SST_run%s_lon%02d_lat%02d_model%i_funiform%i_fscale%i.png"%(runid,lonf,latf,model,funiform,fscale),dpi=200)
+plt.savefig(outpath+"Stochmodpt_dsdt_SST_run%s_%s_model%i_funiform%i_fscale%i.png"%(runid,locfname,model,funiform,fscale),dpi=200)
 
 
 #%% # Plot Each Term in Model To compare < NO ENTRAIN > 
@@ -289,7 +324,7 @@ xtk = np.arange(xrange[0],xrange[-1]+6,6)
 
 for model in range(3):
 
-    locstringfig = "LON: %02d LAT: %02d" % (lonf,latf)
+    locstringfig = loctitle
     monrange = np.arange(12*yrstart,12*yrstop)
     
     
@@ -319,7 +354,7 @@ for model in range(3):
     plt.style.use('ggplot')
     
     plt.subplot(3,1,1)
-    figtitle="Forcing %s" % forcingname[funiform]
+    figtitle="Forcing %s with fscale %.2e" % (forcingname[funiform],fscale)
     viz.plot_annavg(noisept,units,figtitle,ymax=maxval)
     plt.xlim(xrange)
     plt.xticks(xtk)
@@ -340,14 +375,10 @@ for model in range(3):
     plt.suptitle(title,fontsize=16)
     
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-    plt.savefig(outpath+"Stochmodpt_dsdt_ModelParamComp_run%s_lon%02d_lat%02d_model%i_funiform%i_fscale%i.png"%(runid,lonf,latf,model,funiform,fscale),dpi=200)
+    plt.savefig(outpath+"Stochmodpt_dsdt_ModelParamComp_run%s_%s_model%i_funiform%i_fscale%i.png"%(runid,locfname,model,funiform,fscale),dpi=200)
 
 
 #%% Repeat plot for the entraining model
-
-
-
-
 model = 3
 yrstart = 0
 yrstop  = nyr
@@ -378,7 +409,7 @@ fig,ax = plt.subplots(4,1,figsize=(8,8))
 plt.style.use("ggplot")
 
 plt.subplot(4,1,1)
-figtitle="Forcing %s" % forcingname[funiform]
+figtitle="Forcing %s with fscale %.2e" % (forcingname[funiform],fscale)
 viz.plot_annavg(noisept,units,figtitle,ymax=ymax)
     
 plt.subplot(4,1,2)
@@ -450,15 +481,13 @@ labs = [l.get_label() for l in lns]
 ax1.legend(lns,labs,loc=0)
 
 # Set Title
-titlestr = 'MLD and $\lambda$ (Ensemble Average) \n Lon: ' + str(lonf) + ' Lat: '+ str(latf)
+titlestr = "MLD and $\lambda$ (Ensemble Average) \n %s" % loctitle
 plt.title(titlestr)
 plt.tight_layout()
 #plt.grid(True)
-plt.savefig(outpath+"Damping_MLD_Compare_lon%02d_lat%02d.png"%(lonf,latf),dpi=200)
+plt.savefig(outpath+"Damping_MLD_Compare_%s.png"%(locfname),dpi=200)
 
 #%% Plot the sst autocorrelation
-
-
 
 xlim = [0,61]
 xtk =  np.arange(xlim[0],xlim[1]+2,2)
@@ -483,13 +512,13 @@ fig,ax = plt.subplots(1,1,figsize=(6,4))
 plt.style.use("seaborn-bright")
 for model in range(4):
     ax.plot(lags,autocorr[model],label=modelname[model])
-plt.title("Month %i SST Autocorrelation at LON:%i Lat:%i \n Forcing %s" % (kmonth+1,lonf,latf,forcingname[funiform]))
+plt.title("Month %i SST Autocorrelation at %s \n Forcing %s Fscale: %.2e" % (kmonth+1,loctitle,forcingname[funiform],fscale))
 plt.xticks(xtk)
 plt.legend()
 plt.grid(True)
 plt.xlim(xlim)
 plt.style.use("seaborn-bright")
-plt.savefig(outpath+"SST_Autocorrelation_Mon%02d_run%s_lon%02d_lat%02d_funiform%i_fscale%i.png"%(kmonth+1,runid,lonf,latf,funiform,fscale),dpi=200)
+plt.savefig(outpath+"SST_Autocorrelation_Mon%02d_run%s_%s_funiform%i_fscale%i.png"%(kmonth+1,runid,locfname,funiform,fscale),dpi=200)
 
 
 #%% Repeat, calculating autocorrelation for forcing
@@ -516,11 +545,11 @@ fig,ax = plt.subplots(1,1,figsize=(6,4))
 plt.style.use("seaborn-bright")
 for model in range(3):
     ax.plot(lags,fautocorr[model],label=modelname[model])
-plt.title("Month %i Forcing Autocorrelation at LON:%i Lat:%i \n Forcing %s" % (kmonth+1,lonf,latf,forcingname[funiform]))
+plt.title("Month %i Forcing Autocorrelation at %s \n Forcing %s Fscale %.2e" % (kmonth+1,loctitle,forcingname[funiform],fscale))
 plt.legend()
 plt.xlim(xlim)
 plt.style.use("seaborn-bright")
-plt.savefig(outpath+"Forcing_Autocorrelation_Mon%02d_run%s_lon%02d_lat%02d_funiform%i_fscale%i.png"%(kmonth+1,runid,lonf,latf,funiform,fscale),dpi=200)
+plt.savefig(outpath+"Forcing_Autocorrelation_Mon%02d_run%s_%s_funiform%i_fscale%i.png"%(kmonth+1,runid,locfname,funiform,fscale),dpi=200)
 
 #%% Diagnostic Autocorrelation Plot 
 
@@ -531,7 +560,7 @@ fig,ax = plt.subplots(1,1,figsize=(6,4))
 plt.style.use("seaborn")
 for model in range(4):
     ax.plot(lags,autocorr[model],label=modelname[model])
-plt.title("Month %i SST Autocorrelation at LON:%i Lat:%i \n Forcing %s" % (kmonth+1,lonf,latf,forcingname[funiform]))
+plt.title("Month %i SST Autocorrelation at %s \n Forcing %s Fscale %.2e" % (kmonth+1,loctitle,forcingname[funiform],fscale))
 plt.xticks(xtk)
 plt.legend()
 plt.grid(True)
@@ -540,8 +569,8 @@ plt.style.use("seaborn-bright")
 
 # Plot seasonal autocorrelation
 
-choosevar = "Damping Term"
-hm =1
+choosevar = "Fmag"
+hm =2
 
 if choosevar == "Damping":
     invar = damppt
@@ -568,8 +597,8 @@ elif choosevar == "Forcing":
     invar = naopt
     varname = "NAO Forcing (W$m^{-2}$)"
 elif choosevar == "Fmag":
-    invar = Fmagall[hm]
-    varname = "Fmag Mode %i" % hm
+    invar = Fmagall[hm] * fscale
+    varname = "Forcing Magnitude with %s (degC)" % modelname[hm]
 elif choosevar == "NAO":
     invar = naopt
     varname = "NAO Forcing"
@@ -603,9 +632,14 @@ ax2.plot(lags,maxfirsttile,color=[0.6,0.6,0.6])
 ax2.grid(False)
 ax2.set_ylabel(varname)
 plt.xlim(xlims)
-plt.savefig(outpath+"scycle2Fixed_SST_Autocorrelationv%s_Mon%02d_run%s_lon%02d_lat%02d_funiform%i_fscale%i.png"%(choosevar,kmonth+1,runid,lonf,latf,funiform,fscale),dpi=200)
+plt.tight_layout()
+plt.savefig(outpath+"scycle2Fixed_SST_Autocorrelationv%s_Mon%02d_run%s_%s_funiform%i_fscale%i.png"%(choosevar,kmonth+1,runid,locfname,funiform,fscale),dpi=200)
 
 
+
+
+
+## Stuff below here as not been updated
 
 
 #%% Plot NAO Forcing at this point
@@ -613,11 +647,12 @@ plt.savefig(outpath+"scycle2Fixed_SST_Autocorrelationv%s_Mon%02d_run%s_lon%02d_l
 
 fig,ax = plt.subplots(1,1,figsize=(5,3))
 ax.plot(mons3,naopt)
-ax.set_title("NAO Forcing (Monthly), Ensemble Mean")
+ax.set_title("NAO Forcing (Monthly), Ensemble Mean %s with Fscale %.2e" % (loctitle,fscale))
 ax.set_ylabel("$Wm^{-1}\sigma^{-1}$")
-plt.savefig(outpath+"NAOForcing_funiform%i.png"%funiform,dpi=200)
+plt.savefig(outpath+"NAOForcing_%s_funiform%i_fscale.png"%(locfname,funiform,fscale),dpi=200)
 
 #%% Plot NAO Forcing and hclim
+
 fig,ax1=plt.subplots(1,1,figsize=(6,4))
 plt.style.use("seaborn-bright")
 color = 'tab:red'
@@ -642,13 +677,14 @@ labs = [l.get_label() for l in lns]
 ax1.legend(lns,labs,loc=0)
 
 # Set Title
-titlestr = ' MLD and NAO Forcing (Ensemble Average) \n Lon: ' + str(lonf) + ' Lat: '+ str(latf)
+titlestr = ' MLD and NAO Forcing (Ensemble Average) \n %s ' % loctitle
 plt.title(titlestr)
 plt.tight_layout()
-plt.savefig(outpath+"NAOForcing_MLD_funiform%i.png"%funiform,dpi=200)
+plt.savefig(outpath+"NAOForcing_MLD_%s_funiform%i_fscale%03d.png"%(locfname,funiform,fscale),dpi=200)
 
 
 #%% Plot Beta and hclim
+
 fig,ax1=plt.subplots(1,1,figsize=(6,4))
 plt.style.use("seaborn-bright")
 color = 'tab:red'
@@ -673,8 +709,8 @@ labs = [l.get_label() for l in lns]
 ax1.legend(lns,labs,loc=0)
 
 # Set Title
-titlestr = ' MLD and NAO Forcing (Ensemble Average) \n Lon: ' + str(lonf) + ' Lat: '+ str(latf)
+titlestr = ' MLD and NAO Forcing (Ensemble Average) \n %s ' % loctitle
 plt.title(titlestr)
 plt.tight_layout()
-plt.savefig(outpath+"NAOForcing_MLD_funiform%i.png"%funiform,dpi=200)
+plt.savefig(outpath+"NAOForcing_MLD_%s_funiform%i_fscale%03d.png"%(locfname,funiform,fscale),dpi=200)
 
