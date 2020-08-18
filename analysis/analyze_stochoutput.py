@@ -41,7 +41,7 @@ latf     = 50
 # Experiment Settings
 entrain  = 1     # 0 = no entrain; 1 = entrain
 hvarmode = 2     # 0 = fixed mld ; 1 = max mld; 2 = clim mld 
-funiform = 0     # 0 = nonuniform; 1 = uniform; 2 = NAO-like; 3= NAO-monthly
+funiform = 1     # 0 = nonuniform; 1 = uniform; 2 = NAO-like; 3= NAO-monthly
 nyrs     = 1000  # Number of years the experiment was run
 runid    = "001" # Run ID for white noise sequence
 fscale   = 1
@@ -104,8 +104,8 @@ lat = np.squeeze(loaddamp['LAT'])
 mld      = np.load(datpath+"HMXL_hclim.npy") # Climatological MLD
 
 # Read in Stochmod SST Data
-sst = np.load(datpath+"stoch_output_%iyr_funiform%i_entrain0_run%s.npy"%(nyrs,funiform,runid),allow_pickle=True).item()
-sst[3] = np.load(datpath+"stoch_output_%iyr_funiform%i_entrain1_run%s.npy"%(nyrs,funiform,runid))
+sst = np.load(datpath+"stoch_output_%iyr_funiform%i_entrain0_run%s_fscale%03d.npy"%(nyrs,funiform,runid,fscale),allow_pickle=True).item()
+sst[3] = np.load(datpath+"stoch_output_%iyr_funiform%i_entrain1_run%s_fscale%03d.npy"%(nyrs,funiform,runid,fscale))
 lonr = np.load(datpath+"lon.npy")
 latr = np.load(datpath+"lat.npy")
 

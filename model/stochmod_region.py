@@ -13,7 +13,6 @@ from scipy import stats
 import xarray as xr
 import time
 
-
 # Add Module to search path
 import sys
 sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
@@ -22,15 +21,15 @@ import scm
 from amv import proc
 from dask.distributed import Client,progress
 import dask
-#%% User Edits -----------------------------------------------------------------           
 
+#%% User Edits -----------------------------------------------------------------           
 # Point Mode
 pointmode = 0 # Set to 1 to output data for the point speficied below
 lonf = -30
 latf = 50
 
 # ID of the run (determines random number sequence if loading or generating)
-runid = "001"
+runid = "002"
 
 # White Noise Options. Set to 1 to load data
 genrand   = 0  # Set to 1 to regenerate white noise time series, with runid above
@@ -42,7 +41,7 @@ genrand   = 0  # Set to 1 to regenerate white noise time series, with runid abov
 # 3 = NAO-like NHFLX Forcing, with NAO (DJFM) and NHFLX (Monthly)
 # 4 = NAO-like NHFLX Forcing, with NAO (Monthly) and NHFLX (Monthly)
 funiform = 4     # Forcing Mode (see options above)
-fscale   = 10    # Value to scale forcing by
+fscale   = 1    # Value to scale forcing by
 
 # Integration Options
 nyr      = 1000        # Number of years to integrate over
@@ -53,7 +52,7 @@ hfix     = 50          # Fixed MLD value (meters)
 
 # Set Constants
 cp0      = 3850 # Specific Heat [J/(kg*C)]
-rho      = 1000 # Density of Seawater [kg/m3]
+rho      = 1025 # Density of Seawater [kg/m3]
 
 # Set Integration Region
 lonW = -100
@@ -84,6 +83,7 @@ print("pointmode = " + str(pointmode))
 print("fscale    = " + str(fscale))
 print("nyr       = " + str(nyr))
 print("Data will be saved to %s" % datpath)
+allstart = time.time()
 # --------------
 # %% Load Variables -------------------------------------------------------------
 # --------------
@@ -196,21 +196,21 @@ if genrand == 1:
     print("Generating New Time Series")
     if funiform == 0:
         # Generate nonuniform forcing [lon x lat x time]
-        F = np.random.normal(0,1,size=(lonsize,latsize,t_end))/4 # Divide by 4 to scale between -1 and 1
+        F = np.random.normal(0,1,size=(lonsize,latsize,t_end)) * fscale # Removed Divide by 4 to scale between -1 and 1
         
         # Save Forcing
         np.save(datpath+"stoch_output_%iyr_funiform%i_run%s_Forcing.npy"%(nyr,funiform,runid),F)
 
     else:
         
-        randts = np.random.normal(0,1,size=t_end)/4 # Divide by 4 to scale between -1 and 1
+        randts = np.random.normal(0,1,size=t_end) # Removed Divide by 4 to scale between -1 and 1
         np.save(datpath+"stoch_output_%iyr_run%s_randts.npy"%(nyr,runid),randts)
     
 else:
     print("Loading Old Data")
     if funiform == 0:
         # Directly load forcing
-        F = np.load(datpath+"stoch_output_%iyr_run%s_funiform%i_Forcing.npy"%(nyr,runid,funiform))
+        F = np.load(datpath+"stoch_output_%iyr_run%s_funiform%i_fscale%02d_Forcing.npy"%(nyr,runid,funiform))
     else:
         
         randts = np.load(datpath+"stoch_output_%iyr_run%s_randts.npy"%(nyr,runid))
@@ -221,7 +221,7 @@ if funiform != 0:
     
     # Spatially Uniform Forcing
     if funiform == 1:
-        F      = np.ones((lonsize,latsize,t_end))
+        F      = np.ones((lonsize,latsize,t_end)) * fscale
         F      = np.multiply(F,randts[None,None,:])
         Fseas  = np.ones((lonsize,latsize,12))
         
@@ -233,7 +233,7 @@ if funiform != 0:
         
     # Save Forcing
     if saveforcing == 1:
-        np.save(datpath+"stoch_output_%iyr_funiform%i_run%s_Forcing.npy"%(nyr,funiform,runid),F)
+        np.save(datpath+"stoch_output_%iyr_funiform%i_run%s_fscale%03d_Forcing.npy"%(nyr,funiform,runid,fscale),F)
 
 print("Forcing Setup in %s" % (time.time() - startf))
 
@@ -302,19 +302,19 @@ elif pointmode == 1:
 #%%
 # Scrap test
 
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
-diff_h0 = new_h0-old_h0
-fig,ax = plt.subplots(1,1)
-ax.plot(old_h0,color='k',linewidth=0.5,label='old-pt')
-ax.plot(new_h0,color='b',linewidth=0.5,label='new-region')
-ax.plot(diff_h0,label='diff')
-plt.legend()
-np.nanmax(np.abs(diff_h0))
-plt.xlim(12,600)
+# diff_h0 = new_h0-old_h0
+# fig,ax = plt.subplots(1,1)
+# ax.plot(old_h0,color='k',linewidth=0.5,label='old-pt')
+# ax.plot(new_h0,color='b',linewidth=0.5,label='new-region')
+# ax.plot(diff_h0,label='diff')
+# plt.legend()
+# np.nanmax(np.abs(diff_h0))
+# plt.xlim(12,600)
 
-#%% Set up dask client
-client = Client(threads_per_worker=4,n_workers=1)
+# #%% Set up dask client
+# client = Client(threads_per_worker=4,n_workers=1)
 
 #
 #%%
@@ -387,45 +387,45 @@ print(tprint)
 #%% Combine dimensions
 
 
-def combine_spatial(var):
-    """
-    Assuming spatial dimensions are axis = 0,1, combine them.
-    Also assumes that the variable is 3d
-    """
+# def combine_spatial(var):
+#     """
+#     Assuming spatial dimensions are axis = 0,1, combine them.
+#     Also assumes that the variable is 3d
+#     """
 
-    spsize = var.shape[0] * var.shape[1]
-    varrs = np.reshape(var,(spsize,var.shape[2]))
-    return varrs
-
-
-lbd2d  =  combine_spatial(lbd_entr)
-if funiform > 1:
-    F2d    =  combine_spatial(F[2])
-else:
-    F2d    =  combine_spatial(F)
-beta2d =  combine_spatial(beta)
-h2d    =  combine_spatial(hclim)
-kprev2d = combine_spatial(kprev)
-FAC2d   = combine_spatial(FAC)
-spsize = lbd2d.shape[0]
+#     spsize = var.shape[0] * var.shape[1]
+#     varrs = np.reshape(var,(spsize,var.shape[2]))
+#     return varrs
 
 
-T_entr1 = dask.delayed([])
-for i in range(spsize):
-    lbdin   = np.copy(lbd2d[i,:])
-    Fin     = np.copy(F2d[i,:])
-    betain  = np.copy(beta2d[i,:])
-    hclimin = np.copy(h2d[i,:])
-    kprevin = np.copy(kprev2d[i,:])
-    FACin   = np.copy(FAC2d[i,:])
-    delayedtask = dask.delayed(scm.entrain)(t_end,lbdin,T0,Fin,betain,hclimin,kprevin,FACin)
-    T_entr1.append(delayedtask)
+# lbd2d  =  combine_spatial(lbd_entr)
+# if funiform > 1:
+#     F2d    =  combine_spatial(F[2])
+# else:
+#     F2d    =  combine_spatial(F)
+# beta2d =  combine_spatial(beta)
+# h2d    =  combine_spatial(hclim)
+# kprev2d = combine_spatial(kprev)
+# FAC2d   = combine_spatial(FAC)
+# spsize = lbd2d.shape[0]
 
 
-start = time.time()
-dask.compute(*T_entr1)
-elapsed = time.time() - start
-tprint = "\nEntrain Model ran in %.2fs" % (elapsed)
+# T_entr1 = dask.delayed([])
+# for i in range(spsize):
+#     lbdin   = np.copy(lbd2d[i,:])
+#     Fin     = np.copy(F2d[i,:])
+#     betain  = np.copy(beta2d[i,:])
+#     hclimin = np.copy(h2d[i,:])
+#     kprevin = np.copy(kprev2d[i,:])
+#     FACin   = np.copy(FAC2d[i,:])
+#     delayedtask = dask.delayed(scm.entrain)(t_end,lbdin,T0,Fin,betain,hclimin,kprevin,FACin)
+#     T_entr1.append(delayedtask)
+
+
+# start = time.time()
+# dask.compute(*T_entr1)
+# elapsed = time.time() - start
+# tprint = "\nEntrain Model ran in %.2fs" % (elapsed)
 
 
 
@@ -438,9 +438,11 @@ if pointmode == 1:
     sst = T_entr0_all.copy()
     sst[3] = T_entr1
     
-    np.savez(datpath+"stoch_output_point_%iyr_funiform%i_run%s.npz"%(nyr,funiform,runid),sst=sst,hpt=hclim[ko,ka,:])
+    np.savez(datpath+"stoch_output_point_%iyr_funiform%i_run%s_fscale%03d.npz"%(nyr,funiform,runid,fscale),sst=sst,hpt=hclim[ko,ka,:])
 else:
-    np.save(datpath+"stoch_output_%iyr_funiform%i_entrain0_run%s.npy"%(nyr,funiform,runid),T_entr0_all)
-    np.save(datpath+"stoch_output_%iyr_funiform%i_entrain1_run%s.npy"%(nyr,funiform,runid),T_entr1)
+    np.save(datpath+"stoch_output_%iyr_funiform%i_entrain0_run%s_fscale%03d.npy"%(nyr,funiform,runid,fscale),T_entr0_all)
+    np.save(datpath+"stoch_output_%iyr_funiform%i_entrain1_run%s_fscale%03d.npy"%(nyr,funiform,runid,fscale),T_entr1)
     #np.save(datpath+"stoch_output_1000yr_funiform%i_Forcing.npy"%(funiform),F)
 
+
+print("stochmod_region.py ran in %.2fs"% (time.time()-allstart))
