@@ -607,7 +607,7 @@ def init_map(bbox,ax=None):
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath = projpath + '03_Scripts/stochmod/'  
 datpath = projpath + '01_Data/'
-outpath = projpath + '02_Figures/20200813/'
+outpath = projpath + '02_Figures/20200818/'
 
 # Path to SST data from obsv
 datpath2 = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/"
@@ -723,39 +723,7 @@ obvhad = loadmat(datpath2+"hadisst.1870_2018.mat")
 hyr  = obvhad['YR']
 
 
-#----------------------------------------
-# # Old way
-# # Load in observation SST data to compare
-# obvhad = loadmat(datpath2+"hadisst.1870_2018.mat")
-# hlat = np.squeeze(obvhad['LAT'])
-# hlon = np.squeeze(obvhad['LON'])
-# hyr  = obvhad['YR']
-# hsst = obvhad['SST']
 
-# # Change hsst to lon x lat x time
-# hsst = np.transpose(hsst,(2,1,0))
-
-# # Take the set time period
-# startyr = 1920
-# monstart = (1920+1-hyr[0,0])*12
-# hsst = hsst[:,:,monstart::]
-
-# # Find north and south latitude points
-# hsouth = np.where(hlat <= 0)
-# hnorth = np.where(hlat > 0)
-
-# # Find corresponding points in data
-# hsstsouth = np.squeeze(hsst[:,hsouth,:])[:,::-1,:]
-# hsstnorth = np.squeeze(hsst[:,hnorth,:])[:,::-1,:]
-
-# # Stitch things together, reversing the order 
-# hlatnew = np.squeeze(np.concatenate((hlat[hsouth][::-1],hlat[hnorth][::-1])))
-# hsstnew = np.concatenate((hsstsouth,hsstnorth),axis=1)
-
-
-# # Reshape to [Time x Space] and remove NaN Points
-# hsstnew = np.reshape(hsstnew,(360*180,1176)).T
-# hsstok,knan,okpts = find_nan(hsstnew,0)
 
 
 #----------------------------------------
@@ -766,16 +734,17 @@ hlat = hadnc.lat.values
 hsst = hadnc.SST.values
 
 # Take annual average
-annhsst = ann_avg(hsst,2)
+annhsst = proc.ann_avg(hsst,2)
 
 
 # Take average from amv
-h_amv,aa_hsst = calc_AMV(hlon,hlat,annhsst,bbox,order,cutofftime,1)  
-#h_amvo,aa_hssto = calc_AMV(hlon,hlatnew,hsstnew,bbox,order,cutofftime,1)  
+#h_amv,aa_hsst = proc.calc_AMV(hlon,hlat,annhsst,bbox,order,cutofftime,1)  
+ 
+
+#h_regr=proc.regress2ts(annhsst,h_amv/np.nanstd(h_amv),0,1)
 
 
-h_regr=regress2ts(annhsst,h_amv/np.nanstd(h_amv),0,1)
-#h_regro = regress2ts(hsstnew,h_amvo,0,1)
+h_amv,h_regr = proc.calc_AMVquick(hsst,hlon,hlat,bbox)
 
 # %% Perform psd
 
@@ -980,26 +949,43 @@ startyr = 1900
 # Same plot, but for HadlISST
 cmap = cmocean.cm.balance
 #cint = np.arange(-3.5,3.25,0.25)
-cint = np.arange(-0.8,0.9,0.1)
+cint = np.arange(-0.8,1.0,0.2)
 #clab = np.arange(-0.50,0.60,0.10)
 #cint = np.arange(-1,1.2,0.2)
 clab = cint
 
-fig,ax = plt.subplots(1,1,figsize=(8,4))
+fig,ax = plt.subplots(1,1,figsize=(3,1.5))
 plt.style.use("ggplot")
 
 varin = np.transpose(h_regr,(1,0))
 
 plt.subplot(1,1,1)
-plot_AMV_spatial(varin,hlon,hlat,mbbox,cmap,cint,clab)
-plt.title("AMV-related SST Pattern from HadISST, %i-%i"%(startyr,hyr[0,-1]),fontsize=14)
+viz.plot_AMV_spatial(varin,hlon,hlat,mbbox,cmap,cint,clab)
+plt.title("AMV-related SST Pattern from HadISST, %i-%i"%(startyr,hyr[0,-1]),fontsize=8)
 outname = outpath+'AMVpattern_HADLISST.png' 
 plt.savefig(outname, bbox_inches="tight",dpi=200)
 
 
 #%% Plot observation AMV time series
 
-plot_AMV(h_amv)
+
+
+
+startyr = 1900
+
+
+fig,ax = plt.subplots(1,1,figsize=(3,1.5))
+plt.style.use("ggplot")
+
+varin = np.transpose(h_regr,(1,0))
+
+plt.subplot(1,1,1)
+viz.plot_AMV(h_amv)
+plt.title("AMVIndex (HadISST), %i-%i"%(startyr,hyr[0,-1]),fontsize=8)
+plt.xlabel('Years')
+plt.ylabel('AMV Index')
+outname = outpath+'AMVidx_HADLISST.png' 
+plt.savefig(outname, bbox_inches="tight",dpi=200)
 
 
 #%% Plot AMV FFor entrain case
