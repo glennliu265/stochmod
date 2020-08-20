@@ -117,6 +117,7 @@ lonReykjavik = -21.9426 + 360
 latReykjavik = 64.146621
 tol = 5 # in degrees
 eapbox = [320,15,35,60]
+
 #%% Read in NHFLX
 
 # Open Datasets (NHFLX) [1.53s]
@@ -130,7 +131,6 @@ ds = xr.open_mfdataset(nclist,concat_dim='ensemble',
                       )
 # Add ensemble as a dimension
 ds = ds.assign_coords({'ensemble':np.arange(1,43,1)})
-
 
 # Deseason, then Detrend (Deforce) [1m46s]
 # Note: we had already deforced and deseasoned the data in the script where NHFLX was generated.
@@ -159,7 +159,6 @@ for e in range(len(nclist)):
     else:
         pslall = xr.concat([pslall,psl],dim="ensemble")
     print("Completed ensemble %i of 42 in %.2fs" % (e+1,time.time()-startloop))
-
 
 #% Select time period after 1920-01-01 and remove seasonal and ensemble mean [2m8s]
 dsna   = pslall.sel(time=slice('1920-01-01','2005-12-31'))
