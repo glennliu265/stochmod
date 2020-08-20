@@ -7,11 +7,18 @@ Created on Wed Aug 19 17:29:01 2020
 Take raw heat flux data, compute anomalies, deforce and deseason, and apply land ice mask.
 Ported over from [NHFLX_Regress_Monthly.ipynb]. Need to run to check...
 
+Takes in raw NHFLX data from CESM1LE
+    1. Restricts to specified lat/lon, and 1920 onwards
+    2. Calculates monthly anomaly
+    3. Remove ensemble mean
+
+
 @author: gliu
 """
 import xarray as xr
 import time
 import glob
+
 
 import numpy as np
 from scipy.io import loadmat
@@ -48,7 +55,9 @@ def preprocess(ds,varkeep):
     
     return ds
 
-
+def xrdeseason(ds):
+    """ Remove seasonal cycle..."""
+    return ds.groupby('time.month') - ds.groupby('time.month').mean('time')
 
 #%% User Edits
 
@@ -72,6 +81,7 @@ latS = 0
 latN = 0
 
 #%% Part 1: Preprocess NHFLX Data
+allstart = time.time()
 
 # Create list of nc files
 nclists = {}
@@ -179,22 +189,20 @@ for e in range(nens):
 # Add explicit ensemble coordinate
 dsall.assign_coords({"ensemble": np.arange(1,43,1)})
 
+# Calculate monthly anomalies
+dsm = xrdeseason(dsall)
+
 # Calculate Ensemble mean and save
-ensmean = dsall.mean('ensemble')
+ensmean = dsm.mean('ensemble')
 ensmean.to_netcdf("%sNHFLX_ensemble_mean.nc"%(outpath))
 
 # Remove Ensemble Mean
-dsm = dsall - ensmean
-
-# Remove monthly climatology 
-dsm = dsm.groupby('time.month') - dsm.groupby('time.month').mean('time')
-
+dsm = dsm - ensmean
 
 # Apply landice mask and save output
 
 mnum = np.concatenate([np.arange(1,36),np.arange(101,108,1)])
 maskloc = '/home/glliu/01_Data/masks/'
-
 
 for e in range(nens):
     start = time.time()
@@ -214,3 +222,5 @@ for e in range(nens):
     ds.to_netcdf("%sNHFLX_ens%03d.nc"%(outpath,ensnum))
 
     print("Saved ensemble # %03d in %fs" % (ensnum,time.time()-start))
+    
+print("Saved NHFLX files to %s. Completed script in %.2fs" % (outpath,time.time()-allstart))

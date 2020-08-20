@@ -135,11 +135,11 @@ ds = ds.assign_coords({'ensemble':np.arange(1,43,1)})
 # Deseason, then Detrend (Deforce) [1m46s]
 # Note: we had already deforced and deseasoned the data in the script where NHFLX was generated.
 # Oddly enough, there still appears to be a difference between the two...
-start = time.time()
-ds2 = ds.groupby('time.month') - ds.groupby('time.month').mean('time')
-ds2 = ds2 - ds2.mean('ensemble')
-nhflxall = ds2.NHFLX.values
-print("Deseasoned and Deforced in %.2fs" % (time.time()-start) )
+# start = time.time()
+# ds2 = ds.groupby('time.month') - ds.groupby('time.month').mean('time')
+# ds2 = ds2 - ds2.mean('ensemble')
+nhflxall = ds.NHFLX.values
+# print("Deseasoned and Deforced in %.2fs" % (time.time()-start) )
 
 #%% Read in raw SLP Data
 
@@ -256,7 +256,7 @@ for e in range(nens):
                     print("\t Flipping sign based on Reykjavik, Month %i Ens%i" % (m+1,e+1))
                     eofpatp *= -1
                     eofpatf *= -1
-                    pcs[:,pcn] = -1
+                    pcs[:,pcn] *= -1
 
 
                 # Double Check with Lisbon
@@ -286,7 +286,7 @@ for e in range(nens):
         #% Assign to outside variable -------------
         flxpattern[e,m,:,:,:] = flxpats # ENS x Mon x Lon x Lat x PC
         psleofall[e,m,:,:,:]  = psleofs  # ENS x Mon x Lon x Lat x PC
-        pcall[e,m,:] = np.squeeze(pcs)   # ENS x Mon x PC
+        pcall[e,m,:,:] = np.squeeze(pcs)   # ENS x Mon x Yr x PC
 
 
         print("\rCalculated EOF for month %02d of ens %02d in %.2fs" % (m+1,e+1,time.time()-startloop),end="\r",flush=True)
