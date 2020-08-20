@@ -83,7 +83,20 @@ lat = np.squeeze(loaddamp['LAT'])
 print("Data Loaded in %.2fs"%(time.time()-loadstart))
 
 
+#%% Plot Bounding Box
 
+    
+    
+fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize =(4,4))
+ax = viz.init_map([-100,40,-20,90],ax=ax)
+lwb = 1.5
+
+ax,l1 = viz.plot_box(bbox_SP,ax=ax,color='b',return_line=True,leglab='SPG',linewidth=lwb)
+ax,l2 = viz.plot_box(bbox_ST,ax=ax,color='r',return_line=True,leglab='STG',linewidth=lwb)
+ax,l3 = viz.plot_box(bbox_NA,ax=ax,color='k',return_line=True,leglab='NAT',linewidth=lwb)
+
+ax.legend([l1,l2,l3],labels=regions)
+plt.savefig(outpath+"bboxes_viz_fscale.png",dpi=200)
 
 #%% Load the data in
 
@@ -91,6 +104,7 @@ print("Data Loaded in %.2fs"%(time.time()-loadstart))
 # Loop for each forcing...
 for f in range(len(fscales)):
 
+    
     fscale = fscales[f]
     expid = "%iyr_funiform%i_run%s_fscale%03d" % (nyrs,funiform,runid,fscale)
     
@@ -253,3 +267,56 @@ for f in range(len(fscales)):
     plt.suptitle("SST Autocorrelation, Forcing %s" % forcingname[funiform])
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
     plt.savefig(outpath+"Region_SST_Autocorrelation_modelALL_%s.png"%(expid),dpi=200)
+    
+    
+    # Calculate different AMVs for each region
+    amvbboxes = [bbox_SP,bbox_ST,amvbox]
+    amvidx_region = {}
+    amvpat_region = {}
+    for region in range(3):
+        #% Calculate AMV Index
+        amvtime = time.time()
+        amvidx = {}
+        amvpat = {}
+        for model in range(4):
+            amvidx[model],amvpat[model] = proc.calc_AMVquick(sst[model],lonr,latr,amvbboxes[region])
+        print("Calculated AMV variables for region %s in %.2f" % (regions[region],time.time()-amvtime))
+        
+        amvidx_region[region] = amvidx
+        amvpat_region[region] = amvpat
+    
+    
+    
+        #% Make AMV Spatial Plots
+        cmap = cmocean.cm.balance
+        cmap.set_bad(color='yellow')
+        #cint = np.arange(-1,1.1,0.1)
+        #clab = cint
+        fig,axs = plt.subplots(1,4,figsize=(12,1.5),subplot_kw={'projection':ccrs.PlateCarree()})
+        for mode in range(4):
+            varin = np.transpose(amvpat[mode],(1,0))
+            viz.plot_AMV_spatial(varin,lonr,latr,bbox,cmap,pcolor=0,ax=axs[mode])
+            axs[mode].set_title("MLD %s" % modelname[mode],fontsize=12)   
+        #plt.suptitle("AMV Pattern | Forcing: %s; fscale: %ix" % (forcingname[funiform],fscale),ha='center')
+        #fig.tight_layout(rect=[0, 0.03, .75, .95])
+        outname = outpath+'AMVpattern_%s_allmodels_region%s.png' % (expid,regions[region])
+        plt.savefig(outname, bbox_inches="tight",dpi=200)
+        
+        
+        #%Make AMV Time Plots
+        xlm = [24,240]
+        ylm = [-0.5,0.5]
+        #xtk = np.arange(xlm[0],xlm[1]+20,20)
+        fig,axs = plt.subplots(1,4,figsize=(12,1.5))
+        for mode in range(4): 
+            viz.plot_AMV(amvidx[mode],ax=axs[mode])
+            axs[mode].set_title("MLD %s" % modelname[mode],fontsize=12)
+            axs[mode].set_xlim(xlm)
+            #axs[mode].set_xticks(xtk)
+            axs[mode].set_xlabel('Year')
+            #axs[mode].set_ylim(ylm)
+        axs[0].set_ylabel('AMV Index')
+        #plt.suptitle("AMV Index | Forcing: %s; fscale: %ix" % (forcingname[funiform],fscale))
+        #fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+        outname = outpath+'AMVIndex_%s_allmodels_region%s.png' % (expid,regions[region])
+        plt.savefig(outname, bbox_inches="tight",dpi=200)
