@@ -1,26 +1,59 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+calc_NAO_monthly:
+    
 Script to preprocess raw SLP data, perform EOF analysis, and regress back to
-NHFLX anomaly data.
+NHFLX anomaly data. Works on stormtrack and flips EOF signs, checking for 
+NAO in EOF1 and EAP in EOF2 and EOF3. Indicate the bounding boxes and points
+in the user edits section.
 
+Inputs:
+    1. NHFLX anomalies, generated via [preproc_NAO_monthly.py] stored as 
+        NHFLX_ens%03d.nc
+    2. Raw PSL files from CESM (42 ensemble members)
+    
+
+Output:
+    npz file [NAO_Monthly_Regression_PC123.npz] that contains
+    1. pcall      (array: ens x mon x yr x pc): 
+        PC timeseries for each month and ensemble
+        
+    2. flxpattern (array: ens x mon x lat x lon x pc):
+        NHFLX pattern regressed back to PC
+        
+    3. psleofall  (array: ens x mon x lat x lon x pc):
+        PSL pattern regressed back to PC
+        
+    4. varexpall  (array: ens x mon x pc):
+        Variance explained 
+    
+Dependencies:
+    xarray as xr
+    numpy as np
+    sys
+    time
+    glob
+    
+    amv.proc
+
+Notes to self: Parts of the code are really slow, due to the differences in
+latitude from ens 35 onwards, and hence the need to manually read everything in.
+Need to find a way to optimize that (perhaps calculate SLP anomalies beforehand)
 
 Created on Wed Aug 19 18:12:13 2020
 
 @author: gliu
 """
+
 import xarray as xr
 import time
 import glob
-
 import numpy as np
-from scipy.io import loadmat
-import matplotlib.pyplot as plt
-import cartopy.crs as ccrs
 
 import sys
 sys.path.append("/home/glliu/00_Scripts/01_Projects/00_Commons/")
-from amv import proc,viz
+from amv import proc
 
 #%% # Functions
 
@@ -59,7 +92,6 @@ def xrdeseason(ds):
 # Path to data (NHFLX)
 datpath1 = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/NAO_Forcing_DataProc/"
 outpath = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/NHFLX/"
-
 
 #Path to SLP Data and glob expression
 varname = 'PSL'
