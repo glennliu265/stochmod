@@ -89,6 +89,8 @@ varnames = ('NHFLX','SLP')
 # Ensemble numbers
 mnum = np.concatenate([np.arange(1,36),np.arange(101,108,1)])
 
+outpath = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/NAO_Forcing_DataProc/"
+
 print("Running calc_NAO_monthly in mode %i at %s" % (naotype,time.time()))
 #%% Read in SLP and NHFLX Data
 # Currently designed to read the output for preproc_SLP_monthly.py and 
@@ -170,6 +172,7 @@ if naotype < 2:
     eofall     = np.zeros((nens,nlat,nlon,N_mode)) # [ens x lat x lon x pc]
     
     for e in range(nens):
+        startloop = time.time()
         
         # Select ensemble [Space x Time]
         varens = pslnao[e,:,:]  
@@ -208,7 +211,7 @@ if naotype < 2:
             
                 chksum = np.nansum(eofpatp[rboxlat[:,None],rboxlon[None,:]],(0,1))
                 if chksum > 0:
-                    print("\t Flipping sign based on Reykjavik, Month %i Ens%i" % (m+1,e+1))
+                    #print("\t Flipping sign based on Reykjavik, Ens%i" % (e+1))
                     eofpatp *= -1
                     pcs[:,pcn] *= -1
 
@@ -219,16 +222,16 @@ if naotype < 2:
             
             chksum = np.nansum(eofpatp[lboxlat[:,None],lboxlon[None,:]],(0,1))
             if chksum < 0:
-                print("\t Flipping sign based on Lisbon, Month %i Ens%i" % (m+1,e+1))
+                #print("\t Flipping sign based on Lisbon,Ens%i" % (e+1))
                 eofpatp *= -1
                 pcs[:,pcn] *= -1
             
-            # Check for EAP Pattern and Flip (EOF2 and EOF3)
+            # Check for EAP Pattern and Flip (EO#F2 and EOF3)
             elif (pcn == 1) | (pcn == 2):
                 
                 rsum = proc.sel_region(eofpatp.T,lon,lat,eapbox,reg_sum=1)
                 if rsum > 0:
-                    print("\t Flipping sign based on EAP, PC%i onth %i Ens%i" % (pcn+1,m+1,e+1))
+                    print("\t Flipping sign based on EAP, PC%i Ens%i" % (pcn+1,e+1))
                     eofpatp *= -1
                     pcs[:,pcn] *= -1
              
@@ -251,6 +254,7 @@ else:
     eofall     = np.zeros((nens,12,192,288,N_mode)) # [ens x mon x lat x lon x pc]
     
     for e in range(nens):
+        startloop = time.time()
         for m in range(12):
             # [Space x Time]
             varens = pslnao[e,m,:,:]
@@ -341,8 +345,8 @@ else:
 # Move ensemble dimension to the front
 if nhflx.shape[0] != 42:
     ensdim = nhflx.shape.index(nens)
-    dimbefore = np.arange(0,ensdim,1)
-    dimafter = np.arange(ensdim+1,len(nhflx.shape),1)
+    dimsbefore = np.arange(0,ensdim,1)
+    dimsafter  = np.arange(ensdim+1,len(nhflx.shape),1)
     nhflx = nhflx.transpose(np.concatenate([ensdim,dimsbefore,dimsafter]))
     print("Warning: Moving ensemble to first dimension")
 
@@ -372,7 +376,7 @@ if naotype == 0:
             # Perform regression
             flxpattern[e,:,n],_ = proc.regress_2d(pcin,varin)
             
-            msg = '\rCompleted Regression for PC %02i/%02i, ENS %02i/%02i' % (n+1,npc,e+1,nens)
+            msg = '\rCompleted Regression for PC %02i/%02i, ENS %02i/%02i' % (n+1,N_mode,e+1,nens)
             print(msg,end="\r",flush=True)
 
 
@@ -400,11 +404,12 @@ else:
                 
                 # Perform regression
                 flxpattern[e,m,:,n],_ = proc.regress_2d(pcin,varin)
-                msg = '\rCompleted Regression for Mon %02d/12 PC %02i/%02i, ENS %02i/%02i' % (m+1,n+1,npc,e+1,nens)
+                msg = '\rCompleted Regression for Mon %02d/12 PC %02i/%02i, ENS %02i/%02i' % (m+1,n+1,N_mode,e+1,nens)
                 print(msg,end="\r",flush=True)
     flxpattern = flxpattern.reshape(nens,12,nlat,nlon,N_mode)
 print("Completed NHFLX Regression in %.2f" % (time.time()-lstart))
 
 # Save output
-np.savez("%sNAO_Monthly_Regression_PC123.npz"%(datpath1),pcall=pcall,flxpattern=flxpattern,psleofall=eofall,varexpall=varexpall)
-print("saved to %sNAO_Monthly_Regression_PC123.npz. Script complete in %.2f" %(datpath1,time.time()-allstart))
+savename = "%sNAO_Monthly_Regression_PC123.npz"%(outpath) 
+np.savez(savename,pcall=pcall,flxpattern=flxpattern,psleofall=eofall,varexpall=varexpall)
+print("saved to %s. Script complete in %.2f" %(savename,time.time()-allstart))
