@@ -573,3 +573,41 @@ def noentrain_2d(randts,lbd,T0,F):
         print(msg,end="\r",flush=True)
     
     return temp_ts,damp_term
+
+def cut_NAOregion(ds,bbox,mons=None):
+    """
+    Prepares input DataArray for NAO Calculation
+    Inputs
+        1) ds [DataArray]                    - Input DataArray
+        2) bbox [Array: lonW,lonE,latS,latN] - Bounding Boxes
+        3) mons [Array: months]              - Months to include in averaging
+                ex. For DJFM average, mons = [12,1,2,3]
+                Default --> No Monthly Average
+    Outputs
+        ds [DataArray] - Output dataarray with time mean and region
+    """
+    # Average over specified months
+    if mons is not None:
+        # Take the DJFM Mean
+        season = ds.sel(time=np.in1d(ds['time.month'],mons))
+        dsw = season.groupby('time.year').mean('time')
+    else:
+        dsw = ds.copy()
+    
+    # Cut to specified NAO region
+    lonW,lonE,latS,latN = bbox
+    
+    # Convert to degrees East
+    if lonW < 0:
+        lonW += 360
+    if lonE < 0:
+        lonE += 360
+    
+    # Select North Atlantic Region for NAO Calculation...
+    if lonW > lonE: # Cases crossing the prime meridian
+        #print("Crossing Prime Meridian!")
+        dsna = dsw.where((dsw[lonname]>=lonW) | (dsw[lonname]<=lonE),drop=True).sel(lat=slice(latS,latN))
+    else:
+        dsna = dsw.sel(lon=slice(lonW,lonE),lat=slice(latS,latN))
+        
+    return dsna
