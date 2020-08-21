@@ -137,7 +137,7 @@ nlon  = len(lon)
 nlat  = len(lat)
 ntime = len(times)
 nens  = len(mnum)
-nyr   = int(len(ntime)/12)
+nyr   = int(ntime/12)
 
 # Reshape to [lon,lat,time x ens]
 invar = np.reshape(pslglo.transpose(3,2,0,1),(nlon,nlat,ntime*nens)) 
