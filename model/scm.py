@@ -574,7 +574,7 @@ def noentrain_2d(randts,lbd,T0,F):
     
     return temp_ts,damp_term
 
-def cut_NAOregion(ds,bbox,mons=None,lonname='lon',latname='lat'):
+def cut_NAOregion(ds,bbox=[0,360,-90,90],mons=None,lonname='lon',latname='lat'):
     """
     Prepares input DataArray for NAO Calculation by cutting region and taking
     an optional average over specified range of months
