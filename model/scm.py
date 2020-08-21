@@ -11,7 +11,7 @@ Created on Mon Jul 27 11:49:57 2020
 # %%Dependencies
 
 import numpy as np
-
+import xarray as xr
 
 # %%Functions
 """
@@ -574,15 +574,22 @@ def noentrain_2d(randts,lbd,T0,F):
     
     return temp_ts,damp_term
 
-def cut_NAOregion(ds,bbox,mons=None):
+def cut_NAOregion(ds,bbox,mons=None,lonname='lon',latname='lat'):
     """
-    Prepares input DataArray for NAO Calculation
+    Prepares input DataArray for NAO Calculation by cutting region and taking
+    an optional average over specified range of months
+    Dependencies
+        xarray as xr
+        numpy as np
     Inputs
         1) ds [DataArray]                    - Input DataArray
         2) bbox [Array: lonW,lonE,latS,latN] - Bounding Boxes
+        OPTIONAL
         3) mons [Array: months]              - Months to include in averaging
                 ex. For DJFM average, mons = [12,1,2,3]
                 Default --> No Monthly Average
+        4) lonname [str] - name of longitude in dataarray
+        5) latname [str] - name of latitude in dataarray
     Outputs
         ds [DataArray] - Output dataarray with time mean and region
     """
