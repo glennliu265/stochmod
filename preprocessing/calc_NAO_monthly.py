@@ -91,7 +91,7 @@ mnum = np.concatenate([np.arange(1,36),np.arange(101,108,1)])
 
 outpath = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/NAO_Forcing_DataProc/"
 
-print("Running calc_NAO_monthly in mode %i at %s" % (naotype,time.time()))
+print("Running calc_NAO_monthly in mode %i ..." % (naotype))
 #%% Read in SLP and NHFLX Data
 # Currently designed to read the output for preproc_SLP_monthly.py and 
 # preproc_NHFLX_monthly.py
@@ -257,8 +257,8 @@ else:
         startloop = time.time()
         for m in range(12):
             # [Space x Time]
-            varens = pslnao[e,m,:,:]
-            varglo = pslnao[e,m,:,:]
+            varens = pslnao[e,:,:,m]
+            varglo = pslnao[e,:,:,m]
              
              # Get rid of NaN points
             okdata,knan,okpts    = proc.find_nan(varens,1)
