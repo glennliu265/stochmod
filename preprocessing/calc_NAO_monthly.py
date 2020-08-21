@@ -153,10 +153,7 @@ pslnao = pslnao.reshape(nlonr,nlatr,1032,42).transpose(3,2,1,0) # reshape to [en
 # Separate out the month and year dimensions and combine lat/lon, then transpose to [ens x space x yr x mon]
 pslnao = pslnao.reshape(nens,nyr,12,nlatr*nlonr).transpose(0,3,1,2) #[ens x space x yr x mon]
 pslglo = pslglo.reshape(nens,nyr,12,nlat*nlon).transpose(0,3,1,2)  
-    
-                               np.arange(ensdim+1,len(pslnao.shape,),1)
-                               ])
-    pslnao = pslnao.transpose(neworder)
+
 print("Variables loaded for EOF calculation in %.2fs" % (time.time()-cuttime))
 #%% Perform EOF Analysis and calculate the PC
 
