@@ -163,8 +163,8 @@ print("Variables loaded for EOF calculation in %.2fs" % (time.time()-cuttime))
 if naotype < 2:
     
     # Take the DJFM mean 
-    pslnao = np.mean(pslnao[:,:,:,djfm]).mean(3) # [ens x space x yr]
-    pslglo = np.mean(pslglo[:,:,:,djfm]).mean(3) # [ens x space x yr]
+    pslnao = pslnao[:,:,:,djfm].mean(3) # [ens x space x yr]
+    pslglo = pslglo[:,:,:,djfm].mean(3) # [ens x space x yr]
     
     # Preallocate
     pcall      = np.zeros((nens,nyr,N_mode))     # [ens x year x pc]
@@ -412,4 +412,4 @@ print("Completed NHFLX Regression in %.2f" % (time.time()-lstart))
 # Save output
 savename = "%sNAO_Monthly_Regression_PC123_naotype%i.npz"%(outpath,naotype) 
 np.savez(savename,pcall=pcall,flxpattern=flxpattern,psleofall=eofall,varexpall=varexpall)
-print("saved to %s. Script complete in %.2f" %(savename,time.time()-allstart))
+print("Output saved to %s. Script complete in %.2fs" %(savename,time.time()-allstart))
