@@ -21,6 +21,7 @@ places for ens35-42.
 Created on Fri Aug 21 13:33:38 2020
 
 @author: gliu
+
 """
 
 
@@ -31,6 +32,7 @@ import numpy as np
 
 import sys
 sys.path.append("/home/glliu/00_Scripts/01_Projects/00_Commons/")
+sys.path.append("/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model")
 from amv import proc
 
 #%% # Functions
@@ -112,7 +114,7 @@ print("Completed concatenation in %.2fs" % (time.time()-cstart))
 #% Select time period after 1920-01-01 and remove seasonal and ensemble mean [2m8s]
 dsna   = pslall.sel(time=slice('1920-01-01','2005-12-31'))
 dsna2 = xrdeseason(dsna)
-dsna2 = dsna2 - dsna2.mean('ensemble')
+#dsna2 = dsna2 - dsna2.mean('ensemble')
 
 
 
