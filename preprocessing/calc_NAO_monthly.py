@@ -216,16 +216,16 @@ if naotype < 2:
                     pcs[:,pcn] *= -1
 
 
-            # Double Check with Lisbon
-            lboxlon = np.where((lon >= lonLisbon-tol) & (lon <= lonLisbon+tol))[0]
-            lboxlat = np.where((lat >= latLisbon-tol) & (lat <= latLisbon+tol))[0]
-            
-            chksum = np.nansum(eofpatp[lboxlat[:,None],lboxlon[None,:]],(0,1))
-            if chksum < 0:
-                #print("\t Flipping sign based on Lisbon,Ens%i" % (e+1))
-                eofpatp *= -1
-                pcs[:,pcn] *= -1
-            
+                # Double Check with Lisbon
+                lboxlon = np.where((lon >= lonLisbon-tol) & (lon <= lonLisbon+tol))[0]
+                lboxlat = np.where((lat >= latLisbon-tol) & (lat <= latLisbon+tol))[0]
+                
+                chksum = np.nansum(eofpatp[lboxlat[:,None],lboxlon[None,:]],(0,1))
+                if chksum < 0:
+                    #print("\t Flipping sign based on Lisbon,Ens%i" % (e+1))
+                    eofpatp *= -1
+                    pcs[:,pcn] *= -1
+                
             # Check for EAP Pattern and Flip (EO#F2 and EOF3)
             elif (pcn == 1) | (pcn == 2):
                 
@@ -299,15 +299,15 @@ else:
                         pcs[:,pcn] *= -1
 
 
-                # Double Check with Lisbon
-                lboxlon = np.where((lon >= lonLisbon-tol) & (lon <= lonLisbon+tol))[0]
-                lboxlat = np.where((lat >= latLisbon-tol) & (lat <= latLisbon+tol))[0]
-                
-                chksum = np.nansum(eofpatp[lboxlat[:,None],lboxlon[None,:]],(0,1))
-                if chksum < 0:
-                    #print("\t Flipping sign based on Lisbon, Month %i Ens%i" % (m+1,e+1))
-                    eofpatp *= -1
-                    pcs[:,pcn] *= -1
+                    # Double Check with Lisbon
+                    lboxlon = np.where((lon >= lonLisbon-tol) & (lon <= lonLisbon+tol))[0]
+                    lboxlat = np.where((lat >= latLisbon-tol) & (lat <= latLisbon+tol))[0]
+             
+                    chksum = np.nansum(eofpatp[lboxlat[:,None],lboxlon[None,:]],(0,1))
+                    if chksum < 0:
+                        #print("\t Flipping sign based on Lisbon, Month %i Ens%i" % (m+1,e+1))
+                        eofpatp *= -1
+                        pcs[:,pcn] *= -1
                 
                 # Check for EAP Pattern and Flip (EOF2 and EOF3)
                 elif (pcn == 1) | (pcn == 2):
