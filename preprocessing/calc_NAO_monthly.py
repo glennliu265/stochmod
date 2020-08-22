@@ -65,7 +65,7 @@ allstart = time.time()
 #   0 = NAO[DJFM-avg] regressed to NHFLX[DJFM-avg]
 #   1 = NAO[DJFM-avg] regressed to NHFLX[Monthly]
 #   2 = NAO[Monthly]  regressed to NHFLX[Monthly]
-naotype = 2
+naotype = 0
 
 # Bounding Box to compute eof over
 bboxNAO = [-90,40,20,80] # NAO BOX BASED ON DESER ET AL PAPER
@@ -232,7 +232,7 @@ if naotype < 2:
                 rsum = proc.sel_region(eofpatp.T,lon,lat,eapbox,reg_sum=1)
                 if rsum > 0:
                     #print("\t Flipping sign based on EAP, PC%i Ens%i" % (pcn+1,e+1))
-                    eofpatp *= -1
+                    eofpatp    *= -1
                     pcs[:,pcn] *= -1
              
             # ----- Check Sign end -----
@@ -410,6 +410,6 @@ else:
 print("Completed NHFLX Regression in %.2f" % (time.time()-lstart))
 
 # Save output
-savename = "%sNAO_Monthly_Regression_PC123.npz"%(outpath) 
+savename = "%sNAO_Monthly_Regression_PC123_naotype%i.npz"%(outpath,naotype) 
 np.savez(savename,pcall=pcall,flxpattern=flxpattern,psleofall=eofall,varexpall=varexpall)
 print("saved to %s. Script complete in %.2f" %(savename,time.time()-allstart))
