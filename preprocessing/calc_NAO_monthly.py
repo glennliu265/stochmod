@@ -68,8 +68,8 @@ allstart = time.time()
 naotype = 2
 
 # Bounding Box to compute eof over
-# bboxNAO = [-90,40,20,80] # NAO BOX BASED ON DESER ET AL PAPER
-bboxNAO = [-90,20,20,75]
+bboxNAO = [-90,40,20,80] # NAO BOX BASED ON DESER ET AL PAPER
+#bboxNAO = [-90,20,20,75]
 djfm    = [11,0,1,2] # Months to average over for NAO calculation
 
 # EOF flipping options
@@ -231,7 +231,7 @@ if naotype < 2:
                 
                 rsum = proc.sel_region(eofpatp.T,lon,lat,eapbox,reg_sum=1)
                 if rsum > 0:
-                    print("\t Flipping sign based on EAP, PC%i Ens%i" % (pcn+1,e+1))
+                    #print("\t Flipping sign based on EAP, PC%i Ens%i" % (pcn+1,e+1))
                     eofpatp *= -1
                     pcs[:,pcn] *= -1
              
@@ -258,7 +258,7 @@ else:
         for m in range(12):
             # [Space x Time]
             varens = pslnao[e,:,:,m]
-            varglo = pslnao[e,:,:,m]
+            varglo = pslglo[e,:,:,m]
              
              # Get rid of NaN points
             okdata,knan,okpts    = proc.find_nan(varens,1)
@@ -294,7 +294,7 @@ else:
                 
                     chksum = np.nansum(eofpatp[rboxlat[:,None],rboxlon[None,:]],(0,1))
                     if chksum > 0:
-                        print("\t Flipping sign based on Reykjavik, Month %i Ens%i" % (m+1,e+1))
+                        #print("\t Flipping sign based on Reykjavik, Month %i Ens%i" % (m+1,e+1))
                         eofpatp *= -1
                         pcs[:,pcn] *= -1
 
@@ -305,7 +305,7 @@ else:
                 
                 chksum = np.nansum(eofpatp[lboxlat[:,None],lboxlon[None,:]],(0,1))
                 if chksum < 0:
-                    print("\t Flipping sign based on Lisbon, Month %i Ens%i" % (m+1,e+1))
+                    #print("\t Flipping sign based on Lisbon, Month %i Ens%i" % (m+1,e+1))
                     eofpatp *= -1
                     pcs[:,pcn] *= -1
                 
@@ -314,7 +314,7 @@ else:
                     
                     rsum = proc.sel_region(eofpatp.T,lon,lat,eapbox,reg_sum=1)
                     if rsum > 0:
-                        print("\t Flipping sign based on EAP, PC%i onth %i Ens%i" % (pcn+1,m+1,e+1))
+                        #print("\t Flipping sign based on EAP, PC%i onth %i Ens%i" % (pcn+1,m+1,e+1))
                         eofpatp *= -1
                         pcs[:,pcn] *= -1
                  
@@ -386,7 +386,7 @@ if naotype == 0:
 else:
     
     #Preallocate 
-    flxpattern = np.zeros((nens,m,192*288,N_mode))
+    flxpattern = np.zeros((nens,12,192*288,N_mode))
     
     # Loop for each pc
     for n in range(N_mode):
