@@ -144,13 +144,20 @@ invar = np.reshape(pslglo.transpose(3,2,0,1),(nlon,nlat,ntime*nens))
 
 # Correct if expressed in degrees west
 if bboxNAO[0] < 0: bboxNAO[0] += 360
-if bboxNAO[1] < 0: bboxNAO[0] += 360
+if bboxNAO[1] < 0: bboxNAO[1] += 360
 
 # Select NAO region and reshape to original dimensions
 pslnao,rlon,rlat = proc.sel_region(invar,lon,lat,bboxNAO,warn=0)
 nlatr = len(rlat)
 nlonr = len(rlon)
 pslnao = pslnao.reshape(nlonr,nlatr,1032,42).transpose(3,2,1,0) # reshape to [ens x time x lat x lon]
+
+# Apply Area Weights
+wgt    = np.sqrt(np.cos(np.radians(rlat)))
+pslnao = pslnao * wgt[None,None,:,None]
+
+
+
 
 # Separate out the month and year dimensions and combine lat/lon, then transpose to [ens x space x yr x mon]
 pslnao = pslnao.reshape(nens,nyr,12,nlatr*nlonr).transpose(0,3,1,2) #[ens x space x yr x mon]
@@ -165,6 +172,10 @@ if naotype < 2:
     # Take the DJFM mean 
     pslnao = pslnao[:,:,:,djfm].mean(3) # [ens x space x yr]
     pslglo = pslglo[:,:,:,djfm].mean(3) # [ens x space x yr]
+    
+    # Remove ensemble mean
+    pslnao = pslnao - pslnao.mean(0)[None,:,:]
+    pslglo = pslglo - pslglo.mean(0)[None,:,:]
     
     # Preallocate
     pcall      = np.zeros((nens,nyr,N_mode))     # [ens x year x pc]
@@ -191,6 +202,7 @@ if naotype < 2:
         
         #Loop for each mode... (NOte, can vectorize this to speed it up,.)
         psleofs = np.ones((192,288,3))
+        
         for pcn in range(N_mode):
 
             # Regress back to SLP 
@@ -247,6 +259,9 @@ if naotype < 2:
 
 # Calculate Monthly EOF
 else:
+    
+    pslnao = pslnao - pslnao.mean(0)[None,:,:,:]
+    pslglo = pslglo - pslglo.mean(0)[None,:,:]
     
     # Preallocate [ens x mon x year]
     pcall      = np.zeros((nens,12,nyr,N_mode))     # [ens x mon x year x pc]
