@@ -147,7 +147,7 @@ if bboxNAO[0] < 0: bboxNAO[0] += 360
 if bboxNAO[1] < 0: bboxNAO[0] += 360
 
 # Select NAO region and reshape to original dimensions
-pslnao,rlon,rlat = proc.sel_region(invar,lon,lat,bboxNAO)
+pslnao,rlon,rlat = proc.sel_region(invar,lon,lat,bboxNAO,warn=0)
 nlatr = len(rlat)
 nlonr = len(rlon)
 pslnao = pslnao.reshape(nlonr,nlatr,1032,42).transpose(3,2,1,0) # reshape to [ens x time x lat x lon]
@@ -194,7 +194,7 @@ if naotype < 2:
         for pcn in range(N_mode):
 
             # Regress back to SLP 
-            eofpatokp,_ = proc.regress_2d(pcstd[:,pcn],okdatap)
+            eofpatokp,_ = proc.regress_2d(pcstd[:,pcn],okdatap,nanwarn=0)
 
             # Reshape regression pattern and put back (for psl)
             eofpatp = np.ones((192*288))*np.nan
@@ -229,7 +229,7 @@ if naotype < 2:
             # Check for EAP Pattern and Flip (EO#F2 and EOF3)
             elif (pcn == 1) | (pcn == 2):
                 
-                rsum = proc.sel_region(eofpatp.T,lon,lat,eapbox,reg_sum=1)
+                rsum = proc.sel_region(eofpatp.T,lon,lat,eapbox,reg_sum=1,warn=0)
                 if rsum > 0:
                     #print("\t Flipping sign based on EAP, PC%i Ens%i" % (pcn+1,e+1))
                     eofpatp    *= -1
@@ -276,7 +276,7 @@ else:
             for pcn in range(N_mode):
 
                 # Regress back to SLP 
-                eofpatokp,_ = proc.regress_2d(pcstd[:,pcn],okdatap)
+                eofpatokp,_ = proc.regress_2d(pcstd[:,pcn],okdatap,nanwarn=0)
 
                 # Reshape regression pattern and put back (for psl)
                 eofpatp = np.ones((192*288))*np.nan
@@ -312,7 +312,7 @@ else:
                 # Check for EAP Pattern and Flip (EOF2 and EOF3)
                 elif (pcn == 1) | (pcn == 2):
                     
-                    rsum = proc.sel_region(eofpatp.T,lon,lat,eapbox,reg_sum=1)
+                    rsum = proc.sel_region(eofpatp.T,lon,lat,eapbox,reg_sum=1,warn=0)
                     if rsum > 0:
                         #print("\t Flipping sign based on EAP, PC%i onth %i Ens%i" % (pcn+1,m+1,e+1))
                         eofpatp *= -1
@@ -346,7 +346,7 @@ else:
 if nhflx.shape[0] != 42:
     ensdim = nhflx.shape.index(nens)
     dimsbefore = np.arange(0,ensdim,1)
-    dimsafter  = np.arange(ensdim+1,len(nhflx.shape),1)
+    dimsafter  = np.arange([ensdim+1],len(nhflx.shape),1)
     nhflx = nhflx.transpose(np.concatenate([ensdim,dimsbefore,dimsafter]))
     print("Warning: Moving ensemble to first dimension")
 
@@ -369,12 +369,13 @@ if naotype == 0:
             
             # Get PC # Time
             pcin = pcall[e,:,n]
+            pcin = pcin/np.nanstd(pcin)
             
             # Get variable # Space x Time
             varin = nhflx[e,:,:]
             
             # Perform regression
-            flxpattern[e,:,n],_ = proc.regress_2d(pcin,varin)
+            flxpattern[e,:,n],_ = proc.regress_2d(pcin,varin,nanwarn=0)
             
             msg = '\rCompleted Regression for PC %02i/%02i, ENS %02i/%02i' % (n+1,N_mode,e+1,nens)
             print(msg,end="\r",flush=True)
@@ -398,12 +399,13 @@ else:
                     pcin = pcall[e,:,n]
                 else:
                     pcin = pcall[e,m,:,n]
+                pcin = pcin/np.nanstd(pcin)
                 
                 # Get variable
                 varin = nhflx[e,:,:,m]
                 
                 # Perform regression
-                flxpattern[e,m,:,n],_ = proc.regress_2d(pcin,varin)
+                flxpattern[e,m,:,n],_ = proc.regress_2d(pcin,varin,nanwarn=0)
                 msg = '\rCompleted Regression for Mon %02d/12 PC %02i/%02i, ENS %02i/%02i' % (m+1,n+1,N_mode,e+1,nens)
                 print(msg,end="\r",flush=True)
     flxpattern = flxpattern.reshape(nens,12,nlat,nlon,N_mode)
