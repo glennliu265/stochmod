@@ -339,27 +339,25 @@ else:
 lstart = time.time()
 if naotype == 0:
     dsw = scm.cut_NAOregion(dsall,mons=[12,1,2,3])
-    nhflx = dsw.NHFLX.values * -1  # Flip so that things are positive downwards   
+    nhflx = dsw.NHFLX.values * -1  # Flip so that things are positive downwards  
+    nhflx = nhflx.reshape(nens,nyr,nlat*nlon).transpose(0,2,1)  
 else:
     nhflx = dsall.NHFLX.values * -1 # Flip so that things are positive downwards
 # Move ensemble dimension to the front
 if nhflx.shape[0] != 42:
     ensdim = nhflx.shape.index(nens)
     dimsbefore = np.arange(0,ensdim,1)
-    dimsafter  = np.arange([ensdim+1],len(nhflx.shape),1)
-    nhflx = nhflx.transpose(np.concatenate([ensdim,dimsbefore,dimsafter]))
+    dimsafter  = np.arange(ensdim+1,len(nhflx.shape),1)
+    nhflx = nhflx.transpose(np.concatenate([[ensdim],dimsbefore,dimsafter]))
     print("Warning: Moving ensemble to first dimension")
 
-# Separate out the month and year dimensions and combine lat/lon, then transpose to [ens x space x yr x mon]
-nhflx = nhflx.reshape(nens,nyr,12,nlat*nlon).transpose(0,3,1,2)  
+    # Separate out the month and year dimensions and combine lat/lon, then transpose to [ens x space x yr x mon]
+    nhflx = nhflx.reshape(nens,nyr,12,nlat*nlon).transpose(0,3,1,2)  
 
     
 # Perform regression based on the 
 if naotype == 0:
-    
-    # Take djf mean
-    nhflx = nhflx[:,:,:,djfm].mean(3)
-    
+        
     # Preallocate
     flxpattern = np.zeros((nens,192*288,N_mode))
     
