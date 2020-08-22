@@ -338,7 +338,7 @@ else:
 # Load NHFLX Data
 lstart = time.time()
 if naotype == 0:
-    dsw = scm.cut_NAOregion(ds,mons=[12,1,2,3])
+    dsw = scm.cut_NAOregion(dsall,mons=[12,1,2,3])
     nhflx = dsw.NHFLX.values * -1  # Flip so that things are positive downwards   
 else:
     nhflx = dsall.NHFLX.values * -1 # Flip so that things are positive downwards
