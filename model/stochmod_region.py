@@ -29,7 +29,7 @@ lonf = -30
 latf = 50
 
 # ID of the run (determines random number sequence if loading or generating)
-runid = "001"
+runid = "002"
 
 # White Noise Options. Set to 1 to load data
 genrand   = 1  # Set to 1 to regenerate white noise time series, with runid above
@@ -61,15 +61,20 @@ latS = -20
 latN = 90
 
 # Running Location
-#stormtrack = 1 # Set to 1 if running on stormtrack
+stormtrack = 1 # Set to 1 if running on stormtrack
 
 #Set Paths
-projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
-scriptpath  = projpath + '03_Scripts/stochmod/'
-datpath     = projpath + '01_Data/'
-#outpath    = projpath + '02_Figures/20200723/'
+if stormtrack == 0:
+    projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
+#    scriptpath  = projpath + '03_Scripts/stochmod/'
+    datpath     = projpath + '01_Data/'
+
+elif stormtrack == 1:
+    datpath = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/"
+    
 input_path  = datpath + 'model_input/'
-output_path = datpath + 'model_output/'
+output_path = datpath + 'model_output/'   
+    
 
 # Set up some strings for labeling
 #mons3=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
@@ -172,7 +177,7 @@ if funiform > 1:
         naoforcing = np.load(input_path+"NAO_EAP_NHFLX_ForcingDJFM.npy") #[PC x Ens x Lat x Lon]
         
         # Select PC2 and take ensemble average
-        NAO1 = naoforcing[1,:,:,:].mean(1)# [Lat x Lon] # Take mean along ensemble dimension, sum along pc 1-2
+        NAO1 = naoforcing[1,:,:,:].mean(0)# [Lat x Lon] # Take mean along ensemble dimension, sum along pc 1-2
         NAO1 = NAO1[None,:,:] # [1 x Lat x Lon]
         
     elif funiform == 6:
@@ -294,7 +299,10 @@ if pointmode == 0:
             Fh = Fseas[hi]
         else:
             Fh = F
-            
+        
+        if Fh.shape[2] < 12:
+            Fh = np.tile(Fh,12)
+        
         if funiform == 0:
             randts = np.copy(Fh)
         

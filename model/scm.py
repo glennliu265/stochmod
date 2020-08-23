@@ -530,7 +530,7 @@ def noentrain_2d(randts,lbd,T0,F):
     
     
     """
-    
+     
     # Determine run length for uniform or patterned forcing
     if len(randts.shape) > 1:
         t_end = randts.shape[2]
