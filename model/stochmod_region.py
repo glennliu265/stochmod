@@ -29,10 +29,10 @@ lonf = -30
 latf = 50
 
 # ID of the run (determines random number sequence if loading or generating)
-runid = "002"
+runid = "001"
 
 # White Noise Options. Set to 1 to load data
-genrand   = 0  # Set to 1 to regenerate white noise time series, with runid above
+genrand   = 1  # Set to 1 to regenerate white noise time series, with runid above
 
 # Forcing Type
 # 0 = completely random in space time
@@ -40,8 +40,8 @@ genrand   = 0  # Set to 1 to regenerate white noise time series, with runid abov
 # 2 = NAO-like NHFLX Forcing (DJFM), temporally varying 
 # 3 = NAO-like NHFLX Forcing, with NAO (DJFM) and NHFLX (Monthly)
 # 4 = NAO-like NHFLX Forcing, with NAO (Monthly) and NHFLX (Monthly)
-funiform = 4     # Forcing Mode (see options above)
-fscale   = 1    # Value to scale forcing by
+funiform = 0     # Forcing Mode (see options above)
+fscale   = 1     # Value to scale forcing by
 
 # Integration Options
 nyr      = 1000        # Number of years to integrate over
@@ -60,15 +60,16 @@ lonE = 20
 latS = -20
 latN = 90
 
+# Running Location
+#stormtrack = 1 # Set to 1 if running on stormtrack
+
 #Set Paths
 projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
-scriptpath = projpath + '03_Scripts/stochmod/'
-datpath    = projpath + '01_Data/'
-outpath    = projpath + '02_Figures/20200723/'
-
-
-
-
+scriptpath  = projpath + '03_Scripts/stochmod/'
+datpath     = projpath + '01_Data/'
+#outpath    = projpath + '02_Figures/20200723/'
+input_path  = datpath + 'model_input/'
+output_path = datpath + 'model_output/'
 
 # Set up some strings for labeling
 #mons3=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
@@ -89,16 +90,15 @@ allstart = time.time()
 # --------------
 
 # Load damping variables (calculated in hfdamping matlab scripts...)
-damppath    = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/'
 dampmat     = 'ensavg_nhflxdamping_monwin3_sig020_dof082_mode4.mat'
-loaddamp    = loadmat(damppath+dampmat)
+loaddamp    = loadmat(input_path+dampmat)
 LON         = np.squeeze(loaddamp['LON1'])
 LAT         = np.squeeze(loaddamp['LAT'])
 damping     = loaddamp['ensavg']
 
 # Load Mixed layer variables (preprocessed in prep_mld.py)
-mld         = np.load(datpath+"HMXL_hclim.npy") # Climatological MLD
-kprevall    = np.load(datpath+"HMXL_kprev.npy") # Entraining Month
+mld         = np.load(input_path+"HMXL_hclim.npy") # Climatological MLD
+kprevall    = np.load(input_path+"HMXL_kprev.npy") # Entraining Month
 
 
 # Save Options are here
@@ -142,10 +142,10 @@ if funiform > 1:
     if funiform == 2:
         
         # Load NAO Forcing and prepare (Prepared in regress_NAO_pattern.py)
-        naoforcing = np.load(datpath+"NAO_NHFLX_Forcing.npy") #[PC x Ens x Lat x Lon]
+        naoforcing = np.load(input_path+"NAO_EAP_NHFLX_ForcingDJFM.npy") #[PC x Ens x Lat x Lon]
         
         # Select PC1 and take ensemble average
-        NAO1 = np.nanmean(naoforcing[0,:,:,:],0) # [Lat x Lon]
+        NAO1 = np.mean(naoforcing[0,:,:,:],0) # [Lat x Lon]
         NAO1 = NAO1[None,:,:] # [1 x Lat x Lon]
         
     elif funiform == 3:
@@ -157,10 +157,39 @@ if funiform > 1:
         
     elif funiform == 4:
         
-        # Load Forcing and take ensemble average
-        naoforcing = np.load(datpath+"NAO_Monthly_Regression_PC.npz")['eofall'] #[Ens x Mon x Lat x Lon]
-        NAO1 = np.nanmean(naoforcing,0)
+        # # Load Forcing and take ensemble average
+        # naoforcing = np.load(datpath+"NAO_Monthly_Regression_PC.npz")['eofall'] #[Ens x Mon x Lat x Lon]
+        # NAO1 = np.nanmean(naoforcing,0)
     
+          # Load Forcing and take ensemble average
+        naoforcing = np.load(datpath+"NAO_Monthly_Regression_PC123.npz")['flxpattern'] #[Ens x Mon x Lat x Lon]
+        
+        # Take ensemble average, then sum EOF 1 and EOF2
+        NAO1 = naoforcing[:,:,:,:,0].mean(0)
+    
+    elif funiform == 5: # Apply EAP only
+        # Load NAO Forcing and prepare (Prepared in regress_NAO_pattern.py)
+        naoforcing = np.load(input_path+"NAO_EAP_NHFLX_ForcingDJFM.npy") #[PC x Ens x Lat x Lon]
+        
+        # Select PC2 and take ensemble average
+        NAO1 = naoforcing[1,:,:,:].mean(1)# [Lat x Lon] # Take mean along ensemble dimension, sum along pc 1-2
+        NAO1 = NAO1[None,:,:] # [1 x Lat x Lon]
+        
+    elif funiform == 6:
+        # Load NAO Forcing and prepare (Prepared in regress_NAO_pattern.py)
+        naoforcing = np.load(input_path+"NAO_EAP_NHFLX_ForcingDJFM.npy") #[PC x Ens x Lat x Lon]
+        
+        # Select PC1-2 and take ensemble average + sum
+        NAO1 = naoforcing[0:2,:,:,:].mean(1).sum(0)# [Lat x Lon] # Take mean along ensemble dimension, sum along pc 1-2
+        NAO1 = NAO1[None,:,:] # [1 x Lat x Lon]
+        
+    elif funiform == 7:
+        
+        # Load Forcing and take ensemble average
+        naoforcing = np.load(datpath+"NAO_Monthly_Regression_PC123.npz")['flxpattern'] #[Ens x Mon x Lat x Lon]
+        
+        # Take ensemble average, then sum EOF 1 and EOF2
+        NAO1 = naoforcing[:,:,:,:,:2].mean(0).sum(3)
     
     # Transpose to [Lon x Lat x Time]
     NAO1 = np.transpose(NAO1,(2,1,0))
@@ -199,21 +228,21 @@ if genrand == 1:
         F = np.random.normal(0,1,size=(lonsize,latsize,t_end)) * fscale # Removed Divide by 4 to scale between -1 and 1
         
         # Save Forcing
-        np.save(datpath+"stoch_output_%iyr_funiform%i_run%s_Forcing.npy"%(nyr,funiform,runid),F)
+        np.save(output_path+"stoch_output_%iyr_funiform%i_run%s_Forcing.npy"%(nyr,funiform,runid),F)
 
     else:
         
         randts = np.random.normal(0,1,size=t_end) # Removed Divide by 4 to scale between -1 and 1
-        np.save(datpath+"stoch_output_%iyr_run%s_randts.npy"%(nyr,runid),randts)
+        np.save(output_path+"stoch_output_%iyr_run%s_randts.npy"%(nyr,runid),randts)
     
 else:
     print("Loading Old Data")
     if funiform == 0:
         # Directly load forcing
-        F = np.load(datpath+"stoch_output_%iyr_run%s_funiform%i_fscale%02d_Forcing.npy"%(nyr,runid,funiform))
+        F = np.load(output_path+"stoch_output_%iyr_run%s_funiform%i_fscale%02d_Forcing.npy"%(nyr,runid,funiform))
     else:
         
-        randts = np.load(datpath+"stoch_output_%iyr_run%s_randts.npy"%(nyr,runid))
+        randts = np.load(output_path+"stoch_output_%iyr_run%s_randts.npy"%(nyr,runid))
 
 
 # Make forcing
@@ -233,12 +262,12 @@ if funiform != 0:
         
     # Save Forcing
     if saveforcing == 1:
-        np.save(datpath+"stoch_output_%iyr_funiform%i_run%s_fscale%03d_Forcing.npy"%(nyr,funiform,runid,fscale),F)
+        np.save(output_path+"stoch_output_%iyr_funiform%i_run%s_fscale%03d_Forcing.npy"%(nyr,funiform,runid,fscale),F)
 
 print("Forcing Setup in %s" % (time.time() - startf))
 
-if funiform == 0:
-    randts = np.copy(t_end) # Just assign this for now since there is no randts which is a required input in the model code
+#if funiform == 0:
+    #randts = np.copy(t_end) # Just assign this for now since there is no randts which is a required input in the model code
 #
 #%% Scrap Zone for vectorization
 #
@@ -265,7 +294,11 @@ if pointmode == 0:
             Fh = Fseas[hi]
         else:
             Fh = F
-
+            
+        if funiform == 0:
+            randts = np.copy(Fh)
+        
+        
         T_entr0_all[hi],_ =  scm.noentrain_2d(randts,lbdh,T0,Fh)
         print("Simulation for No Entrain Model, hvarmode %s completed in %s" % (hi,time.time() - start))
         
@@ -438,11 +471,19 @@ if pointmode == 1:
     sst = T_entr0_all.copy()
     sst[3] = T_entr1
     
-    np.savez(datpath+"stoch_output_point_%iyr_funiform%i_run%s_fscale%03d.npz"%(nyr,funiform,runid,fscale),sst=sst,hpt=hclim[ko,ka,:])
+    np.savez(output_path+"stoch_output_point_%iyr_funiform%i_run%s_fscale%03d.npz"%(nyr,funiform,runid,fscale),sst=sst,hpt=hclim[ko,ka,:])
 else:
-    np.save(datpath+"stoch_output_%iyr_funiform%i_entrain0_run%s_fscale%03d.npy"%(nyr,funiform,runid,fscale),T_entr0_all)
-    np.save(datpath+"stoch_output_%iyr_funiform%i_entrain1_run%s_fscale%03d.npy"%(nyr,funiform,runid,fscale),T_entr1)
-    #np.save(datpath+"stoch_output_1000yr_funiform%i_Forcing.npy"%(funiform),F)
-
+    
+    
+    # Combine entraining and nonentraining models into 1 dictionary
+    sst = T_entr0_all.copy()
+    sst[3] = T_entr1
+    
+    # SAVE ALL in 1
+    np.save(output_path+"stoch_output_%iyr_funiform%i_run%s_fscale%03d.npy"%(nyr,funiform,runid,fscale),sst)
+    
+    #np.save(output_path+"stoch_output_%iyr_funiform%i_entrain0_run%s_fscale%03d.npy"%(nyr,funiform,runid,fscale),T_entr0_all)
+    #np.save(output_path+"stoch_output_%iyr_funiform%i_entrain1_run%s_fscale%03d.npy"%(nyr,funiform,runid,fscale),T_entr1)
 
 print("stochmod_region.py ran in %.2fs"% (time.time()-allstart))
+print("Output saved as %s" + output_path + "stoch_output_%iyr_funiform%i_run%s_fscale%03d.npy"%(nyr,funiform,runid,fscale))

@@ -532,8 +532,10 @@ def noentrain_2d(randts,lbd,T0,F):
     """
     
     # Determine run length for uniform or patterned forcing
-
-    t_end = len(randts)
+    if len(randts.shape) > 1:
+        t_end = randts.shape[2]
+    else:
+        t_end = len(randts)
     
     # Preallocate
     temp_ts = np.ones((lbd.shape[0],lbd.shape[1],t_end))    * np.nan
