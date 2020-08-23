@@ -14,9 +14,6 @@ import xarray as xr
 import time
 import sys
 
-
-
-
 from dask.distributed import Client,progress
 import dask
 
@@ -47,6 +44,7 @@ t_end    = 12*nyr      # Calculates Integration Period
 dt       = 60*60*24*30 # Timestep size (Will be used to multiply lambda)
 T0       = 0           # Initial temperature [degC]
 hfix     = 50          # Fixed MLD value (meters)
+fstd     = 0.3         # Standard deviation of the forcing
 
 # Set Constants
 cp0      = 3850 # Specific Heat [J/(kg*C)]
@@ -74,7 +72,7 @@ if stormtrack == 0:
 elif stormtrack == 1:
     datpath = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/"
     sys.path.append("/home/glliu/00_Scripts/01_Projects/00_Commons/")
-    sys.path.append("/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model")
+    sys.path.append("/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model/")
 
 import scm
 from amv import proc
@@ -236,14 +234,14 @@ if genrand == 1:
     print("Generating New Time Series")
     if funiform == 0:
         # Generate nonuniform forcing [lon x lat x time]
-        F = np.random.normal(0,1,size=(lonsize,latsize,t_end)) * fscale # Removed Divide by 4 to scale between -1 and 1
+        F = np.random.normal(0,fstd,size=(lonsize,latsize,t_end)) * fscale # Removed Divide by 4 to scale between -1 and 1
         
         # Save Forcing
         np.save(output_path+"stoch_output_%iyr_funiform%i_run%s_Forcing.npy"%(nyr,funiform,runid),F)
 
     else:
         
-        randts = np.random.normal(0,1,size=t_end) # Removed Divide by 4 to scale between -1 and 1
+        randts = np.random.normal(0,fstd,size=t_end) # Removed Divide by 4 to scale between -1 and 1
         np.save(output_path+"stoch_output_%iyr_run%s_randts.npy"%(nyr,runid),randts)
     
 else:
