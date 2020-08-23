@@ -10,8 +10,9 @@ Created on Sun Aug 23 17:10:35 2020
 
 
 import sys
-
+import time
 #%% Determine System
+startall = time.time()
 stormtrack = 1
 if stormtrack == 0:
     projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
@@ -60,9 +61,10 @@ for r in runids:
             fscale = 1
             genrand=1
         else:
-            fscale = naoscaling
+            fscale = naoscale
             genrand=0
     
     
 
-sr.stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,stormtrack)
+        sr.stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,stormtrack)
+        print("Completed run %i funiform %i (Runtime Total: %.2fs)" % (runid,funiform,time.time()-startall))
