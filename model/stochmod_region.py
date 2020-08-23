@@ -12,12 +12,11 @@ from scipy import stats
 #import seaborn as sns
 import xarray as xr
 import time
-
-# Add Module to search path
 import sys
-sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
-sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
-import scm
+
+
+
+
 from amv import proc
 from dask.distributed import Client,progress
 import dask
@@ -61,20 +60,27 @@ latS = -20
 latN = 90
 
 # Running Location
-stormtrack = 1 # Set to 1 if running on stormtrack
+stormtrack = 1 # Set to 1 if running in stormtrack
 
 #Set Paths
 if stormtrack == 0:
     projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 #    scriptpath  = projpath + '03_Scripts/stochmod/'
     datpath     = projpath + '01_Data/'
+   
+    sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
+    sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
+
 
 elif stormtrack == 1:
     datpath = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/"
-    
+    sys.path.append("/home/glliu/00_Scripts/01_Projects/00_Commons/")
+    sys.path.append("/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model")
+
+import scm
 input_path  = datpath + 'model_input/'
 output_path = datpath + 'model_output/'   
-    
+  
 
 # Set up some strings for labeling
 #mons3=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
