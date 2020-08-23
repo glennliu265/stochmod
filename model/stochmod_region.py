@@ -17,7 +17,6 @@ import sys
 
 
 
-from amv import proc
 from dask.distributed import Client,progress
 import dask
 
@@ -78,6 +77,7 @@ elif stormtrack == 1:
     sys.path.append("/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model")
 
 import scm
+from amv import proc
 input_path  = datpath + 'model_input/'
 output_path = datpath + 'model_output/'   
   
