@@ -41,7 +41,7 @@ latf     = 50
 # Experiment Settings
 entrain  = 1     # 0 = no entrain; 1 = entrain
 hvarmode = 2     # 0 = fixed mld ; 1 = max mld; 2 = clim mld 
-funiform = 2     # 0 = nonuniform; 1 = uniform; 2 = NAO-like; 3= NAO-monthly
+funiform = 6     # 0 = nonuniform; 1 = uniform; 2 = NAO-like; 3= NAO-monthly
 nyrs     = 1000  # Number of years the experiment was run
 runid    = "001" # Run ID for white noise sequence
 fscale   = 10
@@ -74,7 +74,6 @@ forcingname = ("All Random","Uniform","$(NAO & NHFLX)_{DJFM}$",
                "$(NAO  &  NHFLX)_{Mon}$",
                "$EAP_{DJFM}$",
                "$(NAO+EAP)_{DJFM}$")
-
 
 if Li_etal == 1:
     # Set Bounding Boxes and Regions
@@ -138,9 +137,7 @@ for r in range(nregion):
     
     sstregion[r] = sstr
 
-
-
-#%% Calculate autocorrelation for a given region
+#%% Calculate autocorrelation and SST averaged time series for a given region
 
 kmonths = {}
 autocorr_region = {}
@@ -185,7 +182,32 @@ np.savez("%sSST_Region_Autocorrelation_%s.npz"%(outpathdat,expid),autocorr_regio
 np.save("%sSST_RegionAvg_%s.npy"%(outpathdat,expid),sstavg_region)
 
 
-#%% Make the plots (individual)
+#%% Calculate AMV Index and Spatial Pattern for each region
+
+# Calculate different AMVs for each region
+amvbboxes = bboxes
+amvidx_region = {}
+amvpat_region = {}
+for region in range(nregion):
+    
+    #% Calculate AMV Index
+    amvtime = time.time()
+    amvidx = {}
+    amvpat = {}
+    
+    for model in range(4):
+        amvidx[model],amvpat[model] = proc.calc_AMVquick(sst[model],lonr,latr,amvbboxes[region])
+    print("Calculated AMV variables for region %s in %.2f" % (regions[region],time.time()-amvtime))
+    
+    amvidx_region[region] = amvidx
+    amvpat_region[region] = amvpat
+    
+# Save Regional Autocorrelation Data
+np.savez("%sAMV_Region_%s.npz"%(outpathdat,expid),amvidx_region=amvidx_region,amvpat_region=amvpat_region)
+
+
+
+#%% Plot Individual Autocorrelation Plots
 
 xlim = [0,36]
 xtks = np.arange(0,38,2)
@@ -207,10 +229,11 @@ for model in range(4):
     plt.xlim(xlim)
     plt.xticks(xtks)
 
-    plt.savefig(outpath+"Region_SST_Autocorrelation_run%s_model%s_funiform%i_fscale%i.png"%(runid,modelname[model],funiform,fscale),dpi=200)
+    plt.savefig(outpathfig+"Region_SST_Autocorrelation_run%s_model%s_funiform%i_fscale%i.png"%(runid,modelname[model],funiform,fscale),dpi=200)
 
 
-#%% Make the plots (row)
+#%% Make the Autoorrelation plots (row)
+
 xlim = [0,36]
 xtks = np.arange(0,39,3)
 ylim = [-0.25,1]
@@ -241,44 +264,12 @@ for model in range(4):
     
 plt.suptitle("SST Autocorrelation, Forcing %s" % forcingname[funiform])
 fig.tight_layout(rect=[0, 0.03, 1, 0.95])
-plt.savefig(outpath+"Region_SST_Autocorrelation_run%s_modelALL_funiform%i_fscale%i.png"%(runid,funiform,fscale),dpi=200)
+plt.savefig(outpathfig+"Region_SST_Autocorrelation_run%s_modelALL_funiform%i_fscale%i.png"%(runid,funiform,fscale),dpi=200)
 
 
-#%% Make same autocorrelation plot but using data from CESM
-cesmauto = np.load(datpath+"Autocorrelation_Region.npy",allow_pickle=True).item()
-cesmauto
 
-# Set colors
-rcolmem = [np.array([189,202,255])/255,
-           np.array([255,134,134])/255,
-           [.75,.75,.75]]
 
-fig,ax = plt.subplots(1,1,figsize = (3,2))
-                      
-for r in range(nregions): 
-    
-    rname = regions[r]
-    
-    for e in range(42):
-   
-        ax.plot(lags,cesmauto[r][e,:],color=rcolmem[r],alpha=0.5)
-    
-ln1 = ax.plot(lags,np.nanmean(cesmauto[0],0),color=regioncolor[0],label=regions[0])
-ln2 = ax.plot(lags,np.nanmean(cesmauto[1],0),color=regioncolor[1],label=regions[1])
-ln3 = ax.plot(lags,np.nanmean(cesmauto[2],0),color=regioncolor[2],label=regions[2])
-
-plt.grid(True)
-ax.set_xlim(xlim)
-ax.set_xticks(xtks)
-ax.set_ylim(ylim)
-ax.set_yticks(ytks)
-lns = ln1 + ln2 + ln3
-labs = [l.get_label() for l in lns]
-ax.legend(lns,labs,prop={'size':8})
-ax.set_title("CESM Autocorrelation")
-plt.savefig(outpathfig+"Region_SST_Autocorrelation_CESM.png",dpi=200)
-
-#%% Make a referece CESM plot
+#%% Make a referece CESM plot of region-averaged SST time series
 
 units = 'degC'
 
@@ -318,5 +309,6 @@ for r in range(nregion):
     plt.savefig("%sSST_%s_%s.png"%(outpathfig,expid,regions[r]),dpi=200)
 
 
+#%%
 
 
