@@ -13,7 +13,7 @@ import sys
 import time
 #%% Determine System
 startall = time.time()
-stormtrack = 1
+stormtrack = 0
 if stormtrack == 0:
     projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 #    scriptpath  = projpath + '03_Scripts/stochmod/'
@@ -46,16 +46,16 @@ fstd     = 0.3         # Standard deviation of the forcing
 bboxsim  = [-100,20,-20,90] # Simulation Box
 
 # Do a stormtrackloop
-runids = ("003","004","005")
-funiforms = (0,1,2,5,6)
+#runids = ("003","004","005")
+#funiforms = (0,1,2,5,6)
+funiforms=[6]
+runids=['001']
 
-for r in runids:
+for runid in runids:
     
-    runid = runids[r]
     
-    for f in funiforms:
+    for funiform in funiforms:
         
-        funiform = funiforms[f]
         
         if funiform < 2:
             fscale = 1
@@ -67,4 +67,4 @@ for r in runids:
     
 
         sr.stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,stormtrack)
-        print("Completed run %i funiform %i (Runtime Total: %.2fs)" % (runid,funiform,time.time()-startall))
+        print("Completed run %s funiform %s (Runtime Total: %.2fs)" % (runid,funiform,time.time()-startall))
