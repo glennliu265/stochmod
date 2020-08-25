@@ -288,11 +288,10 @@ def set_stochparams(h,damping,dt,ND=True,rho=1000,cp0=4218,hfix=50):
     if ND == True:
         beta = np.log( h / np.roll(h,1,axis=2) ) # Roll along time axis
         
-        
         # Find Maximum MLD during the year
         hmax = np.nanmax(np.abs(h),axis=2)
         hmax = hmax[:,:,None]
-    
+        
     else:
         beta = np.log( h / np.roll(h,1,axis=0) )
         
@@ -306,7 +305,7 @@ def set_stochparams(h,damping,dt,ND=True,rho=1000,cp0=4218,hfix=50):
     # Replace Nans with Zeros in beta
     #beta = np.nan_to_num(beta)
     
-    # Preallocate lambda variable
+    # Preallocate lambda variable 
     lbd = {}
     
     # Fixed MLD
@@ -319,11 +318,17 @@ def set_stochparams(h,damping,dt,ND=True,rho=1000,cp0=4218,hfix=50):
     lbd[2] = damping / (rho*cp0*h) * dt
     
     # Calculate Damping (with entrainment)
-    lbd_entr = np.copy(lbd[2]) + beta    
+    lbd_entr = np.copy(lbd[2]) + beta
+    lbd[4] = lbd_entr.copy()
+    
     
     # Compute reduction factor
-    FAC = np.nan_to_num((1-np.exp(-lbd_entr))/lbd_entr)
-    FAC[FAC==0] = 1 # Change all zero FAC values to 1
+    FAC = {}  
+    for i in range(4):
+        
+        fac = np.nan_to_num((1-np.exp(-lbd[i]))/lbd_entr[i])
+        fac[fac==0] = 1 # Change all zero FAC values to 1
+        FAC[i] = fac.copy()
     
     return lbd,lbd_entr,FAC,beta
 
@@ -479,7 +484,6 @@ def make_naoforcing(NAOF,randts,fscale,nyr,FAC):
         3) NAOF   [Array] - NAO forcing [Lon x Lat x Mon] in Watts/m2
         4) fscale         - multiplier to scale white noise forcing\
         5) nyr    [int]   - Number of years to tile the forcing
-        6) FAC    [Array] - Reduction factor 
     Dependencies: 
         1) 
     
@@ -491,22 +495,24 @@ def make_naoforcing(NAOF,randts,fscale,nyr,FAC):
     # Make dictionary
     F = {}
     Fseas = {}
+
+    
     
     # Check if there is a month component
-
+    
     
     if len(NAOF[0]) > 2:
         
         # Fixed MLD
         tilecount = int(12/NAOF[0].shape[2]*nyr)
-        F[0] = np.tile(NAOF[0],tilecount) *randts[None,None,:] * fscale
+        F[0] = np.tile(NAOF[0],tilecount) *randts[None,None,:] * fscale 
             
         # Max MLD
         tilecount = int(12/NAOF[1].shape[2]*nyr)
-        F[1] = np.tile(NAOF[1],tilecount) *randts[None,None,:] * fscale
+        F[1] = np.tile(NAOF[1],tilecount) *randts[None,None,:] * fscale 
         
-        Fseas[0] = NAOF[0] * fscale
-        Fseas[1] = NAOF[1] * fscale
+        Fseas[0] = NAOF[0] * fscale 
+        Fseas[1] = NAOF[1] * fscale 
         
     else:
         
@@ -519,9 +525,9 @@ def make_naoforcing(NAOF,randts,fscale,nyr,FAC):
         Fseas[1] = NAOF[1][:,:,None] * fscale
     
     # Seasonally varying mld...
-    F[2] = np.tile(NAOF[2],nyr) * randts[None,None,:] * fscale * np.tile(FAC,nyr)
-    Fseas[2] =  NAOF[2][:,:,:] * fscale * FAC
-
+    F[2]     = np.tile(NAOF[2],nyr) * randts[None,None,:] * fscale 
+    Fseas[2] =  NAOF[2][:,:,:] * fscale 
+    
             
     return F,Fseas
 
