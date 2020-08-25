@@ -91,8 +91,60 @@ plt.legend()
 
 hlat = hlatnew.copy()
 hsst = dtdsfirst.copy()
+#hsst = dsfirst.copy()
 
 h_amv,h_regr = proc.calc_AMVquick(hsst,hlon,hlat,bbox)
+
+#%% Try Another Calculation Method
+#Methods
+# 0) Regress anomaly onto global mean
+# 1...N) Remove N-degree polynomial
+
+method = 3
+
+# Get timedim 
+x = np.arange(0,118,1)
+
+# First get annual averaged data
+hsstann = proc.ann_avg(hsstnew,2)
+hsstann = hsstann - hsstann.mean(2)[:,:,None]
+
+# Get nan points
+hsstann = hsstann.reshape(360*180,118)
+okdata,knan,okpts = proc.find_nan(hsstann,1)
+
+
+if method == 0:
+    # Calculate global mean SST
+    glomean = okdata.mean(0)
+    # Regress back to the original data to get the global component
+    beta,b=proc.regress_2d(glomean,okdata)
+    # Subtract this from the original data
+    okdt = okdata - beta[:,None]
+
+    # Calculate quadratic trend
+else: 
+    okdt,model = proc.detrend_poly(x,okdata,method)
+    
+    fig,ax=plt.subplots(1,1)
+    ax.scatter(x,okdata[44,:],label='raw')
+    ax.plot(x,model[44,:],label='fit')
+    ax.scatter(x,okdt[:,44],label='dt')
+    ax.set_title("Visualize Detrending Method %i"%method)
+    okdt = okdt.T
+    
+
+# Replace back into data
+hsstdt = np.ones((360*180,118)) * np.nan
+hsstdt[okpts,:] = okdt
+hsstdt = hsstdt.reshape(360,180,118)
+
+
+
+# Use this data to calculate amv
+h_amv,h_regr = proc.calc_AMVquick(hsstdt,hlon,hlat,bbox,anndata=True)
+
+
 
 #%% Plot AMV
 
@@ -113,28 +165,49 @@ bboxes = (bbox_SP,bbox_ST,bbox_TR,bbox_NA)
 #% Make AMV Spatial Plots
 cmap = cmocean.cm.balance
 cmap.set_bad(color='yellow')
-cint = np.arange(-1,1.1,0.1)
+cint = np.arange(-.5,.6,0.1)
 #clab = cint
 fig,axs = plt.subplots(1,1,figsize=(6,4),subplot_kw={'projection':ccrs.PlateCarree()})
-plotbbox = [-100,20,-20,90]
+plt.style.use('ggplot')
+plotbbox = [-100,10,-5,80]
 
 varin = h_regr.T
 viz.plot_AMV_spatial(varin,hlon,hlat,plotbbox,cmap,cint=cint,pcolor=0,ax=axs)
-axs.set_title("HadISST AMV SST Pattern (%s to %s)" % (startyr,hyr[0,-1]),fontsize=12)   
+axs.set_title("HadISST AMV SST Pattern (%s to %s)" % (startyr,hyr[0,-1]),fontsize=14)   
 
 
 # Add region plots
 ax = axs
 lwb = 1.5
-ax,l1 = viz.plot_box(bbox_SP,ax=ax,color='b',return_line=True,leglab='SPG',linewidth=lwb)
+ax,l4 = viz.plot_box(bbox_NA,ax=ax,color='k',return_line=True,leglab='NAT',linewidth=lwb,linestyle="solid")
 ax,l2 = viz.plot_box(bbox_ST,ax=ax,color='r',return_line=True,leglab='STG',linewidth=lwb)
-ax,l3 = viz.plot_box(bbox_TR,ax=ax,color=[0,1,0],return_line=True,leglab='TRO',linewidth=lwb)
-ax,l4 = viz.plot_box(bbox_NA,ax=ax,color='k',return_line=True,leglab='NAT',linewidth=lwb)
+ax,l1 = viz.plot_box(bbox_SP,ax=ax,color='b',return_line=True,leglab='SPG',linewidth=lwb,linestyle='dashed')
+ax,l3 = viz.plot_box(bbox_TR,ax=ax,color=[0,1,0],return_line=True,leglab='TRO',linewidth=lwb,linestyle='dashed')
 
 
-ax.legend([l1,l2,l3,l4],labels=regions,ncol=2,loc='upper left')
 
+leg = ax.legend([l1,l2,l3,l4],labels=regions,ncol=4,bbox_to_anchor=(0, -0.1),loc='upper left')
+#leg(fancybox=True,shadow=True)
+#ax.legend([l1,l2,l3,l4],labels=regions,ncol=4,bbox_to_anchor=(-0.1, 1.1),loc='upper left')
 
-outname = '%sHadISST_AMVpattern_%s-%s.png' % (outpath,startyr,hyr[0,-1])
+outname = '%sHadISST_AMVpattern_%s-%s_dtmethod%i.png' % (outpath,startyr,hyr[0,-1],method)
 plt.savefig(outname, bbox_inches="tight",dpi=200)
 
+#%% Plot AMV INdex
+
+xtks = np.arange(0,140,20)
+xtkl = np.arange(startyr,startyr+140,20)
+fig,ax = plt.subplots(1,1,figsize=(5,1))
+ax = viz.plot_AMV(h_amv,ax=ax)
+ytks = np.arange(-0.5,0.75,0.25)
+    
+ax.set_xticks(xtks)
+ax.set_xticklabels(xtkl)
+ax.set_ylim(-.5,.5)
+ax.set_yticks(ytks)
+ax.set_title("HadISST AMV Index (%s to %s)" % (startyr,hyr[0,-1]),fontsize=10) 
+outname = '%sHadISST_AMVIDX_%s-%s_dtmethod%i.png' % (outpath,startyr,hyr[0,-1],method)
+plt.savefig(outname, bbox_inches="tight",dpi=200)
+    
+    
+    
