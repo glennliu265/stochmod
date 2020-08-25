@@ -132,3 +132,21 @@ ax.legend(lns,labs,prop={'size':8})
 ax.set_title("CESM Autocorrelation")
 
 plt.savefig(outpathfig+"Region_SST_Autocorrelation_CESM.png",dpi=200)
+
+#%% Make a referece CESM plot of region-averaged SST time series
+
+units = 'degC'
+
+
+fig,axs = plt.subplots(4,1,figsize=(6,6)) 
+#plt.style.use('ggplot')
+plt.style.use('seaborn')
+for r in range(nregion):
+    
+    sstin = cesmsst[r]
+    ax = axs[r]
+    titlestr = "%s %s" % (regions[r],viz.quickstatslabel(sstin))
+    ax = viz.ensemble_plot(sstin,0,ax=ax,color=regioncolor[r],ysymmetric=1,ialpha=0.05)
+    ax.set_title(titlestr)    
+plt.tight_layout()
+plt.savefig("%sCESM1LE_RegionalSSTStats.png"%(outpathfig),dpi=200)
