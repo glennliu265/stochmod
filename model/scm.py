@@ -35,7 +35,7 @@ Dependencies:
  4) F     : Forcing term
     
 """
-def noentrain(t_end,lbd,T0,F):
+def noentrain(t_end,lbd,T0,F,FAC,multFAC=1):
     debugmode = 1 # Set to 1 to also save noise and damping time series
     
     # Preallocate
@@ -48,13 +48,15 @@ def noentrain(t_end,lbd,T0,F):
         noise_ts = []
         damp_ts = []
         
-    
+    # Set value for first timestep
     temp_ts[0] = T0
-    
     
     # Prepare the entrainment term
     explbd = np.exp(-lbd)
     explbd[explbd==1] = 0
+    
+    if multFAC ==1:
+        F *= np.tile(FAC,int(t_end/12)) # Tile FAC and scale forcing
     
     # Loop for integration period (indexing convention from matlab)
     for t in range(1,t_end):
@@ -104,7 +106,7 @@ Dependencies:
  4) F     : Forcing term
     
 """
-def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,debugmode=0):
+def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debugmode=0):
     
     # Set tdebugmode to 1 to also save noise,damping,entrain, and Td time series
     linterp   = 1 # Set to 1 to use the kprev variable and linearly interpolate variables
@@ -131,6 +133,9 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,debugmode=0):
     
     # Combine terms where possible 
     B = np.copy(beta*FAC)
+    if multFAC ==1:
+        F *= np.tile(FAC,int(t_end/12)) # Tile FAC and scale forcing
+    
     
     # Assign initial conditions
     temp_ts[0] = np.copy(T0)
@@ -165,7 +170,6 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,debugmode=0):
                 
                 # Calculate Td
                 if linterp == 1:
-                    
 
                     
                     # Get information about the last month
@@ -173,16 +177,13 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,debugmode=0):
                     if m0 == 0:
                         m0 = 12
                     
-                    
-                    
                     # Find # of months since the anomaly was formed
                     k1m = (m - np.floor(kprev[m-1])) % 12
                     k0m = (m - np.floor(kprev[m0-1])) % 12
                     if k1m == 0:
                         k1m = 12
                     if k0m == 0:
-                        k0m = 12
-                        
+                        k0m = 12     
                     
                     # Get the corresponding index month, shifting back for zero indexing
                     kp1 = int(t - k1m)
@@ -319,14 +320,14 @@ def set_stochparams(h,damping,dt,ND=True,rho=1000,cp0=4218,hfix=50):
     
     # Calculate Damping (with entrainment)
     lbd_entr = np.copy(lbd[2]) + beta
-    lbd[4] = lbd_entr.copy()
+    lbd[3] = lbd_entr.copy()
     
     
     # Compute reduction factor
     FAC = {}  
     for i in range(4):
         
-        fac = np.nan_to_num((1-np.exp(-lbd[i]))/lbd_entr[i])
+        fac = np.nan_to_num((1-np.exp(-lbd[i]))/lbd[i])
         fac[fac==0] = 1 # Change all zero FAC values to 1
         FAC[i] = fac.copy()
     
@@ -473,7 +474,7 @@ def convert_NAO(hclim,naopattern,dt,rho=1000,cp0=4218,hfix=50):
     
 
 
-def make_naoforcing(NAOF,randts,fscale,nyr,FAC):
+def make_naoforcing(NAOF,randts,fscale,nyr):
     """
     Makes forcing timeseries, given NAO Forcing Pattern for 3 different
     treatments of MLD (NAOF), a whiite noise time series, and an scaling 
@@ -531,7 +532,7 @@ def make_naoforcing(NAOF,randts,fscale,nyr,FAC):
             
     return F,Fseas
 
-def noentrain_2d(randts,lbd,T0,F):
+def noentrain_2d(randts,lbd,T0,F,FAC,multFAC=1):
     
     """
     Inputs:
@@ -563,6 +564,10 @@ def noentrain_2d(randts,lbd,T0,F):
     # Set initial condition
     temp_ts[:,:,0] = T0
     
+    # Multiply forcing by reduction factor if option is set
+    if multFAC == 1:
+        F *= FAC
+       
     # Loop for each timestep (note: using 1 indexing. T0 is from dec pre-simulation)
     for t in range(1,t_end):
         
