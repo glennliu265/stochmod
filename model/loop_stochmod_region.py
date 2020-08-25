@@ -13,7 +13,7 @@ import sys
 import time
 #%% Determine System
 startall = time.time()
-stormtrack = 0
+stormtrack = 1
 if stormtrack == 0:
     projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 #    scriptpath  = projpath + '03_Scripts/stochmod/'
@@ -46,10 +46,10 @@ fstd     = 0.3         # Standard deviation of the forcing
 bboxsim  = [-100,20,-20,90] # Simulation Box
 
 # Do a stormtrackloop
-#runids = ("003","004","005")
-#funiforms = (0,1,2,5,6)
-funiforms=[6]
-runids=['001']
+runids = ["002","003","004","005"]
+funiforms = [0,1,2,5,6]
+#funiforms=[6]
+#runids=['001']
 
 for runid in runids:
     
