@@ -12,6 +12,12 @@ Created on Mon Jul 27 11:49:57 2020
 
 import numpy as np
 import xarray as xr
+from scipy.io import loadmat
+
+import sys
+sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
+from amv import proc
+import time
 
 # %%Functions
 """
@@ -620,3 +626,139 @@ def cut_NAOregion(ds,bbox=[0,360,-90,90],mons=None,lonname='lon',latname='lat'):
         dsna = dsw.sel(lon=slice(lonW,lonE),lat=slice(latS,latN))
         
     return dsna
+
+
+def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,returnresults=False):
+    """
+    Script to postprocess stochmod output
+    
+    Inputs:
+        1) expid   - "%iyr_funiform%i_run%s_fscale%03d" % (nyrs,funiform,runid,fscale)
+        2) datpath - Path to model output
+        3) rawpath - Path to raw data that was used as model input
+        4) outpathdat - Path to store output data
+        5) lags    - lags to compute for autocorrelation
+        6) returnresults - option to return results [Bool]
+    
+    Based on portions of analyze_stochoutput.py
+    
+    Dependencies:
+        numpy as np
+        from scipy.io import loadmat
+        amv.proc (sel_region)
+        time
+    
+    """
+    
+    #% ---- Presets (Can Modify) ----
+    allstart = time.time()
+    
+    # Regional Analysis Settings
+    bbox_SP = [-60,-15,40,65]
+    bbox_ST = [-80,-10,20,40]
+    bbox_TR = [-75,-15,0,20]
+    bbox_NA = [-80,0 ,0,65]
+    regions = ("SPG","STG","TRO","NAT")        # Region Names
+    bboxes = (bbox_SP,bbox_ST,bbox_TR,bbox_NA) # Bounding Boxes
+    
+    #% ---- Read in Data ----
+    start = time.time()
+    
+    # Read in Stochmod SST Data
+    sst = np.load(datpath+"stoch_output_%s.npy"%(expid),allow_pickle=True).item()
+    lonr = np.load(datpath+"lon.npy")
+    latr = np.load(datpath+"lat.npy")
+    
+    # Load MLD Data
+    mld = np.load(rawpath+"HMXL_hclim.npy") # Climatological MLD
+    
+    # Load Damping Data for lat/lon
+    loaddamp = loadmat(rawpath+"ensavg_nhflxdamping_monwin3_sig020_dof082_mode4.mat")
+    lon = np.squeeze(loaddamp['LON1'])
+    lat = np.squeeze(loaddamp['LAT'])
+    
+    print("Data loaded in %.2fs" % (time.time()-start))
+    #% ---- Get Regional Data ----
+    start = time.time()
+    nregion = len(regions)
+    sstregion = {}
+    for r in range(nregion):
+        bbox = bboxes[r]
+        
+        sstr = {}
+        for model in range(4):
+            tsmodel = sst[model]
+            sstr[model],_,_=proc.sel_region(tsmodel,lonr,latr,bbox)
+        sstregion[r] = sstr
+        
+    # ---- Calculate autocorrelation and Regional avg SST ----
+    
+    kmonths = {}
+    autocorr_region = {}
+    sstavg_region   = {}
+    for r in range(nregion):
+        bbox = bboxes[r]
+        
+        autocorr = {}
+        sstavg = {}
+        for model in range(4):
+            
+            # Get sst and havg
+            tsmodel = sstregion[r][model]
+            havg,_,_= proc.sel_region(mld,lon,lat,bbox)
+            
+            # Find kmonth
+            havg = np.nanmean(havg,(0,1))
+            kmonth     = havg.argmax()+1
+            kmonths[r] = kmonth
+            
+            
+            # Take regional average 
+            tsmodel = np.nanmean(tsmodel,(0,1))
+            sstavg[model] = np.copy(tsmodel)
+            tsmodel = proc.year2mon(tsmodel) # mon x year
+            
+            # Deseason (No Seasonal Cycle to Remove)
+            tsmodel2 = tsmodel - np.mean(tsmodel,1)[:,None]
+            
+            # Compute autocorrelation and save data for region
+            autocorr[model] = proc.calc_lagcovar(tsmodel2,tsmodel2,lags,kmonth+1,0)
+
+        autocorr_region[r] = autocorr.copy()
+        sstavg_region[r] = sstavg.copy()
+        
+    # Save Regional Autocorrelation Data
+    np.savez("%sSST_Region_Autocorrelation_%s.npz"%(outpathdat,expid),autocorr_region=autocorr_region,kmonths=kmonths)
+    
+    # Save Regional Average SST 
+    np.save("%sSST_RegionAvg_%s.npy"%(outpathdat,expid),sstavg_region)
+    
+    print("Completed autocorrelation and averaging calculations in %.2fs" % (time.time()-start))
+    # ---- Calculate different AMVs for each region ----
+    start = time.time()
+    
+    amvbboxes = bboxes
+    amvidx_region = {}
+    amvpat_region = {}
+    for region in range(nregion):
+        
+        #% Calculate AMV Index
+        amvtime = time.time()
+        amvidx = {}
+        amvpat = {}
+        
+        for model in range(4):
+            amvidx[model],amvpat[model] = proc.calc_AMVquick(sst[model],lonr,latr,amvbboxes[region])
+        print("Calculated AMV variables for region %s in %.2f" % (regions[region],time.time()-amvtime))
+        
+        amvidx_region[region] = amvidx
+        amvpat_region[region] = amvpat
+        
+    # Save Regional Autocorrelation Data
+    np.savez("%sAMV_Region_%s.npz"%(outpathdat,expid),amvidx_region=amvidx_region,amvpat_region=amvpat_region)
+    print("AMV Calculations done in %.2fs" % (time.time()-start))
+    print("Stochmod Post-processing Complete in %.2fs" % (time.time() - allstart))
+    print("Data has been saved to %s" % (outpathdat))
+    if returnresults == True:
+        return sstregion,autocorr_region,kmonths,sstavg_region,amvidx_region,amvpat_region
+        
