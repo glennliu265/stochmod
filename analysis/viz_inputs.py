@@ -30,6 +30,12 @@ from amv import proc,viz
 from dask.distributed import Client,progress
 import dask
 
+import cartopy.crs as ccrs
+import cmocean
+import cartopy
+import xarray as xr
+import cartopy.feature as cfeature
+
 #%% User Edits -----------------------------------------------------------------           
 # Point Mode
 pointmode = 0 # Set to 1 to output data for the point speficied below
@@ -48,7 +54,7 @@ genrand   = 0  # Set to 1 to regenerate white noise time series, with runid abov
 # 2 = NAO-like NHFLX Forcing (DJFM), temporally varying 
 # 3 = NAO-like NHFLX Forcing, with NAO (DJFM) and NHFLX (Monthly)
 # 4 = NAO-like NHFLX Forcing, with NAO (Monthly) and NHFLX (Monthly)
-funiform = 5     # Forcing Mode (see options above)
+funiform = 6     # Forcing Mode (see options above)
 fscale   = 10    # Value to scale forcing by
 
 # Integration Options
@@ -139,7 +145,8 @@ np.save(datpath+"lon.npy",lonr)
 # %% Load and Prep NAO Forcing... <Move to separate script?>
 
 
-if funiform > 1:
+
+if funiform > 1: # For NAO-like forcings (and EAP forcings, load in data and setup)
     # Load Longitude for processing
     lon360 =  np.load(datpath+"CESM_lon360.npy")
     
@@ -172,13 +179,22 @@ if funiform > 1:
         # Take ensemble average, then sum EOF 1 and EOF2
         NAO1 = naoforcing[:,:,:,:,0].mean(0)
     
-    elif funiform == 5:
+    elif funiform == 5: # Apply EAP only
         # Load NAO Forcing and prepare (Prepared in regress_NAO_pattern.py)
         naoforcing = np.load(input_path+"NAO_EAP_NHFLX_ForcingDJFM.npy") #[PC x Ens x Lat x Lon]
         
-        # Select PC1 and take ensemble average
+        # Select PC2 and take ensemble average
+        NAO1 = naoforcing[1,:,:,:].mean(0)# [Lat x Lon] # Take mean along ensemble dimension, sum along pc 1-2
+        NAO1 = NAO1[None,:,:] # [1 x Lat x Lon]
+        
+    elif funiform == 6:
+        # Load NAO Forcing and prepare (Prepared in regress_NAO_pattern.py)
+        naoforcing = np.load(input_path+"NAO_EAP_NHFLX_ForcingDJFM.npy") #[PC x Ens x Lat x Lon]
+        
+        # Select PC1-2 and take ensemble average + sum
         NAO1 = naoforcing[0:2,:,:,:].mean(1).sum(0)# [Lat x Lon] # Take mean along ensemble dimension, sum along pc 1-2
         NAO1 = NAO1[None,:,:] # [1 x Lat x Lon]
+        
     elif funiform == 7:
         
         # Load Forcing and take ensemble average
@@ -200,6 +216,7 @@ if funiform > 1:
     
     # Convert from W/m2 to C/S for the three different mld options
     NAOF = scm.convert_NAO(hclim,NAO1,dt,rho=rho,cp0=cp0,hfix=hfix)
+    
 else:
     NAOF = 1
     
@@ -211,24 +228,45 @@ else:
 lbd,lbd_entr,FAC,beta = scm.set_stochparams(hclim,dampingr,dt,ND=1,rho=rho,cp0=cp0,hfix=hfix)
 
 
-
-#%% Try Looking at some forcing values from CESM
-
-cesmforce = xr.open_dataset(datpath+'NHFLX_ForcingStats_Converted_NotMonthly_hvarmode2_ensavg.nc')
+#%% Plot Forcing patterns (EAP, NAO, NAO+EAP)
 
 
-fstd = cesmforce.fstd.values
-clon = cesmforce.lon.values
-clat = cesmforce.lat.values
-
-clon1,fstd=proc.lon360to180(clon,fstd.transpose(1,0))
+# Load NAO Forcing and prepare (Prepared in regress_NAO_pattern.py)
+naoforcing = np.load(input_path+"NAO_EAP_NHFLX_ForcingDJFM.npy") #[PC x Ens x Lat x Lon]
 
 
-# Get values  for different regions
-bbox_SP = [-60,-15,40,65]
-bbox_ST = [-80,-10,20,40]
-bbox_TR = [-75,-15,0,20]
-bbox_NA = [-80,0 ,0,65]
+#%% Make input plot for Mixed layer Depth
 
-regions = ("SPG","STG","TRO","NAT")
-bboxes = (bbox_SP,bbox_ST,bbox_TR,bbox_NA)
+invar = hclim.max(2) - hclim.min(2)
+bbox = [-80,0,0,90]
+cint = np.concatenate([np.arange(0,100,20),np.arange(100,1200,100)])
+cmap = cmocean.cm.dense
+
+fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(5,4))
+ax = viz.init_map(bbox,ax=ax)
+pcm = ax.contourf(lonr,latr,invar.T,cint,cmap=cmap)
+cl = ax.contour(lonr,latr,invar.T,cint,colors="k",linewidths = 0.5)     
+ax.clabel(cl,fmt="%i",fontsize=8)
+ax.add_feature(cfeature.LAND,color='k')
+ax.set_title("$MLD_{max} - MLD_{min}$" + "\n 40-member Ensemble Average",fontsize=12)
+plt.colorbar(pcm,ax=ax,orientation='horizontal',fraction=0.040, pad=0.05)
+plt.savefig(outpath+"MLD_MaxDiff.png",dpi=200)
+
+
+#%% Make plot for EAP + NAO Forcing
+
+invar = NAO1.squeeze()
+bbox = [-80,0,0,90]
+cint = np.arange(-50,55,5)
+cmap = cmocean.cm.balance
+
+fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(5,4))
+ax = viz.init_map(bbox,ax=ax)
+pcm = ax.contourf(lonr,latr,invar.T,cint,cmap=cmap)
+cl = ax.contour(lonr,latr,invar.T,cint,colors="k",linewidths = 0.5)     
+
+ax.clabel(cl,fmt="%i",fontsize=8)
+ax.add_feature(cfeature.LAND,color='k')
+ax.set_title("NAO+EAP Forcing Pattern (DJFM) \n (Positive into Ocean)",fontsize=12)
+plt.colorbar(pcm,ax=ax,orientation='horizontal',fraction=0.040, pad=0.05)
+plt.savefig(outpath+"NAO_EAP_Forcing.png",dpi=200)

@@ -22,6 +22,7 @@ import cartopy.crs as ccrs
 import cmocean
 import cartopy
 import xarray as xr
+import cartopy.feature as cfeature
 #%%
 
 
@@ -36,14 +37,14 @@ mode    = 4      # (1) No mask (2) SST only (3) Flx only (4) Both
 savevar = 1     # Option to save calulated variable
 # Set Paths
 datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/"
-outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20200813/"
+outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20200823/"
 # Plotting
 bbox = [280, 360, 0, 90]
 cmap = cmocean.cm.tempo
 
 # Set string for lagmax
 lagmax = lags[-1]
-save_allens = 1 # Option to save output that has been averaged for lags, but not ens
+save_allens = 0 # Option to save output that has been averaged for lags, but not ens
 #%% Load Necessary Data
 
 # Load Lat Lon
@@ -110,10 +111,9 @@ dampmasked = damping * mall
 # Select Lags
 dampchoose = dampmasked[:,:,:,:,lagidx]
 
-
 # Save allens data if set
 if save_allens == 1:
-    dampavged = np.nanmean(dampchoose,4)
+    dampavged = np.mean(dampchoose,4)
     dampavged = np.transpose(dampavged,(1,0,3,2))
     da = xr.DataArray(dampavged,
                        coords={ 'lat':lat, 'lon':lon,  'month':np.arange(1,13,1),'ensemble':np.arange(1,43,1) },
@@ -126,9 +126,10 @@ if save_allens == 1:
 
 # Take ensemble and lag average
 if len(lags) > 1:
-    dampseason = np.nanmean(dampchoose,(2,4))
+    dampseason  = np.mean(dampchoose,(2,4))
+    dampseason1 = np.mean(dampchoose,(2,4))
 else:
-    dampseason = np.nanmean(dampchoose,(2))
+    dampseason = np.mean(dampchoose,(2))
     
     
 # Save data if option is set
@@ -156,14 +157,15 @@ freqfail = 1-mfreq/maxscore
 
 # Make Plot
 cint = np.arange(0,1.1,.1)
-fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(6,4))
+fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(5,4))
 ax = viz.init_map(bbox,ax=ax)
 pcm = ax.contourf(lon,lat,mfreq.T/maxscore,cint,cmap=cmap)
 cl = ax.contour(lon,lat,mfreq.T/maxscore,cint,colors="k",linewidths = 0.5)
+ax.add_feature(cfeature.LAND,color='k')
 #pcm = ax.contourf(lon,lat,freqfail.T,cint,cmap=cmap)
 #cl = ax.contour(lon,lat,freqfail.T,cint,colors="k",linewidths = 0.5)
 plt.clabel(cl,np.arange(0,1.2,0.2),fmt="%.1f")
-ax.set_title("Total Number of Significant Damping Values\n"+ r"Max = %i | p = %.2f | $\rho$ > %.2f " % (maxscore,p,corrthres))
+ax.set_title("Total Number of Significant Damping Values\n"+ r"MaxFreq = %i | p = %.2f | $\rho$ > %.2f " % (maxscore,p,corrthres))
 plt.colorbar(pcm,ax=ax)
 plt.savefig(outpath+"%s_SigPts_mode%i_monwin%i_lags%i_sig%03d.png"%(flux,mode,monwin,lagmax,p*100),dpi=200)
 
@@ -197,14 +199,15 @@ plt.colorbar(pcm,ax=ax,orientation="horizontal")
 plt.savefig(outpath+"%s_Damping_and_SigPts_mode%i_monwin%i_lags12_sig%03d.png"%(flux,mode,monwin,p*100),dpi=200)
 
 #%% Just plot the damping values
-fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(6,4))
+fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(5,4))
 cint = np.arange(-50,55,5)
 ax = viz.init_map(bbox,ax=ax)
-pcm = ax.contourf(lon,lat,np.nanmean(dampseason,2).T,cint,cmap=cmocean.cm.balance)
-cl = ax.contour(lon,lat,np.nanmean(dampseason,2).T,cint,colors="k",linewidths = 0.5)
-ax.clabel(cl,fmt="%i")
-ax.set_title("%s Damping (Ann, Lag, Ens Avg)\n" % flux+ r"| p = %.2f | $\rho$ > %.2f " % (p,corrthres))
-plt.colorbar(pcm,ax=ax,orientation="horizontal",fraction=0.046, pad=0.1)
+pcm = ax.contourf(lon,lat,np.mean(dampseason,2).T,cint,cmap=cmocean.cm.balance)
+cl = ax.contour(lon,lat,np.mean(dampseason,2).T,cint,colors="k",linewidths = 0.5)
+ax.clabel(cl,fmt="%i",fontsize=8)
+ax.add_feature(cfeature.LAND,color='k')
+ax.set_title("$\lambda_{a,%s}$ (Ann, Lag, Ens Avg)\n" % flux+ r"p = %.2f | $\rho$ > %.2f " % (p,corrthres),fontsize=12)
+plt.colorbar(pcm,ax=ax,orientation='horizontal',fraction=0.040, pad=0.05)
 plt.savefig(outpath+"%s_Damping__mode%i_monwin%i_lags%i_sig%03d.png"%(flux,mode,monwin,lagmax,p*100),dpi=200)
 
 
@@ -302,5 +305,17 @@ plt.colorbar(pcm,ax=ax)
 plt.savefig(outpath+"%s_FailSigPts_mode%i_monwin%i_lag1_sig%03d.png"%(flux,mode,monwin,p*100),dpi=200)
 
 
-#%% Check dampseason
+#%% Find regions that are included in nanmean (nm) but not regular mean (mn)
+nm = np.copy(dampseason)
+mn = np.copy(dampseason1)
 
+nm[np.isnan(nm)] = 0
+mn[np.isnan(mn)] = 0
+diff = nm - mn
+
+
+
+maskout = np.copy(diff)
+maskout[np.where(diff>0)] = 1
+
+plt.pcolormesh(lon,lat,maskout[:,:,5].T,cmap=cmocean.cm.balance)
