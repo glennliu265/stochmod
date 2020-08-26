@@ -46,7 +46,7 @@ fstd     = 0.3         # Standard deviation of the forcing
 bboxsim  = [-100,20,-20,90] # Simulation Box
 
 # Do a stormtrackloop
-runids = ["002","003","004","005"]
+runids = ["001"]
 funiforms = [0,1,2,5,6]
 #funiforms=[6]
 #runids=['001']
