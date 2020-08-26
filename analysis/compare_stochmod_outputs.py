@@ -54,7 +54,7 @@ nyrs      = 1000        # Number of years to integrate over
 #runids = ("003","004","005")
 #funiforms = (0,1,2,5,6)
 
-runids=['001']
+runids=['006']
 
 
 # Set region variables
@@ -126,39 +126,42 @@ cesmauto = np.load(projpath + "01_Data/Autocorrelation_Region.npy",allow_pickle=
 
 
         
-#%% Make Autoorrelation Plots for each model, NAT region
+#%% Make Autoorrelation Plots for each model, each region
 
 rid = 3
 xlm = [0,36]
 xtk = np.arange(0,39,3)
 
-accesm = cesmauto[rid]
 
+nregions=4
 
-# Make a plot for each model
-for model in range(4):
+for rid in range(nregions):
+    accesm = cesmauto[rid]
     
-    fig,ax = plt.subplots(1,1,figsize=(6,4))
-    plt.style.use('seaborn')
-    # Plot CESM Ensemble Data
-    ax = viz.ensemble_plot(accesm,0,ax=ax,color=rcol[rid],ysymmetric=0,ialpha=0.05)
-    
-    
-    for f in range(len(funiforms)):
+    # Make a plot for each model
+    for model in range(4):
         
-        funiform = funiforms[f]
+        fig,ax = plt.subplots(1,1,figsize=(6,4))
+        plt.style.use('seaborn')
+        # Plot CESM Ensemble Data
+        ax = viz.ensemble_plot(accesm,0,ax=ax,color=rcol[rid],ysymmetric=0,ialpha=0.05)
         
-        # Get Autocorrelation data to plot
-        acplot = ssta[funiform][rid][model]
-        ax.plot(lags,acplot,color=fcolors[f],ls=fstyles[f],label=fnames[f])
-    
-    plt.legend(ncol=3)
-    plt.xticks(xtk)
-    plt.xlim(xlm)
-    plt.title("%s SST Autocorrelation for Month %02d, %s" % (regions[rid],kmon[rid],modelname[model]))
-    plt.xlabel("Lags (Months)")
-    plt.ylabel("Correlation")
-    plt.savefig("%sSST_Autocorrelation_ForcingCompare_%s_model%i.png" % (outpathfig,regions[rid],model),dpi=200)
+        
+        for f in range(len(funiforms)):
+            
+            funiform = funiforms[f]
+            
+            # Get Autocorrelation data to plot
+            acplot = ssta[funiform][rid][model]
+            ax.plot(lags,acplot,color=fcolors[f],ls=fstyles[f],label=fnames[f])
+        
+        plt.legend(ncol=3)
+        plt.xticks(xtk)
+        plt.xlim(xlm)
+        plt.title("%s SST Autocorrelation for Month %02d, %s" % (regions[rid],kmon[funiform][rid],modelname[model]))
+        plt.xlabel("Lags (Months)")
+        plt.ylabel("Correlation")
+        plt.savefig("%sSST_Autocorrelation_ForcingCompare_%s_model%i.png" % (outpathfig,regions[rid],model),dpi=200)
     
 
 
