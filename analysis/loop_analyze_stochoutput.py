@@ -10,7 +10,7 @@ import sys
 
 
 #%%
-stormtrack = 0
+stormtrack = 1
 if stormtrack == 0:
     projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
     datpath     = projpath + '01_Data/model_output/'
@@ -34,17 +34,17 @@ import scm
 #%% User Edits
 
 # Analysis Options
-lags = np.arange(0,61,1)
+lags = np.arange(0,37,1)
 
 # Options to determine the experiment ID
 naoscale  = 10 # Number to scale NAO and other forcings by
 nyrs      = 1000        # Number of years to integrate over
 
 # Do a stormtrackloop
-#runids = ("003","004","005")
-#funiforms = (0,1,2,5,6)
-funiforms=[0,1,2,5,6]
-runids=['001']
+runids = ("001","002","003","004","005")
+funiforms = (0,1,2,5,6)
+#funiforms=[0,1,2,5,6]
+#runids=['006']
 
 for runid in runids:
     for funiform in funiforms:
@@ -60,3 +60,4 @@ for runid in runids:
         # Generate Output
         scm.postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags)
         print("Completed Post-processing for Experiment: %s" % expid)
+
