@@ -31,7 +31,7 @@ from cartopy.util import add_cyclic_point
 projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath = projpath + '03_Scripts/stochmod/'
 datpath    = projpath + '01_Data/'
-outpath    = projpath + '02_Figures/20200811/'
+outpath    = projpath + '02_Figures/20200823/'
 
 # Path to damping data
 damppath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/"
@@ -68,7 +68,6 @@ lon = np.squeeze(loaddamp['LON1'])
 lat = np.squeeze(loaddamp['LAT'])
 damping = loaddamp['ensavg'] #[lon x lat x mon]
 #damping = np.transpose(damping,(2,1,0)) # [mon x lat x lon]
-
 
 # Load MLD Data (preprocessed in prep_mld.py)
 mld         = np.load(datpath+"HMXL_hclim.npy") # Climatological MLD

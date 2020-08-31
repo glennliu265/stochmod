@@ -9,8 +9,6 @@ Forcing sensitivity analysis (fscale) with stochmod_region output
 @author: gliu
 """
 
-
-
 import matplotlib.pyplot as plt
 import numpy as np
 import cartopy.crs as ccrs
@@ -18,19 +16,17 @@ import cartopy.crs as ccrs
 import time
 import cmocean
 
-
 from scipy.io import loadmat
 
 import sys
 sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
 from amv import proc,viz
-
 #%% 
 
 # Set run parameters to test
 runid    = "002"
 fscales   = [1,10,100]
-funiform = 4   
+funiform = 5   
 nyrs     = 1000
 
 # Point to Plot
@@ -41,7 +37,7 @@ latf = 65
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath = projpath + '03_Scripts/stochmod/'
 datpath = projpath + '01_Data/'
-outpath = projpath + '02_Figures/20200818/'
+outpath = projpath + '02_Figures/20200820/'
 
 # Autocorrelation Options
 lags = np.arange(0,61,1)
@@ -49,12 +45,20 @@ lags = np.arange(0,61,1)
 # String Names Set
 
 modelname = ("Fixed","Max", "Seasonal", "Entrain")
-forcingname = ("All Random","Uniform","$(NAO & NHFLX)_{DJFM}$","$NAO_{DJFM}  &  NHFLX_{Mon}$","$(NAO  &  NHFLX)_{Mon}$")
+forcingname = ("All Random","Uniform","$(NAO & NHFLX)_{DJFM}$",
+               "$NAO_{DJFM}  &  NHFLX_{Mon}$",
+               "$(NAO  &  NHFLX)_{Mon}$",
+               "$EAP_{DJFM}$",
+               "$(NAO+EAP)_{DJFM}$")
 
 # Set regions for analysis
-bbox_SP = [-60,20,50,70]
-bbox_ST = [-80,20,10,45]
-bbox_NA = [-80,20 ,0,65]#[-75,20,0,90]
+bbox_SP = [-60,20,40,60]
+bbox_ST = [-80,20,20,40]
+bbox_TR = [-75,20,0,20]
+bbox_NA = [-80,20 ,0,60]#[-75,20,0,90]
+
+#regions = ("SPG","STG","TRO","NAT")
+#bboxes = (bbox_SP,bbox_ST,bbox_TR,bbox_NA)
 regions = ("SPG","STG","NAT")
 bboxes = (bbox_SP,bbox_ST,bbox_NA)
 
@@ -79,10 +83,12 @@ loaddamp = loadmat(damppath+dampmat)
 lon = np.squeeze(loaddamp['LON1'])
 lat = np.squeeze(loaddamp['LAT'])
 
+
+
 # Make some strings
 print("Data Loaded in %.2fs"%(time.time()-loadstart))
 
-
+bbm = [-100,40,-20,90] # Mapping bbox
 #%% Plot Bounding Box
 
     
@@ -93,7 +99,9 @@ lwb = 1.5
 
 ax,l1 = viz.plot_box(bbox_SP,ax=ax,color='b',return_line=True,leglab='SPG',linewidth=lwb)
 ax,l2 = viz.plot_box(bbox_ST,ax=ax,color='r',return_line=True,leglab='STG',linewidth=lwb)
-ax,l3 = viz.plot_box(bbox_NA,ax=ax,color='k',return_line=True,leglab='NAT',linewidth=lwb)
+ax,l4 = viz.plot_box(bbox_TR,ax=ax,color=[0,1,0],return_line=True,leglab='TRO',linewidth=lwb)
+ax,l4 = viz.plot_box(bbox_NA,ax=ax,color='k',return_line=True,leglab='NAT',linewidth=lwb)
+
 
 ax.legend([l1,l2,l3],labels=regions)
 plt.savefig(outpath+"bboxes_viz_fscale.png",dpi=200)
@@ -173,7 +181,7 @@ for f in range(len(fscales)):
     fig,axs = plt.subplots(1,4,figsize=(12,1.5),subplot_kw={'projection':ccrs.PlateCarree()})
     for mode in range(4):
         varin = np.transpose(amvpat[mode],(1,0))
-        viz.plot_AMV_spatial(varin,lonr,latr,bbox,cmap,pcolor=0,ax=axs[mode])
+        viz.plot_AMV_spatial(varin,lonr,latr,bbm,cmap,pcolor=0,ax=axs[mode])
         axs[mode].set_title("MLD %s" % modelname[mode],fontsize=12)   
     #plt.suptitle("AMV Pattern | Forcing: %s; fscale: %ix" % (forcingname[funiform],fscale),ha='center')
     #fig.tight_layout(rect=[0, 0.03, .75, .95])

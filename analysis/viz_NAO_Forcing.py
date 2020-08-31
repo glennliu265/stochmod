@@ -77,7 +77,7 @@ def div_cint(var):
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath = projpath + '03_Scripts/stochmod/'
 datpath = projpath + '01_Data/'
-outpath = projpath + '02_Figures/20200730/'
+outpath = projpath + '02_Figures/20200820/'
 
 # Path to SST data from obsv
 datpath2 = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/"
