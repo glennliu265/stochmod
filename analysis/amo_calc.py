@@ -739,7 +739,6 @@ annhsst = proc.ann_avg(hsst,2)
 
 # Take average from amv
 #h_amv,aa_hsst = proc.calc_AMV(hlon,hlat,annhsst,bbox,order,cutofftime,1)  
- 
 
 #h_regr=proc.regress2ts(annhsst,h_amv/np.nanstd(h_amv),0,1)
 
@@ -1187,4 +1186,24 @@ plt.savefig(outname, bbox_inches="tight",dpi=200)
 
 
 
-# Write function to plot a point when you indicate it
+#%% Plot HadISST AMV with bounding boxes
+
+startyr = 1900
+# Same plot, but for HadlISST
+cmap = cmocean.cm.balance
+#cint = np.arange(-3.5,3.25,0.25)
+cint = np.arange(-0.8,1.0,0.2)
+#clab = np.arange(-0.50,0.60,0.10)
+#cint = np.arange(-1,1.2,0.2)
+clab = cint
+
+fig,ax = plt.subplots(1,1,figsize=(3,1.5))
+plt.style.use("ggplot")
+
+varin = np.transpose(h_regr,(1,0))
+
+plt.subplot(1,1,1)
+viz.plot_AMV_spatial(varin,hlon,hlat,mbbox,cmap,cint,clab)
+plt.title("AMV-related SST Pattern from HadISST, %i-%i"%(startyr,hyr[0,-1]),fontsize=8)
+outname = outpath+'AMVpattern_HADLISST.png' 
+plt.savefig(outname, bbox_inches="tight",dpi=200)
