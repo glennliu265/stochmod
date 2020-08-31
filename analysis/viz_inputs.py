@@ -36,6 +36,7 @@ import cartopy
 import xarray as xr
 import cartopy.feature as cfeature
 
+import matplotlib.colors as mc
 #%% User Edits -----------------------------------------------------------------           
 # Point Mode
 pointmode = 0 # Set to 1 to output data for the point speficied below
@@ -235,6 +236,29 @@ lbd,lbd_entr,FAC,beta = scm.set_stochparams(hclim,dampingr,dt,ND=1,rho=rho,cp0=c
 naoforcing = np.load(input_path+"NAO_EAP_NHFLX_ForcingDJFM.npy") #[PC x Ens x Lat x Lon]
 
 
+# Convert NAO DJFM Forcing (taken from above, funiform=2)
+NAO1 = np.mean(naoforcing[0,:,:,:],0) # [Lat x Lon]
+NAO1 = NAO1[None,:,:] # [1 x Lat x Lon]
+NAO1 = np.transpose(NAO1,(2,1,0))
+lon180,NAO1 = proc.lon360to180(lon360,NAO1)
+NAODJFM = NAO1[klon[:,None],klat[None,:],:].copy()
+
+
+# Convert EAP DJFM Forcing (taken from above, funiform=5)
+NAO1 = naoforcing[1,:,:,:].mean(0)# [Lat x Lon] # Take mean along ensemble dimension, sum along pc 1-2
+NAO1 = NAO1[None,:,:] # [1 x Lat x Lon]
+NAO1 = np.transpose(NAO1,(2,1,0))
+lon180,NAO1 = proc.lon360to180(lon360,NAO1)
+EAPDJFM = NAO1[klon[:,None],klat[None,:],:].copy()
+
+
+# Conver5 EAP+NAO (funiform=6)
+# Select PC1-2 and take ensemble average + sum
+NAO1 = naoforcing[0:2,:,:,:].mean(1).sum(0)# [Lat x Lon] # Take mean along ensemble dimension, sum along pc 1-2
+NAO1 = NAO1[None,:,:] # [1 x Lat x Lon]
+NAO1 = np.transpose(NAO1,(2,1,0))
+lon180,NAO1 = proc.lon360to180(lon360,NAO1)
+BOTHDJFM = NAO1[klon[:,None],klat[None,:],:].copy()
 #%% Make input plot for Mixed layer Depth
 
 invar = hclim.max(2) - hclim.min(2)
@@ -252,10 +276,33 @@ ax.set_title("$MLD_{max} - MLD_{min}$" + "\n 40-member Ensemble Average",fontsiz
 plt.colorbar(pcm,ax=ax,orientation='horizontal',fraction=0.040, pad=0.05)
 plt.savefig(outpath+"MLD_MaxDiff.png",dpi=200)
 
+#%% Mini MLD Map (maximum)
+invar = hclim.max(2)
+bbox = [-90,5,-5,90]
+#cint = np.concatenate([np.arange(0,100,20),np.arange(100,1200,100)])
+cint = np.arange(0,1100,100)
+cmap = cmocean.cm.dense
+
+fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(4,3))
+ax = viz.init_map(bbox,ax=ax)
+pcm = ax.contourf(lonr,latr,invar.T,cint,cmap=cmap)
+cl = ax.contour(lonr,latr,invar.T,cint,colors="k",linewidths = 0.5)     
+#ax.clabel(cl,fmt="%i",fontsize=8)
+ax.add_feature(cfeature.LAND,color='w')
+#Add Natl Plot
+lwb = 1.5
+bbox_NA    =[-80,0 ,0,65] 
+ax,l4 = viz.plot_box(bbox_NA,ax=ax,color='k',return_line=True,leglab='NAT',linewidth=lwb,linestyle="solid")
+
+
+ax.set_title("$MLD_{max}$",fontsize=12)
+plt.colorbar(pcm,ax=ax,orientation='horizontal',fraction=0.040, pad=0.05)
+plt.savefig(outpath+"MLD_Max.png",dpi=200)
 
 #%% Make plot for EAP + NAO Forcing
 
-invar = NAO1.squeeze()
+
+
 bbox = [-80,0,0,90]
 cint = np.arange(-50,55,5)
 cmap = cmocean.cm.balance
@@ -265,8 +312,170 @@ ax = viz.init_map(bbox,ax=ax)
 pcm = ax.contourf(lonr,latr,invar.T,cint,cmap=cmap)
 cl = ax.contour(lonr,latr,invar.T,cint,colors="k",linewidths = 0.5)     
 
+
 ax.clabel(cl,fmt="%i",fontsize=8)
 ax.add_feature(cfeature.LAND,color='k')
+
+
 ax.set_title("NAO+EAP Forcing Pattern (DJFM) \n (Positive into Ocean)",fontsize=12)
 plt.colorbar(pcm,ax=ax,orientation='horizontal',fraction=0.040, pad=0.05)
 plt.savefig(outpath+"NAO_EAP_Forcing.png",dpi=200)
+
+#%% Mini veresion of NAO Plots (and others)
+
+fnames  = ["Random","Uniform","NAO (DJFM)","EAP (DJFM)","NAO+EAP (DJFM)"]
+fcolors = ["teal","mediumseagreen","b","tomato","m"]
+fstyles = ["dotted","dashed",'solid','solid','solid']
+
+
+# Plot NAO Countours
+bbox = [-90,5,-5,90]
+cint = np.arange(-50,55,5)
+cmap = cmocean.cm.balance
+invar = NAODJFM.squeeze()
+fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(4,3))
+ax = viz.init_map(bbox,ax=ax)
+pcm = ax.contourf(lonr,latr,invar.T,cint,cmap=cmap)
+cl = ax.contour(lonr,latr,invar.T,cint,colors="k",linewidths = 0.5)   
+
+#Add Natl Plot
+lwb = 1.5
+bbox_NA    =[-80,0 ,0,65] 
+ax,l4 = viz.plot_box(bbox_NA,ax=ax,color='k',return_line=True,leglab='NAT',linewidth=lwb,linestyle="solid")
+
+# Labels
+ax.clabel(cl,fmt="%i",fontsize=8)
+ax.add_feature(cfeature.LAND,color='k')
+ax.set_title("$F'_{NAO}$ (DJFM) \n (Positive into Ocean)",fontsize=10)
+plt.colorbar(pcm,ax=ax,orientation='horizontal',fraction=0.040, pad=0.06)
+plt.savefig(outpath+"NAO_Forcing_bboxNAT_small.png",dpi=200)
+
+#%% Sample plot but for EAP
+# Plot NAO Countours
+bbox = [-90,5,-5,90]
+cint = np.arange(-50,55,5)
+cmap = cmocean.cm.balance
+invar = EAPDJFM.squeeze()
+fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(4,3))
+ax = viz.init_map(bbox,ax=ax)
+pcm = ax.contourf(lonr,latr,invar.T,cint,cmap=cmap)
+cl = ax.contour(lonr,latr,invar.T,cint,colors="k",linewidths = 0.5)   
+
+#Add Natl Plot
+lwb = 1.5
+bbox_NA    =[-80,0 ,0,65] 
+ax,l4 = viz.plot_box(bbox_NA,ax=ax,color='k',return_line=True,leglab='NAT',linewidth=lwb,linestyle="solid")
+
+# Labels
+ax.clabel(cl,fmt="%i",fontsize=8)
+ax.add_feature(cfeature.LAND,color='k')
+ax.set_title("$F'_{EAP}$ (DJFM) \n (Positive into Ocean)",fontsize=10)
+plt.colorbar(pcm,ax=ax,orientation='horizontal',fraction=0.040, pad=0.06)
+plt.savefig(outpath+"EAP_Forcing_bboxNAT_small.png",dpi=200)
+
+#%% Histogram of NAO Forcings
+
+# Get RBG arrays
+rgbfcol = [mc.to_rgba_array(x) for x in fcolors]
+# Alter alpha
+rgbfcol[:][3] *= 0.5
+falpha=0.5
+
+binedges = np.arange(-5,6,0.5)
+fig,axs=plt.subplots(3,1,figsize=(3,3),sharey=True,sharex=True)
+
+h1 = axs[0].hist(NAODJFM.ravel(),bins=binedges,edgecolor="k",color=fcolors[1],alpha=falpha)
+axs[0].set_title("NAO DJFM, max=%03d" % h1[0].max())
+h2 = axs[1].hist(EAPDJFM.ravel(),bins=binedges,edgecolor="k",color=fcolors[3],alpha=falpha)
+axs[1].set_title("EAP DJFM max=%03d" % h2[0].max())
+h3  = axs[2].hist(BOTHDJFM.ravel(),bins=binedges,edgecolor="k",color=fcolors[4],alpha=falpha)
+axs[2].set_title("EAP+NAO DJFM max=%03d" % h3[0].max())
+axs[2].set_ylim([0,5000])
+axs[2].set_yticks(np.arange(0,7500,2500))
+axs[2].set_xlim((-5,5))
+axs[2].set_xlabel("Forcing (W/$m^{2})$")
+axs[1].set_ylabel("Frequency")
+plt.tight_layout()
+plt.savefig(outpath+"Forcing_Histograms.png",dpi=200)
+
+#%% Plot Seasonal Damping and MLD parameters, averaged over the NAtl
+
+mons3 = np.arange(1,13,1)
+damppt = proc.sel_region(dampingr,lonr,latr,bbox_NA,reg_avg=1)
+hpt = proc.sel_region(hclim,lonr,latr,bbox_NA,reg_avg=1)
+
+
+fig,ax1=plt.subplots(1,1,figsize=(4,3))
+plt.style.use("seaborn-bright")
+color = 'tab:red'
+ax1.set_xlabel('Month')
+ax1.set_ylabel('$\lambda_{net} (W m^{-2} K^{-1}$)')
+ln1 = ax1.plot(mons3,damppt,color='r',label=r'$\lambda_{net}$')
+ax1.tick_params(axis='y',labelcolor=color)
+ax1.grid(None)
+
+ax2 = ax1.twinx()
+color = 'tab:blue'
+ax2.set_ylabel('Mixed Layer Depth (m)',color=color)
+
+ln2 = ax2.plot(mons3,hpt,color='b',label=r'HMXL')
+ax2.tick_params(axis='y',labelcolor=color)
+ax2.grid(None)
+ax2.set_xticks(mons3)
+# Set Legend
+lns = ln1 + ln2
+labs = [l.get_label() for l in lns]
+ax1.legend(lns,labs,loc="upper center")
+
+# Set Title
+titlestr = "MLD and $\lambda_{a}$ (NAT Average)"
+plt.title(titlestr)
+plt.tight_layout()
+#plt.grid(True)
+plt.savefig(outpath+"Damping_MLD_NATAVG.png",dpi=200)
+
+#%% Plot lbd/(rho*cp*h) HSEAS
+
+mons3 = np.arange(1,13,1)
+lbdplot = proc.sel_region(lbd[2],lonr,latr,bbox_NA,reg_avg=1)
+FACplot = proc.sel_region(FAC[2],lonr,latr,bbox_NA,reg_avg=1)
+
+
+
+fig,ax1=plt.subplots(1,1,figsize=(4,3))
+plt.style.use("seaborn-bright")
+color = 'tab:red'
+ax1.set_xlabel('Month')
+ax1.set_ylabel("degC/sec")
+
+ln1 = ax1.plot(mons3,lbdplot,color='k',label=r'$\lambda_{a}$')
+ax1.tick_params(axis='y',labelcolor=color)
+ax1.set_xticks(mons3)
+
+#plt.title(titlestr)
+plt.tight_layout()
+#plt.grid(True)
+plt.savefig(outpath+"Damping_RhoCPH_MLD_NATAVG.png",dpi=200)
+#%% Plot lbd/(rho*cp*h) HMAX
+
+mons3 = np.arange(1,13,1)
+lbdplot = proc.sel_region(lbd_entr,lonr,latr,bbox_NA,reg_avg=1)
+lbdplot_noentr = proc.sel_region(lbd[2],lonr,latr,bbox_NA,reg_avg=1)
+
+
+fig,ax1=plt.subplots(1,1,figsize=(4,3))
+plt.style.use("seaborn-bright")
+color = 'tab:red'
+ax1.set_xlabel('Month')
+ax1.set_ylabel("degC/sec")
+
+ln1 = ax1.plot(mons3,lbdplot,color='b',label=r'$\lambda$ (with entrainment)')
+ln2 = ax1.plot(mons3,lbdplot_noentr,color='k',label=r'$\lambda$ (no entrainment)')
+ax1.tick_params(axis='y',labelcolor=color)
+ax1.set_xticks(mons3)
+plt.legend()
+
+#plt.title(titlestr)
+plt.tight_layout()
+#plt.grid(True)
+plt.savefig(outpath+"Damping_entr_RhoCPH_MLD_NATAVG.png",dpi=200)
