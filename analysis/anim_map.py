@@ -34,12 +34,14 @@ outpathfig  = projpath + '02_Figures/20200823/'
 # Load variables
 nyrs    = 1000
 funiform= 6
-runid   = "001"
+runid   = "006"
 fscale  = 10
 expid = "%iyr_funiform%i_run%s_fscale%03d" % (nyrs,funiform,runid,fscale)
 sst = np.load(datpath+"stoch_output_%s.npy"%(expid),allow_pickle=True).item()
 lon = np.load(datpath+"lon.npy")
 lat = np.load(datpath+"lat.npy")
+
+randts = np.load(datpath+"stoch_output_1000yr_run006_randts.npy")
 
 #%% Prepare for input intp the animation
 
@@ -47,15 +49,21 @@ lat = np.load(datpath+"lat.npy")
 # Prepare variables
 invar = sst[3].transpose(1,0,2)
 
+# Make a land/ice mask
+mask = invar.sum(2)
+mask[~np.isnan(mask)] = 1
+
 # Animation parameters
-frames = 1200 #Indicate number of frames
-figsize = (6,4)
+frames = 120 #Indicate number of frames
+figsize = (4,3)
 vm = [-5,5]
 interval = 0.1
 bbox = [-80,0,0,80]
 fps= 10
 savetype="gif"
 dpi=100
+
+
 #%% Try to animate a forcing map (mp4.gif) [INEFFIIENT VERSION]
 
 
@@ -116,7 +124,7 @@ def make_figure(bbox):
     ax.set_extent(bbox)
     
     # Add filled coastline
-    ax.add_feature(cfeature.LAND,facecolor='k')
+    ax.add_feature(cfeature.LAND,facecolor='k',zorder=10)
     
     # Add Gridlines
     gl = ax.gridlines(draw_labels=True,linewidth=0.75,color='gray',linestyle=':')
@@ -142,7 +150,72 @@ def animate(i):
 anim = FuncAnimation(
     fig, animate, interval=interval, frames=frames, blit=False,)
 
-anim.save('%stest.gif'%outpathfig, writer='imagemagick',fps=fps,dpi=dpi)
+anim.save('%ssst_test.gif'%outpathfig, writer='imagemagick',fps=fps,dpi=dpi)
+
+# Pass figure animator and draw on it
+# blit = True, redraw only parts that have changed
+
+print("Animation completed in %.2fs"%(time.time()-start))
+#%%   Make timeseries animation
+
+
+invar = randts
+## https://brushingupscience.com/2016/06/21/matplotlib-animations-the-easy-way/
+
+t = np.arange(0,len(randts),1)
+
+start = time.time()
+fig,ax = plt.subplots(1,1,figsize=(4,1)) # Make the basemap
+line = ax.plot(t[0],randts[0],color='r',lw=1.5)
+                      
+
+def animate(i):
+     line.set_xdata(t[0:i])
+     line.set_ydata(randts[0:i])
+     print("\rCompleted frame %i"%i,end="\r",flush=True)
+     
+anim = FuncAnimation(
+    fig, animate, interval=interval, frames=frames, blit=False,)
+
+anim.save('%srandts_test.gif'%outpathfig, writer='imagemagick',fps=fps,dpi=dpi)
+
+# Pass figure animator and draw on it
+# blit = True, redraw only parts that have changed
+print("Animation completed in %.2fs"%(time.time()-start))
+
+
+
+fig,ax = plt.subplots(1,1,figsize=(4,2)) # Make the basemap
+plt.plot(t,randts,color='r',lw=0.5)
+plt.ylabel("Forcing (degC/sec)")
+plt.xlabel("Months")
+plt.title("Forcing Example N(0,0.3)")
+plt.tight_layout()
+plt.savefig(outpathfig+"randtsex.png",dpi=200)
+
+#%% Animate forcing map
+
+F = np.load(datpath+"stoch_output_1000yr_run0_funiform0_fscale001_Forcing.npy")
+
+
+invar = F.transpose(1,0,2)* mask[:,:,None]
+
+start = time.time()
+fig,ax = make_figure(bbox) # Make the basemap
+pcm = ax.pcolormesh(lon,lat,invar[...,0],vmin=vm[0],vmax=vm[1],cmap=cmocean.cm.balance)
+fig.colorbar(pcm,orientation='horizontal',fraction=0.040,pad=0.05)
+
+
+
+def animate(i):
+     pcm.set_array(invar[...,i].flatten())
+     ax.set_title("t = %i" % i)
+     print("\rCompleted frame %i"%i,end="\r",flush=True)
+     
+anim = FuncAnimation(
+    fig, animate, interval=interval, frames=frames, blit=False,)
+
+anim.save('%sForcingAnim.gif'%outpathfig, writer='imagemagick',fps=fps,dpi=dpi)
 
 # Pass figure animator and draw on it
 # blit = True, redraw only parts that have changed
