@@ -74,7 +74,7 @@ rcolmem = [np.array([189,202,255])/255,
 # Set Forcing Names and colors
 funiforms=[0,1,2,5,6]
 fnames  = ["Random","Uniform","NAO (DJFM)","EAP (DJFM)","NAO+EAP (DJFM)"]
-fcolors = ["teal","teal","b","tomato","m"]
+fcolors = ["teal","springgreen","b","tomato","m"]
 fstyles = ["dotted","dashed",'solid','solid','solid']
 
 # Set Model Names
