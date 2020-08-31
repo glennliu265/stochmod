@@ -193,6 +193,40 @@ leg = ax.legend([l1,l2,l3,l4],labels=regions,ncol=4,bbox_to_anchor=(0, -0.1),loc
 outname = '%sHadISST_AMVpattern_%s-%s_dtmethod%i.png' % (outpath,startyr,hyr[0,-1],method)
 plt.savefig(outname, bbox_inches="tight",dpi=200)
 
+#%% Mini HadiSST AMV Plot NAT
+
+cmap = cmocean.cm.balance
+cmap.set_bad(color='yellow')
+cint = np.arange(-1,1.1,0.1)
+
+#clab = cint
+fig,axs = plt.subplots(1,1,figsize=(4,3),subplot_kw={'projection':ccrs.PlateCarree()})
+plt.style.use('ggplot')
+plotbbox = [-100,10,-5,80]
+
+varin = h_regr.T
+viz.plot_AMV_spatial(varin,hlon,hlat,plotbbox,cmap,cint=cint,pcolor=0,ax=axs,fontsize=8)
+axs.set_title("HadISST AMV SST Pattern (%s to %s)" % (startyr,hyr[0,-1]),fontsize=12)   
+
+
+# Add region plots
+ax = axs
+lwb = 1.5
+ax,l4 = viz.plot_box(bbox_NA,ax=ax,color='k',return_line=True,leglab='NAT',linewidth=lwb,linestyle="solid")
+#ax,l2 = viz.plot_box(bbox_ST,ax=ax,color='r',return_line=True,leglab='STG',linewidth=lwb)
+#ax,l1 = viz.plot_box(bbox_SP,ax=ax,color='b',return_line=True,leglab='SPG',linewidth=lwb,linestyle='dashed')
+#ax,l3 = viz.plot_box(bbox_TR,ax=ax,color=[0,1,0],return_line=True,leglab='TRO',linewidth=lwb,linestyle='dashed')
+
+
+plt.legend(fancybox=True,shadow=True,loc='upper center')
+#leg = ax.legend([l1,l2,l3,l4],labels=regions,ncol=4,bbox_to_anchor=(0, -0.1),loc='upper left')
+#leg(fancybox=True,shadow=True)
+#ax.legend([l1,l2,l3,l4],labels=regions,ncol=4,bbox_to_anchor=(-0.1, 1.1),loc='upper left')
+
+outname = '%sHadISST_AMVpattern_%s-%s_dtmethod%i_NATOnly_miniplot.png' % (outpath,startyr,hyr[0,-1],method)
+plt.savefig(outname, bbox_inches="tight",dpi=200)
+
+
 #%%  Make AMV Spatial Plots, but only show the N.Atl Bounding Box
 
 cmap = cmocean.cm.balance
@@ -224,6 +258,39 @@ plt.legend(fancybox=True,shadow=True,loc='upper center')
 #ax.legend([l1,l2,l3,l4],labels=regions,ncol=4,bbox_to_anchor=(-0.1, 1.1),loc='upper left')
 
 outname = '%sHadISST_AMVpattern_%s-%s_dtmethod%i_NATOnly.png' % (outpath,startyr,hyr[0,-1],method)
+plt.savefig(outname, bbox_inches="tight",dpi=200)
+
+#%%  Make AMV Spatial Plots, but only show the NSPG Bounding Box
+
+cmap = cmocean.cm.balance
+cmap.set_bad(color='yellow')
+cint = np.arange(-.5,.6,0.1)
+
+#clab = cint
+fig,axs = plt.subplots(1,1,figsize=(4,3),subplot_kw={'projection':ccrs.PlateCarree()})
+plt.style.use('ggplot')
+plotbbox = [-100,10,-5,80]
+
+varin = h_regr.T
+viz.plot_AMV_spatial(varin,hlon,hlat,plotbbox,cmap,cint=cint,pcolor=0,ax=axs)
+axs.set_title("HadISST AMV SST Pattern (%s to %s)" % (startyr,hyr[0,-1]),fontsize=14)   
+
+
+# Add region plots
+ax = axs
+lwb = 1.5
+#ax,l4 = viz.plot_box(bbox_NA,ax=ax,color='k',return_line=True,leglab='NAT',linewidth=lwb,linestyle="solid")
+#ax,l2 = viz.plot_box(bbox_ST,ax=ax,color='r',return_line=True,leglab='STG',linewidth=lwb)
+#ax,l1 = viz.plot_box(bbox_SP,ax=ax,color='b',return_line=True,leglab='SPG',linewidth=lwb,linestyle='dashed')
+ax,l3 = viz.plot_box(bbox_TR,ax=ax,color=[0,1,0],return_line=True,leglab='TRO',linewidth=lwb,linestyle='dashed')
+
+
+plt.legend(fancybox=True,shadow=True,loc='upper center')
+#leg = ax.legend([l1,l2,l3,l4],labels=regions,ncol=4,bbox_to_anchor=(0, -0.1),loc='upper left')
+#leg(fancybox=True,shadow=True)
+#ax.legend([l1,l2,l3,l4],labels=regions,ncol=4,bbox_to_anchor=(-0.1, 1.1),loc='upper left')
+
+outname = '%sHadISST_AMVpattern_%s-%s_dtmethod%i_TROOnly.png' % (outpath,startyr,hyr[0,-1],method)
 plt.savefig(outname, bbox_inches="tight",dpi=200)
 
 
