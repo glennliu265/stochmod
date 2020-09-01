@@ -106,8 +106,12 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     print("pointmode = " + str(pointmode))
     print("fscale    = " + str(fscale))
     print("nyr       = " + str(nyr))
+    print("bbox      = " + str(bboxsim))
     print("Data will be saved to %s" % datpath)
     allstart = time.time()
+    
+    # Set experiment ID
+    expid = "%iyr_funiform%i_run%s_fscale%03d" %(nyr,funiform,runid,fscale)
     # --------------
     # %% Load Variables -------------------------------------------------------------
     # --------------
@@ -249,7 +253,8 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
         if funiform == 0: # Create entire forcing array [lon x lat x time] and apply scaling factor
             F = np.random.normal(0,fstd,size=(lonsize,latsize,t_end)) * fscale # Removed Divide by 4 to scale between -1 and 1
             # Save Forcing
-            np.save(output_path+"stoch_output_%iyr_run%s_funiform%i_fscale%03d_Forcing.npy"%(nyr,runid,funiform,fscale),F)
+            np.save(output_path+"stoch_output_%s_Forcing.npy"%(expid),F)
+            
         else: # Just generate the time series
             randts = np.random.normal(0,fstd,size=t_end) # Removed Divide by 4 to scale between -1 and 1
             np.save(output_path+"stoch_output_%iyr_run%s_randts.npy"%(nyr,runid),randts)
@@ -257,7 +262,7 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     else: # Load old data
         print("Loading Old Data")
         if funiform == 0:# Directly load full forcing
-            F = np.load(output_path+"stoch_output_%iyr_run%s_funiform%i_fscale%03d_Forcing.npy"%(nyr,runid,funiform,fscale))
+            F = np.load(output_path+"stoch_output_%s_Forcing.npy"%(expid))
         else: # Load random time series
             randts = np.load(output_path+"stoch_output_%iyr_run%s_randts.npy"%(nyr,runid))
     
@@ -270,11 +275,12 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
             Fseas  = np.ones((lonsize,latsize,12)) # Dummy variable 
         
         else: # NAO Like Forcing..., apply scaling and randts
+        
             F,Fseas = scm.make_naoforcing(NAOF,randts,fscale,nyr)
 
         # Save Forcing if option is set
         if saveforcing == 1:
-            np.save(output_path+"stoch_output_%iyr_funiform%i_run%s_fscale%03d_Forcing.npy"%(nyr,funiform,runid,fscale),F)
+            np.save(output_path+"stoch_output_%s_Forcing.npy"%(runid),F)
     
     print("Forcing Setup in %s" % (time.time() - startf))
     
@@ -295,6 +301,23 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
         hclima    = np.nanmean(hclim,(0,1)) # Take lon,lat mean, ignoring nans
         kpreva    = scm.find_kprev(hclima)
         dampinga  = np.nanmean(dampingr,(0,1)) # Repeat for damping
+        
+        
+        # Set up forcing
+        if funiform > 1:
+            Favg = {}
+            NAOavg = {}
+            NAOFavg = {}
+            for hi in range(3): # Take regional average for each forcing
+                Favg[hi] = proc.sel_region(F[hi],lonr,latr,bboxsim,reg_avg=1) # Average over region
+                NAOavg[hi] = proc.sel_region(NAO1[hi],lonr,latr,bboxsim,reg_avg=1)
+                NAOFavg[hi] = proc.sel_region(NAOF[hi],lonr,latr,bboxsim,reg_avg=1)
+            F    = Favg.copy()    
+            NAO1 = NAOavg.copy() 
+            NAOF = NAOFavg.copy()
+        else:
+            F = proc.sel_region(F,lonr,latr,bboxsim,reg_avg=1)
+        
         
         
         # Convert units
@@ -341,7 +364,6 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
             FACh = np.tile(FACh[:,:],int(t_end/12))
             
         if pointmode == 0: #simulate all points
-            
             if Fh.shape[2] < 12: # Adjust for cases where Fh is not seasonal
                 Fh = np.tile(Fh,12)
             if funiform == 0:
@@ -349,22 +371,23 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
                 
             T_entr0_all[hi],_ =  scm.noentrain_2d(randts,lbdh,T0,Fh,FACh,multFAC=multFAC)
             print("Simulation for No Entrain Model, hvarmode %s completed in %s" % (hi,time.time() - start))
-        elif pointmode == 1: # simulate for 1 point
             
+        elif pointmode == 1: # simulate for 1 point
             start = time.time()
     
             # Run Point Model
-            T_entr0_all[hi],_,_=scm.noentrain(t_end,lbdh[ko,ka,:],T0,Fh[ko,ka,:])
+            T_entr0_all[hi],_,_=scm.noentrain(t_end,lbdh[ko,ka,:],T0,Fh[ko,ka,:],FACh,multFAC=multFAC)
 
             elapsed = time.time() - start
             tprint = "\nNo Entrain Model, hvarmode %i, ran in %.2fs" % (hi,elapsed)
             print(tprint)
         
         elif pointmode == 2: # simulate using regionally averaged params
-            
+        
              # Run Point Model
             start = time.time()
             T_entr0_all[hi],_,_=scm.noentrain(t_end,lbdh,T0,Fh,FACh,multFAC=multFAC)
+            
             elapsed = time.time() - start
             tprint = "\nNo Entrain Model, hvarmode %i, ran in %.2fs" % (hi,elapsed)
             print(tprint)    
@@ -514,7 +537,22 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
         sst = T_entr0_all.copy()
         sst[3] = T_entr1
         
-        np.savez(output_path+"stoch_output_point%s_%iyr_funiform%i_run%s_fscale%03d.npz"%(locstring,nyr,funiform,runid,fscale),sst=sst,hpt=hclim[ko,ka,:])
+        if pointmode == 1:
+            np.savez(output_path+"stoch_output_point%s_%s.npz"%(locstring,expid),sst=sst,hpt=hclim[ko,ka,:])
+        elif pointmode == 2:
+            np.savez(output_path+"stoch_output_point%s_%s.npz"%(locstring,expid),
+                     sst=sst,
+                     hclim=hclima,
+                     kprev=kpreva,
+                     dampping=dampinga,
+                     F=F,
+                     lbd=lbd,
+                     lbd_entr=lbd_entr,
+                     beta=beta,
+                     FAC=FAC,
+                     NAO1=NAO1,
+                     NAOF=NAOF
+                     )
         
     else:
         
@@ -522,11 +560,12 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
         sst = T_entr0_all.copy()
         sst[3] = T_entr1
         
+        
         # SAVE ALL in 1
-        np.save(output_path+"stoch_output_%iyr_funiform%i_run%s_fscale%03d.npy"%(nyr,funiform,runid,fscale),sst)
+        np.save(output_path+"stoch_output_%s.npy"%(expid),sst)
         
         #np.save(output_path+"stoch_output_%iyr_funiform%i_entrain0_run%s_fscale%03d.npy"%(nyr,funiform,runid,fscale),T_entr0_all)
         #np.save(output_path+"stoch_output_%iyr_funiform%i_entrain1_run%s_fscale%03d.npy"%(nyr,funiform,runid,fscale),T_entr1)
     
     print("stochmod_region.py ran in %.2fs"% (time.time()-allstart))
-    print("Output saved as %s" + output_path + "stoch_output_%iyr_funiform%i_run%s_fscale%03d.npy"%(nyr,funiform,runid,fscale))
+    print("Output saved as %s" + output_path + "stoch_output_%s.npy"%(expid))
