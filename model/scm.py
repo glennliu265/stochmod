@@ -55,7 +55,7 @@ def noentrain(t_end,lbd,T0,F,FAC,multFAC=1):
     explbd = np.exp(-lbd)
     explbd[explbd==1] = 0
     
-    if multFAC ==1:
+    if (multFAC ==1) & (F.shape[0] != FAC.shape[0]):
         F *= np.tile(FAC,int(t_end/12)) # Tile FAC and scale forcing
     
     # Loop for integration period (indexing convention from matlab)
@@ -425,51 +425,40 @@ def convert_NAO(hclim,naopattern,dt,rho=1000,cp0=4218,hfix=50):
     given seasonal MLD (hclim)
     
     Inputs:
-        1) hclim          - climatological MLD [Mons]
-        2) NAOF   [Array] - NAO forcing [Lon x Lat] in Watts/m2
-        3) dt             - timestep in seconds
-        4) rho            - Density of water [kg/m3]
-        5) cp0            - Specific Heat of water [J/(K*kg)]
-        6) hfix           - Fixed Mixed layer Depth
+        1) hclim [3d Array]      - climatological MLD [Mons]
+        2) NAOF [2d or 3d Array] - NAO forcing [Lon x Lat] in Watts/m2
+        3) dt                    - timestep in seconds
+        4) rho                   - Density of water [kg/m3]
+        5) cp0                   - Specific Heat of water [J/(K*kg)]
+        6) hfix                  - Fixed Mixed layer Depth
     
     Output:
-        1) NAOF [dict]    - Dictionary of arrays, where 
+        1) NAOF [dict]    - Dictionary of arrays [lon x lat x mon], where 
             0 = fixed MLD
             1 = maximum MLD
             2 = seasonal MLD
     
     """
     
+    # Check if forcing pattern is 3D
+    patshape = naopattern.shape
+    if len(patshape) != 3: 
+        naopattern = naopattern[:,:,None]
+        
+    # Set up MLD[lon x lat x mon x hvarmode]
+    mld = np.ones((patshape[0],patshape[1],12,3))
+    mld[:,:,:,0]  *= hfix # Fixed MLD
+    mld[:,:,:,1]  = np.tile(hclim.max(2)[:,:,None],12) # Max MLD
+    mld[:,:,:,2]  = hclim.copy() # Clim MLD
+        
+        
     # Convert NAO to correct units...
     NAOF = {}
     for i in range(3):
+        
+        hchoose = mld[:,:,:,i]
+        NAOF[i] = naopattern * dt / cp0 / rho / hchoose
     
-        # Fixed MLD
-        if i == 0:
-            hchoose = hfix
-        # Max MLD
-        elif i == 1:
-            hchoose = np.nanmax(np.abs(hclim),axis=2)
-        # Varying MLD
-        elif i == 2:
-            hchoose = np.copy(hclim)
-        
-        # Compute and restrict to region
-        if i == 2:
-            
-            if len(naopattern.shape) == 2:
-                # Monthly Varying Forcing [Lon x Lat x Mon]
-                NAOF[i] = naopattern[:,:,None] * dt / cp0 / rho / hchoose
-            elif len(naopattern.shape) == 3: # For seasonally varying NAO pattern
-                # Monthly Varying Forcing [Lon x Lat x Mon]
-                NAOF[i] = naopattern           * dt / cp0 / rho / hchoose
-        else:
-            
-            if (len(naopattern.shape) == 3) & (i == 1):
-                 NAOF[i] = naopattern * dt / cp0 / rho / hchoose[:,:,None]
-            else:
-                NAOF[i]  = naopattern * dt / cp0 / rho / hchoose
-        
     return NAOF
     
 
