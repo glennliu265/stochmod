@@ -18,15 +18,11 @@ import sys
 from dask.distributed import Client,progress
 import dask
 
-
-
-
 #%% User Edits
 
 # Run Mode
 # pointmode = 0 # Set to 1 to output data for the point speficied below
 # points=[-30,50] # Lon, Lat for pointmode
-
 
 # # Forcing Type
 # # 0 = completely random in space time
@@ -53,34 +49,34 @@ import dask
 
 def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,stormtrack,points=[-30,50]):
                     
-
+    # --------------
+    # %% Set Parameters--------------------------------------------------------
+    # --------------
     # Unpack Points if in pointmode
     lonf,latf = points
-        
-    # Other intengration Options
+    
+    # Other intengration Options (not set by user)
     t_end    = 12*nyr      # Calculates Integration Period
     dt       = 60*60*24*30 # Timestep size (Will be used to multiply lambda)
     T0       = 0           # Initial temperature [degC]
     hfix     = 50          # Fixed MLD value (meters)
-
+    
     # Set Constants
     cp0      = 3850 # Specific Heat [J/(kg*C)]
     rho      = 1025 # Density of Seawater [kg/m3]
 
     # Set Integration Region
     lonW,lonE,latS,latN = bboxsim
-
     
+    # Save Option
+    saveforcing = 0 # Save Forcing for each point (after scaling, etc)
     
-    #Set Paths
+    #Set Paths (stormtrack and local)
     if stormtrack == 0:
         projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
-    #    scriptpath  = projpath + '03_Scripts/stochmod/'
         datpath     = projpath + '01_Data/'
-       
         sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
         sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
-    
     
     elif stormtrack == 1:
         datpath = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/"
@@ -91,13 +87,9 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     from amv import proc
     input_path  = datpath + 'model_input/'
     output_path = datpath + 'model_output/'   
-      
-
-    # Set up some strings for labeling
-    #mons3=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
-    #monsfull=('January','Febuary','March','April','May','June','July','August','September','October','November','December')
     
     ## ------------ Script Start -------------------------------------------------
+    
     print("Now Running stochmod_region with the following settings: \n")
     print("funiform  = " + str(funiform))
     print("genrand   = " + str(genrand))
@@ -112,8 +104,9 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     
     # Set experiment ID
     expid = "%iyr_funiform%i_run%s_fscale%03d" %(nyr,funiform,runid,fscale)
+    
     # --------------
-    # %% Load Variables -------------------------------------------------------------
+    # %% Load Variables ------------------------------------------------------
     # --------------
     
     # Load damping variables (calculated in hfdamping matlab scripts...)
@@ -127,11 +120,10 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     mld         = np.load(input_path+"HMXL_hclim.npy") # Climatological MLD
     kprevall    = np.load(input_path+"HMXL_kprev.npy") # Entraining Month
     
-    # Save Options are here
-    saveforcing = 0 # Save Forcing for each point
+
     
     # ------------------
-    # %% Restrict to region ---------------------------------------------------------
+    # %% Restrict to region --------------------------------------------------
     # ------------------
     
     # Note: what is the second dimension for?
@@ -141,7 +133,7 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     else:
             
         klon = np.where((LON <= lonW) & (LON >= lonE))[0]
-              
+    
     # Restrict Damping Region
     dampingr = damping[klon[:,None],klat[None,:],:]
     lonr = np.squeeze(LON[klon])
@@ -157,15 +149,18 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     np.save(datpath+"lat.npy",latr)
     np.save(datpath+"lon.npy",lonr)
     
-    # %% Load and Prep NAO Forcing... <Move to separate script?>
     
+    # ------------------
+    # %% Prep NAO Forcing ----------------------------------------------------
+    # ------------------
+    # Consider moving this section to another script?
     
     if funiform > 1: # For NAO-like forcings (and EAP forcings, load in data and setup)
+    
         # Load Longitude for processing
         lon360 =  np.load(datpath+"CESM_lon360.npy")
-        
-        # Load (NAO-NHFLX)_DJFM Forcing
-        if funiform == 2:
+
+        if funiform == 2: # Load (NAO-NHFLX)_DJFM Forcing
             
             # Load NAO Forcing and prepare (Prepared in regress_NAO_pattern.py)
             naoforcing = np.load(input_path+"NAO_EAP_NHFLX_ForcingDJFM.npy") #[PC x Ens x Lat x Lon]
@@ -174,14 +169,14 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
             NAO1 = np.mean(naoforcing[0,:,:,:],0) # [Lat x Lon]
             NAO1 = NAO1[None,:,:] # [1 x Lat x Lon]
             
-        elif funiform == 3:
+        elif funiform == 3: # NAO (DJFM) regressed to monthly NHFLX
             
             # Load NAO Forcing and take ensemble average
             naoforcing = np.load(datpath+"Monthly_NAO_Regression.npy") #[Ens x Mon x Lat x Lon]
             NAO1 = np.nanmean(naoforcing,0) * -1  # Multiply by -1 to flip flux sign convention
             
             
-        elif funiform == 4:
+        elif funiform == 4: # Monthly NAO and NHFLX
             
             # # Load Forcing and take ensemble average
             # naoforcing = np.load(datpath+"NAO_Monthly_Regression_PC.npz")['eofall'] #[Ens x Mon x Lat x Lon]
@@ -190,10 +185,11 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
               # Load Forcing and take ensemble average
             naoforcing = np.load(datpath+"NAO_Monthly_Regression_PC123.npz")['flxpattern'] #[Ens x Mon x Lat x Lon]
             
-            # Take ensemble average, then sum EOF 1 and EOF2
+            # Select PC1 Take ensemble average
             NAO1 = naoforcing[:,:,:,:,0].mean(0)
         
-        elif funiform == 5: # Apply EAP only
+        elif funiform == 5: # DJFM EAP and NHFLX 
+        
             # Load NAO Forcing and prepare (Prepared in regress_NAO_pattern.py)
             naoforcing = np.load(input_path+"NAO_EAP_NHFLX_ForcingDJFM.npy") #[PC x Ens x Lat x Lon]
             
@@ -201,7 +197,8 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
             NAO1 = naoforcing[1,:,:,:].mean(0)# [Lat x Lon] # Take mean along ensemble dimension, sum along pc 1-2
             NAO1 = NAO1[None,:,:] # [1 x Lat x Lon]
             
-        elif funiform == 6:
+        elif funiform == 6: # DJFM NAO+EAP and NHFLX
+        
             # Load NAO Forcing and prepare (Prepared in regress_NAO_pattern.py)
             naoforcing = np.load(input_path+"NAO_EAP_NHFLX_ForcingDJFM.npy") #[PC x Ens x Lat x Lon]
             
@@ -209,7 +206,7 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
             NAO1 = naoforcing[0:2,:,:,:].mean(1).sum(0)# [Lat x Lon] # Take mean along ensemble dimension, sum along pc 1-2
             NAO1 = NAO1[None,:,:] # [1 x Lat x Lon]
             
-        elif funiform == 7:
+        elif funiform == 7: # Monthly NAO+EAP and NHFLX (need to fix this...)
             
             # Load Forcing and take ensemble average
             naoforcing = np.load(datpath+"NAO_Monthly_Regression_PC123.npz")['flxpattern'] #[Ens x Mon x Lat x Lon]
@@ -233,8 +230,7 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
         
     else:
         NAOF = 1
-        
-        
+    
     # ----------------------------
     # %% Set-up damping parameters
     # ----------------------------
@@ -251,6 +247,7 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     if genrand == 1: # Generate new time series
         print("Generating New Time Series")
         if funiform == 0: # Create entire forcing array [lon x lat x time] and apply scaling factor
+        
             F = np.random.normal(0,fstd,size=(lonsize,latsize,t_end)) * fscale # Removed Divide by 4 to scale between -1 and 1
             # Save Forcing
             np.save(output_path+"stoch_output_%s_Forcing.npy"%(expid),F)
@@ -258,6 +255,8 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
         else: # Just generate the time series
             randts = np.random.normal(0,fstd,size=t_end) # Removed Divide by 4 to scale between -1 and 1
             np.save(output_path+"stoch_output_%iyr_run%s_randts.npy"%(nyr,runid),randts)
+            
+        
     
     else: # Load old data
         print("Loading Old Data")

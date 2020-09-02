@@ -36,7 +36,7 @@ lonf      = -30
 latf      = 50
 
 # Experiment Settings
-funiform = 4 # 0 = nonuniform; 1 = uniform; 2 = NAO-like (DJFM); 3 = NAO DJFM- Monthly Flx; 4 = NAO+Flx Monthly
+funiform = 1 # 0 = nonuniform; 1 = uniform; 2 = NAO-like (DJFM); 3 = NAO DJFM- Monthly Flx; 4 = NAO+Flx Monthly
 
 # Model Parameters...
 nyr = 10000
@@ -49,7 +49,7 @@ seasonal_forcing = 0
 # Forcing Parameters
 runid = "002"
 genrand = 0
-fscale   = 100
+fscale   = 1
 
 # Ocean Parameters
 hfix     = 50
@@ -125,9 +125,6 @@ else:
 if funiform == 2:
     
     naoforce = np.load(datpath+"NAO_Forcing_EnsAvg.npy") #lon x lat
-    
-
-    
     
 # Monthly NHFLX regressed to DJFM NAOIndex
 elif funiform == 3:
