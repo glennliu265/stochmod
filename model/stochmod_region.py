@@ -47,6 +47,30 @@ import dask
 # # Running Location
 # stormtrack = 1 # Set to 1 if running in stormtrack
 
+"""
+Inputs
+
+1) pointmode [int]
+    (0) Full Run (1) Single Point (2) Regional Average
+2) funiform [int]
+    Forcing Type:
+        (0) Spatially Random
+        (1) Spatially Uniform
+        (2) NAO pattern (Fixed DJFM)
+        (3) NAO pattern (Varying DJFM)
+        (4) NAO pattern (Monthly)
+        (5) EAP pattern (Fixed DJFM)
+        (6) NAO+EAP pattern (Fixed DJFM)
+        (7) NAO+EAP pattern (Monthly)
+
+"""
+
+
+
+
+
+
+
 def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,stormtrack,points=[-30,50]):
                     
     # --------------
@@ -120,8 +144,6 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     mld         = np.load(input_path+"HMXL_hclim.npy") # Climatological MLD
     kprevall    = np.load(input_path+"HMXL_kprev.npy") # Entraining Month
     
-
-    
     # ------------------
     # %% Restrict to region --------------------------------------------------
     # ------------------
@@ -149,6 +171,7 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     np.save(datpath+"lat.npy",latr)
     np.save(datpath+"lon.npy",lonr)
     
+    # dampingr, hclim, kprev, lonr, latr
     
     # ------------------
     # %% Prep NAO Forcing ----------------------------------------------------
@@ -229,6 +252,7 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
         NAOF = scm.convert_NAO(hclim,NAO1,dt,rho=rho,cp0=cp0,hfix=hfix)
         
     else:
+        
         NAOF = 1
     
     # ----------------------------
@@ -255,8 +279,6 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
         else: # Just generate the time series
             randts = np.random.normal(0,fstd,size=t_end) # Removed Divide by 4 to scale between -1 and 1
             np.save(output_path+"stoch_output_%iyr_run%s_randts.npy"%(nyr,runid),randts)
-            
-        
     
     else: # Load old data
         print("Loading Old Data")
@@ -287,6 +309,7 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     # ----------------------------
     # %% Additional setup based on pointmode  ------------------------------------------------
     # ----------------------------    
+    
     if pointmode == 1: # Find indices for pointmode
         ko,ka = proc.find_latlon(lonf,latf,lonr,latr)
         locstring = "lon%02d_lat%02d" % (lonf,latf)
@@ -344,7 +367,7 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
         multFAC = 1
     
     # Run Model Without Entrainment
-    T_entr0_all = {}
+    sst = {}
     # Loop for each Mixed Layer Depth Treatment
     for hi in range(3):
         start = time.time()
@@ -368,14 +391,14 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
             if funiform == 0:
                 randts = np.copy(Fh)
                 
-            T_entr0_all[hi],_ =  scm.noentrain_2d(randts,lbdh,T0,Fh,FACh,multFAC=multFAC)
+            sst[hi],_ =  scm.noentrain_2d(randts,lbdh,T0,Fh,FACh,multFAC=multFAC)
             print("Simulation for No Entrain Model, hvarmode %s completed in %s" % (hi,time.time() - start))
             
         elif pointmode == 1: # simulate for 1 point
             start = time.time()
     
             # Run Point Model
-            T_entr0_all[hi],_,_=scm.noentrain(t_end,lbdh[ko,ka,:],T0,Fh[ko,ka,:],FACh,multFAC=multFAC)
+            sst[hi],_,_=scm.noentrain(t_end,lbdh[ko,ka,:],T0,Fh[ko,ka,:],FACh,multFAC=multFAC)
 
             elapsed = time.time() - start
             tprint = "\nNo Entrain Model, hvarmode %i, ran in %.2fs" % (hi,elapsed)
@@ -385,7 +408,7 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
         
              # Run Point Model
             start = time.time()
-            T_entr0_all[hi],_,_=scm.noentrain(t_end,lbdh,T0,Fh,FACh,multFAC=multFAC)
+            sst[hi],_,_=scm.noentrain(t_end,lbdh,T0,Fh,FACh,multFAC=multFAC)
             
             elapsed = time.time() - start
             tprint = "\nNo Entrain Model, hvarmode %i, ran in %.2fs" % (hi,elapsed)
@@ -416,10 +439,6 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     # Run Model With Entrainment
     start = time.time()
     
-    
-    #output = dask.delayed({})#= dask.delayed(np.ones((lonsize,latsize,t_end))*np.nan)
-    
-    
     icount = 0
     if funiform > 1:
         Fh = np.copy(F[2])
@@ -427,19 +446,17 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
         Fh = np.copy(F)
     FACh = FAC[3]
     
-    
     if pointmode == 1:
         
-        T_entr1= scm.entrain(t_end,lbd_entr[ko,ka,:],T0,Fh[ko,ka,:],beta[ko,ka,:],hclim[ko,ka,:],kprev[ko,ka,:],FACh[ko,ka,:],multFAC=multFAC)
+        sst[3]= scm.entrain(t_end,lbd_entr[ko,ka,:],T0,Fh[ko,ka,:],beta[ko,ka,:],hclim[ko,ka,:],kprev[ko,ka,:],FACh[ko,ka,:],multFAC=multFAC)
         
     elif pointmode == 2:
         
-        T_entr1= scm.entrain(t_end,lbd_entr,T0,Fh,beta,hclima,kpreva,FACh,multFAC=multFAC)
+        sst[3]= scm.entrain(t_end,lbd_entr,T0,Fh,beta,hclima,kpreva,FACh,multFAC=multFAC)
         
     else:
         
         T_entr1 = np.ones((lonsize,latsize,t_end))*np.nan
-        
         for o in range(0,lonsize):
             # Get Longitude Value
             lonf = lonr[o]
@@ -477,6 +494,9 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
                 print(msg,end="\r",flush=True)
             #End Latitude Loop
         #End Longitude Loop
+        
+        # Copy over to sst dictionary
+        sst[3] = T_entr1.copy()
     
     #T_entr1 = dask.compute(*T_entr1)
     elapsed = time.time() - start
@@ -532,12 +552,9 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     
     if pointmode > 0:
         
-        # Combine entraining and nonentraining models into 1 dictionary
-        sst = T_entr0_all.copy()
-        sst[3] = T_entr1
-        
         if pointmode == 1:
             np.savez(output_path+"stoch_output_point%s_%s.npz"%(locstring,expid),sst=sst,hpt=hclim[ko,ka,:])
+            
         elif pointmode == 2:
             np.savez(output_path+"stoch_output_point%s_%s.npz"%(locstring,expid),
                      sst=sst,
@@ -554,11 +571,6 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
                      )
         
     else:
-        
-        # Combine entraining and nonentraining models into 1 dictionary
-        sst = T_entr0_all.copy()
-        sst[3] = T_entr1
-        
         
         # SAVE ALL in 1
         np.save(output_path+"stoch_output_%s.npy"%(expid),sst)
