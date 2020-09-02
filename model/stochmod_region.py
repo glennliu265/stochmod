@@ -364,12 +364,12 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
         if funiform in [6,7]: # NAO + EAP Forcing
             for hi in range(3):
                 
-                rNAOF1 = proc.sel_region(NAOF1,lonr,latr,bboxsim,reg_avg=1)
+                rNAOF1 = proc.sel_region(NAOF1[hi],lonr,latr,bboxsim,reg_avg=1)
                 rF1 = randts1 * np.tile(rNAOF1,nyr)
                 
                 # Add to forcing
                 rNAOF[hi] += rNAOF1
-                rF += rF1
+                rF[hi] += rF1
                 
         F = rF.copy()
         Fseas = rNAOF.copy()
