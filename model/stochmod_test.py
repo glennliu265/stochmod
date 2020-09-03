@@ -16,8 +16,11 @@ from scipy import stats
 import xarray as xr
 import time
 import sys
+sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
+sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
 
-
+from amv import viz
+import matplotlib.pyplot as plt
 
 import time
 
@@ -26,7 +29,10 @@ import time
 # Point/Region Options
 pointmode  = 2
 points     = [-30,50]
-bboxsim    = [-60,-15,40,65] # Simulation Box
+region = 0
+
+
+bboxsim    = [-60,-15,40,65]
 # bbox_SP = [-60,-15,40,65]
 # bbox_ST = [-80,-10,20,40]
 # bbox_TR = [-75,-15,0,20]
@@ -45,6 +51,22 @@ nyr        = 1000
 
 stormtrack = 0
 
+#%%
+
+if pointmode == 2:
+    # Set region variables
+    bbox_SP = [-60,-15,40,65]
+    bbox_ST = [-80,-10,20,40]
+    bbox_TR = [-75,-15,0,20]
+    bbox_NA = [-80,0 ,0,65]
+    regions = ("SPG","STG","TRO","NAT")
+    bboxes = (bbox_SP,bbox_ST,bbox_TR,bbox_NA)
+    rcol = ('b','r',[0,1,0],'k')
+    rcolmem = [np.array([189,202,255])/255,
+               np.array([255,134,134])/255,
+               np.array([153,255,153])/255,
+               [.75,.75,.75]]
+    bboxsim = bboxes[region]
 #%% Outside Function setup
 
 startall = time.time()
@@ -52,7 +74,7 @@ if stormtrack == 0:
     projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 #    scriptpath  = projpath + '03_Scripts/stochmod/'
     datpath     = projpath + '01_Data/'
-   
+    outpath = projpath + '02_Figures/Scrap/'
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
 
@@ -65,7 +87,7 @@ elif stormtrack == 1:
 
 
 # --------------
-# %% Set Parameters--------------------------------------------------------
+# % Set Parameters--------------------------------------------------------
 # --------------
 # Unpack Points if in pointmode
 lonf,latf = points
@@ -124,7 +146,7 @@ allstart = time.time()
 expid = "%iyr_funiform%i_run%s_fscale%03d" %(nyr,funiform,runid,fscale)
 
 # --------------
-# %% Load Variables ------------------------------------------------------
+# % Load Variables ------------------------------------------------------
 # --------------
 
 # Load damping variables (calculated in hfdamping matlab scripts...)
@@ -139,7 +161,7 @@ mld         = np.load(input_path+"HMXL_hclim.npy") # Climatological MLD
 kprevall    = np.load(input_path+"HMXL_kprev.npy") # Entraining Month
 
 # ------------------
-# %% Restrict to region --------------------------------------------------
+# % Restrict to region --------------------------------------------------
 # ------------------
 
 # Note: what is the second dimension for?
@@ -154,7 +176,7 @@ np.save(datpath+"lat.npy",latr)
 np.save(datpath+"lon.npy",lonr)
 
 # ------------------
-# %% Prep NAO Forcing ----------------------------------------------------
+# %Prep NAO Forcing ----------------------------------------------------
 # ------------------
 
 # Consider moving this section to another script?
@@ -252,7 +274,7 @@ else:
 # Out: Dict. (keys 0-2) with [lon x lat x mon]
 
 # ----------------------------
-# %% Set-up damping parameters
+# % Set-up damping parameters
 # ----------------------------
 
 lbd,lbd_entr,FAC,beta = scm.set_stochparams(hclim,dampingr,dt,ND=1,rho=rho,cp0=cp0,hfix=hfix)
@@ -336,6 +358,28 @@ print("Forcing Setup in %.2fs" % (time.time() - startf))
 if pointmode == 1: # Find indices for pointmode
     ko,ka = proc.find_latlon(lonf,latf,lonr,latr)
     locstring = "lon%02d_lat%02d" % (lonf,latf)
+    
+    
+    # Select variable at point
+    hclima = hclim[ko,ka,:]
+    dampingr = dampingr[ko,ka,:]
+    kpreva = kprev[ko,ka,:]
+    lbd_entr = lbd_entr[ko,ka,:]
+    beta = beta[ko,ka,:]
+    
+    lbda = {}
+    FACa = {}
+    Fa = {}
+    for hi in range(4):
+        FACa[hi] = FAC[hi][ko,ka,:]
+        lbda[hi] = lbd[hi][ko,ka,:]
+        if hi < 3:
+            Fa[hi] = F[hi][ko,ka,:]
+    lbd = lbda.copy()
+    FAC = FACa.copy()
+    F = Fa.copy()
+    
+    
 
 if pointmode == 2: # Take regionally averaged parameters (need to recalculate some things)
     
@@ -344,7 +388,7 @@ if pointmode == 2: # Take regionally averaged parameters (need to recalculate so
     # For this current setup, raw variables are averaged
     # Note: This assumes that bboxsim is the region you want to average over
     hclima    = np.nanmean(hclim,(0,1)) # Take lon,lat mean, ignoring nans
-    kpreva    = scm.find_kprev(hclima)
+    kpreva    = scm.find_kprev(hclima)[0]
     dampinga  = np.nanmean(dampingr,(0,1)) # Repeat for damping
     
     
@@ -379,9 +423,19 @@ if pointmode == 2: # Take regionally averaged parameters (need to recalculate so
     
 
 
+
+
+
 # ----------
 # %%RUN MODELS -----------------------------------------------------------------
 # ----------
+
+# FAC  - dict [0-3]
+# lbd  - dict [0-4]
+# lbd_entr - Array [lon x lat x mon]
+# randts - Array [time]
+# hclim - Array [lon x lat x mon]
+# kprev - Array [lon x lat x mon]
 
 
 # Set mulFAC condition based on forcing
@@ -406,12 +460,14 @@ for hi in range(3):
     else:
         Fh = F
     
-    # Match Forcing and FAC shape
-    if (len(Fh.shape)>2) & (Fh.shape[2] != FACh.shape[2]):
-        FACh = np.tile(FACh,int(t_end/12))
-    
+
         
     if pointmode == 0: #simulate all points
+    
+        # Match Forcing and FAC shape
+        if (len(Fh.shape)>2) & (Fh.shape[2] != FACh.shape[2]):
+            FACh = np.tile(FACh,int(t_end/12))
+            
         if Fh.shape[2] < 12: # Adjust for cases where Fh is not seasonal
             Fh = np.tile(Fh,12)
         if funiform == 0:
@@ -419,20 +475,9 @@ for hi in range(3):
         
         sst[hi],_ =  scm.noentrain_2d(randts,lbdh,T0,Fh,FACh,multFAC=multFAC)
         print("Simulation for No Entrain Model, hvarmode %s completed in %s" % (hi,time.time() - start))
-        
-    elif pointmode == 1: # simulate for 1 point
-        start = time.time()
-
+    
+    else:
         # Run Point Model
-        sst[hi],_,_=scm.noentrain(t_end,lbdh[ko,ka,:],T0,Fh[ko,ka,:],FACh[ko,ka,:],multFAC=multFAC)
-
-        elapsed = time.time() - start
-        tprint = "\nNo Entrain Model, hvarmode %i, ran in %.2fs" % (hi,elapsed)
-        print(tprint)
-    
-    elif pointmode == 2: # simulate using regionally averaged params
-    
-         # Run Point Model
         start = time.time()
         sst[hi],_,_=scm.noentrain(t_end,lbdh,T0,Fh,FACh,multFAC=multFAC)
         
@@ -440,12 +485,26 @@ for hi in range(3):
         tprint = "\nNo Entrain Model, hvarmode %i, ran in %.2fs" % (hi,elapsed)
         print(tprint)    
         
+    # elif pointmode == 1: # simulate for 1 point
+    #     start = time.time()
 
-#%%
+    #     # Run Point Model
+    #     sst[hi],_,_=scm.noentrain(t_end,lbdh,T0,Fh,FACh,multFAC=multFAC)
 
-#
-#%%
-
+    #     elapsed = time.time() - start
+    #     tprint = "\nNo Entrain Model, hvarmode %i, ran in %.2fs" % (hi,elapsed)
+    #     print(tprint)
+    
+    # elif pointmode == 2: # simulate using regionally averaged params
+    
+    #      # Run Point Model
+    #     start = time.time()
+    #     sst[hi],_,_=scm.noentrain(t_end,lbdh,T0,Fh,FACh,multFAC=multFAC)
+        
+    #     elapsed = time.time() - start
+    #     tprint = "\nNo Entrain Model, hvarmode %i, ran in %.2fs" % (hi,elapsed)
+    #     print(tprint)    
+  
 
 # Run Model With Entrainment
 start = time.time()
@@ -459,11 +518,11 @@ FACh = FAC[3]
 
 if pointmode == 1:
     
-    sst[3]= scm.entrain(t_end,lbd_entr[ko,ka,:],T0,Fh[ko,ka,:],beta[ko,ka,:],hclim[ko,ka,:],kprev[ko,ka,:],FACh[ko,ka,:],multFAC=multFAC)
+    sst[3]= scm.entrain(t_end,lbd[3],T0,Fh,beta,hclima,kpreva,FACh,multFAC=multFAC)
     
 elif pointmode == 2:
     
-    sst[3]= scm.entrain(t_end,lbd_entr,T0,Fh,beta,hclima,kpreva,FACh,multFAC=multFAC)
+    sst[3]= scm.entrain(t_end,lbd[3],T0,Fh,beta,hclima,kpreva,FACh,multFAC=multFAC)
     
 else:
     
@@ -490,7 +549,7 @@ else:
                 #print(msg)
 
             else:
-                T_entr1[o,a,:] = scm.entrain(t_end,lbd_entr[o,a,:],T0,Fh[o,a,:],beta[o,a,:],hclim[o,a,:],kprev[o,a,:],FACh[o,a,:],multFAC=multFAC)
+                T_entr1[o,a,:] = scm.entrain(t_end,lbd[3][o,a,:],T0,Fh[o,a,:],beta[o,a,:],hclim[o,a,:],kprev[o,a,:],FACh[o,a,:],multFAC=multFAC)
                 
                 # lbdin   = np.copy(lbd_entr[o,a,:])
                 # Fin     = np.copy(Fh[o,a,:])
@@ -514,38 +573,136 @@ elapsed = time.time() - start
 tprint = "\nEntrain Model ran in %.2fs" % (elapsed)
 print(tprint)    
         
-#%% Combine dimensions
 
 
 # %% save output
 
-if pointmode > 0:
+# if pointmode > 0:
     
-    if pointmode == 1:
-        np.savez(output_path+"stoch_output_point%s_%s.npz"%(locstring,expid),sst=sst,hpt=hclim[ko,ka,:])
+#     if pointmode == 1:
+#         np.savez(output_path+"stoch_output_point%s_%s.npz"%(locstring,expid),sst=sst,hpt=hclim[ko,ka,:])
         
-    elif pointmode == 2:
-        np.savez(output_path+"stoch_output_point%s_%s.npz"%(locstring,expid),
-                 sst=sst,
-                 hclim=hclima,
-                 kprev=kpreva,
-                 dampping=dampinga,
-                 F=F,
-                 lbd=lbd,
-                 lbd_entr=lbd_entr,
-                 beta=beta,
-                 FAC=FAC,
-                 NAO1=NAO1,
-                 NAOF=NAOF
-                 )
+#     elif pointmode == 2:
+#         np.savez(output_path+"stoch_output_point%s_%s.npz"%(locstring,expid),
+#                  sst=sst,
+#                  hclim=hclima,
+#                  kprev=kpreva,
+#                  dampping=dampinga,
+#                  F=F,
+#                  lbd=lbd,
+#                  lbd_entr=lbd_entr,
+#                  beta=beta,
+#                  FAC=FAC,
+#                  NAO1=NAO1,
+#                  NAOF=NAOF
+#                  )
     
-else:
+# else:
     
-    # SAVE ALL in 1
-    np.save(output_path+"stoch_output_%s.npy"%(expid),sst)
+#     # SAVE ALL in 1
+#     np.save(output_path+"stoch_output_%s.npy"%(expid),sst)
     
-    #np.save(output_path+"stoch_output_%iyr_funiform%i_entrain0_run%s_fscale%03d.npy"%(nyr,funiform,runid,fscale),T_entr0_all)
-    #np.save(output_path+"stoch_output_%iyr_funiform%i_entrain1_run%s_fscale%03d.npy"%(nyr,funiform,runid,fscale),T_entr1)
+#     #np.save(output_path+"stoch_output_%iyr_funiform%i_entrain0_run%s_fscale%03d.npy"%(nyr,funiform,runid,fscale),T_entr0_all)
+#     #np.save(output_path+"stoch_output_%iyr_funiform%i_entrain1_run%s_fscale%03d.npy"%(nyr,funiform,runid,fscale),T_entr1)
 
-print("stochmod_region.py ran in %.2fs"% (time.time()-allstart))
-print("Output saved as %s" + output_path + "stoch_output_%s.npy"%(expid))
+# print("stochmod_region.py ran in %.2fs"% (time.time()-allstart))
+# print("Output saved as %s" + output_path + "stoch_output_%s.npy"%(expid))
+
+
+
+#%% Make some  plots
+
+
+# Set Strings
+forcingname = ("All Random","Uniform","$(NAO & NHFLX)_{DJFM}$","$NAO_{DJFM}  &  NHFLX_{Mon}$","$(NAO  &  NHFLX)_{Mon}$","$EAP_{DJFM}$","(EAP+NAO)_{DJFM}")
+regions = ("SPG","STG","TRO","NAT")
+modelname = ("MLD Fixed","MLD Max", "MLD Clim", "Entrain")
+mons3=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
+
+
+if pointmode == 1:
+    loctitle = "LON %02d Lat %02d" % (lonf,latf)
+else:
+    loctitle = regions[region]
+    locstring = loctitle
+
+
+#%% Plot Point
+
+model = 3 # Select Model( 0:hfix || 1:hmax || 2:hvar || 3: entrain)
+
+sstpt = sst[model]
+if model == 3:
+    Fpt = F[2]
+else:
+    Fpt = F[model]
+
+# Calculate Annual Averages
+sstptann = proc.ann_avg(sstpt,0)
+Fptann   = proc.ann_avg(Fpt,0)
+
+# Set plotting parameters and text
+tper = np.arange(0,t_end)
+yper = np.arange(0,t_end,12)
+fstats = viz.quickstatslabel(Fpt)
+tstats = viz.quickstatslabel(sstpt)
+
+# Start plot
+fig,ax = plt.subplots(2,1,figsize=(8,6))
+plt.style.use('ggplot')
+
+plt.subplot(2,1,1)
+plt.plot(tper,Fpt)
+plt.plot(yper,Fptann,color='k',label='Ann. Avg')
+plt.ylabel("Forcing ($^{\circ}C/s$)",fontsize=10)
+plt.legend()
+plt.title("%s Forcing at %s with Fscale %.2e \n %s " % (forcingname[funiform],loctitle,fscale,fstats))
+
+
+plt.subplot(2,1,2)
+plt.plot(tper,sstpt)
+plt.plot(yper,sstptann,color='k',label='Ann. Avg')
+plt.ylabel("SST ($^{\circ}C$)",fontsize=10)
+plt.xlabel("Time(Months)",fontsize=10)
+plt.legend()
+#plt.title("Detrended, Deseasonalized SST at LON: %02d LAT: %02d \n Mean: %.2f || Std: %.2f || Max: %.2f" % (lonf,latf,np.nanmean(sstpt),np.nanstd(sstpt),np.nanmax(np.abs(sstpt))))
+plt.title("SST (%s) \n %s" % (modelname[model],tstats))
+
+
+plt.tight_layout()
+
+plt.savefig(outpath+"Stochmodpt_dsdt_SST_run%s_%s_model%i_funiform%i_fscale%i.png"%(runid,locstring,model,funiform,fscale),dpi=200)
+
+#%% Plot the sst autocorrelation
+
+lags = np.arange(0,61,1)
+xlim = [0,61]
+xtk =  np.arange(xlim[0],xlim[1]+2,2)
+
+kmonth = hclima.argmax()
+autocorr = {}
+for model in range(4):
+    
+    # Get the data
+    tsmodel = sst[model]
+    tsmodel = proc.year2mon(tsmodel) # mon x year
+    
+    # Deseason (No Seasonal Cycle to Remove)
+    tsmodel2 = tsmodel - np.mean(tsmodel,1)[:,None]
+    
+    # Plot
+    autocorr[model] = proc.calc_lagcovar(tsmodel,tsmodel,lags,kmonth+1,0)
+    
+
+# plot results
+fig,ax = plt.subplots(1,1,figsize=(6,4))
+plt.style.use("seaborn-bright")
+for model in range(4):
+    ax.plot(lags,autocorr[model],label=modelname[model])
+plt.title("Month %i SST Autocorrelation at %s \n Forcing %s Fscale: %.2e" % (kmonth+1,loctitle,forcingname[funiform],fscale))
+plt.xticks(xtk)
+plt.legend()
+plt.grid(True)
+plt.xlim(xlim)
+plt.style.use("seaborn-bright")
+plt.savefig(outpath+"SST_Autocorrelation_Mon%02d_run%s_%s_funiform%i_fscale%i.png"%(kmonth+1,runid,locstring,funiform,fscale),dpi=200)
