@@ -27,7 +27,7 @@ import time
 #%% Function Inputs
 
 # Point/Region Options
-pointmode  = 2
+pointmode  = 1
 points     = [-30,50]
 region     = 0
 
@@ -47,9 +47,10 @@ fstd       = 1
 
 # Other integration options
 nyr        = 1000
-nobeta     = 1 # Set to 1 to not include beta in lbd entrain
+nobeta     = 0 # Set to 1 to not include beta in lbd entrain
 
-stormtrack = 0
+
+
 
 # NEW EXPERIMENT SETTINGS 
 mldavg = 0 # Use constant (in time) average MLD values for the region
@@ -69,8 +70,10 @@ if pointmode == 2:
                np.array([153,255,153])/255,
                [.75,.75,.75]]
     bboxsim = bboxes[region]
-# Outside Function setup
 
+
+# Outside Function setup
+stormtrack = 0
 startall = time.time()
 if stormtrack == 0:
     projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
@@ -198,10 +201,13 @@ np.save(datpath+"lon.npy",lonr)
 # ------------------
 # %Prep NAO Forcing ----------------------------------------------------
 # ------------------
+# Load in forcing data and:
+#     - standardize format [lon x lat x time]
+#     - take appropriate averages.
+#     - restrict to region
+#     - convert to deg/C (apply MLD cycle if applicable)
+#     - Output as dictionary, indexed by MLD config
 
-# Consider moving this section to another script?
-
-# Load in forcing data and standardize format [lon x lat x time]
 if funiform > 1: # For NAO-like forcings (and EAP forcings, load in data and setup)
 
     # Load Longitude for processing
@@ -273,35 +279,72 @@ if funiform > 1: # For NAO-like forcings (and EAP forcings, load in data and set
     
     # Restrict to region 
     NAO1,_,_ = proc.sel_region(NAO1,LON,LAT,bboxsim)
-else:
+else: # For funiform= uniform or random forcing, just make array of ones
     NAO1 = np.ones(hclim.shape)
     
+# for ____ NAO1.shape = ...
+# funiform1 --> 37x27x12, array of ones
+# funiform2 --> 37x27x1, fixed pattern
+# funiform3 --> 37x27x12, Monthly Pattern
+
+# funiform5 --> 37x27x1, fixed pattern (EAP-DJFM)
+# funiform6 --> 36x27x2, fixed pattern (EAP and NAO like forcing)
+
 
 # Convert NAO from W/m2 to degC/sec. Returns dict with keys 0-2
-if funiform > 5: # Separately convert NAO and EAP forcing
-
-    NAOF  = scm.convert_NAO(hclim,NAO1[:,:,0],dt,rho=rho,cp0=cp0,hfix=hfix)
-    NAOF1 = scm.convert_NAO(hclim,NAO1[:,:,1],dt,rho=rho,cp0=cp0,hfix=hfix)
-
-else:
+NAOF  = {}
+NAOF1 = {}
+if applyfac == 0: # Don't Apply MLD Cycle
     
-    if applyfac == 1: # Apply MLD seasonal cycle to the forcing
-        NAOF = scm.convert_NAO(hclim,NAO1,dt,rho=rho,cp0=cp0,hfix=hfix)
+    if funiform > 1:
+        NAO1 = NAO1 * dt / rho / cp0 # Do conversions (minus MLD)
+    
+    for i in range(3):
+        if funiform > 5: 
+            NAOF[i]  = NAO1[:,:,0].copy() # NAO Forcing
+            NAOF1[i] = NAO1[:,:,1].copy() # EAP Forcing
+        else:
+            NAOF[i] = NAO1.copy()
+        
+else: # Apply seasonal MLD cycle and convert
+        
+        
+    if funiform > 5: # Separately convert NAO and EAP forcing
+        NAOF  = scm.convert_NAO(hclim,NAO1[:,:,0],dt,rho=rho,cp0=cp0,hfix=hfix) # NAO Forcing
+        NAOF1 = scm.convert_NAO(hclim,NAO1[:,:,1],dt,rho=rho,cp0=cp0,hfix=hfix) # EAP Forcing
+
     else:
-        NAOF = np.ones(dampingr.shape)
+        NAOF = scm.convert_NAO(hclim,NAO1,dt,rho=rho,cp0=cp0,hfix=hfix)
 
-
-# Out: Dict. (keys 0-2) with [lon x lat x mon]
+"""     
+# Outformat: Dict. (keys 0-2, representing MLD type) with [lon x lat x mon]
+# We have prepared NAO forcing patterns for the 3 different MLD treatments (if
+# applyfac is set. All it requires now is scaling by both the chosen factor and
+# white nosie timeseries)
+"""
 
 # ----------------------------
 # % Set-up damping parameters
 # ----------------------------
+# Converts damping parameters from raw form (Watts/m2) to (deg/sec)
+# Also calculates beta and FAC
+# Note: Consider combining with NAO Forcing conversion?
 
 lbd,lbd_entr,FAC,beta = scm.set_stochparams(hclim,dampingr,dt,ND=1,rho=rho,cp0=cp0,hfix=hfix)
+
+
+"""
+Out Format:
+    lbd -> Dict (keys 0-3) representing each mode, damping parameter
+    lbd_entr -> array of entrainment damping
+    FAC -> Dict (keys 0-3) representing each model, integration factor
+    beta ->array [Lon x Lat x Mon]
+"""
 
 # ----------------------------
 # %% Set Up Forcing           ------------------------------------------------
 # ----------------------------
+
 
 startf = time.time()
     
@@ -344,23 +387,27 @@ if funiform in [5,6,7]:
 # Use random time series to scale the forcing pattern
 if funiform != 0:
     
-    if (funiform == 1) & (applyfac==0):# Spatially Uniform Forcing, replicate to domain and apply scaling factor
     
-        F      = np.ones((lonsize,latsize,t_end)) * fscale
-        F      = np.multiply(F,randts[None,None,:])
-        Fseas  = NAOF.copy()
+    # if (funiform == 1) & (applyfac==0):# Spatially Uniform Forcing, replicate to domain and apply scaling factor
         
-    elif funiform in [5,6,7]: # NAO + EAP Forcing
+    #     F1 = {}
+    #     for hi in range(3):
+    #         # Tile monthly data to simulation length and scale by white noise time series
+    #         F1[hi] = np.tile(NAOF[hi],nyr) * fscale *  randts[None,None,:]
+    #     Fseas1  = NAOF.copy()
+        
+    if funiform in [5,6,7]: # NAO + EAP Forcing
         F,Fseas   = scm.make_naoforcing(NAOF,randts,fscale,nyr) # Scale NAO Focing
         F1,Fseas1 = scm.make_naoforcing(NAOF1,randts1,fscale,nyr) # Scale EAP forcing
         
         
         # Add the two forcings together
         for hi in range(3):
-            F[hi] += F1[hi]
+            F[hi]     += F1[hi]
             Fseas[hi] += Fseas1[hi]
             
     else: # NAO Like Forcing of funiform with mld/lbd factors, apply scaling and randts
+    
         F,Fseas = scm.make_naoforcing(NAOF,randts,fscale,nyr)
     
 
@@ -370,95 +417,109 @@ if funiform != 0:
         
 print("Forcing Setup in %.2fs" % (time.time() - startf))
 
-
+"""
+Output:
+    F - dict (keys = 0-2, representing each MLD treatment) [ lon x lat x time (simulation length)]
+    Fseas - dict (keys = 0-2, representing each MLD treatment) [ lon x lat x  month]
+    
+    
+"""
 # ----------------------------
 # %% Additional setup based on pointmode  ------------------------------------------------
 # ----------------------------    
 
 if pointmode == 1: # Find indices for pointmode
+
+    # Get indices for selected point and make string for plotting
     ko,ka = proc.find_latlon(lonf,latf,lonr,latr)
     locstring = "lon%02d_lat%02d" % (lonf,latf)
     
     # Select variable at point
-    hclima = hclim[ko,ka,:]
+    hclima   = hclim[ko,ka,:]
     dampinga = dampingr[ko,ka,:]
-    kpreva = kprev[ko,ka,:]
+    kpreva   = kprev[ko,ka,:]
     lbd_entr = lbd_entr[ko,ka,:]
-    beta = beta[ko,ka,:]
+    beta     = beta[ko,ka,:]
+    naoa     = NAO1[ko,ka,...]
     
-    naoa = NAO1[ko,ka,...]
-    
-    lbda = {}
-    FACa = {}
-    Fa = {}
-    Fseasa = {}
-    for hi in range(4):
-        FACa[hi] = FAC[hi][ko,ka,:]
-        lbda[hi] = lbd[hi][ko,ka,:]
-        if hi < 3:
-            if applyfac==1:
-                Fa[hi] = F[hi][ko,ka,:]
-                Fseasa = Fseas[hi][ko,ka,:]
-            else:
-                Fa = F[ko,ka,:]
-                Fseasa = F[ko,ka]
-    lbd = lbda.copy()
-    FAC = FACa.copy()
+    # Do the same for dictionaries indexed by MLD config
+    Fa    = {} # Forcing
+    Fseasa = {} # Seasonal Forcing pattern
+    for hi in range(3):
+        Fa[hi] = F[hi][ko,ka,:]
+        Fseasa = Fseas[hi][ko,ka,:]
     F = Fa.copy()
     Fseas=Fseasa.copy()
     
-    
-
-    
-    
+    # Do the same but for each model type
+    lbda = {}
+    FACa = {}
+    for model in range(4):
+        FACa[model] = FAC[model][ko,ka,:]
+        lbda[model] = lbd[model][ko,ka,:]
+    lbd = lbda.copy()
+    FAC = FACa.copy()
 
 if pointmode == 2: # Take regionally averaged parameters (need to recalculate some things)
     
+    # Make string for plotting
     locstring = "lon%02d_%02d_lat%02d_%02d" % (lonW,lonE,latS,latN)
     
-    # For this current setup, raw variables are averaged
-    # Note: This assumes that bboxsim is the region you want to average over
+    # Current setup: Average raw variables, assuming
+    # that bboxsim is the region you want to average over
     hclima    = np.nanmean(hclim,(0,1)) # Take lon,lat mean, ignoring nans
     kpreva    = scm.find_kprev(hclima)[0]
     dampinga  = np.nanmean(dampingr,(0,1)) # Repeat for damping
+    naoa      = np.nanmean(NAO1,(0,1)) # Repeat for nao forcing
     
-    
-    # Form Regional Averaged Forcing
-    if (funiform > 1) | (applyfac==1):
-        rNAOF = {} # [keys:0-2][mon]
-        rF = {}
-        #rFseas = {}
+    # Get regionally averaged forcing based on mld config
+    rNAOF = {}
+    rF    = {}
+    for hi in range(3):
+        rNAOF[hi] = proc.sel_region(NAOF[hi],lonr,latr,bboxsim,reg_avg=1)
+        rF[hi] = randts * np.tile(rNAOF[hi],nyr)
+        
+    # Add in EAP Forcing [consider making separate file to save?]
+    if funiform in [6,7]: # NAO + EAP Forcing
         for hi in range(3):
-            rNAOF[hi] = proc.sel_region(NAOF[hi],lonr,latr,bboxsim,reg_avg=1)
-            rF[hi] = randts * np.tile(rNAOF[hi],nyr)
-            #rFseas[hi] = proc.sel_region(Fseas[hi],lonr,latr,bboxsim,reg_avg=1)
+            rNAOF1 = proc.sel_region(NAOF1[hi],lonr,latr,bboxsim,reg_avg=1)
+            rF1 = randts1 * np.tile(rNAOF1,nyr)
             
-        # Add in EAP Forcing [consider making separate file to save?]
-        if funiform in [6,7]: # NAO + EAP Forcing
-            for hi in range(3):
-                
-                rNAOF1 = proc.sel_region(NAOF1[hi],lonr,latr,bboxsim,reg_avg=1)
-                rF1 = randts1 * np.tile(rNAOF1,nyr)
-                
-                # Add to forcing
-                rNAOF[hi] += rNAOF1
-                rF[hi] += rF1
-                
-        F = rF.copy()
-        Fseas = rNAOF.copy()
-    else:
-        F = randts * fscale
+            # Add to forcing
+            rNAOF[hi] += rNAOF1
+            rF[hi] += rF1
+    # Copy over forcing
+    F = rF.copy()
+    Fseas = rNAOF.copy()
 
-
-    # Convert units
+    # Recalculate parameters based on reigonal averages
     lbd,lbd_entr,FAC,beta = scm.set_stochparams(hclima,dampinga,dt,ND=0,rho=rho,cp0=cp0,hfix=hfix)
     
     
-
-
+# Remove entrainment from damping term if option is set
 if nobeta == 1:
     lbd[3] = lbd[2]
 
+
+"""
+Output:
+    
+Dict with keys 0-2 for MLD configuation
+    - F (Forcing, full timeseries)
+    - Fseas (Forcing, seasonal pattern)
+
+Dict with keys 0-3 for Model Type
+    - lbd (damping parameter)
+    - FAC (integration factor)
+
+Just Arrays...
+    - beta (entrainment velocity)
+    - dampinga (atmospheric damping)
+    - hclima (mixed layer depth)
+    - kpreva (entraining month)
+    - naoa (NAO forcing pattern)
+    
+"""
 
 # ----------
 # %%RUN MODELS -----------------------------------------------------------------
@@ -472,11 +533,11 @@ if nobeta == 1:
 # kprev - Array [lon x lat x mon]
 
 
-# Set mulFAC condition based on forcing
-if (funiform < 2) & (applyfac==0):
-    multFAC = 0 # Don't apply reduction factor to forcing if no pattern is applied
+# Set mulFAC condition based on applyfac
+if applyfac == 2:
+    multFAC = 1 # Don't apply integrationreduction factor if applyfac is set to 0 or 1
 else:
-    multFAC = 1
+    multFAC = 0
 
 # Run Model Without Entrainment
 sst = {}
@@ -489,10 +550,11 @@ for hi in range(3):
     lbdh = lbd[hi]
     
     # Select Forcing
-    if (funiform > 1) | (applyfac==1):
-        Fh = F[hi]
-    else:
-        Fh = F
+    Fh  = F[hi]
+    # if (funiform > 1) | (applyfac==1):
+    #     Fh = F[hi]
+    # else:
+    #     Fh = F
     
 
         
@@ -544,10 +606,11 @@ for hi in range(3):
 start = time.time()
 
 icount = 0
-if (funiform > 1) | (applyfac==1):
-    Fh = np.copy(F[2])
-else:
-    Fh = np.copy(F)
+Fh = F[2]
+# if (funiform > 1) | (applyfac==1):
+#     Fh = np.copy(F[2])
+# else:
+#     Fh = np.copy(F)
 FACh = FAC[3]
 
 if pointmode == 1:
@@ -659,6 +722,10 @@ if pointmode == 1:
 else:
     loctitle = regions[region]
     locstring = loctitle
+    
+    
+# Set Experiment ID
+expid = "run%s_%s_funiform%i_fscale%i_applyfac%i" % (runid,locstring,funiform,fscale,applyfac)
 
 
 #%% Plot Point
@@ -717,7 +784,7 @@ plt.vlines(np.arange(xl[0]+mon-1,xl[1],12),1,1)
 
 plt.tight_layout()
 
-plt.savefig(outpath+"Stochmodpt_dsdt_SST_run%s_%s_model%i_funiform%i_fscale%i.png"%(runid,locstring,model,funiform,fscale),dpi=200)
+plt.savefig(outpath+"Stochmodpt_dsdt_SST_model%i_%s.png"%(model,expid),dpi=200)
 
 
 
@@ -742,7 +809,8 @@ xtk =  np.arange(xlim[0],xlim[1]+2,2)
 plt.style.use("seaborn-bright")
 
 
-kmonth = hclima.argmax()
+kmonth = hclima.argmax() # kmonth is the INDEX of the mongth
+
 autocorr = {}
 for model in range(4):
     
@@ -773,7 +841,7 @@ plt.legend()
 plt.grid(True)
 plt.xlim(xlim)
 plt.style.use("seaborn-bright")
-plt.savefig(outpath+"SST_Autocorrelation_Mon%02d_run%s_%s_funiform%i_fscale%i.png"%(kmonth,runid,locstring,funiform,fscale),dpi=200)
+plt.savefig(outpath+"SST_Autocorrelation_Mon%02d_%s.png"%(kmonth+1,expid),dpi=200)
 
 
 
@@ -896,11 +964,7 @@ ax2.grid(False)
 ax2.set_ylabel(varname)
 plt.xlim(xlims)
 plt.tight_layout()
-plt.savefig(outpath+"scycle2Fixed_SST_Autocorrelationv%s_Mon%02d_run%s_%s_funiform%i_fscale%i.png"%(choosevar,kmonth+1,runid,locstring,funiform,fscale),dpi=200)
-
-
-
-
+plt.savefig(outpath+"scycle2Fixed_SST_Autocorrelationv%s_Mon%02d_%s.png"%(choosevar,kmonth+1,expid),dpi=200)
 
 
 fig,ax = plt.subplots(2,1)
@@ -940,7 +1004,7 @@ plt.legend(ncol=3,fontsize=8)
 plt.grid(True)
 plt.xlim(xlim)
 plt.style.use("seaborn-bright")
-plt.savefig(outpath+"SST_Autocorrelation_Mon%02d_run%s_%s_funiform%i_fscale%i_betacomparison.png"%(kmonth,runid,locstring,funiform,fscale),dpi=200)
+plt.savefig(outpath+"SST_Autocorrelation_Mon%02d_%s_betacomparison.png"%(kmonth+1,expid),dpi=200)
 
 
 #%% Tiny plot of beta
