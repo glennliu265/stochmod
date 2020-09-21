@@ -29,8 +29,7 @@ import time
 # Point/Region Options
 pointmode  = 2
 points     = [-30,50]
-region = 0
-
+region     = 0
 
 bboxsim    = [-60,-15,40,65]
 # bbox_SP = [-60,-15,40,65]
@@ -39,19 +38,22 @@ bboxsim    = [-60,-15,40,65]
 # bbox_NA = [-80,0 ,0,65]
 # fullsim = [-100,20,-20,90]
 
-# Forcing OPtions
-funiform   = 6
+# Forcing Options
+funiform   = 1
 fscale     = 1
 runid      = "000"
-genrand    = 1
+genrand    = 0
 fstd       = 1
 
 # Other integration options
 nyr        = 1000
+nobeta     = 1 # Set to 1 to not include beta in lbd entrain
 
 stormtrack = 0
 
-#%%
+# NEW EXPERIMENT SETTINGS 
+mldavg = 0 # Use constant (in time) average MLD values for the region
+lbdavg = 0 # Use constant (in time) average atmospheric damping for the region
 
 if pointmode == 2:
     # Set region variables
@@ -60,14 +62,14 @@ if pointmode == 2:
     bbox_TR = [-75,-15,0,20]
     bbox_NA = [-80,0 ,0,65]
     regions = ("SPG","STG","TRO","NAT")
-    bboxes = (bbox_SP,bbox_ST,bbox_TR,bbox_NA)
+    bboxes  = (bbox_SP,bbox_ST,bbox_TR,bbox_NA)
     rcol = ('b','r',[0,1,0],'k')
     rcolmem = [np.array([189,202,255])/255,
                np.array([255,134,134])/255,
                np.array([153,255,153])/255,
                [.75,.75,.75]]
     bboxsim = bboxes[region]
-#%% Outside Function setup
+# Outside Function setup
 
 startall = time.time()
 if stormtrack == 0:
@@ -108,7 +110,10 @@ lonW,lonE,latS,latN = bboxsim
 # Save Option
 saveforcing = 0 # Save Forcing for each point (after scaling, etc)
 
-# Apply fac
+# Apply fac options
+# 0) Forcing is just the White Noise For ing
+# 1) Forcing is white noise (numerator) and includes MLD
+# 2) Forcing includes both MLD seasonal cycle AND integration factor
 applyfac = 1 # Apply integration factor and MLD to scaling
 
 #Set Paths (stormtrack and local)
@@ -168,6 +173,21 @@ kprevall    = np.load(input_path+"HMXL_kprev.npy") # Entraining Month
 dampingr,lonr,latr = proc.sel_region(damping,LON,LAT,bboxsim)
 hclim,_,_ = proc.sel_region(mld,LON,LAT,bboxsim)
 kprev,_,_ = proc.sel_region(kprevall,LON,LAT,bboxsim)
+
+if mldavg == 1:
+    hclim = np.ones(hclim.shape) * np.nanmean(hclim,(0,1,2))
+if lbdavg == 1:
+    dampingr = np.ones(hclim.shape) * np.nanmean(dampingr,(0,1,2))
+
+# Set artificial MLD
+# hclim = np.ones(hclim.shape[0:-1])
+# # Set artificial MLD (remove later)
+# hclima=np.array([1,1,1,
+#         1,1,1,
+#         1,100,100,
+#         100,1,1])
+# hclim = hclim[:,:,None] * hclima[None,None,:]
+
 
 # Get lat and long sizes
 lonsize = lonr.shape[0]
@@ -359,25 +379,36 @@ if pointmode == 1: # Find indices for pointmode
     ko,ka = proc.find_latlon(lonf,latf,lonr,latr)
     locstring = "lon%02d_lat%02d" % (lonf,latf)
     
-    
     # Select variable at point
     hclima = hclim[ko,ka,:]
-    dampingr = dampingr[ko,ka,:]
+    dampinga = dampingr[ko,ka,:]
     kpreva = kprev[ko,ka,:]
     lbd_entr = lbd_entr[ko,ka,:]
     beta = beta[ko,ka,:]
     
+    naoa = NAO1[ko,ka,...]
+    
     lbda = {}
     FACa = {}
     Fa = {}
+    Fseasa = {}
     for hi in range(4):
         FACa[hi] = FAC[hi][ko,ka,:]
         lbda[hi] = lbd[hi][ko,ka,:]
         if hi < 3:
-            Fa[hi] = F[hi][ko,ka,:]
+            if applyfac==1:
+                Fa[hi] = F[hi][ko,ka,:]
+                Fseasa = Fseas[hi][ko,ka,:]
+            else:
+                Fa = F[ko,ka,:]
+                Fseasa = F[ko,ka]
     lbd = lbda.copy()
     FAC = FACa.copy()
     F = Fa.copy()
+    Fseas=Fseasa.copy()
+    
+    
+
     
     
 
@@ -396,9 +427,11 @@ if pointmode == 2: # Take regionally averaged parameters (need to recalculate so
     if (funiform > 1) | (applyfac==1):
         rNAOF = {} # [keys:0-2][mon]
         rF = {}
+        #rFseas = {}
         for hi in range(3):
             rNAOF[hi] = proc.sel_region(NAOF[hi],lonr,latr,bboxsim,reg_avg=1)
             rF[hi] = randts * np.tile(rNAOF[hi],nyr)
+            #rFseas[hi] = proc.sel_region(Fseas[hi],lonr,latr,bboxsim,reg_avg=1)
             
         # Add in EAP Forcing [consider making separate file to save?]
         if funiform in [6,7]: # NAO + EAP Forcing
@@ -423,7 +456,8 @@ if pointmode == 2: # Take regionally averaged parameters (need to recalculate so
     
 
 
-
+if nobeta == 1:
+    lbd[3] = lbd[2]
 
 
 # ----------
@@ -455,7 +489,7 @@ for hi in range(3):
     lbdh = lbd[hi]
     
     # Select Forcing
-    if funiform > 1:
+    if (funiform > 1) | (applyfac==1):
         Fh = F[hi]
     else:
         Fh = F
@@ -510,7 +544,7 @@ for hi in range(3):
 start = time.time()
 
 icount = 0
-if funiform > 1:
+if (funiform > 1) | (applyfac==1):
     Fh = np.copy(F[2])
 else:
     Fh = np.copy(F)
@@ -618,7 +652,7 @@ forcingname = ("All Random","Uniform","$(NAO & NHFLX)_{DJFM}$","$NAO_{DJFM}  &  
 regions = ("SPG","STG","TRO","NAT")
 modelname = ("MLD Fixed","MLD Max", "MLD Clim", "Entrain")
 mons3=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
-
+monname=('January','February','March','April','May','June','July','August','September','October','November','December')
 
 if pointmode == 1:
     loctitle = "LON %02d Lat %02d" % (lonf,latf)
@@ -630,6 +664,12 @@ else:
 #%% Plot Point
 
 model = 3 # Select Model( 0:hfix || 1:hmax || 2:hvar || 3: entrain)
+
+mon = 6
+xl  = [11940,12000]
+#yl = [-1e200,1e200] 
+
+
 
 sstpt = sst[model]
 if model == 3:
@@ -665,19 +705,42 @@ plt.plot(yper,sstptann,color='k',label='Ann. Avg')
 plt.ylabel("SST ($^{\circ}C$)",fontsize=10)
 plt.xlabel("Time(Months)",fontsize=10)
 plt.legend()
+#plt.yscale('log')
 #plt.title("Detrended, Deseasonalized SST at LON: %02d LAT: %02d \n Mean: %.2f || Std: %.2f || Max: %.2f" % (lonf,latf,np.nanmean(sstpt),np.nanstd(sstpt),np.nanmax(np.abs(sstpt))))
 plt.title("SST (%s) \n %s" % (modelname[model],tstats))
+
+plt.xlim(xl)
+#plt.ylim(yl)
+plt.xticks(np.arange(11940,12006,6))
+plt.vlines(np.arange(xl[0]+mon-1,xl[1],12),1,1)
 
 
 plt.tight_layout()
 
 plt.savefig(outpath+"Stochmodpt_dsdt_SST_run%s_%s_model%i_funiform%i_fscale%i.png"%(runid,locstring,model,funiform,fscale),dpi=200)
 
+
+
+
+
+#%%
+
+fig,ax = plt.subplots(1,1)
+ax.plot(tper[5000:100],sstpt[1:100])
+#ax.set_yscale('log')
+#ax.set_ylim([-2e287,0])
+
 #%% Plot the sst autocorrelation
 
-lags = np.arange(0,61,1)
-xlim = [0,61]
+# Load CESM Data
+cesmauto = np.load(projpath + "01_Data/Autocorrelation_Region.npy",allow_pickle=True).item()
+
+
+lags = np.arange(0,37,1)
+xlim = [0,36]
 xtk =  np.arange(xlim[0],xlim[1]+2,2)
+plt.style.use("seaborn-bright")
+
 
 kmonth = hclima.argmax()
 autocorr = {}
@@ -697,12 +760,207 @@ for model in range(4):
 # plot results
 fig,ax = plt.subplots(1,1,figsize=(6,4))
 plt.style.use("seaborn-bright")
+
+# Plot CESM
+accesm = cesmauto[region]
+ax = viz.ensemble_plot(accesm,0,ax=ax,color='k',ysymmetric=0,ialpha=0.05)
+
 for model in range(4):
     ax.plot(lags,autocorr[model],label=modelname[model])
-plt.title("Month %i SST Autocorrelation at %s \n Forcing %s Fscale: %.2e" % (kmonth+1,loctitle,forcingname[funiform],fscale))
+plt.title("%s SST Autocorrelation at %s \n Forcing %s Fscale: %.2e" % (monname[kmonth],loctitle,forcingname[funiform],fscale))
 plt.xticks(xtk)
 plt.legend()
 plt.grid(True)
 plt.xlim(xlim)
 plt.style.use("seaborn-bright")
-plt.savefig(outpath+"SST_Autocorrelation_Mon%02d_run%s_%s_funiform%i_fscale%i.png"%(kmonth+1,runid,locstring,funiform,fscale),dpi=200)
+plt.savefig(outpath+"SST_Autocorrelation_Mon%02d_run%s_%s_funiform%i_fscale%i.png"%(kmonth,runid,locstring,funiform,fscale),dpi=200)
+
+
+
+# Plot Some relevant parameters
+#%% Plot the inputs (RAW)
+fig,axs=plt.subplots(3,1,sharex=True,figsize=(6,6))
+ax=axs[0]
+ax.set_title("Mixed Layer Depth")
+ax.set_ylabel("meters")
+ax.plot(mons3,hclima,color='b')
+
+ax=axs[1]
+ax.set_title("$\lambda_{a}$")
+ax.set_ylabel("W$m^{-2}$")
+ax.plot(mons3,dampinga,color='r')
+
+ax=axs[2]
+ax.set_title("$Forcing$")
+ax.set_ylabel("W$m^{-2}$")
+ax.plot(mons3,dampinga,color='r')
+
+#%% Plot secondary inputs, post processing
+
+
+#% Plot the 4 lambdas
+fig,axs = plt.subplots(3,1,sharex=True,figsize=(6,6))
+
+ax=axs[0]
+for model in range(4):
+    ax.plot(mons3,lbd[model],label=modelname[model])
+ax.set_ylabel("degC/sec")
+ax.set_xlabel("Month")
+ax.set_title(r"$\lambda (\rho cp_{0}H)^{-1}$")
+ax.legend()
+    
+ax=axs[1]
+for model in range(4):
+    ax.plot(mons3,FAC[model],label=modelname[model])
+ax.set_title(r"Integration Factor")    
+
+#%%
+
+model = 2
+
+
+xlims = (0,36)
+# Plot Autocorrelation
+fig,ax = plt.subplots(1,1,figsize=(6,4))
+plt.style.use("seaborn")
+#for model in range(4):
+ax.plot(lags,autocorr[model],label=modelname[model])
+plt.title("%s SST Autocorrelation at %s \n Forcing %s Fscale %.2e" % (monname[kmonth],loctitle,forcingname[funiform],fscale))
+plt.xticks(xtk)
+plt.legend()
+plt.grid(True)
+plt.xlim(xlim)
+plt.style.use("seaborn-bright")
+
+# Plot seasonal autocorrelation
+choosevar = "MLD"
+
+if choosevar == "Damping":
+    invar = dampinga
+    varname = "Damping (ATMOSPHERIC)"
+    
+elif choosevar == "Beta":
+    invar = beta
+    varname = "$ln(h(t+1)/h(t))$"
+    
+elif choosevar == "MLD":
+    invar = hclima
+    varname = "Mixed Layer Depth"
+    
+elif choosevar == "Lambda Entrain":
+    #invar = np.exp(-lbd_entr*dt/(rho*cp0*hpt))
+    invar = lbd_entr
+    varname = "Lambda (Entrain)"
+    
+elif choosevar == "Lambda":
+    invar = lbd[model]
+    varname = "Lambda Mode %i" % model
+    
+elif choosevar == "Forcing":
+    invar = naopt
+    varname = "NAO Forcing (W$m^{-2}$)"
+elif choosevar == "Fmag":
+    invar = Fseas[model] #* fscale
+    varname = "Forcing Magnitude with %s (degC)" % modelname[model]
+elif choosevar == "NAO":
+    invar = naopt
+    varname = "NAO Forcing"
+elif choosevar == "Damping Term":
+
+    if hm == 0:
+        h = hfix
+    elif hm == 1:
+        h = np.max(hpt)
+    elif hm == 2:
+        h = hpt
+    
+    if hm < 3:
+        #invar = np.exp(-damppt*dt/(rho*cp0*h))
+        invar = np.exp(-lbd[hm])
+    else:
+        #invar = np.exp(-lbd_entr*dt/(rho*cp0*hpt))
+        invar = np.exp(-lbd_entr)
+    varname = "Damping Term (degC/mon) Mode %i" % hm
+
+
+    
+# Find index of maximum and roll so that it is now the first entry (currently set to only repeat for 5 years)
+kmonth = hclima.argmax()
+maxfirsttile = np.tile(np.roll(invar,-1*kmonth-1),3)
+maxfirsttile = np.concatenate((maxfirsttile,[maxfirsttile[0]]))
+
+# Twin axis and plot
+ax2 = ax.twinx()
+ax2.plot(lags,maxfirsttile,color=[0.6,0.6,0.6])
+ax2.grid(False)
+ax2.set_ylabel(varname)
+plt.xlim(xlims)
+plt.tight_layout()
+plt.savefig(outpath+"scycle2Fixed_SST_Autocorrelationv%s_Mon%02d_run%s_%s_funiform%i_fscale%i.png"%(choosevar,kmonth+1,runid,locstring,funiform,fscale),dpi=200)
+
+
+
+
+
+
+fig,ax = plt.subplots(2,1)
+ax[0].plot(mons3,hclima)
+ax[1].plot(mons3,lbd[2])
+
+#%% Plot to Compare Inclusion of Beta in Damping
+
+# Note: I first ran the script with nobeta=1, and saved the following:
+#autocorr_nobeta = np.copy(autocorr[3])
+# Make sure to run again with nobeta=0 and run the autocorrelation calculation
+
+modcol = ['b','g','r','darkviolet']
+
+# plot results
+fig,ax = plt.subplots(1,1,figsize=(6,4))
+plt.style.use("seaborn-bright")
+
+# Plot CESM
+accesm = cesmauto[region]
+ax = viz.ensemble_plot(accesm,0,ax=ax,color='k',ysymmetric=0,ialpha=0.05)
+
+# Plot Hseas Model
+model =2
+ax.plot(lags,autocorr[model],label=modelname[model],color=modcol[model])
+
+# Plot Entrain with beta
+model =3
+ax.plot(lags,autocorr[model],label=modelname[model]+" with Beta",color=modcol[model],ls="dotted")
+
+# Plot Entrain without beta
+ax.plot(lags,autocorr_nobeta,label=modelname[model]+" without Beta",color=modcol[model])
+
+plt.title("%s SST Autocorrelation at %s \n Forcing %s Fscale: %.2e" % (monname[kmonth],loctitle,forcingname[funiform],fscale))
+plt.xticks(xtk)
+plt.legend(ncol=3,fontsize=8)
+plt.grid(True)
+plt.xlim(xlim)
+plt.style.use("seaborn-bright")
+plt.savefig(outpath+"SST_Autocorrelation_Mon%02d_run%s_%s_funiform%i_fscale%i_betacomparison.png"%(kmonth,runid,locstring,funiform,fscale),dpi=200)
+
+
+#%% Tiny plot of beta
+
+fig,ax = plt.subplots(1,1,figsize=(4,2))
+ax.plot(mons3,beta)
+ax.set_title("Beta")
+ax.set_xlabel("Months")
+plt.savefig(outpath+"Beta_%s.png"%(locstring),dpi=200)
+
+#%% Comparison plot of the lambda, before and after beta inclusion
+
+modcol = ['b','g','r','darkviolet']
+fig,ax = plt.subplots(1,1,figsize=(4,3))
+lbdname = [0,0,r"$\lambda (\rho cp_{0}H)^{-1}$",r"$\lambda (\rho cp_{0}H)^{-1}$"+r"+ $w_{e}H^{-1}$"]
+for model in [2,3]:
+    ax.plot(mons3,lbd[model],label=lbdname[model],color=modcol[model])
+ax.set_ylabel("degC/sec")
+plt.legend()
+plt.savefig(outpath+"Lbd_Seas_comparison_%s.png"%(locstring),dpi=200)
+
+
+
