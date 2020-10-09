@@ -49,29 +49,32 @@ def noentrain(t_end,lbd,T0,F,FAC,multFAC=1):
         damp_ts = []
         
     # Set value for first timestep
-    temp_ts[0] = T0
+    temp_ts[0] = T0 #"DEC"
     
     # Prepare the entrainment term
     explbd = np.exp(-lbd)
     explbd[explbd==1] = 0
     
-    if (multFAC ==1) & (F.shape[0] != FAC.shape[0]):
+    if (multFAC == 1) & (F.shape[0] != FAC.shape[0]):
         F *= np.tile(FAC,int(t_end/12)) # Tile FAC and scale forcing
     
     # Loop for integration period (indexing convention from matlab)
-    for t in range(1,t_end):
+    for t in range(t_end):
         
         # Get the month
-        m = t%12
+        m = (t+1)%12
         if m == 0:
             m = 12
-    
+        #print("For t = %i month is %i"%(t,m))
 
         # Get Noise/Forcing Term
-        noise_term = F[t-1]
+        noise_term = F[t]
         
         # Form the damping term with temp from previous timestep
-        damp_term = explbd[m-1]*temp_ts[t-1]
+        if t == 0:
+            damp_term = explbd[m-1]*T0
+        else:
+            damp_term = explbd[m-1]*temp_ts[t-1]
         
         # Compute the temperature
         temp_ts[t] = damp_term + noise_term  
@@ -147,11 +150,11 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debugmode=0):
 
     Td0 = 0
     # Loop for integration period (indexing convention from matlab)
-    for t in range(1,t_end):
+    for t in range(t_end):
         
         
         # Get the month
-        m  = t%12
+        m  = (t+1)%12
 
         if m == 0:
             m = 12
@@ -226,7 +229,10 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debugmode=0):
         noise_term = F[t-1]
         
         # Form the damping term
-        damp_term = explbd[m-1]*temp_ts[t-1]
+        if t == 0:
+            damp_term = explbd[m-1]*T0
+        else:
+            damp_term = explbd[m-1]*temp_ts[t-1]
         
         # Compute the temperature
         temp_ts[t] = damp_term + noise_term + entrain_term
