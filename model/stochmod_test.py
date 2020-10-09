@@ -27,7 +27,7 @@ import time
 #%% Function Inputs
 
 # Point/Region Options
-pointmode  = 1
+pointmode  = 2
 points     = [-30,50]
 region     = 0
 
@@ -42,13 +42,12 @@ bboxsim    = [-60,-15,40,65]
 funiform   = 1
 fscale     = 1
 runid      = "000"
-genrand    = 0
+genrand    = 1
 fstd       = 1
 
 # Other integration options
-nyr        = 1000
+nyr        = 10000
 nobeta     = 0 # Set to 1 to not include beta in lbd entrain
-
 
 
 
@@ -536,6 +535,7 @@ Just Arrays...
 # Set mulFAC condition based on applyfac
 if applyfac == 2:
     multFAC = 1 # Don't apply integrationreduction factor if applyfac is set to 0 or 1
+    
 else:
     multFAC = 0
 
@@ -575,6 +575,7 @@ for hi in range(3):
     else:
         # Run Point Model
         start = time.time()
+        
         sst[hi],_,_=scm.noentrain(t_end,lbdh,T0,Fh,FACh,multFAC=multFAC)
         
         elapsed = time.time() - start
@@ -713,7 +714,7 @@ print(tprint)
 # Set Strings
 forcingname = ("All Random","Uniform","$(NAO & NHFLX)_{DJFM}$","$NAO_{DJFM}  &  NHFLX_{Mon}$","$(NAO  &  NHFLX)_{Mon}$","$EAP_{DJFM}$","(EAP+NAO)_{DJFM}")
 regions = ("SPG","STG","TRO","NAT")
-modelname = ("MLD Fixed","MLD Max", "MLD Clim", "Entrain")
+modelname = ("MLD Fixed","MLD Max", "MLD CSeasonal", "Entrain")
 mons3=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
 monname=('January','February','March','April','May','June','July','August','September','October','November','December')
 
@@ -822,7 +823,7 @@ for model in range(4):
     tsmodel2 = tsmodel - np.mean(tsmodel,1)[:,None]
     
     # Plot
-    autocorr[model] = proc.calc_lagcovar(tsmodel,tsmodel,lags,kmonth+1,0)
+    autocorr[model] = proc.calc_lagcovar(tsmodel2,tsmodel2,lags,kmonth+1,0)
     
 
 # plot results
@@ -1028,3 +1029,55 @@ plt.savefig(outpath+"Lbd_Seas_comparison_%s.png"%(locstring),dpi=200)
 
 
 
+#%% Explore effect of different starting months....
+
+# Load CESM Data
+#cesmauto = np.load(projpath + "01_Data/Autocorrelation_Region.npy",allow_pickle=True).item()
+
+lags = np.arange(0,37,1)
+xlim = [0,36]
+xtk =  np.arange(xlim[0],xlim[1]+2,2)
+plt.style.use("seaborn-bright")
+
+
+for m in range(12):
+    kmonth = m
+
+
+
+
+
+
+    #kmonth = hclima.argmax() # kmonth is the INDEX of the mongth
+
+    autocorr = {}
+    for model in range(4):
+        
+        # Get the data
+        tsmodel = sst[model]
+        tsmodel = proc.year2mon(tsmodel) # mon x year
+        
+        # Deseason (No Seasonal Cycle to Remove)
+        tsmodel2 = tsmodel - np.mean(tsmodel,1)[:,None]
+        
+        # Plot
+        autocorr[model] = proc.calc_lagcovar(tsmodel2,tsmodel2,lags,kmonth+1,0)
+    
+
+    # plot results
+    fig,ax = plt.subplots(1,1,figsize=(6,4))
+    plt.style.use("seaborn-bright")
+    
+    # Plot CESM
+    #accesm = cesmauto[region]
+    #ax = viz.ensemble_plot(accesm,0,ax=ax,color='k',ysymmetric=0,ialpha=0.05)
+    
+    for model in range(4):
+        ax.plot(lags,autocorr[model],label=modelname[model])
+    plt.title("%s SST Autocorrelation at %s \n Forcing %s Fscale: %.2e" % (monname[kmonth],loctitle,forcingname[funiform],fscale))
+    plt.xticks(xtk)
+    plt.legend()
+    plt.grid(True)
+    plt.xlim(xlim)
+    plt.style.use("seaborn-bright")
+    plt.savefig(outpath+"SST_Autocorrelation_Mon%02d_%s.png"%(kmonth+1,expid),dpi=200)
