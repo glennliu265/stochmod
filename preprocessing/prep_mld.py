@@ -175,7 +175,7 @@ def getpt_pop(lonf,latf,ds,searchdeg=0.5,returnarray=1):
     else:
         return pmean
     
-#%%
+#%% Old calculation method using xarray
 
 start = time.time()
 icount= 0
@@ -183,7 +183,7 @@ for o in range(0,lonsize):
     # Get Longitude Value
     lonf = lon[o]
     
-    # Convert to degrees East
+    # Convert to degrees Easth
     if lonf < 0:
         lonf = lonf + 360
     
@@ -213,9 +213,102 @@ for o in range(0,lonsize):
         icount +=1
         print("Completed %i of %i" % (icount,lonsize*latsize))
         
-
-
+        
+        
 print("Finished in %f seconds" % (time.time()-start))
+        
+
+
+#%% # New Calculation method (Seems to be faster)
+
+tlon = tlon.values
+tlat = tlat.values
+invar = h_ensmean.transpose(1,2,0)
+
+
+def getpt_pop_array(lonf,latf,invar,tlon,tlat,searchdeg=0.75,printfind=True):
+    
+    """
+    IMPT: assumes input variable is of the shape [lat x lon x otherdims]
+    tlon = ARRAY [lat x lon]
+    tlat = ARRAY [lat x lon]
+    """
+    
+    if lonf < 0:# Convet longitude to degrees East
+        lonf += 360
+    
+    # Query Points
+    quer = np.where((lonf-searchdeg < tlon) & (tlon < lonf+searchdeg) & (latf-searchdeg < tlat) & (tlat < latf+searchdeg))
+    latid,lonid = quer
+    
+    if printfind:
+        print("Closest LAT to %.1f was %s" % (latf,tlat[quer]))
+        print("Closest LON to %.1f was %s" % (lonf,tlon[quer]))
+        
+    if (len(latid)==0) | (len(lonid)==0):
+        print("Returning NaN because no points were found for LAT%.1f LON%.1f"%(latf,lonf))
+        return np.nan
+        exit
+    
+    
+    # Locate points on variable
+    if invar.shape[:2] != tlon.shape:
+        print("Warning, dimensions do not line up. Make sure invar is Lat x Lon x Otherdims")
+        exit
+    
+    return invar[latid,lonid,:].mean(0) # Take mean along first dimension
+    
+    
+
+
+start = time.time()
+icount= 0
+for o in range(0,lonsize):
+    # Get Longitude Value
+    lonf = lon[o]
+    
+    # Convert to degrees Easth
+    if lonf < 0:
+        lonf = lonf + 360
+    
+    for a in range(0,latsize):
+        
+        
+        # Get latitude indices
+        latf = lat[a]
+        
+        # Get point
+        value = getpt_pop_array(lonf,latf,invar,tlon,tlat,searchdeg=stol,printfind=False)
+        if np.any(np.isnan(value)):
+            msg = "Land Point @ lon %f lat %f" % (lonf,latf)
+            hclim[o,a,:] = np.ones(12)*np.nan
+            kprev[o,a,:] = np.ones(12)*np.nan
+            
+        else:
+            hclim[o,a,:] = value.copy()
+            # Find Entraining Months
+            kprev[o,a,:],_ = find_kprev(hclim[o,a,:])
+        icount +=1
+        print("Completed %i of %i" % (icount,lonsize*latsize))
+        
+        
+print("Finished in %f seconds" % (time.time()-start))  
+    
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 #%%
 np.save(datpath+hout,hclim)
 np.save(datpath+kprevout,kprev)
