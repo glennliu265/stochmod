@@ -34,7 +34,6 @@ bbox = [-90+360, 40, 20, 80]
 mode = 'DJFM' # Mode is 'DJFM',or 'Monthly'
 debug = True # Set to true to make figure at end
 
-
 # Outpath
 outpath = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/01_hfdamping/hfdamping_PIC_SLAB/NAO/"
 outname = "EOF_NAO_%s_PIC_SLAB.npz" % (mode)
@@ -351,24 +350,47 @@ for p in range(N_mode):
     pc = pcstd[:,p]
     
     pattern[:,p],_ = proc.regress_2d(pc,flx,nanwarn=1)
-    print("Regressed to PC %i"% (p+1))
+    print("Regressed nhflx to PC %i"% (p+1))
 
 pattern = pattern.reshape(nlat,nlon,N_mode)
 
 if debug:
     plt.pcolormesh(lon,lat,pattern[:,:,0],cmap=cmap),plt.colorbar(),plt.title("EOF 1"),plt.show()
+
+
+#%% Do the same for PSL
+
+# Read out psl values
+psl_all = dsall.PSL.values
+
+# Calculate DJFM Mean
+ntime,nlat,nlon = psl_all.shape
+pslw= psl_all.reshape(int(ntime/12),12,nlat*nlon)
+pslw= pslw[:,[-1,0,1,2],:].mean(1) # Select DJFM
+
+# Standardize PC
+pcstd = pcall / np.std(pcall,0)
+
+# Preallocate
+pattern_psl = np.zeros((nlat*nlon,N_mode)) # [space x pc]
+
+for p in range(N_mode):
     
+    pc = pcstd[:,p]
     
+    pattern_psl[:,p],_ = proc.regress_2d(pc,pslw,nanwarn=1)
+    print("Regressed psl to PC %i"% (p+1))
+
 # Save Output
 st = time.time()
 np.savez(outpath+outname,**{
          'eofs': eofall,
          'pcs': pcall,
          'varexp': varexpall,
+         'psl_pattern':pattern_psl,
          'nhflx_pattern': pattern,
          'lon': lon,
          'lat':lat,
          'times':times}
         )   
-
 print("Data saved in %.2fs"%(time.time()-st))
