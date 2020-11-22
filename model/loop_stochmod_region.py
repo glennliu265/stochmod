@@ -12,7 +12,7 @@ import sys
 import time
 #%% Determine System
 startall = time.time()
-stormtrack = 0
+stormtrack = 1
 if stormtrack == 0:
     projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 #    scriptpath  = projpath + '03_Scripts/stochmod/'
@@ -48,11 +48,10 @@ bboxsim  = [-100,20,-20,90] # Simulation Box
 runids    = ["100"]
 funiforms = [0,1,2,5,6]
 applyfac  = 1
-mconfig   = "SLAB_PIC"
+mconfig   = "FULL_HTR"
 
 for runid in runids:
-    
-    
+    # 
     for funiform in funiforms:
         
         

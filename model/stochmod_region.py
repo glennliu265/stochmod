@@ -522,7 +522,7 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
                 FACh = np.tile(FACh,int(t_end/12))
             
             sst[hi],_ =  scm.noentrain_2d(randts,lbdh,T0,Fh,FACh,multFAC=multFAC)
-            print("Simulation for No Entrain Model, hvarmode %s completed in %s" % (hi,time.time() - start))
+            print("\nSimulation for No Entrain Model, hvarmode %s completed in %s" % (hi,time.time() - start))
             
             
         
