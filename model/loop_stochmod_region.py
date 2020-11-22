@@ -8,12 +8,11 @@ Created on Sun Aug 23 17:10:35 2020
 @author: gliu
 """
 
-
 import sys
 import time
 #%% Determine System
 startall = time.time()
-stormtrack = 1
+stormtrack = 0
 if stormtrack == 0:
     projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 #    scriptpath  = projpath + '03_Scripts/stochmod/'
@@ -46,10 +45,10 @@ fstd     = 0.3         # Standard deviation of the forcing
 bboxsim  = [-100,20,-20,90] # Simulation Box
 
 # Do a stormtrackloop
-runids = ["001"]
+runids    = ["100"]
 funiforms = [0,1,2,5,6]
-#funiforms=[6]
-#runids=['001']
+applyfac  = 1
+mconfig   = "SLAB_PIC"
 
 for runid in runids:
     
@@ -63,8 +62,7 @@ for runid in runids:
         else:
             fscale = naoscale
             genrand=0
-    
-    
-
-        sr.stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,stormtrack)
+        
+        
+        sr.stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,stormtrack,mconfig=mconfig,applyfac=applyfac)
         print("Completed run %s funiform %s (Runtime Total: %.2fs)" % (runid,funiform,time.time()-startall))

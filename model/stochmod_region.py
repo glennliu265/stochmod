@@ -314,9 +314,7 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     
     startf = time.time()
     
-    
 
-    startf = time.time()
         
     # Prepare or load random time series
     if genrand == 1: # Generate new time series
@@ -326,6 +324,8 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
             F = np.random.normal(0,fstd,size=(lonsize,latsize,t_end)) * fscale # Removed Divide by 4 to scale between -1 and 1
             # Save Forcing
             np.save(output_path+"stoch_output_%s_Forcing.npy"%(expid),F)
+            
+            randts = np.random.normal(0,fstd,size=t_end) # Just generate dummy randts
             
         else: # Just generate the time series
             randts = np.random.normal(0,fstd,size=t_end) # Removed Divide by 4 to scale between -1 and 1
@@ -377,6 +377,11 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
         # Save Forcing if option is set
         if saveforcing == 1:
             np.save(output_path+"stoch_output_%s_Forcing.npy"%(runid),F)
+    else: # Duplicate for uniform forcing
+        F0 = F.copy()
+        F={}
+        for hi in range(3):
+            F[hi] = F0
             
     print("Forcing Setup in %.2fs" % (time.time() - startf))
     
@@ -510,7 +515,8 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     
         
         if pointmode == 0: #simulate all points
-                
+
+            
             # Match Forcing and FAC shape
             if (len(Fh.shape)>2) & (Fh.shape[2] != FACh.shape[2]):
                 FACh = np.tile(FACh,int(t_end/12))
