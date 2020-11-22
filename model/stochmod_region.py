@@ -66,7 +66,7 @@ Inputs
 """
 
 
-def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,stormtrack,points=[-30,50]):
+def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,stormtrack,points=[-30,50],mconfig='FULL_HTR'):
                     
     # --------------
     # %% Set Parameters--------------------------------------------------------
@@ -95,15 +95,15 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     
     #Set Paths (stormtrack and local)
     if stormtrack == 0:
-    projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
-    datpath     = projpath + '01_Data/'
-    sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
-    sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
+        projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
+        datpath     = projpath + '01_Data/'
+        sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
+        sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
     
     elif stormtrack == 1:
-    datpath = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/"
-    sys.path.append("/home/glliu/00_Scripts/01_Projects/00_Commons/")
-    sys.path.append("/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model/")
+        datpath = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/"
+        sys.path.append("/home/glliu/00_Scripts/01_Projects/00_Commons/")
+        sys.path.append("/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model/")
     
     import scm
     from amv import proc
@@ -113,6 +113,7 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     ## ------------ Script Start -------------------------------------------------
     
     print("Now Running stochmod_region with the following settings: \n")
+    print("mconfig   = " + mconfig)
     print("funiform  = " + str(funiform))
     print("genrand   = " + str(genrand))
     print("fstd      = " + str(fstd))
@@ -131,12 +132,15 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     # %% Load Variables ------------------------------------------------------
     # --------------
     
-    # Load damping variables (calculated in hfdamping matlab scripts...)
+    # Load Latitude and Longitude
     dampmat     = 'ensavg_nhflxdamping_monwin3_sig020_dof082_mode4.mat'
     loaddamp    = loadmat(input_path+dampmat)
     LON         = np.squeeze(loaddamp['LON1'])
     LAT         = np.squeeze(loaddamp['LAT'])
-    damping     = loaddamp['ensavg']
+    #damping     = loaddamp['ensavg']
+    
+    # Load Dampinng
+    damping = np.load(input_path+mconfig+"NHFLX_Damping_monwin3_sig005_dof894_mode4.npy")
     
     # Load Mixed layer variables (preprocessed in prep_mld.py)
     mld         = np.load(input_path+"HMXL_hclim.npy") # Climatological MLD
@@ -252,7 +256,7 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     else:
         NAOF = np.ones(dampingr.shape)
     
-    
+        
     # Out: Dict. (keys 0-2) with [lon x lat x mon]
     
     # ----------------------------
@@ -270,60 +274,59 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     # Prepare or load random time series
     if genrand == 1: # Generate new time series
     
-    print("Generating New Time Series")
-    if funiform == 0: # Create entire forcing array [lon x lat x time] and apply scaling factor
-        F = np.random.normal(0,fstd,size=(lonsize,latsize,t_end)) * fscale # Removed Divide by 4 to scale between -1 and 1
-        # Save Forcing
-        np.save(output_path+"stoch_output_%s_Forcing.npy"%(expid),F)
+        print("Generating New Time Series")
+        if funiform == 0: # Create entire forcing array [lon x lat x time] and apply scaling factor
+            F = np.random.normal(0,fstd,size=(lonsize,latsize,t_end)) * fscale # Removed Divide by 4 to scale between -1 and 1
+            # Save Forcing
+            np.save(output_path+"stoch_output_%s_Forcing.npy"%(expid),F)
+            
+        else: # Just generate the time series
+            randts = np.random.normal(0,fstd,size=t_end) # Removed Divide by 4 to scale between -1 and 1
+            np.save(output_path+"stoch_output_%iyr_run%s_randts.npy"%(nyr,runid),randts)
         
-    else: # Just generate the time series
-        randts = np.random.normal(0,fstd,size=t_end) # Removed Divide by 4 to scale between -1 and 1
-        np.save(output_path+"stoch_output_%iyr_run%s_randts.npy"%(nyr,runid),randts)
-    
     else: # Load old data
-    
-    print("Loading Old Data")
-    if funiform == 0:# Directly load full forcing
-        F = np.load(output_path+"stoch_output_%s_Forcing.npy"%(expid))
-    else: # Load random time series
-        randts = np.load(output_path+"stoch_output_%iyr_run%s_randts.npy"%(nyr,runid))
-    
-    
+        
+        print("Loading Old Data")
+        if funiform == 0:# Directly load full forcing
+            F = np.load(output_path+"stoch_output_%s_Forcing.npy"%(expid))
+        else: # Load random time series
+            randts = np.load(output_path+"stoch_output_%iyr_run%s_randts.npy"%(nyr,runid))
+        
+        
     # Generate extra time series for EAP forcing
     if funiform in [5,6,7]:
-    numforce = 1 # In the future, incoporate forcing for other EOFs
-    if genrand == 1:
-        randts1 = np.random.normal(0,fstd,size=t_end) # Removed Divide by 4 to scale between -1 and 1
-        np.save(output_path+"stoch_output_%iyr_run%s_randts_%03d.npy"%(nyr,runid,numforce),randts)
-    else:
-        randts1 = np.load(output_path+"stoch_output_%iyr_run%s_randts_%03d.npy"%(nyr,runid,numforce))
-        
-    if funiform == 5: # Assign EAP Forcing white noise time series
-        randts = randts1
+        numforce = 1 # In the future, incoporate forcing for other EOFs
+        if genrand == 1:
+            randts1 = np.random.normal(0,fstd,size=t_end) # Removed Divide by 4 to scale between -1 and 1
+            np.save(output_path+"stoch_output_%iyr_run%s_randts_%03d.npy"%(nyr,runid,numforce),randts)
+        else:
+            randts1 = np.load(output_path+"stoch_output_%iyr_run%s_randts_%03d.npy"%(nyr,runid,numforce))
+            
+        if funiform == 5: # Assign EAP Forcing white noise time series
+            randts = randts1
     
         
     
     # Use random time series to scale the forcing pattern
     if funiform != 0:
     
-    if (funiform == 1) & (applyfac==0):# Spatially Uniform Forcing, replicate to domain and apply scaling factor
-    
-        F      = np.ones((lonsize,latsize,t_end)) * fscale
-        F      = np.multiply(F,randts[None,None,:])
-        Fseas  = NAOF.copy()
+        if (funiform == 1) & (applyfac==0):# Spatially Uniform Forcing, replicate to domain and apply scaling factor
         
-    elif funiform in [5,6,7]: # NAO + EAP Forcing
-        F,Fseas   = scm.make_naoforcing(NAOF,randts,fscale,nyr) # Scale NAO Focing
-        F1,Fseas1 = scm.make_naoforcing(NAOF1,randts1,fscale,nyr) # Scale EAP forcing
-        
-        
-        # Add the two forcings together
-        for hi in range(3):
-            F[hi] += F1[hi]
-            Fseas[hi] += Fseas1[hi]
+            F      = np.ones((lonsize,latsize,t_end)) * fscale
+            F      = np.multiply(F,randts[None,None,:])
+            Fseas  = NAOF.copy()
             
-    else: # NAO Like Forcing of funiform with mld/lbd factors, apply scaling and randts
-        F,Fseas = scm.make_naoforcing(NAOF,randts,fscale,nyr)
+        elif funiform in [5,6,7]: # NAO + EAP Forcing
+            F,Fseas   = scm.make_naoforcing(NAOF,randts,fscale,nyr) # Scale NAO Focing
+            F1,Fseas1 = scm.make_naoforcing(NAOF1,randts1,fscale,nyr) # Scale EAP forcing
+            
+            # Add the two forcings together
+            for hi in range(3):
+                F[hi] += F1[hi]
+                Fseas[hi] += Fseas1[hi]
+                
+        else: # NAO Like Forcing of funiform with mld/lbd factors, apply scaling and randts
+            F,Fseas = scm.make_naoforcing(NAOF,randts,fscale,nyr)
     
     
     # Save Forcing if option is set
@@ -375,7 +378,6 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
         Fseas = rNAOF.copy()
     else:
         F = randts * fscale
-    
     
     # Convert units
     lbd,lbd_entr,FAC,beta = scm.set_stochparams(hclima,dampinga,dt,ND=0,rho=rho,cp0=cp0,hfix=hfix)
