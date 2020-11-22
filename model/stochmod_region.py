@@ -47,6 +47,37 @@ import dask
 # # Running Location
 # stormtrack = 1 # Set to 1 if running in stormtrack
 
+# applyfac options
+# 0) Forcing is just the White Noise For ing
+# 1) Forcing is white noise (numerator) and includes MLD
+# 2) Forcing includes both MLD seasonal cycle AND integration factor
+# 3) Forcing just includes integration factor
+#%% DEBUG CHOICES
+
+# Integration/Model Options
+nyr        = 1000        # Number of years to integrate over
+pointmode  = 0
+bboxsim    = [-100,20,-20,90] # Simulation Box
+mconfig    = "FULL_HTR"
+points     = [-30,50]
+
+# Forcing Options
+runid      = "100"
+genrand    = 1 
+fstd       = 0.3         # Standard deviation of the forcing
+fscale     = 1
+funiform   = 6
+applyfac   = 2
+
+# Running Location
+stormtrack = 0 # Set to 1 if running in stormtrack
+
+
+#%%
+
+
+
+
 """
 Inputs
 
@@ -62,11 +93,17 @@ Inputs
         (5) EAP pattern (Fixed DJFM)
         (6) NAO+EAP pattern (Fixed DJFM)
         (7) NAO+EAP pattern (Monthly)
+3) applyfac [int]
+    (0) Forcing is just the White Noise
+    (1) Forcing is white noise (numerator) and includes MLD
+    (2) Forcing includes both MLD seasonal cycle AND integration factor
+    
+    Apply integration factor and mixed layer depth pattern to forcing...
 
 """
 
 
-def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,stormtrack,points=[-30,50],mconfig='FULL_HTR'):
+def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,stormtrack,points=[-30,50],mconfig='FULL_HTR',applyfac=1):
                     
     # --------------
     # %% Set Parameters--------------------------------------------------------
@@ -89,9 +126,6 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     
     # Save Option
     saveforcing = 0 # Save Forcing for each point (after scaling, etc)
-    
-    # Apply fac
-    applyfac = 1 # Apply integration factor and MLD to scaling
     
     #Set Paths (stormtrack and local)
     if stormtrack == 0:
@@ -126,7 +160,9 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     allstart = time.time()
     
     # Set experiment ID
-    expid = "%iyr_funiform%i_run%s_fscale%03d" %(nyr,funiform,runid,fscale)
+    
+    #expid = "%iyr_funiform%i_run%s_fscale%03d" %(nyr,funiform,runid,fscale)
+    expid = "%s_%iyr_funiform%i_run%s_fscale%03d_applyfac%i" %(mconfig,nyr,funiform,runid,fscale,applyfac)
     
     # --------------
     # %% Load Variables ------------------------------------------------------
@@ -137,10 +173,13 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     loaddamp    = loadmat(input_path+dampmat)
     LON         = np.squeeze(loaddamp['LON1'])
     LAT         = np.squeeze(loaddamp['LAT'])
-    #damping     = loaddamp['ensavg']
     
-    # Load Dampinng
-    damping = np.load(input_path+mconfig+"NHFLX_Damping_monwin3_sig005_dof894_mode4.npy")
+    # Load Atmospheric Heat Flux Feedback/Damping
+    if mconfig == "FULL_HTR":
+        damping = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig020_dof082_mode4.npy")
+    
+    elif mconfig == "SLAB_PIC":
+        damping = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig005_dof894_mode4.npy")
     
     # Load Mixed layer variables (preprocessed in prep_mld.py)
     mld         = np.load(input_path+"HMXL_hclim.npy") # Climatological MLD
@@ -166,97 +205,93 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     # ------------------
     
     # Consider moving this section to another script?
-    
-    # Load in forcing data and standardize format [lon x lat x time]
     if funiform > 1: # For NAO-like forcings (and EAP forcings, load in data and setup)
     
-    # Load Longitude for processing
-    lon360 =  np.load(datpath+"CESM_lon360.npy")
+        # Load Longitude for processing
+        lon360 =  np.load(datpath+"CESM_lon360.npy")
     
-    if funiform == 2: # Load (NAO-NHFLX)_DJFM Forcing
+        if funiform == 2: # Load (NAO-NHFLX)_DJFM Forcing
+            
+            # [lon x lat x pc]
+            naoforcing = np.load(input_path+mconfig+"_NAO_EAP_NHFLX_Forcing_DJFM.npy") #[PC x Ens x Lat x Lon]
+            
+            # Select PC1 # [lon x lat x 1]
+            NAO1 = naoforcing[:,:,[0]]
+                
+        elif funiform == 3: # NAO (DJFM) regressed to monthly NHFLX
+            
         
-        # Load NAO Forcing and prepare (Prepared in regress_NAO_pattern.py)
-        naoforcing = np.load(input_path+"NAO_EAP_NHFLX_ForcingDJFM.npy") #[PC x Ens x Lat x Lon]
+            # NOTE: THESE HAVE NOT BEEN RECALCULATED. NEED TO REDO FOR PIC SLAB ----
+            # Load NAO Forcing and take ensemble average
+            naoforcing = np.load(datpath+"Monthly_NAO_Regression.npy") #[Ens x Mon x Lat x Lon]
+            NAO1 = np.nanmean(naoforcing,0) * -1  # Multiply by -1 to flip flux sign convention
+            
+            
+        elif funiform == 4: # Monthly NAO and NHFLX
+            
+            # NOTE: THESE HAVE NOT BEEN RECALCULATED. NEED TO REDO FOR PIC SLAB ----
+            # # Load Forcing and take ensemble average
+            # naoforcing = np.load(datpath+"NAO_Monthly_Regression_PC.npz")['eofall'] #[Ens x Mon x Lat x Lon]
+            # NAO1 = np.nanmean(naoforcing,0)
+            
+            # Load Forcing and take ensemble average
+            naoforcing = np.load(datpath+"NAO_Monthly_Regression_PC123.npz")['flxpattern'] #[Ens x Mon x Lat x Lon]
+            
+            # Select PC1 Take ensemble average
+            NAO1 = naoforcing[:,:,:,:,0].mean(0)
         
-        # Select PC1 and take ensemble average
-        NAO1 = np.mean(naoforcing[0,:,:,:],0) # [Lat x Lon]
-        NAO1 = NAO1[None,:,:] # [1 x Lat x Lon]
+        elif funiform == 5: # EAP (DJFM) ONLY
+            
+            # [lon x lat x pc]
+            naoforcing = np.load(input_path+mconfig+"_NAO_EAP_NHFLX_Forcing_DJFM.npy") #[PC x Ens x Lat x Lon]
+            
+            # Select PC1 # [lon x lat x 1]
+            NAO1 = naoforcing[:,:,[1]]
+            
+            
+        elif funiform == 6: # DJFM NAO and EAP
+            
+            # [lon x lat x pc]
+            naoforcing = np.load(input_path+mconfig+"_NAO_EAP_NHFLX_Forcing_DJFM.npy") #[PC x Ens x Lat x Lon]
+            
+            # Select PC 1 and 2 # [lon x lat x 2]
+            NAO1 = naoforcing[:,:,[1,2]]
         
-    elif funiform == 3: # NAO (DJFM) regressed to monthly NHFLX
         
-        # Load NAO Forcing and take ensemble average
-        naoforcing = np.load(datpath+"Monthly_NAO_Regression.npy") #[Ens x Mon x Lat x Lon]
-        NAO1 = np.nanmean(naoforcing,0) * -1  # Multiply by -1 to flip flux sign convention
+        # Restrict to region 
+        NAO1,_,_ = proc.sel_region(NAO1,LON,LAT,bboxsim)
         
+    else: # For funiform= uniform or random forcing, just make array of ones
         
-    elif funiform == 4: # Monthly NAO and NHFLX
-        
-        # # Load Forcing and take ensemble average
-        # naoforcing = np.load(datpath+"NAO_Monthly_Regression_PC.npz")['eofall'] #[Ens x Mon x Lat x Lon]
-        # NAO1 = np.nanmean(naoforcing,0)
+        NAO1 = np.ones(hclim.shape)
     
-          # Load Forcing and take ensemble average
-        naoforcing = np.load(datpath+"NAO_Monthly_Regression_PC123.npz")['flxpattern'] #[Ens x Mon x Lat x Lon]
-        
-        # Select PC1 Take ensemble average
-        NAO1 = naoforcing[:,:,:,:,0].mean(0)
-    
-    elif funiform == 5: # DJFM EAP and NHFLX 
-    
-        # Load NAO Forcing and prepare (Prepared in regress_NAO_pattern.py)
-        naoforcing = np.load(input_path+"NAO_EAP_NHFLX_ForcingDJFM.npy") #[PC x Ens x Lat x Lon]
-        
-        # Select PC2 and take ensemble average
-        NAO1 = naoforcing[1,:,:,:].mean(0)# [Lat x Lon] # Take mean along ensemble dimension
-        NAO1 = NAO1[None,:,:] # [1 x Lat x Lon]
-        
-    elif funiform == 6: # DJFM NAO+EAP and NHFLX
-    
-        # Load NAO Forcing and prepare (Prepared in regress_NAO_pattern.py)
-        naoforcing = np.load(input_path+"NAO_EAP_NHFLX_ForcingDJFM.npy") #[PC x Ens x Lat x Lon]
-        
-        # Select PC1-2 and take ensemble average 
-        NAO1 = naoforcing[0:2,:,:,:].mean(1)# [PC x Lat x Lon] # Take mean along ensemble dimension
-        # Note that PC is in the "time" dimension
-        
-    # elif funiform == 7: # Monthly NAO+EAP and NHFLX (need to fix this...)
-        
-    #     # Load Forcing and take ensemble average
-    #     naoforcing = np.load(datpath+"NAO_Monthly_Regression_PC123.npz")['flxpattern'] #[Ens x Mon x Lat x Lon]
-        
-    #     # Take ensemble average, then sum EOF 1 and EOF2
-    #     NAO1 = naoforcing[:,:,:,:,:2].mean(0) # [ PC x Mon x Lat x Lon]
-        
-    # # Temporarily reshape to combine PC and mon
-    # if funiform > 6:   
-    #     NAO1 = NAO1.reshape(24,192,288) # NOTE: need to uncombine later
-    
-    # Transpose to [Lon x Lat x Time]
-    NAO1 = np.transpose(NAO1,(2,1,0))
-    
-    # Convert Longitude to Degrees East
-    lon180,NAO1 = proc.lon360to180(lon360,NAO1)
-    
-    # Restrict to region 
-    NAO1,_,_ = proc.sel_region(NAO1,LON,LAT,bboxsim)
-    else:
-    NAO1 = np.ones(hclim.shape)
     
     
     # Convert NAO from W/m2 to degC/sec. Returns dict with keys 0-2
-    if funiform > 5: # Separately convert NAO and EAP forcing
-    
-    NAOF  = scm.convert_NAO(hclim,NAO1[:,:,0],dt,rho=rho,cp0=cp0,hfix=hfix)
-    NAOF1 = scm.convert_NAO(hclim,NAO1[:,:,1],dt,rho=rho,cp0=cp0,hfix=hfix)
-    
-    else:
-    
-    if applyfac == 1: # Apply MLD seasonal cycle to the forcing
-        NAOF = scm.convert_NAO(hclim,NAO1,dt,rho=rho,cp0=cp0,hfix=hfix)
-    else:
-        NAOF = np.ones(dampingr.shape)
-    
+    NAOF  = {}
+    NAOF1 = {}
+    if applyfac == 0: # Don't Apply MLD Cycle
         
+        if funiform > 1:
+            NAO1 = NAO1 * dt / rho / cp0 # Do conversions (minus MLD)
+        
+        for i in range(3):
+            if funiform > 5: 
+                NAOF[i]  = NAO1[:,:,0].copy() # NAO Forcing
+                NAOF1[i] = NAO1[:,:,1].copy() # EAP Forcing
+            else:
+                NAOF[i] = NAO1.copy()
+            
+    else: # Apply seasonal MLD cycle and convert
+            
+            
+        if funiform > 5: # Separately convert NAO and EAP forcing
+            NAOF  = scm.convert_NAO(hclim,NAO1[:,:,0],dt,rho=rho,cp0=cp0,hfix=hfix) # NAO Forcing
+            NAOF1 = scm.convert_NAO(hclim,NAO1[:,:,1],dt,rho=rho,cp0=cp0,hfix=hfix) # EAP Forcing
+    
+        else:
+            NAOF = scm.convert_NAO(hclim,NAO1,dt,rho=rho,cp0=cp0,hfix=hfix)
+
     # Out: Dict. (keys 0-2) with [lon x lat x mon]
     
     # ----------------------------
