@@ -313,9 +313,25 @@ nm[np.isnan(nm)] = 0
 mn[np.isnan(mn)] = 0
 diff = nm - mn
 
-
-
 maskout = np.copy(diff)
 maskout[np.where(diff>0)] = 1
 
 plt.pcolormesh(lon,lat,maskout[:,:,5].T,cmap=cmocean.cm.balance)
+
+#%% Updated Damping Value Plot (Comparison with SLAB HF-Feedback)
+
+lagstr = "%i-%i" % (lags[0],lags[-1])
+
+bbox = [275-360, 360-360, 0, 65]
+fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(5,4))
+cint = np.arange(-50,55,5)
+ax = viz.init_map(bbox,ax=ax)
+pcm = ax.contourf(lon,lat,np.mean(dampseason,2).T,cint,cmap=cmocean.cm.balance)
+cl = ax.contour(lon,lat,np.mean(dampseason,2).T,cint,colors="k",linewidths = 0.5)
+ax.clabel(cl,fmt="%i",fontsize=8)
+ax.add_feature(cfeature.LAND,color='gray')
+ax.set_title(r"CESM-Historical Annual Mean $\lambda_{a,%s}$ (Lags %s & Ens. Avg)" % (flux,lagstr)+ "\n"+r"DOF= %i | p = %.2f | R > %.2f " % (dof,p,corrthres),fontsize=12)
+
+#ax.set_title("$\lambda_{a,%s}$ (Ann, Lag, Ens Avg)\n" % flux+ r"p = %.2f | $\rho$ > %.2f " % (p,corrthres),fontsize=12)
+plt.colorbar(pcm,ax=ax,orientation='horizontal',fraction=0.05, pad=0.05)
+plt.savefig(outpath+"%s_Damping__mode%i_monwin%i_lags%i_sig%03d.png"%(flux,mode,monwin,lagmax,p*100),dpi=200)
