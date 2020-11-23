@@ -359,7 +359,7 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     if funiform != 0:
         
             
-        if funiform in [5,6,7]: # NAO + EAP Forcing
+        if funiform in [6,7]: # NAO + EAP Forcing
             F,Fseas   = scm.make_naoforcing(NAOF,randts,fscale,nyr) # Scale NAO Focing
             F1,Fseas1 = scm.make_naoforcing(NAOF1,randts1,fscale,nyr) # Scale EAP forcing
             

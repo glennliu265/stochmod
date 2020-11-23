@@ -35,10 +35,8 @@ import stochmod_region as sr
 
 pointmode = 0 # Set to 1 to output data for the point speficied below
 points=[-30,50] # Lon, Lat for pointmode
-
 naoscale = 10 # Number to scale NAO and other forcings by
 
-    
 # Integration Options
 nyr      = 1000        # Number of years to integrate over
 fstd     = 0.3         # Standard deviation of the forcing
@@ -46,7 +44,7 @@ bboxsim  = [-100,20,-20,90] # Simulation Box
 
 # Do a stormtrackloop
 runids    = ["100"]
-funiforms = [0,1,2,5,6]
+funiforms = [5,6]
 applyfac  = 1
 mconfig   = "FULL_HTR"
 
