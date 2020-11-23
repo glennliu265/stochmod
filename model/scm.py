@@ -684,6 +684,7 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,returnresults=
     lat = np.squeeze(loaddamp['LAT'])
     
     print("Data loaded in %.2fs" % (time.time()-start))
+    
     #% ---- Get Regional Data ----
     start = time.time()
     nregion = len(regions)

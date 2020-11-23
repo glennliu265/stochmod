@@ -39,9 +39,11 @@ lags = np.arange(0,37,1)
 # Options to determine the experiment ID
 naoscale  = 10 # Number to scale NAO and other forcings by
 nyrs      = 1000        # Number of years to integrate over
+applyfac  = 1
+mconfig   = "FULL_HTR"
 
 # Do a stormtrackloop
-runids = ("001","002","003","004","005")
+runids = ["100"]
 funiforms = (0,1,2,5,6)
 #funiforms=[0,1,2,5,6]
 #runids=['006']
@@ -55,7 +57,8 @@ for runid in runids:
             fscale = naoscale
             
         # Set experiment ID
-        expid = "%iyr_funiform%i_run%s_fscale%03d" % (nyrs,funiform,runid,fscale)
+        expid = "%s_%iyr_funiform%i_run%s_fscale%03d_applyfac%i" %(mconfig,nyrs,funiform,runid,fscale,applyfac)
+        #expid = "%iyr_funiform%i_run%s_fscale%03d" % (nyrs,funiform,runid,fscale)
         
         # Generate Output
         scm.postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags)
