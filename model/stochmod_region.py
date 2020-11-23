@@ -11,6 +11,7 @@ import numpy as np
 #import matplotlib.pyplot as plt
 import time
 import sys
+import glob
 
 #%% User Edits
 
@@ -341,9 +342,11 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     
     
     # Generate extra time series for EAP forcing
-    if funiform in [6,7]:
+    if funiform in [5,6,7]:
         numforce = 1 # In the future, incoporate forcing for other EOFs
-        if genrand == 1:
+        
+        # Generate newtimeseries if it is missing
+        if (genrand == 1) | (len(glob.glob(output_path+"stoch_output_%iyr_run%s_randts_%03d.npy"%(nyr,runid,numforce)))==0):
             print("Generating Additional New Time Series for EAP")
             randts1 = np.random.normal(0,fstd,size=t_end) # Removed Divide by 4 to scale between -1 and 1
             np.save(output_path+"stoch_output_%iyr_run%s_randts_%03d.npy"%(nyr,runid,numforce),randts)
@@ -351,8 +354,8 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
             print("Loading Additional New Time Series for EAP")
             randts1 = np.load(output_path+"stoch_output_%iyr_run%s_randts_%03d.npy"%(nyr,runid,numforce))
             
-        #if funiform == 5: # Assign EAP Forcing white noise time series
-            #randts = randts1
+        if funiform == 5: # Assign EAP Forcing white noise time series
+            randts = randts1
         
     
     # Use random time series to scale the forcing pattern

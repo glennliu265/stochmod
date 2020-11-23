@@ -10,6 +10,7 @@ Created on Sun Aug 23 17:10:35 2020
 
 import sys
 import time
+import glob
 #%% Determine System
 startall = time.time()
 stormtrack = 1
@@ -43,16 +44,15 @@ bboxsim  = [-100,20,-20,90] # Simulation Box
 
 # Do a stormtrackloop
 runids    = ["100"]
-funiforms = [5,6]
-applyfac  = 1
+funiforms = [6]
+applyfac  = 1#2
 mconfig   = "FULL_HTR"
 
 for runid in runids:
-    # 
+    
     for funiform in funiforms:
         
-        
-        if funiform < 2:
+        if (funiform < 2) | (len(glob.glob(datpath+'model_output' + "stoch_output_%iyr_run%s_randts.npy"%(nyr,runid)))==0):
             fscale = 1
             genrand=1
         else:
