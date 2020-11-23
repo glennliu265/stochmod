@@ -351,8 +351,8 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
             print("Loading Additional New Time Series for EAP")
             randts1 = np.load(output_path+"stoch_output_%iyr_run%s_randts_%03d.npy"%(nyr,runid,numforce))
             
-        if funiform == 5: # Assign EAP Forcing white noise time series
-            randts = randts1
+        #if funiform == 5: # Assign EAP Forcing white noise time series
+            #randts = randts1
         
     
     # Use random time series to scale the forcing pattern
