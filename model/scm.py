@@ -546,7 +546,7 @@ def noentrain_2d(randts,lbd,T0,F,FAC,multFAC=1):
         t_end = len(randts)
     
     # Preallocate
-    temp_ts = np.ones((lbd.shape[0],lbd.shape[1],t_end))    * np.nan
+    temp_ts = np.ones((lbd.shape[0],lbd.shape[1],t_end)) 
     damp_term = np.ones((lbd.shape[0],lbd.shape[1],t_end))  * np.nan
     noise_term = np.ones((lbd.shape[0],lbd.shape[1],t_end)) * np.nan
     
@@ -557,14 +557,14 @@ def noentrain_2d(randts,lbd,T0,F,FAC,multFAC=1):
     explbd[explbd==1] =0
     
     # Set initial condition
-    temp_ts[:,:,0] = T0
+    #temp_ts[:,:,0] = T0
     
     # Multiply forcing by reduction factor if option is set
     if multFAC == 1:
         F *= FAC
        
     # Loop for each timestep (note: using 1 indexing. T0 is from dec pre-simulation)
-    for t in range(1,t_end):
+    for t in range(t_end):
         
         # Get the month
         m = t%12
@@ -583,8 +583,18 @@ def noentrain_2d(randts,lbd,T0,F,FAC,multFAC=1):
         # Add with the corresponding forcing term to get the temp
         temp_ts[:,:,t] = damp_term[:,:,t] + noise_term[:,:,t]
         
+        
+        
         msg = '\rCompleted timestep %i of %i' % (t,t_end-1)
         print(msg,end="\r",flush=True)
+    
+    msk = noise_term.copy()
+    msk[~np.isnan(msk)] = 1
+    temp_ts *= msk[:,:,:]
+    
+    if np.all(np.isnan(temp_ts)):
+        print("WARNING ALL ARE NAN")
+        
     
     return temp_ts,damp_term
 
@@ -722,6 +732,13 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,returnresults=
             
             # Take regional average 
             tsmodel = np.nanmean(tsmodel,(0,1))
+            
+            # Temp FIX
+            if model < 3:
+                tsmodel = np.roll(tsmodel,-1) # First t uses Jan Forcing Dec Damping..
+            else:
+                tsmodel = np.roll(tsmodel,-1) # First t is feb.
+            
             sstavg[model] = np.copy(tsmodel)
             tsmodel = proc.year2mon(tsmodel) # mon x year
             
