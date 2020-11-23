@@ -48,15 +48,16 @@ funiforms = [0,1,2,5,6]
 applyfac  = 2
 mconfig   = "FULL_HTR"
 
+fscale = naoscale
+
 for runid in runids:
     
     for funiform in funiforms:
         
         if (funiform < 2) | (len(glob.glob(datpath+'model_output' + "stoch_output_%iyr_run%s_randts.npy"%(nyr,runid)))==0):
-            fscale = 1
             genrand=1
         else:
-            fscale = naoscale
+            
             genrand=0
         
         
