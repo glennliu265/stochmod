@@ -44,8 +44,8 @@ bboxsim  = [-100,20,-20,90] # Simulation Box
 
 # Do a stormtrackloop
 runids    = ["100"]
-funiforms = [6]
-applyfac  = 1#2
+funiforms = [0,1,2,5,6]
+applyfac  = 2
 mconfig   = "FULL_HTR"
 
 for runid in runids:
