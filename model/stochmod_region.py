@@ -341,7 +341,7 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     
     
     # Generate extra time series for EAP forcing
-    if funiform in [5,6,7]:
+    if funiform in [6,7]:
         numforce = 1 # In the future, incoporate forcing for other EOFs
         if genrand == 1:
             print("Generating Additional New Time Series for EAP")
