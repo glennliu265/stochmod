@@ -32,7 +32,6 @@ elif stormtrack == 1:
 import stochmod_region as sr
 
 # # of runs
-
 pointmode = 0 # Set to 1 to output data for the point speficied below
 points=[-30,50] # Lon, Lat for pointmode
 naoscale = 10 # Number to scale NAO and other forcings by
