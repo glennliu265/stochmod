@@ -716,7 +716,7 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,returnresults=
             
             # Find kmonth
             havg = np.nanmean(havg,(0,1))
-            kmonth     = havg.argmax()+1
+            kmonth     = havg.argmax()
             kmonths[r] = kmonth
             
             
