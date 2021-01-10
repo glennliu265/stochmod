@@ -194,10 +194,10 @@ for f in range(len(funiforms)):
                 
                 varin = np.transpose(amvpat[region][mode],(1,0))
                 viz.plot_AMV_spatial(varin,lonr,latr,bbox,cmap,cint=cint,clab=clabs,pcolor=0,ax=axs[mode],fmt="%.1f",)
-                axs[mode].set_title("%s" % modelname[mode],fontsize=12)   
+                axs[mode].set_title("MLD %s" % modelname[mode],fontsize=12)   
             #plt.suptitle("AMV Pattern | Forcing: %s; fscale: %ix" % (forcingname[funiform],fscale),ha='center')
             #fig.tight_layout(rect=[0, 0.03, .75, .95])
-            outname = outpathfig+'%s_AMVpattern_%s_allmodels.png' % (regions[region],expid)
+            outname = outpathfig+'%s_AMVpattern_%s_allmodels_region%s.png' % (regions[region],expid)
             plt.savefig(outname, bbox_inches="tight",dpi=200)
             
             
@@ -218,7 +218,7 @@ for f in range(len(funiforms)):
             axs[0].set_ylabel('AMV Index')
             #plt.suptitle("AMV Index | Forcing: %s; fscale: %ix" % (forcingname[funiform],fscale))
             #fig.tight_layout(rect=[0, 0.03, 1, 0.95])
-            outname = outpathfig+'%s_AMVIndex_%s_allmodels.png' % (regions[region],expid)
+            outname = outpathfig+'%s_AMVIndex_%s_allmodels_region%s.png' % (regions[region],expid)
             plt.savefig(outname, bbox_inches="tight",dpi=200)
 
 
