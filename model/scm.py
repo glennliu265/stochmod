@@ -247,12 +247,6 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False):
     explbd = np.exp(np.copy(-lbd))
     explbd[explbd==1] = 0
     
-    # Apply reduction factor
-    if multFAC ==1:
-        B  = np.copy(beta*FAC)
-        F *= np.tile(FAC,int(t_end/12)) # Tile FAC and scale forcing
-        
-    
     Td0 = None # Set Td=None Initially
     # Loop for integration period (indexing convention from matlab)
     for t in range(t_end):
