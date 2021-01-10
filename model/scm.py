@@ -19,7 +19,88 @@ sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons
 from amv import proc
 import time
 
-# %%Functions
+#%% Helper Functions/Utilities
+
+def calc_Td(t,index,values,prevmon=False,debug=False):
+    """
+    Calculate entraining temperature (Td) using linear interpolation.
+    
+    Parameters
+    ----------
+    t : INT
+        Timestep (in months, where t(0) = Jan)
+    index : ARRAY [12]
+        Time of entraining month
+    values : ARRAY [t]
+        Array of values to interpolate
+    prevmon : BOOL, optional
+        Set to True to calculate Td0. The default is False.
+    debug : TYPE, optional
+        Set to True to print outputs. The default is False.
+
+    Returns
+    -------
+    Td: INT if prevmon=False, Tuple (Td1,Td0) if prevmon=False
+    """
+    
+    # Initialize month array
+    months = []
+    m1  = (t+1)%12
+    if m1 == 0:
+        m1 = 12
+    months.append(m1)
+    
+    # Option to include previous month
+    if prevmon:
+        m0 = m1-1
+        if m0==0:
+            m0 = 12
+        months.append(m0)
+    if debug:
+        print("t=%i, Month is %i"%(t,m1))
+
+    # Loop for each month
+    Td = []
+    for m in months:
+        print("\tCalculating Td for m=%i"%m)
+        
+        # For m0, check if index=0 and skip if so (first entraining month)
+        if (len(months)>1) and (m==months[-1]):
+            if index[m-1] == 0:
+                Td.append(Td[0])
+                print("\t\tSince m0=%i, or first entraining month, Td0=Td1" % m)
+                continue
+        
+        # Find # of months since the anomaly was formed
+        k1m = (m1 - np.floor(index[m-1])) % 12
+        if k1m == 0:
+            k1m = 12
+        
+        # Get Index in t
+        kp1 = int(t - k1m)
+        if debug:
+            print("\t\tkprev is %.2f for month %i, or %i months ago at t=%i"% (index[m-1],m,k1m,kp1))
+        
+        # Retrieve value between 0 and 1
+        kval = index[m-1]-np.floor(index[m-1])
+        
+        # Interpolate
+        Td1 = np.interp(kval,[0,1],[values[kp1],values[kp1+1]])
+        if debug:
+            print("\t\tsince %.2f is between %i and %i... "%(kval,0,1))
+            print("\t\t\tTd is interpolated to %.2f, between %.2f and %.2f"%(Td1,values[kp1],values[kp1+1]))
+        Td.append(Td1)
+    
+    if prevmon: # return Td=[Td1,Td0]
+        return Td
+    else: # Just return Td1
+        return Td[0]
+
+
+
+
+#%% Stochastic Model Code
+
 """
 SST Stochastic Model, no Entrainment
 Integrated with the forward method
@@ -109,150 +190,149 @@ Dependencies:
  4) F     : Forcing term
     
 """
-def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debugmode=0):
+def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False):
+    """
+    SST Stochastic Model, with Entrainment
+    Integrated with the forward method at a single point
+    assuming lambda at a constant monthly timestep
     
-    # Set tdebugmode to 1 to also save noise,damping,entrain, and Td time series
-    linterp   = 1 # Set to 1 to use the kprev variable and linearly interpolate variables
+    Parameters
+    ----------
+    t_end : INT
+        Length of integration, in months
+    lbd : ARRAY [12,]
+        Heat Flux Feedback (degC/sec)
+    T0 : INT
+        Initial Temperature (degC)
+    F : ARRAY [t_end,]
+        Forcing term (white noise time series) (degC/sec)
+    beta : ARRAY [12,]
+        Entrainment term coefficient (log(h(t+1)/h(t)))
+    h : ARRAY [12,]
+        Mixed Layer Depth (meters)
+    kprev : ARRAY [12,]
+        Month of detrainment (calculated through find_kprev)
+    FAC : ARRAY [12,]
+        Integration Factor ((1-exp(-lbd))/lbd)
+    multFAC : BOOL, optional
+        Set to true to apply integration factor to forcing and entrain term. 
+        The default is TRUE.
+    debug : BOOL, optional
+        Set to true to print messages at each timestep. The default is False.
+
+    Returns
+    -------
+    temp_ts : ARRAY [t_end,]
+        Resultant Temperature timeseries
+    if debug is True, returns the follow ARRAYs [t_end,]
+        noise_ts   - Noise term
+        damp_ts    - Damping term
+        entrain_ts - Entrainment Term
+        Td_ts      - Entraining Temperature
+        
+    """
     
     # Preallocate
     temp_ts = np.zeros(t_end)
     
-    if debugmode == 1:
+    if debug:
         noise_ts = np.zeros(t_end)
         damp_ts = np.zeros(t_end)
         entrain_ts = np.zeros(t_end)
         Td_ts   = np.zeros(t_end)
-    else:
-        noise_ts = []
-        damp_ts = []
-        entrain_ts = []
-        Td_ts = []
+        
+    entrain_term = np.zeros(t_end)
     
     # Prepare the entrainment term
     explbd = np.exp(np.copy(-lbd))
     explbd[explbd==1] = 0
     
-    
-    # Combine terms where possible 
-    B = np.copy(beta*FAC)
+    # Apply reduction factor
     if multFAC ==1:
+        B  = np.copy(beta*FAC)
         F *= np.tile(FAC,int(t_end/12)) # Tile FAC and scale forcing
+        
     
-    
-    # Assign initial conditions
-    temp_ts[0] = np.copy(T0)
-    
-    # Create MLD arrays
-    if linterp == 0:
-        mlddepths = np.arange(0,np.max(h)+1,1)
-        mldtemps = np.zeros(mlddepths.shape)
-
-    Td0 = 0
+    Td0 = None # Set Td=None Initially
     # Loop for integration period (indexing convention from matlab)
     for t in range(t_end):
         
-        
-        # Get the month
+        # Get the month (start from Jan, so +1)
         m  = (t+1)%12
-
         if m == 0:
             m = 12
-       
+        
+        # --------------------------
         # Calculate entrainment term
-        if t<13:
+        # --------------------------
+        if t<12: # Start Entrainment term after first 12 months
             entrain_term = 0
         else:
-            
-            # If not an entraining month, skip this step
-            if beta[m-1] == 0:
+            if beta[m-1] == 0: # For months with no entrainment
                 entrain_term = 0
+                Td0 = None # Reset Td0 term
+                if debug:
+                    print("No entrainment on month %i"%m)
+                    print("--------------------\n")
             else:
-                
-                
-                # Calculate Td
-                if linterp == 1:
-
-                    # Get information about the last month
-                    m0 = m - 1
-                    if m0 == 0:
-                        m0 = 12
-                    
-                    # Find # of months since the anomaly was formed
-                    k1m = (m - np.floor(kprev[m-1])) % 12
-                    k0m = (m - np.floor(kprev[m0-1])) % 12
-                    if k1m == 0:
-                        k1m = 12
-                    if k0m == 0:
-                        k0m = 12     
-                    
-                    # Get the corresponding index month, shifting back for zero indexing
-                    kp1 = int(t - k1m)
-                    kp0 = int(t - k0m)
-                    
-                                    
-                    # Get points (rememebering to shift backwards to account for indexing)
-                    # To save computing power, store the Td1 as Td0 for next step?
-                    Td1 = np.interp(kprev[m-1],[kp1,kp1+1],[temp_ts[kp1],temp_ts[kp1+1]])
-                    
-                    #if Td0 == 0:
-                    #print("Calculating Td0 for loop %i"%t)
-                    if m0-1 == h.argmin():
-                        #print("Assigning Td0 = Td1...")
-                        Td0 = Td1
-                    elif Td0 == 0:
-                        #print("Manually calculating Td0 for step %i month %i"%(t,m))      
-                        Td0 = np.interp(kprev[m0-1],[kp0,kp0+1],[temp_ts[kp0],temp_ts[kp0+1]])
-                    
-                    
-                elif linterp == 0:
-                    Td1 = mldtemps[round(h.item(m-1))]
-                    Td0 = mldtemps[round(h.item(m0-1))]           
+                if Td0 is None: # Calculate Td0 
+                    Td1,Td0 = calc_Td(t,kprev,temp_ts,prevmon=True,debug=debug)
+                else: # Use Td0 from last timestep
+                    Td1 = calc_Td(t,kprev,temp_ts,prevmon=False,debug=debug)
                 
                 Td = (Td1+Td0)/2
-                
+                if debug:
+                    print("Td is %.2f, which is average of Td1=%.2f, Td0=%.2f"%(Td,Td1,Td0)) 
+                    print("--------------------\n")
                 Td0 = np.copy(Td1)# Copy Td1 to Td0 for the next loop
                 
                 # Calculate entrainment term
-                entrain_term = B[m-1]*Td
-                
-                if debugmode == 1:
-                    Td_ts[t] = Td
-
+                entrain_term = beta[m-1]*Td
         
-    
+        # ----------------------
         # Get Noise/Forcing Term
-        noise_term = F[t-1]
+        # ----------------------
+        noise_term = F[t]
         
-        # Form the damping term
+        # ----------------------
+        # Calculate damping term
+        # ----------------------
         if t == 0:
             damp_term = explbd[m-1]*T0
         else:
             damp_term = explbd[m-1]*temp_ts[t-1]
         
+        # ------------------------
+        # Check Integration Factor
+        # ------------------------
+        if multFAC:
+            integration_factor = FAC[m-1]
+        else:
+            integration_factor = 1
+        
+        # -----------------------
         # Compute the temperature
-        temp_ts[t] = damp_term + noise_term + entrain_term
+        # -----------------------
+        temp_ts[t] = damp_term + (noise_term + entrain_term) * integration_factor
 
-        # Save other variables
+        # ----------------------------------
+        # Save other variables in debug mode
+        # ----------------------------------
+        if debug:
+            damp_ts[t] = damp_term.copy()
+            noise_ts[t] = noise_term.copy() * integration_factor
+            entrain_ts[t] = entrain_term.copy() * integration_factor
+        
         if debugmode == 1:
             noise_ts[t] = noise_term
             damp_ts[t] = damp_term
             entrain_ts[t] = entrain_term
-        
-        
-        # Set mixed layer depth tempertures
-        if linterp == 0:
-            mldtemps[mlddepths<=h.item(m-1)] = temp_ts[t]
-
-    # Quick indexing fix
-    temp_ts[0] = T0
-    if debugmode == 1:
-        noise_ts = np.delete(noise_ts,0)
-        damp_ts = np.delete(damp_ts,0)
-        entrain_ts = np.delete(entrain_ts,0)
+            Td_ts[t] = Td
     
-    if debugmode == 1:
+    if debug:
         return temp_ts,noise_ts,damp_ts,entrain_ts,Td_ts
     return temp_ts
+
 
 
 def set_stochparams(h,damping,dt,ND=True,rho=1000,cp0=4218,hfix=50):
