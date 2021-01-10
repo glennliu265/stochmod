@@ -479,3 +479,62 @@ plt.legend()
 plt.tight_layout()
 #plt.grid(True)
 plt.savefig(outpath+"Damping_entr_RhoCPH_MLD_NATAVG.png",dpi=200)
+
+
+
+#%% Visualize a point
+
+damping_hist=damping.copy()    
+damping_slab=np.load(input_path+"SLAB_PIC_NHFLX_Damping_monwin3_sig005_dof894_mode4.npy")
+damping_slab= damping_slab[klon[:,None],klat[None,:],:]  
+
+
+
+nlon,nlat,nmon = damping_slab.shape
+klon,klat = proc.find_latlon(-30,50,lonr,latr)
+
+mons3=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
+# Plot Heat Flux Feedback
+fig,ax = plt.subplots(1,1)
+ax.plot(mons3,damping_slab.reshape(nlon*nlat,12).T,color='k',alpha = 0.01,label="")
+
+ax.plot(mons3,damping_slab[klon,klat,:],label="Lon -30, Lat 50",color='r')
+ax.plot(mons3,np.nanmean(damping_slab,(0,1)),color='b',label="N Atl. Avg")
+ax.legend()
+ax.set_ylabel("W/m2/K")
+ax.set_title("Heat Flux Feedback")
+ax.set_ylim([-10,100])
+plt.savefig(outpath+"HeatFluxAll.png",dpi=200)
+plt.show()
+
+
+
+# Plot MLD
+fig,ax = plt.subplots(1,1)
+ax.plot(mons3,hclim.reshape(nlon*nlat,12).T,color='k',alpha = 0.01,label="")
+
+ax.plot(mons3,hclim[klon,klat,:],label="Lon -30, Lat 50",color='r')
+ax.plot(mons3,np.nanmean(hclim,(0,1)),color='b',label="N Atl. Avg")
+ax.legend()
+ax.set_ylabel("m")
+ax.set_title("Mixed Layer Depth")
+#ax.set_ylim([-10,100])
+plt.savefig(outpath+"MLDAll.png",dpi=200)
+plt.show()
+
+
+
+# Tiny Plot
+fig,ax = plt.subplots(1,2,figsize=(8,3))
+plt.style.use('seaborn')
+ax[0].plot(mons3,damping_slab[klon,klat,:],label="30W,50N")
+ax[0].plot(mons3,np.nanmean(damping_slab,(0,1)),label="N Atl. Avg")
+ax[0].set_title("Heat Flux Feedback (W/m2/K)")
+ax[0].legend()
+
+ax[1].plot(mons3,hclim[klon,klat,:],label="30W,50N")
+ax[1].plot(mons3,np.nanmean(hclim,(0,1)),label="N Atl. Avg")
+ax[1].set_title("Mixed Layer Depth (m)")
+ax[1].legend()
+
+plt.show()

@@ -154,7 +154,7 @@ bbox_SP = [-60,-15,40,65]
 bbox_ST = [-80,-10,20,40]
 bbox_TR = [-75,-15,0,20]
 bbox_NA = bbox#[-75,20,0,90]
-
+    
 
 #regions = ("SPG","STG","TRO","NAT")
 #bboxes = (bbox_SP,bbox_ST,bbox_TR,bbox_NA)
@@ -174,16 +174,16 @@ plotbbox = [-100,10,-5,80]
 varin = h_regr.T
 viz.plot_AMV_spatial(varin,hlon,hlat,plotbbox,cmap,cint=cint,pcolor=0,ax=axs)
 axs.set_title("HadISST AMV SST Pattern (%s to %s)" % (startyr,hyr[0,-1]),fontsize=14)   
-
+scolors  = ["black","cornflowerblue","crimson","gold"]
 
 # Add region plots
 ax = axs
 lwb = 1.5
-ax,l4 = viz.plot_box(bbox_NA,ax=ax,color='k',return_line=True,leglab='NAT',linewidth=lwb,linestyle="solid")
-ax,l2 = viz.plot_box(bbox_ST,ax=ax,color='r',return_line=True,leglab='STG',linewidth=lwb)
-ax,l1 = viz.plot_box(bbox_SP,ax=ax,color='b',return_line=True,leglab='SPG',linewidth=lwb,linestyle='dashed')
-ax,l3 = viz.plot_box(bbox_TR,ax=ax,color=[0,1,0],return_line=True,leglab='TRO',linewidth=lwb,linestyle='dashed')
+ax,l4 = viz.plot_box(bbox_NA,ax=ax,color=scolors[0],return_line=True,leglab='NAT',linewidth=lwb,linestyle="solid")
 
+ax,l2 = viz.plot_box(bbox_ST,ax=ax,color=scolors[2],return_line=True,leglab='STG',linewidth=lwb)
+ax,l1 = viz.plot_box(bbox_SP,ax=ax,color=scolors[1],return_line=True,leglab='SPG',linewidth=lwb,linestyle='dashed')
+ax,l3 = viz.plot_box(bbox_TR,ax=ax,color=scolors[3],return_line=True,leglab='TRO',linewidth=lwb,linestyle='dashed')
 
 
 leg = ax.legend([l1,l2,l3,l4],labels=regions,ncol=4,bbox_to_anchor=(0, -0.1),loc='upper left')

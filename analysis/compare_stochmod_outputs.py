@@ -45,7 +45,7 @@ import scm
 
 
 # Lags for labeling
-lags = np.arange(0,61,1)
+lags = np.arange(0,37,1)
 
 # Options to determine the experiment ID
 naoscale  = 10 # Number to scale NAO and other forcings by
@@ -54,7 +54,7 @@ nyrs      = 1000        # Number of years to integrate over
 #runids = ("003","004","005")
 #funiforms = (0,1,2,5,6)
 
-runids=['006']
+runids=['100']
 
 
 # Set region variables
@@ -76,12 +76,14 @@ funiforms=[0,1,2,5,6]
 fnames  = ["Random","Uniform","NAO (DJFM)","EAP (DJFM)","NAO+EAP (DJFM)"]
 fcolors = ["teal","springgreen","b","tomato","m"]
 fstyles = ["dotted","dashed",'solid','solid','solid']
+mconfig = "SLAB_PIC"
+applyfac = 2
 
 # Set Model Names
-modelname = ("MLD Fixed","MLD Max", "MLD Clim", "Entrain")
+modelname = ("MLD Fixed","MLD Max", "MLD Seasonal", "MLD Entrain")
 
 
-
+fscale = naoscale
 #%% Load in the data
 
 # Load lat/lon coordinates
@@ -95,16 +97,12 @@ sstr  = {} # SST Regional
 ssta  = {} # Autocorrelation
 kmon  = {} # Entrainment Month
 
+
 for runid in runids:
     for funiform in funiforms:
         
-        if funiform < 2:
-            fscale = 1
-        else:
-            fscale = naoscale
-            
         # Set experiment ID
-        expid = "%iyr_funiform%i_run%s_fscale%03d" % (nyrs,funiform,runid,fscale)
+        expid = "%s_%iyr_funiform%i_run%s_fscale%03d_applyfac%i" %(mconfig,nyrs,funiform,runid,fscale,applyfac)
         
         # Load AMV
         amvload = np.load("%sAMV_Region_%s.npz"%(outpathdat,expid),allow_pickle=True)
@@ -122,30 +120,55 @@ for runid in runids:
         print("Loaded in post-processed data for %s" % expid)
         
 # Load CESM Data
-cesmauto = np.load(projpath + "01_Data/Autocorrelation_Region.npy",allow_pickle=True).item()
-
+if mconfig == "FULL_HTR":
+    cesmauto = np.load(projpath + "01_Data/Autocorrelation_Region.npy",allow_pickle=True).item()
+elif mconfig == "SLAB_PIC":
+    cesmauto = np.load(projpath + "01_Data/CESM-SLAB_PIC_autocorrelation_Regions.npy")
 
         
 #%% Make Autoorrelation Plots for each model, each region
 
+mons3=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
+monname=('January','February','March','April','May','June','July','August','September','October','November','December')
+
+
+
+
 rid = 3
 xlm = [0,36]
 xtk = np.arange(0,39,3)
-
+xtk2 =  np.arange(xlm[0],xlm[1],3)
 
 nregions=4
 
 for rid in range(nregions):
-    accesm = cesmauto[rid]
+    
+    if mconfig == "FULL_HTR":
+        accesm = cesmauto[rid]
+    elif mconfig == "SLAB_PIC":
+        accesm = cesmauto[:,rid]
     
     # Make a plot for each model
     for model in range(4):
+        # Get Month Index
+        kmonth = kmon[funiform][rid]
+        mons3tile = np.tile(np.array(mons3),int(np.floor(len(lags)/12))) 
+        mons3tile = np.roll(mons3tile,-kmonth)
         
         fig,ax = plt.subplots(1,1,figsize=(6,4))
         plt.style.use('seaborn')
-        # Plot CESM Ensemble Data
-        ax = viz.ensemble_plot(accesm,0,ax=ax,color=rcol[rid],ysymmetric=0,ialpha=0.05)
         
+        ax2 = ax.twiny()
+        ax2.set_xlim(xlm)
+        ax2.set_xticks(xtk2)
+        ax2.set_xticklabels(mons3tile[xtk2], rotation = 45)
+        ax2.set_axisbelow(True)
+        ax2.grid(zorder=0,alpha=0)
+        # Plot CESM Ensemble Data
+        if mconfig == "FULL_HTR":
+            ax = viz.ensemble_plot(accesm,0,ax=ax,color='k',ysymmetric=0,ialpha=0.05)
+        elif mconfig == "SLAB_PIC":
+            ax.plot(lags,accesm,label="CESM-SLAB (PIC)",color='k')
         
         for f in range(len(funiforms)):
             
@@ -155,32 +178,38 @@ for rid in range(nregions):
             acplot = ssta[funiform][rid][model]
             ax.plot(lags,acplot,color=fcolors[f],ls=fstyles[f],label=fnames[f])
         
-        plt.legend(ncol=3)
-        plt.xticks(xtk)
-        plt.xlim(xlm)
-        plt.title("%s SST Autocorrelation for Month %02d, %s" % (regions[rid],kmon[funiform][rid],modelname[model]))
-        plt.xlabel("Lags (Months)")
-        plt.ylabel("Correlation")
-        plt.savefig("%s%s_SST_Autocorrelation_ForcingCompare_model%i.png" % (outpathfig,regions[rid],model),dpi=200)
+
+        
+        ax.legend(ncol=3)
+        ax.set_xticks(xtk)
+        ax.set_xlim(xlm)
+        ax.set_title("%s SST Autocorrelation for %s, %s" % (regions[rid],monname[kmonth],modelname[model]))
+        ax.set_xlabel("Lags (Months)")
+        ax.set_ylabel("Correlation")
+        plt.tight_layout()
+        plt.savefig("%s%s_SST_Autocorrelation_ForcingCompare_model%i_%s_applyfac%i.png" % (outpathfig,regions[rid],model,mconfig,applyfac),dpi=200)
     
+
 
 
 #%% Make AMV Plots
 
-bbox = [-100,40,-20,90]
+bbox = [-100,40,0,90]
 runid = runids[0]
-cint = np.arange(-.5,.6,.1)
+cint = np.arange(-.5,.55,.05)
 clabs = np.arange(-.5,.75,.25)
 for f in range(len(funiforms)):
     funiform = funiforms[f]
     
-    expid = "%iyr_funiform%i_run%s_fscale%03d" % (nyrs,funiform,runid,fscale)
+    # Set experiment ID
+    expid = "%s_%iyr_funiform%i_run%s_fscale%03d_applyfac%i" %(mconfig,nyrs,funiform,runid,fscale,applyfac)  
     
     amvidx = amvid[funiform]
     amvpat = amvsp[funiform]
             
     for region in range(4):
-    
+              
+        
             #% Make AMV Spatial Plots
             cmap = cmocean.cm.balance
             cmap.set_bad(color='yellow')
@@ -190,11 +219,17 @@ for f in range(len(funiforms)):
             
             
             for mode in range(4):
+                
                 print("Now on mode %i region %i f %i"% (mode,region,f))
                 
                 varin = np.transpose(amvpat[region][mode],(1,0))
+<<<<<<< Updated upstream
                 viz.plot_AMV_spatial(varin,lonr,latr,bbox,cmap,cint=cint,clab=clabs,pcolor=0,ax=axs[mode],fmt="%.1f",)
                 axs[mode].set_title("MLD %s" % modelname[mode],fontsize=12)   
+=======
+                viz.plot_AMV_spatial(varin,lonr,latr,bbox,cmap,cint=cint,labels=False,pcolor=0,ax=axs[mode],fmt="%.1f",)
+                axs[mode].set_title("%s" % modelname[mode],fontsize=12)   
+>>>>>>> Stashed changes
             #plt.suptitle("AMV Pattern | Forcing: %s; fscale: %ix" % (forcingname[funiform],fscale),ha='center')
             #fig.tight_layout(rect=[0, 0.03, .75, .95])
             outname = outpathfig+'%s_AMVpattern_%s_allmodels_region%s.png' % (regions[region],expid)
@@ -218,7 +253,12 @@ for f in range(len(funiforms)):
             axs[0].set_ylabel('AMV Index')
             #plt.suptitle("AMV Index | Forcing: %s; fscale: %ix" % (forcingname[funiform],fscale))
             #fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+<<<<<<< Updated upstream
             outname = outpathfig+'%s_AMVIndex_%s_allmodels_region%s.png' % (regions[region],expid)
+=======
+            #plt.tight_layout()
+            outname = outpathfig+'%s_AMVIndex_%s_allmodels.png' % (regions[region],expid)
+>>>>>>> Stashed changes
             plt.savefig(outname, bbox_inches="tight",dpi=200)
 
 

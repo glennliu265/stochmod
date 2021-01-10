@@ -337,6 +337,7 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
         print("Loading Old Data")
         if funiform == 0:# Directly load full forcing
             F = np.load(output_path+"stoch_output_%s_Forcing.npy"%(expid))
+            randts = np.random.normal(0,fstd,size=t_end) # Just generate dummy randts
         else: # Load random time series
             randts = np.load(output_path+"stoch_output_%iyr_run%s_randts.npy"%(nyr,runid))
     
@@ -578,7 +579,7 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
         
     else: # Single point/average region
         
-        sst[3]= scm.entrain(t_end,lbd[3],T0,Fh,beta,hclima,kpreva,FACh,multFAC=multFAC)
+        T_entr1= scm.entrain(t_end,lbd[3],T0,Fh,beta,hclima,kpreva,FACh,multFAC=multFAC)
     
     
     
@@ -616,5 +617,5 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
         np.save(output_path+"stoch_output_%s.npy"%(expid),sst)
     
     print("stochmod_region.py ran in %.2fs"% (time.time()-allstart))
-    print("Output saved as %s" + output_path + "stoch_output_%s.npy"%(expid))
+    print("Output saved as" + output_path + "stoch_output_%s.npy"%(expid))
     

@@ -52,11 +52,6 @@ fscale=naoscale
 
 for runid in runids:
     for funiform in funiforms:
-        
-        # if funiform < 2:
-        #     fscale = 1
-        # else:
-        #     fscale = naoscale
             
         # Set experiment ID
         expid = "%s_%iyr_funiform%i_run%s_fscale%03d_applyfac%i" %(mconfig,nyrs,funiform,runid,fscale,applyfac)

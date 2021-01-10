@@ -46,7 +46,7 @@ bboxsim  = [-100,20,-20,90] # Simulation Box
 runids    = ["100"]
 funiforms = [0,1,2,5,6]
 applyfac  = 2
-mconfig   = "FULL_HTR"
+mconfig   = "FULL_HTR"#"FULL_HTR"
 
 fscale = naoscale
 
@@ -54,7 +54,7 @@ for runid in runids:
     
     for funiform in funiforms:
         
-        if (funiform < 2) | (len(glob.glob(datpath+'model_output' + "stoch_output_%iyr_run%s_randts.npy"%(nyr,runid)))==0):
+        if (len(glob.glob(datpath+'model_output/' + "stoch_output_%iyr_run%s_randts.npy"%(nyr,runid)))==0):
             genrand=1
         else:
             
