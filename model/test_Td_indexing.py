@@ -69,8 +69,8 @@ for t in np.arange(12,24,1):
 
     
     # Get Index
-    kp1 = int(t - k1m)
-    kp0 = int(t - k0m)
+    kp1 = int(t+1 - k1m)
+    kp0 = int(t+1 - k0m)
     print("kprev is %.2f for month %i, or %i months ago at t=%i"% (kprev[m-1],m,k1m,kp1))
     print("kprev is %.2f for month %i, or %i months ago at t=%i"% (kprev[m0-1],m0,k0m,kp0))
     

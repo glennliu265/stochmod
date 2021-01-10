@@ -27,7 +27,7 @@ import time
 #%% Function Inputs
 
 # Point/Region Options
-pointmode  = 2
+pointmode  = 1
 points     = [-30,50]
 region     = 0
 
@@ -48,8 +48,6 @@ fstd       = 1
 # Other integration options
 nyr        = 10000
 nobeta     = 0 # Set to 1 to not include beta in lbd entrain
-
-
 
 # NEW EXPERIMENT SETTINGS 
 mldavg = 0 # Use constant (in time) average MLD values for the region
@@ -734,7 +732,7 @@ expid = "run%s_%s_funiform%i_fscale%i_applyfac%i" % (runid,locstring,funiform,fs
 model = 3 # Select Model( 0:hfix || 1:hmax || 2:hvar || 3: entrain)
 
 mon = 6
-xl  = [11940,12000]
+xl  = [0,12000]
 #yl = [-1e200,1e200] 
 
 

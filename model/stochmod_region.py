@@ -259,9 +259,7 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     else: # For funiform= uniform or random forcing, just make array of ones
         
         NAO1 = np.ones(hclim.shape)
-    
-    
-    
+
     # Convert NAO from W/m2 to degC/sec. Returns dict with keys 0-2
     NAOF  = {}
     NAOF1 = {}
@@ -314,9 +312,7 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     # ----------------------------
     
     startf = time.time()
-    
 
-        
     # Prepare or load random time series
     if genrand == 1: # Generate new time series
     
@@ -360,24 +356,20 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
         
     
     # Use random time series to scale the forcing pattern
-    if funiform != 0:
-        
-            
+    if funiform != 0: 
         if funiform in [6,7]: # NAO + EAP Forcing
             F,Fseas   = scm.make_naoforcing(NAOF,randts,fscale,nyr) # Scale NAO Focing
             F1,Fseas1 = scm.make_naoforcing(NAOF1,randts1,fscale,nyr) # Scale EAP forcing
-            
-            
+
             # Add the two forcings together
             for hi in range(3):
                 F[hi]     += F1[hi]
                 Fseas[hi] += Fseas1[hi]
-                
+      
         else: # NAO Like Forcing of funiform with mld/lbd factors, apply scaling and randts
         
             F,Fseas = scm.make_naoforcing(NAOF,randts,fscale,nyr)
-        
-    
+            
         # Save Forcing if option is set
         if saveforcing == 1:
             np.save(output_path+"stoch_output_%s_Forcing.npy"%(runid),F)
@@ -388,7 +380,6 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
             F[hi] = F0
             
     print("Forcing Setup in %.2fs" % (time.time() - startf))
-    
     """
     Output:
         F - dict (keys = 0-2, representing each MLD treatment) [ lon x lat x time (simulation length)]
@@ -519,7 +510,6 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     
         
         if pointmode == 0: #simulate all points
-
             
             # Match Forcing and FAC shape
             if (len(Fh.shape)>2) & (Fh.shape[2] != FACh.shape[2]):
@@ -528,17 +518,11 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
             sst[hi],_ =  scm.noentrain_2d(randts,lbdh,T0,Fh,FACh,multFAC=multFAC)
             print("\nSimulation for No Entrain Model, hvarmode %s completed in %s" % (hi,time.time() - start))
             
-            
-        
-        
         else: # simulate for 1 point (or regionally averaged case)
             start = time.time()
             
             # Run Point Model
             sst[hi],_,_=scm.noentrain(t_end,lbdh,T0,Fh,FACh,multFAC=multFAC)
-    
-
-    
             elapsed = time.time() - start
             tprint = "\nNo Entrain Model, hvarmode %i, ran in %.2fs" % (hi,elapsed)
             print(tprint)

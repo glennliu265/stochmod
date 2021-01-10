@@ -1163,9 +1163,6 @@ plt.savefig(outname, bbox_inches="tight",dpi=200)
 np.savetxt(datpath+"T_entr0.csv",T_entr0,delimiter=",")
 np.savetxt(datpath+"T_entr1.csv",T_entr1,delimiter=",")
 
-
-
-#
 # %% Visualize some variables
 
 
