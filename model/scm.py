@@ -128,7 +128,6 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debugmode=0):
         entrain_ts = []
         Td_ts = []
     
-    
     # Prepare the entrainment term
     explbd = np.exp(np.copy(-lbd))
     explbd[explbd==1] = 0
@@ -158,8 +157,7 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debugmode=0):
 
         if m == 0:
             m = 12
-        
-                            
+       
         # Calculate entrainment term
         if t<13:
             entrain_term = 0
@@ -174,7 +172,6 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debugmode=0):
                 # Calculate Td
                 if linterp == 1:
 
-                    
                     # Get information about the last month
                     m0 = m - 1
                     if m0 == 0:
@@ -191,13 +188,11 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debugmode=0):
                     # Get the corresponding index month, shifting back for zero indexing
                     kp1 = int(t - k1m)
                     kp0 = int(t - k0m)
-    
+                    
                                     
                     # Get points (rememebering to shift backwards to account for indexing)
                     # To save computing power, store the Td1 as Td0 for next step?
                     Td1 = np.interp(kprev[m-1],[kp1,kp1+1],[temp_ts[kp1],temp_ts[kp1+1]])
-                    
-                    
                     
                     #if Td0 == 0:
                     #print("Calculating Td0 for loop %i"%t)
@@ -332,7 +327,7 @@ def set_stochparams(h,damping,dt,ND=True,rho=1000,cp0=4218,hfix=50):
     # Compute reduction factor
     FAC = {}  
     for i in range(4):
-        
+        fac = (1-np.exp(-lbd[i]))/lbd[i]
         fac = np.nan_to_num((1-np.exp(-lbd[i]))/lbd[i])
         fac[fac==0] = 1 # Change all zero FAC values to 1
         FAC[i] = fac.copy()
@@ -371,7 +366,7 @@ def find_kprev(h):
             im0 = m0-1
         
         # Set values for minimun/maximum -----------------------------------------
-        if im == h.argmax() or im== h.argmin():
+        if im == h.argmax(): #or im== h.argmin():
             print("Ignoring %i, max/min" % m)
             kprev[im] = m
             hout[im] = h[im]
@@ -734,9 +729,7 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,returnresults=
             tsmodel = np.nanmean(tsmodel,(0,1))
             
             # Temp FIX
-            if model < 3:
-                tsmodel = np.roll(tsmodel,-1) # First t uses Jan Forcing Dec Damping..
-            else:
+            if model == 3:
                 tsmodel = np.roll(tsmodel,-1) # First t is feb.
             
             sstavg[model] = np.copy(tsmodel)
