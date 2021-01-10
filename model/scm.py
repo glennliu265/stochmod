@@ -62,14 +62,17 @@ def calc_Td(t,index,values,prevmon=False,debug=False):
     # Loop for each month
     Td = []
     for m in months:
-        print("\tCalculating Td for m=%i"%m)
+        if debug:
+            print("\tCalculating Td for m=%i"%m)
         
-        # For m0, check if index=0 and skip if so (first entraining month)
-        if (len(months)>1) and (m==months[-1]):
-            if index[m-1] == 0:
-                Td.append(Td[0])
-                print("\t\tSince m0=%i, or first entraining month, Td0=Td1" % m)
-                continue
+        # # For m0, check if index=0 and skip if so (first entraining month)
+        # if (len(months)>1) and (m==months[-1]):
+        #     if index[m-1] == 0:
+        #         return 0,0
+        #         # Td.append(Td[0])
+        #         # if debug:
+        #         #     print("\t\tSince m0=%i, or first entraining month, Td0=Td1" % m)
+        #         # continue
         
         # Find # of months since the anomaly was formed
         k1m = (m1 - np.floor(index[m-1])) % 12
@@ -77,7 +80,7 @@ def calc_Td(t,index,values,prevmon=False,debug=False):
             k1m = 12
         
         # Get Index in t
-        kp1 = int(t - k1m)
+        kp1 = int(t+1 - k1m)
         if debug:
             print("\t\tkprev is %.2f for month %i, or %i months ago at t=%i"% (index[m-1],m,k1m,kp1))
         
@@ -279,7 +282,23 @@ def set_stochparams(h,damping,dt,ND=True,rho=1000,cp0=4218,hfix=50):
 
 
 def find_kprev(h):
-    
+    """
+    Script to find the month of detrainment, given a seasonal
+    cycle of mixed layer depths
+
+    Parameters
+    ----------
+    h : ARRAY [12,]
+        Seasonal Mixed layer depth cycle
+
+    Returns
+    -------
+    kprev : [12,]
+        Detrainment Month
+    hout : [12,]
+        Output for plotting(?)
+
+    """
     # Preallocate
     kprev = np.zeros(12)
     hout = np.zeros(12)
@@ -291,13 +310,8 @@ def find_kprev(h):
     dz = h / np.roll(h,1) 
     dz = dz > 1
     #dz = dz.values
-    
-        
-        
-        
+
     for m in monthx:
-        
-        
         # Quick Indexing Fixes ------------------
         im = m-1 # Month Index (Pythonic)
         m0 = m-1 # Previous month
@@ -314,9 +328,7 @@ def find_kprev(h):
             kprev[im] = m
             hout[im] = h[im]
             continue
-        
-    
-        
+
         # Ignore detrainment months
         if dz[im] == False:
             print("Ignoring %i, shoaling month" % m)
@@ -328,8 +340,7 @@ def find_kprev(h):
           
         searchflag = 0
         ifindm = im0
-        
-        
+
         while searchflag == 0:
                 
             hfind= hdiff[ifindm]
@@ -351,7 +362,6 @@ def find_kprev(h):
                     m_after = ifindm+1
                 
                 # For even more negative indices
-                
                 print("Found kprev for month %i it is %f!" % (m,np.interp(findmld,[h_before,h_after],[m_before,m_after])))
                 kprev[im] = np.interp(findmld,[h_before,h_after],[m_before,m_after])
                 hout[im] = findmld
@@ -383,7 +393,6 @@ def convert_NAO(hclim,naopattern,dt,rho=1000,cp0=4218,hfix=50):
             2 = seasonal MLD
     
     """
-    
     # Check if forcing pattern is 3D
     patshape = naopattern.shape
     if len(patshape) != 3: 
@@ -394,8 +403,7 @@ def convert_NAO(hclim,naopattern,dt,rho=1000,cp0=4218,hfix=50):
     mld[:,:,:,0]  *= hfix # Fixed MLD
     mld[:,:,:,1]  = np.tile(hclim.max(2)[:,:,None],12) # Max MLD
     mld[:,:,:,2]  = hclim.copy() # Clim MLD
-        
-        
+    
     # Convert NAO to correct units...
     NAOF = {}
     for i in range(3):
@@ -423,21 +431,17 @@ Dependencies:
  4) F     : Forcing term
     
 """
-def noentrain(t_end,lbd,T0,F,FAC,multFAC=1):
-    debugmode = 1 # Set to 1 to also save noise and damping time series
+def noentrain(t_end,lbd,T0,F,FAC,multFAC=1,debug=False):
     
     # Preallocate
     temp_ts = np.zeros(t_end)
     
-    if debugmode == 1:
+    if debug:
         damp_ts = np.zeros(t_end)
         noise_ts = np.zeros(t_end)
-    else:
-        noise_ts = []
-        damp_ts = []
         
     # Set value for first timestep
-    temp_ts[0] = T0 #"DEC"
+    #temp_ts[0] = T0 #"DEC"
     
     # Prepare the entrainment term
     explbd = np.exp(-lbd)
@@ -466,22 +470,16 @@ def noentrain(t_end,lbd,T0,F,FAC,multFAC=1):
         
         # Compute the temperature
         temp_ts[t] = damp_term + noise_term  
-    
+        
         # Save other variables
-        if debugmode == 1:
+        if debug:
             noise_ts[t] = np.copy(noise_term)
-            damp_ts[t]  = np.copy(damp_term)
-
-    # Quick indexing fix
-    temp_ts[0] = T0
-    if debugmode == 1:
-        noise_ts = np.delete(noise_ts,0)
-        damp_ts = np.delete(damp_ts,0)
+            damp_ts[t]  = np.copy(damp_term) 
     
-    return temp_ts,noise_ts,damp_ts if debugmode ==1 else temp_ts
+    return temp_ts,noise_ts,damp_ts if debug else temp_ts
 
 # Entrain Model (Single Point)
-def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False):
+def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=False):
     """
     SST Stochastic Model, with Entrainment
     Integrated with the forward method at a single point
@@ -509,6 +507,8 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False):
         Set to true to apply integration factor to forcing and entrain term. 
         The default is TRUE.
     debug : BOOL, optional
+        Set to true to output each term separately
+    debugprint : BOOL, optional
         Set to true to print messages at each timestep. The default is False.
 
     Returns
@@ -556,17 +556,17 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False):
             if beta[m-1] == 0: # For months with no entrainment
                 entrain_term = 0
                 Td0 = None # Reset Td0 term
-                if debug:
+                if debugprint:
                     print("No entrainment on month %i"%m)
                     print("--------------------\n")
             else:
                 if Td0 is None: # Calculate Td0 
-                    Td1,Td0 = calc_Td(t,kprev,temp_ts,prevmon=True,debug=debug)
+                    Td1,Td0 = calc_Td(t,kprev,temp_ts,prevmon=True,debug=debugprint)
                 else: # Use Td0 from last timestep
-                    Td1 = calc_Td(t,kprev,temp_ts,prevmon=False,debug=debug)
+                    Td1 = calc_Td(t,kprev,temp_ts,prevmon=False,debug=debugprint)
                 
                 Td = (Td1+Td0)/2
-                if debug:
+                if debugprint:
                     print("Td is %.2f, which is average of Td1=%.2f, Td0=%.2f"%(Td,Td1,Td0)) 
                     print("--------------------\n")
                 Td0 = np.copy(Td1)# Copy Td1 to Td0 for the next loop
@@ -604,9 +604,9 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False):
         # Save other variables in debug mode
         # ----------------------------------
         if debug:
-            damp_ts[t] = damp_term.copy()
-            noise_ts[t] = noise_term.copy() * integration_factor
-            entrain_ts[t] = entrain_term.copy() * integration_factor
+            damp_ts[t] = damp_term
+            noise_ts[t] = noise_term * integration_factor
+            entrain_ts[t] = entrain_term * integration_factor
     if debug:
         return temp_ts,damp_ts,noise_ts,entrain_ts,Td_ts
     return temp_ts
