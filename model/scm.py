@@ -413,6 +413,58 @@ def convert_NAO(hclim,naopattern,dt,rho=1000,cp0=4218,hfix=50):
     
     return NAOF
 
+def get_data(pointmode,query,lat,lon,damping,mld,kprev,F):
+    """
+    Wrapper to return data based on pointmode
+    
+    Parameters
+    ----------
+    pointmode : INT
+        0 = Return variables as is
+        1 = Return variables at a point
+        2 = Return area-averaged variables
+    query : ARRAY
+        [lon,lat] if pointmode is 1
+        [lonW,lonE,latS,latN] if pointmode is 2
+    lat : ARRAY
+        latitude coordinates
+    lon : ARRAY
+        longitude coordinates
+    damping : ARRAY [lat,lon,month]
+        heat flux feedback (W/m2)
+    mld : ARRAY [lat,lon,month]
+        mixed layer depth (m)
+    kprev : ARRAY [lat,lon,month]
+        detrainment month
+    F : ARRAY [lat,lon,month]
+        forcing pattern
+    
+    Returns
+    -------
+        1. point indices ARRAY
+        2. damping at point ARRAY
+        3. mld at point ARRAY
+        4. kprev at point ARRAY
+        5. forcing at point ARRAY
+    """
+    
+    if pointmode == 1:
+        o,a = proc.find_latlon(query[0],query[1],lon,lat)
+        return [o,a],damping[o,a],mld[o,a],kprev[o,a],F[o,a]
+    else:
+        inparams = [damping,mld,kprev,F]
+        outparams = []
+        for param in inparams:
+            
+            if pointmode == 2:
+                var = proc.sel_region(param,lon,lat,query,reg_avg=1)
+                lonr=[0,] # Dummy Variable
+                latr=[0,] # Dummy Variable
+            else:    
+                var,lonr,latr = proc.sel_region()
+            outparams.append(var)
+        return np.concatenate([lonr,latr,outparams])
+
 
 #%% Stochastic Model Code
 
