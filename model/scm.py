@@ -527,8 +527,9 @@ def noentrain(t_end,lbd,T0,F,FAC,multFAC=1,debug=False):
         if debug:
             noise_ts[t] = np.copy(noise_term)
             damp_ts[t]  = np.copy(damp_term) 
-    
-    return temp_ts,noise_ts,damp_ts if debug else temp_ts
+    if debug:
+        return temp_ts,noise_ts,damp_ts
+    return temp_ts
 
 # Entrain Model (Single Point)
 def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=False):
@@ -876,4 +877,41 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,returnresults=
     print("Data has been saved to %s" % (outpathdat))
     if returnresults == True:
         return sstregion,autocorr_region,kmonths,sstavg_region,amvidx_region,amvpat_region
+    
+def calc_autocorr(sst,lags,basemonth):
+    """
+    Calculate autocorrelation for output of stochastic models
+    
+    Parameters
+    ----------
+    sst : DICT
+        SST timeseries for each experiment
+    lags : ARRAY
+        Lags to calculate autocorrelation for
+    basemonth : INT
+        Month corresponding to lag 0 (ex. Jan=1)
+       
+    Returns
+    -------
+    autocorr : DICT
+        Autocorrelation stored in same order as sst
+    """
+    n = len(sst)
+    autocorr = {}
+    for model in range(n):
         
+        # Get the data
+        tsmodel = sst[model]
+        tsmodel = proc.year2mon(tsmodel) # mon x year
+        
+        # Deseason (No Seasonal Cycle to Remove)
+        tsmodel2 = tsmodel - np.mean(tsmodel,1)[:,None]
+        
+        # Plot
+        autocorr[model] = proc.calc_lagcovar(tsmodel2,tsmodel2,lags,basemonth,0)
+    return autocorr
+
+
+
+
+
