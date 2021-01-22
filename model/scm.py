@@ -281,7 +281,7 @@ def set_stochparams(h,damping,dt,ND=True,rho=1000,cp0=4218,hfix=50):
     return lbd,lbd_entr,FAC,beta
 
 
-def find_kprev(h):
+def find_kprev(h,debug=False):
     """
     Script to find the month of detrainment, given a seasonal
     cycle of mixed layer depths
@@ -324,14 +324,16 @@ def find_kprev(h):
         
         # Set values for minimun/maximum -----------------------------------------
         if im == h.argmax(): #or im== h.argmin():
-            print("Ignoring %i, max/min" % m)
+            if debug:
+                print("Ignoring %i, max/min" % m)
             kprev[im] = m
             hout[im] = h[im]
             continue
 
         # Ignore detrainment months
         if dz[im] == False:
-            print("Ignoring %i, shoaling month" % m)
+            if debug:
+                print("Ignoring %i, shoaling month" % m)
             continue
         
         # For all other entraining months.., search backwards
@@ -362,7 +364,8 @@ def find_kprev(h):
                     m_after = ifindm+1
                 
                 # For even more negative indices
-                print("Found kprev for month %i it is %f!" % (m,np.interp(findmld,[h_before,h_after],[m_before,m_after])))
+                if debug:
+                    print("Found kprev for month %i it is %f!" % (m,np.interp(findmld,[h_before,h_after],[m_before,m_after])))
                 kprev[im] = np.interp(findmld,[h_before,h_after],[m_before,m_after])
                 hout[im] = findmld
             
