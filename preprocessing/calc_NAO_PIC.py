@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-HF Damping Calculations: Compute ENAO and EAP from PIC SLAB
+Compute NAO Index and Regresion to NHFLX for forcing pattern
+
+Currently supports DJFM-DJFM and DJFM-MON Forcing Patterns
+
 Created on Fri Oct 30 12:08:19 2020
 
 @author: gliu
@@ -19,7 +22,7 @@ from amv import proc
 #%% User Edits
 
 # Mode
-mode = 'SLAB' # "SLAB or FULL"
+mconfig = 'SLAB' # "SLAB or FULL"
 
 # TS [time lat lon]
 varkeep = ['PSL','time','lat','lon','lev'] 
@@ -32,7 +35,7 @@ bbox = [-90+360, 40, 20, 80]
 
 # Mode:
 mode = 'DJFM' # Mode is 'DJFM',or 'Monthly'
-debug = True # Set to true to make figure at end
+debug = False # Set to true to make figure at end
 
 # Outpath
 outpath = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/01_hfdamping/hfdamping_PIC_SLAB/NAO/"
@@ -205,9 +208,9 @@ def combineflux(fluxname,filepath,downward_positive=True,verbose=False):
 #%% Script Start
 # Get List of nc files for preindustrial control
 ncpath = r'/vortex/jetstream/climate/data1/yokwon/CESM1_LE/downloaded/atm/proc/tseries/monthly/PSL/'
-if mode == 'SLAB':
+if mconfig == 'SLAB':
     ncsearch = 'e.e11.E1850C5CN.f09_g16.001.cam.h0.PSL.*.nc'
-elif mode == 'FULL':
+elif mconfig == 'FULL':
     ncsearch = 'b.b11.E1850C5CN.f09_g16.001.cam.h0.PSL.*.nc'
 nclist = glob.glob(ncpath+ncsearch)
 nclist.sort()
@@ -230,7 +233,8 @@ lat = dsreg.lat.values
 times = dsreg.time.values
 print("Data loaded in %.2fs"%(time.time()-st))
 
-#%% Calculate ENSO
+
+#%% Calculate NAO
 
 # Apply Area Weight
 _,Y = np.meshgrid(lon,lat)
@@ -394,3 +398,65 @@ np.savez(outpath+outname,**{
          'times':times}
         )   
 print("Data saved in %.2fs"%(time.time()-st))
+
+
+#%% Calculate DJFM Index regressed to Monthly variables [DJFM-MON]
+
+# Load Indices
+ld  = np.load(outpath+outname)
+pcall = ld['pcs'] #[901 x 3], YR x PC
+
+# Load Fluxes
+flux     = 'NHFLX'
+pcrem    = 2
+ensolag  = 1
+emonwin  = 3
+datpath  = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/01_hfdamping/hfdamping_PIC_SLAB/02_ENSOREM/" # Output Path
+ensoexp  = "lag%i_pcs%i_monwin%i" % (ensolag,pcrem,emonwin)
+filepath = datpath+"ENSOREM_%s_"+ensoexp + ".npz"
+flx      = combineflux(flux,filepath,verbose=True) # [10776 x 192 x 288] [ time x lat x lon]
+
+# GET PSL values from dataarray
+psl_all = dsall.PSL.values
+
+# Reshape flx to separate month/year, combine spatial dimensions
+nmons,nlat,nlon = flx.shape
+flxr = flx.reshape(int(nmons/12),12,nlat*nlon)
+pslr = psl_all.reshape(int(psl_all.shape[0]/12),12,nlat*nlon)
+
+
+# Restrict PC (drop first 2 years due to ensolag + 3monwin, and end year due to 3monwin)
+pcin  = pcall[2:-1,:]
+pslr  = pslr[2:-1,:]
+
+# Standardize PC
+pcstd = pcin / np.std(pcin,0)
+
+# Preallocate
+pattern    = np.zeros((nlat*nlon,N_mode,12))*np.nan # [x space x pc x mon]
+patternpsl = np.zeros(pattern.shape)*np.nan
+for p in range(N_mode):
+    
+    pc = pcstd[:,p]
+    
+    for m in range(12):
+        
+        pattern[:,p,m],_ = proc.regress_2d(pc,flxr[:,m,:],nanwarn=1)
+        patternpsl[:,p,m],_=proc.regress_2d(pc,pslr[:,m,:],nanwarn=1)
+        print("Regressed psl and nhflx to PC %i for month %i"% (p+1,m+1))
+
+pattern = pattern.reshape(nlat,nlon,N_mode,12)        
+patternpsl = patternpsl.reshape(nlat,nlon,N_mode,12)
+
+# Save Output
+st = time.time()
+mode = "DJFM-MON"
+outname = "EOF_NAO_%s_PIC_SLAB.npz" % (mode)
+np.savez(outpath+outname,**{
+         'psl_pattern':patternpsl,
+         'nhflx_pattern': pattern,
+         'lon': lon,
+         'lat':lat}
+        )   
+print("Data saved in %.2fs"%(time.time()-st))
+        
