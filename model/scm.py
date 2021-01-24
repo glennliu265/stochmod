@@ -310,7 +310,7 @@ def find_kprev(h,debug=False):
     dz = h / np.roll(h,1) 
     dz = dz > 1
     #dz = dz.values
-
+    
     for m in monthx:
         # Quick Indexing Fixes ------------------
         im = m-1 # Month Index (Pythonic)
@@ -706,7 +706,7 @@ def noentrain_2d(randts,lbd,T0,F,FAC,multFAC=1,debug=False):
         F *= FAC
     
     # Loop for each timestep (note: using 1 indexing. T0 is from dec pre-simulation)
-    for t in tqm(range(t_end)):
+    for t in tqdm(range(t_end)):
         
         # Get the month
         m = (t+1)%12 # Start from January
