@@ -61,7 +61,10 @@ def calc_Td(t,index,values,prevmon=False,debug=False):
 
     # Loop for each month
     Td = []
-    for m in months:
+    mcnts = [1,0] # Amount to add to get the index
+    
+    for mcount,m in enumerate(months):
+        mcnt = mcnts[mcount]
         if debug:
             print("\tCalculating Td for m=%i"%m)
         
@@ -80,7 +83,7 @@ def calc_Td(t,index,values,prevmon=False,debug=False):
             k1m = 12
         
         # Get Index in t
-        kp1 = int(t+1 - k1m)
+        kp1 = int(t+mcnt - k1m)
         if debug:
             print("\t\tkprev is %.2f for month %i, or %i months ago at t=%i"% (index[m-1],m,k1m,kp1))
         
