@@ -619,6 +619,9 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
                     print("No entrainment on month %i"%m)
                     print("--------------------\n")
             else:
+                if (Td0 is None) & (h.argmin()==m-2) :# For first entraining month
+                    Td1 = calc_Td(t,kprev,temp_ts,prevmon=False,debug=debugprint)
+                    Td0 = Td1 # Previous month does not have entrainment!
                 if Td0 is None: # Calculate Td0 
                     Td1,Td0 = calc_Td(t,kprev,temp_ts,prevmon=True,debug=debugprint)
                 else: # Use Td0 from last timestep
