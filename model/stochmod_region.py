@@ -13,6 +13,7 @@ import time
 import sys
 import glob
 from tqdm import trange
+import dask
 
 #%% User Edits
 
@@ -99,7 +100,8 @@ Inputs
 """
 
 
-def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,stormtrack,points=[-30,50],mconfig='FULL_HTR',applyfac=1):
+def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,stormtrack,
+                    points=[-30,50],mconfig='FULL_HTR',applyfac=1,parallel=False):
                     
     # --------------
     # %% Set Parameters--------------------------------------------------------
@@ -205,7 +207,6 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     
         # # Load Longitude for processing
         # lon360 =  np.load(datpath+"CESM_lon360.npy")
-    
         if funiform == 2: # Load (NAO-NHFLX)_DJFM Forcing
             
             # [lon x lat x pc]
@@ -240,9 +241,16 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
             # [lon x lat x pc]
             naoforcing = np.load(input_path+mconfig+"_NAO_EAP_NHFLX_Forcing_DJFM.npy") #[PC x Ens x Lat x Lon]
             
-            # Select PC1 # [lon x lat x 1]
+            # Select PC 2 # [lon x lat x 1]
             NAO1 = naoforcing[:,:,[1]]
             
+        elif funiform == 5.5: # EAP (DJFM-MON)
+            
+            # [lon x lat x pc x mon]
+            naoforcing = np.load(input_path+mconfig+"_NAO_EAP_NHFLX_Forcing_DJFM-MON.npy") #[PC x Ens x Lat x Lon]
+            
+            # Select PC 2 # [lon x lat x 2 x mon]
+            NAO1 = naoforcing[:,:,[1],:]
             
         elif funiform == 6: # DJFM NAO and EAP
             
@@ -259,7 +267,8 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
             
             # Select PC 1 and 2 # [lon x lat x 2 x mon]
             NAO1 = naoforcing[:,:,[0,1],:]
-
+            
+            
         # Restrict to region
         NAO1,_,_ = proc.sel_region(NAO1,LON,LAT,bboxsim,autoreshape=True)
         
@@ -321,16 +330,16 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
 
     # Prepare or load random time series
     if genrand == 1: # Generate new time series
-    
         print("Generating New Time Series")
-        if funiform == 0: # Create entire forcing array [lon x lat x time] and apply scaling factor
+        
+        # Create and save entire forcing array [lon x lat x time] and apply scaling factor
+        if funiform == 0: 
             F = np.random.normal(0,fstd,size=(lonsize,latsize,t_end)) * fscale # Removed Divide by 4 to scale between -1 and 1
-            # Save Forcing
             np.save(output_path+"stoch_output_%s_Forcing.npy"%(expid),F)
-            
             randts = np.random.normal(0,fstd,size=t_end) # Just generate dummy randts
-            
-        else: # Just generate the time series
+       
+        # Just generate the time series
+        else: 
             randts = np.random.normal(0,fstd,size=t_end) # Removed Divide by 4 to scale between -1 and 1
             np.save(output_path+"stoch_output_%iyr_run%s_randts.npy"%(nyr,runid),randts)
     
@@ -342,7 +351,7 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
             randts = np.random.normal(0,fstd,size=t_end) # Just generate dummy randts
         else: # Load random time series
             randts = np.load(output_path+"stoch_output_%iyr_run%s_randts.npy"%(nyr,runid))
-    
+            
     
     # Generate extra time series for EAP forcing
     if funiform in [5,6,7]:
@@ -356,7 +365,7 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
         else:
             print("Loading Additional New Time Series for EAP")
             randts1 = np.load(output_path+"stoch_output_%iyr_run%s_randts_%03d.npy"%(nyr,runid,numforce))
-            
+        
         if funiform == 5: # Assign EAP Forcing white noise time series
             randts = randts1
         
@@ -366,12 +375,12 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
         if funiform in [6,7]: # NAO + EAP Forcing
             F,Fseas   = scm.make_naoforcing(NAOF,randts,fscale,nyr) # Scale NAO Focing
             F1,Fseas1 = scm.make_naoforcing(NAOF1,randts1,fscale,nyr) # Scale EAP forcing
-
+            
             # Add the two forcings together
             for hi in range(3):
                 F[hi]     += F1[hi]
                 Fseas[hi] += Fseas1[hi]
-      
+            
         else: # NAO Like Forcing of funiform with mld/lbd factors, apply scaling and randts
         
             F,Fseas = scm.make_naoforcing(NAOF,randts,fscale,nyr)
@@ -498,7 +507,8 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     
     # Run Model Without Entrainment
     sst = {}
-    # Loop for each Mixed Layer Depth Treatment
+    
+    #Loop for each Mixed Layer Depth Treatment
     for hi in range(3):
         start = time.time()
         
@@ -509,7 +519,6 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
         # Select Forcing
         Fh  = F[hi]
         
-    
         # # Match Forcing and FAC shape
         # if (len(Fh.shape)>2) & (Fh.shape[2] != FACh.shape[2]):
         #     FACh = np.tile(FACh,int(t_end/12))
@@ -521,7 +530,7 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
             if (len(Fh.shape)>2) & (Fh.shape[2] != FACh.shape[2]):
                 FACh = np.tile(FACh,int(t_end/12))
             
-            sst[hi],_ =  scm.noentrain_2d(randts,lbdh,T0,Fh,FACh,multFAC=multFAC)
+            sst[hi] =  scm.noentrain_2d(randts,lbdh,T0,Fh,FACh,multFAC=multFAC)
             print("\nSimulation for No Entrain Model, hvarmode %s completed in %s" % (hi,time.time() - start))
             
         else: # simulate for 1 point (or regionally averaged case)
@@ -536,7 +545,6 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
 
     #%%
     
-    
     # Run Model With Entrainment
     start = time.time()
     
@@ -545,28 +553,66 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     FACh = FAC[3] # Integration Factor with entrainment
     
     if pointmode == 0: # All Points
-        
-        T_entr1 = np.ones((lonsize,latsize,t_end))*np.nan
-        for o in trange(lonsize,desc="Longitude"):
+        if parallel:
+            st = time.time()
+            lonsize,latsize,_ = F[2].shape
+
+            Fin   = F[2].reshape(lonsize*latsize,t_end)
+            FACin = FAC[3].reshape(lonsize*latsize,12)
             
-            for a in trange(latsize,desc="Latitude"):
-                
-                # Skip if the point is land
-                if np.isnan(np.mean(dampingr[o,a,:])):
-                    #msg = "Land Point @ lon %f lat %f" % (lonf,latf)
-                    icount += 1
+            dampingpt = dampingr.reshape(FACin.shape)
+            lbdin     = lbd[3].reshape(FACin.shape)
+            betain    = beta.reshape(FACin.shape)
+            hin       = hclim.reshape(FACin.shape)
+            kprevin   = kprev.reshape(FACin.shape)
+            
+            #T_entr1 = np.zeros(Fin.shape) * np.nan
+            results = []
+            T_entr1 = np.array([])
+            for i in trange(lonsize*latsize):
+                if np.isnan(np.mean(dampingpt[i,:])):
+                    results.append(np.zeros(t_end)*np.nan)
                     continue
-                    #print(msg)
-        
-                else:
-                    T_entr1[o,a,:] = scm.entrain(t_end,lbd[3][o,a,:],T0,Fh[o,a,:],beta[o,a,:],hclim[o,a,:],kprev[o,a,:],FACh[o,a,:],multFAC=multFAC)
-                icount += 1
                 
-                #msg = '\rCompleted Entrain Run for %i of %i points' % (icount,lonsize*latsize)
-                #print(msg,end="\r",flush=True)
+                inputs = (t_end,lbdin[i],T0,Fin[i],betain[i],hin[i],kprevin[i],FACin[i],multFAC)
+                #T_entr1[i,:] = dask.delayed(scm.entrain_parallel)(inputs)
+                result = dask.delayed(scm.entrain_parallel)(inputs)
+                results.append(result)
+                #T_entr1.append(dask.delayed(scm.entrain_parallel)(inputs))
+            dask.compute(*results)
+            x = T_entr1.compute()
+            end = time.time()
+            print("Finished in %.2fs"%(end-st))
+        else: # Regular Loop without parallelization
+            T_entr1 = np.ones((lonsize,latsize,t_end))*np.nan
+            for o in trange(lonsize,desc="Longitude"):
                 
-            #End Latitude Loop
-        #End Longitude Loop
+                for a in range(latsize):
+                    
+    
+                    
+                    # Skip if the point is land
+                    if np.isnan(np.mean(dampingr[o,a,:])):
+                        #msg = "Land Point @ lon %f lat %f" % (lonf,latf)
+                        icount += 1
+                        continue
+                        #print(msg)
+            
+                    else:
+                        # T_entr1[o,a,:] = scm.entrain(t_end,lbd[3][o,a,:],
+                        #                                        T0,Fh[o,a,:],beta[o,a,:],
+                        #                                        hclim[o,a,:],kprev[o,a,:],
+                        #                                        FACh[o,a,:],multFAC=multFAC,
+                        #                                        debug=False,debugprint=False)
+                    
+                        T_entr1[o,a,:] = scm.entrain(t_end,lbd[3][o,a,:],T0,Fh[o,a,:],beta[o,a,:],hclim[o,a,:],kprev[o,a,:],FACh[o,a,:],multFAC=multFAC)
+                    icount += 1
+                    
+                    #msg = '\rCompleted Entrain Run for %i of %i points' % (icount,lonsize*latsize)
+                    #print(msg,end="\r",flush=True)
+                    
+                #End Latitude Loop
+            #End Longitude Loop
         
     else: # Single point/average region
         
@@ -579,23 +625,23 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     tprint = "\nEntrain Model ran in %.2fs" % (elapsed)
     print(tprint)
     
-    # %% save output
+    #%% save output
     
     if pointmode > 0:
     
         np.savez(output_path+"stoch_output_point%s_%s.npz"%(locstring,expid),
-                 sst=sst,
-                 hclim=hclima,
-                 kprev=kpreva,
-                 dampping=dampinga,
-                 F=F,
-                 lbd=lbd,
-                 lbd_entr=lbd_entr,
-                 beta=beta,
-                 FAC=FAC,
-                 NAO1=NAO1,
-                 NAOF=NAOF
-                 )
+                  sst=sst,
+                  hclim=hclima,
+                  kprev=kpreva,
+                  dampping=dampinga,
+                  F=F,
+                  lbd=lbd,
+                  lbd_entr=lbd_entr,
+                  beta=beta,
+                  FAC=FAC,
+                  NAO1=NAO1,
+                  NAOF=NAOF
+                  )
             
         
     
