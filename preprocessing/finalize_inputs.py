@@ -114,8 +114,8 @@ if debug:
     plt.savefig(outpath+"CESM_Historical_DJFM_Forcing.png",dpi=200,bbox_inches='tight')
     
 # Save output
-np.save("%sNAO_EAP_NHFLX_Forcing_DJFM_HIST.npy" % (input_path),naof_hist)
-np.save("%sNAO_EAP_PSL_DJFM_HIST.npy" %(input_path),nao_hist)
+np.save("%sFULL_HTR_NAO_EAP_NHFLX_Forcing_DJFM.npy" % (input_path),naof_hist)
+np.save("%sFULL_HTR_NAO_EAP_PSL_DJFM.npy" %(input_path),nao_hist)
 
 
 
@@ -161,8 +161,8 @@ if debug:
     plt.savefig(outpath+"CESM_SLAB_DJFM_Forcing.png",dpi=200,bbox_inches='tight')
     
 # Save output
-np.save("%sNAO_EAP_NHFLX_Forcing_DJFM_SLAB.npy" % (input_path),naof_slab)
-np.save("%sNAO_EAP_PSL_DJFM_SLAB.npy" %(input_path),nao_slab)
+np.save("%sSLAB_PIC_NAO_EAP_NHFLX_Forcing_DJFM.npy" % (input_path),naof_slab)
+np.save("%sSLAB_PIC_NAO_EAP_PSL_DJFM.npy" %(input_path),nao_slab)
 
 
 
@@ -183,8 +183,8 @@ lon180,naof_slab = proc.lon360to180(lon360,naof_slab,autoreshape=True)
 _,nao_slab = proc.lon360to180(lon360,nao_slab,autoreshape=True)
 
 # Save output
-np.save("%sNAO_EAP_NHFLX_Forcing_DJFM-MON_SLAB.npy" % (input_path),naof_slab)
-np.save("%sNAO_EAP_PSL_DJFM-MON_SLAB.npy" %(input_path),nao_slab)
+np.save("%sSLAB_PIC_NAO_EAP_NHFLX_Forcing_DJFM-MON.npy" % (input_path),naof_slab)
+np.save("%sSLAB_PIC_NAO_EAP_PSL_DJFM-MON.npy" %(input_path),nao_slab)
 
 
 # Visualize the results
@@ -267,10 +267,9 @@ fig.colorbar(cf1,ax=axs.ravel().tolist(),orientation='vertical',shrink=0.95,pad=
 #fig.tight_layout()
 plt.savefig(outpath+"SLAB_NAO+EAPDJFM-MON_NHFLX.png" ,dpi=200) 
 
+
+
 #%% Finalize Heat Fluxes
-
-
-
 
 #%% Finalize Mixed Layer Depths
 
