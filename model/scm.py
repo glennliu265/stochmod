@@ -12,7 +12,7 @@ Created on Mon Jul 27 11:49:57 2020
 import numpy as np
 import xarray as xr
 from scipy.io import loadmat
-import tqdm
+from tqdm import tqdm
 
 import sys
 sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -725,8 +725,8 @@ def noentrain_2d(randts,lbd,T0,F,FAC,multFAC=1,debug=False):
         # Add with the corresponding forcing term to get the temp
         temp_ts[:,:,t] = damp_term[:,:,t] + noise_term[:,:,t]
         
-        msg = '\rCompleted timestep %i of %i' % (t,t_end-1)
-        print(msg,end="\r",flush=True)
+        #msg = '\rCompleted timestep %i of %i' % (t,t_end-1)
+        #print(msg,end="\r",flush=True)
     
     # Apply mask to temp_term
     msk = noise_term.copy()
@@ -913,8 +913,3 @@ def calc_autocorr(sst,lags,basemonth):
         # Plot
         autocorr[model] = proc.calc_lagcovar(tsmodel2,tsmodel2,lags,basemonth,0)
     return autocorr
-
-
-
-
-
