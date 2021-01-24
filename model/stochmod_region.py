@@ -12,6 +12,7 @@ import numpy as np
 import time
 import sys
 import glob
+from tqdm import trange
 
 #%% User Edits
 
@@ -215,12 +216,11 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
                 
         elif funiform == 3: # NAO (DJFM) regressed to monthly NHFLX
             
-        
-            # NOTE: THESE HAVE NOT BEEN RECALCULATED. NEED TO REDO FOR PIC SLAB ----
-            # Load NAO Forcing and take ensemble average
-            naoforcing = np.load(datpath+"Monthly_NAO_Regression.npy") #[Ens x Mon x Lat x Lon]
-            NAO1 = np.nanmean(naoforcing,0) * -1  # Multiply by -1 to flip flux sign convention
+            # [lon x lat x pc x mon]
+            naoforcing = np.load(input_path+mconfig+"_NAO_EAP_NHFLX_Forcing_DJFM-MON.npy") #[PC x Ens x Lat x Lon]
             
+            # Select PC 1 and 2 # [lon x lat x mon]
+            NAO1 = naoforcing[:,:,0,:]
             
         elif funiform == 4: # Monthly NAO and NHFLX
             
@@ -250,34 +250,40 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
             naoforcing = np.load(input_path+mconfig+"_NAO_EAP_NHFLX_Forcing_DJFM.npy") #[PC x Ens x Lat x Lon]
             
             # Select PC 1 and 2 # [lon x lat x 2]
-            NAO1 = naoforcing[:,:,[1,2]]
-        
-        
-        # Restrict to region 
-        NAO1,_,_ = proc.sel_region(NAO1,LON,LAT,bboxsim)
+            NAO1 = naoforcing[:,:,[0,1]]
+            
+        elif funiform == 7: # DJFM Index, Monthly NHFLX
+            
+            # [lon x lat x pc x mon]
+            naoforcing = np.load(input_path+mconfig+"_NAO_EAP_NHFLX_Forcing_DJFM-MON.npy") #[PC x Ens x Lat x Lon]
+            
+            # Select PC 1 and 2 # [lon x lat x 2 x mon]
+            NAO1 = naoforcing[:,:,[0,1],:]
+
+        # Restrict to region
+        NAO1,_,_ = proc.sel_region(NAO1,LON,LAT,bboxsim,autoreshape=True)
         
     else: # For funiform= uniform or random forcing, just make array of ones
         
         NAO1 = np.ones(hclim.shape)
-
+    
     # Convert NAO from W/m2 to degC/sec. Returns dict with keys 0-2
     NAOF  = {}
     NAOF1 = {}
     if applyfac == 0: # Don't Apply MLD Cycle
-        
+    
         if funiform > 1:
             NAO1 = NAO1 * dt / rho / cp0 # Do conversions (minus MLD)
         
         for i in range(3):
-            if funiform > 5: 
-                NAOF[i]  = NAO1[:,:,0].copy() # NAO Forcing
-                NAOF1[i] = NAO1[:,:,1].copy() # EAP Forcing
+            if funiform > 5:  # Separate NAO and EAP Forcing
+                NAOF[i]  = NAO1[:,:,0,...].copy() # NAO Forcing
+                NAOF1[i] = NAO1[:,:,1,...].copy() # EAP Forcing
             else:
                 NAOF[i] = NAO1.copy()
             
     else: # Apply seasonal MLD cycle and convert
-            
-            
+        
         if funiform > 5: # Separately convert NAO and EAP forcing
             NAOF  = scm.convert_NAO(hclim,NAO1[:,:,0],dt,rho=rho,cp0=cp0,hfix=hfix) # NAO Forcing
             NAOF1 = scm.convert_NAO(hclim,NAO1[:,:,1],dt,rho=rho,cp0=cp0,hfix=hfix) # EAP Forcing
@@ -541,9 +547,9 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     if pointmode == 0: # All Points
         
         T_entr1 = np.ones((lonsize,latsize,t_end))*np.nan
-        for o in range(0,lonsize):
+        for o in trange(lonsize,desc="Longitude"):
             
-            for a in range(0,latsize):
+            for a in trange(latsize,desc="Latitude"):
                 
                 # Skip if the point is land
                 if np.isnan(np.mean(dampingr[o,a,:])):
@@ -554,26 +560,24 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
         
                 else:
                     T_entr1[o,a,:] = scm.entrain(t_end,lbd[3][o,a,:],T0,Fh[o,a,:],beta[o,a,:],hclim[o,a,:],kprev[o,a,:],FACh[o,a,:],multFAC=multFAC)
-
                 icount += 1
-                msg = '\rCompleted Entrain Run for %i of %i points' % (icount,lonsize*latsize)
-                print(msg,end="\r",flush=True)
+                
+                #msg = '\rCompleted Entrain Run for %i of %i points' % (icount,lonsize*latsize)
+                #print(msg,end="\r",flush=True)
+                
             #End Latitude Loop
         #End Longitude Loop
         
     else: # Single point/average region
         
         T_entr1= scm.entrain(t_end,lbd[3],T0,Fh,beta,hclima,kpreva,FACh,multFAC=multFAC)
-    
-    
-    
+
     # Copy over to sst dictionary
     sst[3] = T_entr1.copy()
     
     elapsed = time.time() - start
     tprint = "\nEntrain Model ran in %.2fs" % (elapsed)
-    print(tprint)    
-        
+    print(tprint)
     
     # %% save output
     
