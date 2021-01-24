@@ -293,7 +293,7 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
             
     else: # Apply seasonal MLD cycle and convert
         
-        if funiform > 5: # Separately convert NAO and EAP forcing
+        if funiform >= 6: # Separately convert NAO and EAP forcing
             NAOF  = scm.convert_NAO(hclim,NAO1[:,:,0],dt,rho=rho,cp0=cp0,hfix=hfix) # NAO Forcing
             NAOF1 = scm.convert_NAO(hclim,NAO1[:,:,1],dt,rho=rho,cp0=cp0,hfix=hfix) # EAP Forcing
     

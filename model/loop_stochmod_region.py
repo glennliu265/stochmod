@@ -45,7 +45,7 @@ bboxsim  = [-100,20,-20,90] # Simulation Box
 
 # Do a stormtrackloop
 runids    = ["202"]
-funiforms = [3,5.5,7]
+funiforms = [5.5,7]
 applyfac  = 2
 mconfig   = "SLAB_PIC"#"FULL_HTR"
 
