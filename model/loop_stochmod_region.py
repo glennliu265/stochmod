@@ -34,8 +34,9 @@ import stochmod_region as sr
 
 # # of runs
 pointmode = 0 # Set to 1 to output data for the point speficied below
-points=[-30,50] # Lon, Lat for pointmode
-naoscale = 10 # Number to scale NAO and other forcings by
+points    = [-30,50] # Lon, aLat for pointmode
+naoscale  = 10 # Number to scale NAO and other forcings by
+parallel  = False
 
 # Integration Options
 nyr      = 1000        # Number of years to integrate over
@@ -43,10 +44,10 @@ fstd     = 0.3         # Standard deviation of the forcing
 bboxsim  = [-100,20,-20,90] # Simulation Box
 
 # Do a stormtrackloop
-runids    = ["100"]
-funiforms = [0,1,2,5,6]
+runids    = ["202"]
+funiforms = [0,1,3,5.5,7]
 applyfac  = 2
-mconfig   = "FULL_HTR"#"FULL_HTR"
+mconfig   = "SLAB_PIC"#"FULL_HTR"
 
 fscale = naoscale
 
@@ -59,7 +60,7 @@ for runid in runids:
         else:
             
             genrand=0
-        
-        
-        sr.stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,stormtrack,mconfig=mconfig,applyfac=applyfac)
+
+        sr.stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,stormtrack,
+                           mconfig=mconfig,applyfac=applyfac,parallel=parallel)
         print("Completed run %s funiform %s (Runtime Total: %.2fs)" % (runid,funiform,time.time()-startall))
