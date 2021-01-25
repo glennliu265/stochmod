@@ -285,7 +285,7 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
             NAO1 = NAO1 * dt / rho / cp0 # Do conversions (minus MLD)
         
         for i in range(3):
-            if funiform > 5:  # Separate NAO and EAP Forcing
+            if funiform > 5.5:  # Separate NAO and EAP Forcing
                 NAOF[i]  = NAO1[:,:,0,...].copy() # NAO Forcing
                 NAOF1[i] = NAO1[:,:,1,...].copy() # EAP Forcing
             else:
@@ -366,7 +366,7 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
             print("Loading Additional New Time Series for EAP")
             randts1 = np.load(output_path+"stoch_output_%iyr_run%s_randts_%03d.npy"%(nyr,runid,numforce))
         
-        if funiform == 5: # Assign EAP Forcing white noise time series
+        if funiform in [5,5.5]: # Assign EAP Forcing white noise time series
             randts = randts1
         
     
