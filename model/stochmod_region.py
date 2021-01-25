@@ -250,7 +250,7 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
             naoforcing = np.load(input_path+mconfig+"_NAO_EAP_NHFLX_Forcing_DJFM-MON.npy") #[PC x Ens x Lat x Lon]
             
             # Select PC 2 # [lon x lat x 2 x mon]
-            NAO1 = naoforcing[:,:,[1],:]
+            NAO1 = naoforcing[:,:,1,:]
             
         elif funiform == 6: # DJFM NAO and EAP
             
