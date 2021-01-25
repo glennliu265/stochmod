@@ -204,7 +204,14 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     
     # Consider moving this section to another script?
     if funiform > 1: # For NAO-like forcings (and EAP forcings, load in data and setup)
-    
+        
+        if funiform == 1.5: # Scale by standard deviation of NHFLX
+        
+            # [lon x lat x mon]
+            NAO1 = np.load(input_path+mconfig+"_NHFLXSTD_Forcing_Mon.npy")
+            
+            
+        
         # # Load Longitude for processing
         # lon360 =  np.load(datpath+"CESM_lon360.npy")
         if funiform == 2: # Load (NAO-NHFLX)_DJFM Forcing
@@ -382,7 +389,7 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
                 Fseas[hi] += Fseas1[hi]
             
         else: # NAO Like Forcing of funiform with mld/lbd factors, apply scaling and randts
-        
+            
             F,Fseas = scm.make_naoforcing(NAOF,randts,fscale,nyr)
             
         # Save Forcing if option is set
