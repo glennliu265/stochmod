@@ -10,7 +10,7 @@ import sys
 
 
 #%%
-stormtrack = 0
+stormtrack = 1
 if stormtrack == 0:
     projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
     datpath     = projpath + '01_Data/model_output/'
@@ -43,8 +43,8 @@ applyfac  = 2
 mconfig   = "SLAB_PIC"
 
 # Do a stormtrackloop
-runids = ["100"]
-funiforms = (0,1,2,5,6)
+runids = ["202",]
+funiforms = [0,1,3,5.5,7,]
 #funiforms=[0,1,2,5,6]
 #runids=['006']
 
