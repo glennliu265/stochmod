@@ -204,7 +204,7 @@ def make_naoforcing(NAOF,randts,fscale,nyr):
             
     return F,Fseas
 
-def set_stochparams(h,damping,dt,ND=True,rho=1000,cp0=4218,hfix=50):
+def set_stochparams(h,damping,dt,ND=True,rho=1000,cp0=4218,hfix=50,usemax=False):
     """
     Given MLD and Heat Flux Feedback, Calculate Parameters
     
@@ -221,6 +221,7 @@ def set_stochparams(h,damping,dt,ND=True,rho=1000,cp0=4218,hfix=50):
             rho   - density of water [kg/m3]
             cp0   - specific heat of water [J/(K*kg)]
             hfix  - fixed mixed layer depth [m]
+            usemax - use seasonal maximum MLD
     
     
     Outputs:
@@ -243,11 +244,16 @@ def set_stochparams(h,damping,dt,ND=True,rho=1000,cp0=4218,hfix=50):
         hmax = np.nanmax(np.abs(h),axis=2)
         hmax = hmax[:,:,None]
         
+        ## Find Mean MLD during the year
+        hmean = np.nanmean(h,axis=2)
+        hmean = hmean[:,:,None]
+        
     else:
         beta = np.log( h / np.roll(h,1,axis=0) )
         
         # Find Maximum MLD during the year
         hmax = np.nanmax(np.abs(h))
+        hmean = np.nanmean(h)
     
     
     # Set non-entraining months to zero
@@ -262,8 +268,12 @@ def set_stochparams(h,damping,dt,ND=True,rho=1000,cp0=4218,hfix=50):
     # Fixed MLD
     lbd[0] = damping / (rho*cp0*hfix) * dt
     
-    # Maximum MLD
-    lbd[1] = damping / (rho*cp0*hmax) * dt
+    # Mean MLD
+    lbd[1] = damping / (rho*cp0*hmean) * dt
+    
+    if usemax:
+        # Maximum MLD
+        lbd[1] = damping / (rho*cp0*hmax) * dt
     
     # Seasonal MLD
     lbd[2] = damping / (rho*cp0*h) * dt
@@ -379,7 +389,7 @@ def find_kprev(h,debug=False):
 
 
 
-def convert_NAO(hclim,naopattern,dt,rho=1000,cp0=4218,hfix=50):
+def convert_NAO(hclim,naopattern,dt,rho=1000,cp0=4218,hfix=50,usemax=False):
     """
     Convert NAO forcing pattern [naopattern] from (W/m2) to (degC/S) 
     given seasonal MLD (hclim)
@@ -391,7 +401,7 @@ def convert_NAO(hclim,naopattern,dt,rho=1000,cp0=4218,hfix=50):
         4) rho                   - Density of water [kg/m3]
         5) cp0                   - Specific Heat of water [J/(K*kg)]
         6) hfix                  - Fixed Mixed layer Depth
-    
+        7) usemax (optional)     - Set to True to use max seasonal MLD
     Output:
         1) NAOF [dict]    - Dictionary of arrays [lon x lat x mon], where 
             0 = fixed MLD
@@ -403,11 +413,13 @@ def convert_NAO(hclim,naopattern,dt,rho=1000,cp0=4218,hfix=50):
     patshape = naopattern.shape
     if len(patshape) != 3: 
         naopattern = naopattern[:,:,None]
-        
+    
     # Set up MLD[lon x lat x mon x hvarmode]
     mld = np.ones((patshape[0],patshape[1],12,3))
     mld[:,:,:,0]  *= hfix # Fixed MLD
-    mld[:,:,:,1]  = np.tile(hclim.max(2)[:,:,None],12) # Max MLD
+    mld[:,:,:,1]  = np.tile(hclim.mean(2)[:,:,None],12) # Mean MLD
+    if usemax:
+        mld[:,:,:,1]  = np.tile(hclim.max(2)[:,:,None],12) # Max MLD
     mld[:,:,:,2]  = hclim.copy() # Clim MLD
     
     # Convert NAO to correct units...
