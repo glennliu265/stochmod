@@ -24,23 +24,22 @@ import cartopy.crs as ccrs
 
 #%% Set Options
 #bboxsim  = [-100,20,-20,90] # Simulation Box
-query     = [-30,50]
-pointmode = 1
-mconfig   = "SLAB_PIC"
-t_end     = 120000
-hfix      = 50
-dt        = 3600*24*30
-multFAC   = 0
-T0        = 0
-lags      = np.arange(0,37,1)
-fstd      = 1
-multFAC   = 1
-ftype     = "DJFM-MON"
-genrand   = 0
-runid     = "syn001"
+
 
 #pcnames = ["NAO","EAP","NAO+EAP"]
 #exps = 
+
+
+
+
+
+
+
+#config['mldpt']
+#config['Fpt']
+#config['damppt']
+
+
 
 # Set Paths
 projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
@@ -51,65 +50,291 @@ outpath = projpath + '02_Figures/20210112/'
 
 mons3=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
 
+config = {}
+config['mconfig']     = "SLAB_PIC" # Model Configuration
+config['ftype']       = "DJFM-MON" # Forcing Type
+config['genrand']     = 1
+config['fstd']        = 1
+config['t_end']       = 120000    # Number of months in simulation
+config['runid']       = "syn001"  # White Noise ID
+config['fname']       = "FLXSTD" #['NAO','EAP,'EOF3','FLXSTD']
+config['pointmode']   = 1
+config['query']       = [-30,50]
+config['applyfac']    = 2 # Apply Integration Factor and MLD to forcing
+config['lags']        = np.arange(0,37,1)
+config['output_path'] = projpath + '02_Figures/20210112/'
+
 #%%
 
 
-def load_data(verbose=False):
+def load_data(mconfig,ftype,projpath=None):
     
+    """
+    Inputs
+    ------
+    mconfig : STR
+        Model Configuration (SLAB_PIC or FULL_HTR)
+    ftype : STR
+        Forcing Type ('DJFM-MON' or ... )
+    projpath : STR (optional)
+        Path to project folder (default uses path on laptop)
     
-
-def synth_stochmod(config):
+    Outputs
+    -------
+    mld : ARRAY 
+        Monhtly Mean Mixed Layer Depths
+    kprevall : ARRAY
+        Detrainment Months
+    lon : ARRAY
+        Longitudes (-180 to 180)
+    lat : ARRAY
+        Latitudes
+    lon360 : ARRAY
+        Longitudes (0 to 360)
+    cesmslabac : ARRAY
+        Autocorrelation at each point in the CESM Slab
+    damping : ARRAY
+        Monthly ensemble mean Heat flux feedback
+    forcing : ARRAY
+        Monthly forcing at each point (NAO, EAP, EOF3)
     """
     
+    # Set Paths
+    if projpath is None:
+        projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
+    datpath     = projpath + '01_Data/'
+    input_path  = datpath + 'model_input/'
+    
+    # Load Data (MLD and kprev) [lon x lat x month]
+    mld            = np.load(input_path+"HMXL_hclim.npy") # Climatological MLD
+    kprevall       = np.load(input_path+"HMXL_kprev.npy") # Entraining Month
+    
+    # Load Lat/Lon, autocorrelation
+    dampmat        = 'ensavg_nhflxdamping_monwin3_sig020_dof082_mode4.mat'
+    loaddamp       = loadmat(input_path+dampmat)
+    lon            = np.squeeze(loaddamp['LON1'])
+    lat            = np.squeeze(loaddamp['LAT'])
+    cesmslabac     = np.load(datpath+"CESM_clim/TS_SLAB_Autocorrelation.npy") #[mon x lag x lat x lon]
+    lon360         = loadmat("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/CESM1_LATLON.mat")['LON'].squeeze()
+    
+    # Load damping [lon x lat x mon]
+    if mconfig == "SLAB_PIC":
+        damping = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig005_dof894_mode4.npy")
+    elif mconfig=="FULL_HTR":
+        damping = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig020_dof082_mode4.npy")
+    
+    # Load Forcing  [lon x lat x pc x month]
+    forcing = np.load(input_path+mconfig+ "_NAO_EAP_NHFLX_Forcing_%s.npy" % ftype)#[:,:,0,:]
+    
+    return mld,kprevall,lon,lat,lon360,cesmslabac,damping,forcing
 
+
+
+def synth_stochmod(config,verbose=False,viz=False,
+                   dt=3600*24*30,rho=1025,cp0=3850,hfix=50,T0=0):
+    """
     Parameters
     ----------
     config : DICT
+        'mconfig'
+        'ftype'
+        'genrand'
+        'fstd'
+        't_end'
+        'runid'
+        'fname'
+    dt : INT (optional)
+        Timestep in seconds (monthly timestep by default)
         
+'output_path'        
 
     Returns
     -------
     None.
-
-    """    
-    
+    """
     # Load data
+    # ---------
+    mld,kprevall,lon,lat,lon360,cesmslabac,damping,forcing = load_data(config['mconfig'],config['ftype'])
+    if verbose:
+        print("Loaded Data")
+    
+    # Generate Random Forcing
+    # -----------------------
+    if config['genrand']:
+        randts = np.random.normal(0,config['fstd'],config['t_end'])
+        np.save(config['output_path'] + "Forcing_fstd%.2f_%s.npy"% (config['fstd'],config['runid']),randts)
+        if verbose:
+            print("Generating New Forcing")
+    else:
+        randts = np.load(output_path+"Forcing_fstd%.2f_%s.npy"% (config['fstd'],config['runid']))
+        if verbose:
+            print("Loading Old Forcing")
+    
+    # Select Forcing [lon x lat x mon]
+    if config['fname'] == 'NAO':
+        forcing = forcing[:,:,0,:]
+    elif config['fname'] == 'EAP':
+        forcing = forcing[:,:,1,:]
+    elif config['fname'] == 'EOF3':
+        forcing = forcing[:,:,2,:]
+    elif config['fname'] == 'FLXSTD':
+        forcing = np.load("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/SLAB_PIC_NHFLXSTD_Forcing_MON.npy")
+    
+    # Restrict input parameters to point (or regional average)
+    params = scm.get_data(config['pointmode'],config['query'],lat,lon,
+                          damping,mld,kprevall,forcing)
+    [o,a],damppt,mldpt,kprev,Fpt = params
+    kmonth = mldpt.argmax()
+    print("Restricted Parameters to Point")
+    
+    # Check for synthetic points, and assign to variable if it exists
+    synthflag = []
+    if 'mldpt' in config:
+        mldpt = config['mldpt']
+        synthflag.append('mld')
+    if 'Fpt' in config:
+        Fpt = config['Fpt']
+        synthflag.append('forcing')
+    if 'damppt' in config:
+        damppt = config['damppt']
+        synthflag.append('damping')
+    if verbose:
+        print("Detected synthetic forcings for %s"%str(synthflag))
+    
+    if viz:
+        synth = [damppt,mldpt,Fpt]
+        fig,ax = viz.summarize_params(lat,lon,params,synth=synth)
+    
+    # Prepare forcing
+    Fh = {}
+    nyrs = int(config['t_end']/12)
+    
+    if config['applyfac'] in [0,3]: # White Noise Forcing, unscaled by MLD
+        for h in range(3):
+            Fh[h] = randts * np.tile(Fpt,nyrs)
+    else: # White Noise Forcing + MLD
+        for h in range(3):
+            if h == 0: # Fixed 50 meter MLD
+                Fh[h] = randts * np.tile(Fpt,nyrs) * (dt/(cp0*rho*hfix))
+            elif h == 1: # Seasonal Mean MLD
+                Fh[h] = randts * np.tile(Fpt,nyrs) * (dt/(cp0*rho*mldpt.mean()))
+            elif h == 2: # Seasonall Varying mean MLD
+                Fh[h] = randts * np.tile(Fpt/mldpt,nyrs) * (dt/(cp0*rho))
+    
+    # Convert Parameters
+    lbd,lbd_entr,FAC,beta = scm.set_stochparams(mldpt,damppt,dt,ND=False,hfix=hfix)
+    if verbose:
+        print("Completed parameter setup!")
+    
+    # Run the stochastic model
+    multFAC = 0
+    if config['applyfac'] > 1: # Apply Integration factor
+        multFAC = 1
     
     
+    sst         = {}
+    dampingterm = {}
+    forcingterm = {}
+    for i in range(3): # No Entrainment Cases
+        sst[i],forcingterm[i],dampingterm[i] = scm.noentrain(t_end,lbd[i],T0,Fh[i],FAC[i],multFAC=multFAC,debug=True)
     
+    sst[3],dampingterm[3],forcingterm[3],entrainterm,Td=scm.entrain(config['t_end'],
+                       lbd[3],T0,Fh[2],
+                       beta,mldpt,kprev,
+                       FAC[3],multFAC=multFAC,
+                       debug=True,debugprint=False)
+    if verbose:
+        print("Model Runs Complete!")
+    
+    # Calculate Autocorrelation
+    autocorr = scm.calc_autocorr(sst,config['lags'],kmonth+1)
+    if verbose:
+        print("Autocorrelation Calculations Complete!")
+    return autocorr,sst,dampingterm,forcingterm,entrainterm,Td,kmonth,params
+
 
 #%%
-# Load Data (MLD and kprev, damping)
-mld            = np.load(input_path+"HMXL_hclim.npy") # Climatological MLD
-kprevall       = np.load(input_path+"HMXL_kprev.npy") # Entraining Month
-dampmat        = 'ensavg_nhflxdamping_monwin3_sig020_dof082_mode4.mat'
-loaddamp       = loadmat(input_path+dampmat)
-lon            = np.squeeze(loaddamp['LON1'])
-lat            = np.squeeze(loaddamp['LAT'])
-cesmslabac     = np.load(datpath+"CESM_clim/TS_SLAB_Autocorrelation.npy")
-lon360         = loadmat("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/CESM1_LATLON.mat")['LON'].squeeze()
+
+#%%
+
+st = time.time()
+ac,sst,dmp,frc,ent,Td,kmonth,params=synth_stochmod(config)
+print("Ran script in %.2fs"%(time.time()-st))
+
+
+
+#%% Load some data into the local workspace for plotting
+query = config['query']
+mconfig = config['mconfig']
+ftype = config['ftype']
 locstring      = "lon%i_lat%i" % (query[0],query[1])
 locstringtitle = "Lon: %.1f Lat: %.1f" % (query[0],query[1])
 
-if mconfig == "SLAB_PIC":
-    damping = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig005_dof894_mode4.npy")
-elif mconfig=="FULL_HTR":
-    damping = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig020_dof082_mode4.npy")
+# Read in CESM autocorrelation for all points'
+mld,kprevall,lon,lat,lon360,cesmslabac,damping,forcing = load_data(mconfig,ftype)
+ko,ka     = proc.find_latlon(query[0]+360,query[1],lon360,lat)
+cesmauto2 = cesmslabac[kmonth,:,ka,ko]
+cesmauto = cesmauto2[lags]
 
-# Load Forcing
-forcing = np.load(input_path+mconfig+ "_NAO_EAP_NHFLX_Forcing_%s.npy" % ftype)#[:,:,0,:]
-forcing = forcing[:,:,0,:]
-if genrand:
-    randts = np.random.normal(0,fstd,t_end)
-    #randts = np.abs(randts)
-    np.save(output_path+"Forcing_fstd%.2f_%s.npy"% (fstd,runid),randts) 
-else:
-    randts = np.load(output_path+"Forcing_fstd%.2f_%s.npy"% (fstd,runid))
+# Load out data from model run
+[o,a],damppt,mldpt,kprev,Fpt = params
 
-# Restrict to point
-params = scm.get_data(pointmode,query,lat,lon,damping,mld,kprevall,forcing)
-[o,a],damppt,hclim,kprev,Fpt = params
+#%% Make some quick plots
 
+#%% Plot Autocorrelation (All Models)
+
+
+labels=["MLD Fixed","MLD Max","MLD Seasonal","MLD Entrain"]
+
+#labels=["MLD (MAX)","MLD Seasonal","MLD Entrain"]
+colors=["red","orange","magenta","blue"]
+
+title = "SST Autocorrelation at %s (Lag 0 = %s)" % (locstringtitle,mons3[mldpt.argmax()])
+
+
+xtk2 = np.arange(0,37,2)
+fig,ax = plt.subplots(1,1)
+ax,ax2,ax3 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,loopvar=Fpt,title=title)
+ax.plot(lags,cesmauto2[lags],label="CESM SLAB",color='k')
+for i in [0,1,2,3]:
+    ax.plot(ac[i],label=labels[i],color=colors[i])
+#ax.legend(ncol=3,fontsize=10)
+#ax3.set_ylabel("MLD (m)")
+#ax3.set_ylabel("Damping (W/m2)")
+ax3.set_ylabel("Forcing (W/m2)")
+ax3.yaxis.label.set_color('gray')
+ax.legend(fontsize=8)
+plt.tight_layout()
+plt.savefig(outpath+"AC_WithSEAS_MLD_%s.png"%(locstring),dpi=200)
+
+#%% Plot autocorrelation of different terms for a particular model
+
+i = 1 # Select the model
+
+
+# First, calculate the autocorrelation
+vnames = ["SST","Damping Term","Forcing Term","Entrain Term"]
+vcalc = [sst[i],dmp[i],frc[i],ent]
+vac = []
+for v in vcalc:
+    vac.append(scm.calc_autocorr([vcalc[i]],config['lags'],kmonth+1))
+    
+
+
+fig,ax = plt.subplots()
+
+for v in vcalc:
+    
+    
+    
+
+
+#%%
+
+
+if viz:
+    fig,ax = viz.summarize_params(lat,lon,params,synth=synth)
+    plt.tight_layout()
 #Visualize points (raw)
 #fig,ax = viz.summarize_params(lat,lon,params)
 #plt.tight_layout()
@@ -281,29 +506,6 @@ expf[0] = Fpt.copy()
 
 np.save(outpath+"Exps_saved.npy",exps)
 
-#%% Plot Autocorrelation (All Models)
-labels=["MLD Fixed","MLD Max","MLD Seasonal","MLD Entrain"]
-
-#labels=["MLD (MAX)","MLD Seasonal","MLD Entrain"]
-colors=["red","orange","green","blue"]
-
-title = "SST Autocorrelation at %s (Lag 0 = %s)" % (locstringtitle,mons3[hclim.argmax()])
-
-
-xtk2 = np.arange(0,37,2)
-fig,ax = plt.subplots(1,1)
-ax,ax2,ax3 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,loopvar=Fpt,title=title)
-ax.plot(lags,cesmauto2[lags],label="CESM SLAB",color='k')
-for i in [0,1,2,3]:
-    ax.plot(autocorr[i],label=labels[i],color=colors[i])
-#ax.legend(ncol=3,fontsize=10)
-#ax3.set_ylabel("MLD (m)")
-#ax3.set_ylabel("Damping (W/m2)")
-ax3.set_ylabel("Forcing (W/m2)")
-ax3.yaxis.label.set_color('gray')
-ax.legend(fontsize=8)
-plt.tight_layout()
-plt.savefig(outpath+"AC_WithSEAS_MLD_%s_testpositive.png"%(locstring),dpi=200)
 
 
 #%% Just Plot a few autocorrelation curves
