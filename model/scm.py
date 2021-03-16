@@ -46,6 +46,7 @@ def calc_Td(t,index,values,prevmon=False,debug=False):
     # Initialize month array
     months = []
     m1  = (t+1)%12
+    #m1=t%12
     if m1 == 0:
         m1 = 12
     months.append(m1)
@@ -62,7 +63,7 @@ def calc_Td(t,index,values,prevmon=False,debug=False):
     # Loop for each month
     Td = []
     mcnts = [1,0] # Amount to add to get the index
-    
+    #mcnts = [0,-1]
     for mcount,m in enumerate(months):
         mcnt = mcnts[mcount]
         if debug:
@@ -524,12 +525,15 @@ def noentrain(t_end,lbd,T0,F,FAC,multFAC=1,debug=False):
     for t in range(t_end):
         
         # Get the month
-        m = (t+1)%12
+        m = (t+1)%12 # First t+dt is Feb, t is therefore Jan
+        #m = t%12 # First t+dt is Jan, t is therefor dec...
         if m == 0:
             m = 12
         #print("For t = %i month is %i"%(t,m))
-
-        # Get Noise/Forcing Term
+        
+        # Get Noise/Forcing Term (first step will be Jan...)
+        # Isn't t-1 since t-1 = -1, which would be dec forcing..
+        # UPDATE: So dec forcing generates Jan SST, etc...???
         noise_term = F[t]
         
         # Form the damping term with temp from previous timestep
@@ -615,6 +619,7 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
         
         # Get the month (start from Jan, so +1)
         m  = (t+1)%12
+        #m=t%12
         if m == 0:
             m = 12
         
@@ -753,6 +758,7 @@ def entrain_parallel(inputs):
         
         # Get the month (start from Jan, so +1)
         m  = (t+1)%12
+        #m=t%12
         if m == 0:
             m = 12
         
@@ -866,7 +872,8 @@ def noentrain_2d(randts,lbd,T0,F,FAC,multFAC=1,debug=False):
     for t in tqdm(range(t_end)):
         
         # Get the month
-        m = (t+1)%12 # Start from January
+        m = (t+1)%12 # Start from January, params are same month
+        #m=t%12 
         if m == 0:
             m = 12
         
@@ -877,7 +884,7 @@ def noentrain_2d(randts,lbd,T0,F,FAC,multFAC=1,debug=False):
         if F.shape[2] == 12:
             noise_term[:,:,t] = F[:,:,m-1] * randts[None,None,t-1]
         else:
-            noise_term[:,:,t] = F[:,:,t-1] 
+            noise_term[:,:,t] = F[:,:,t] 
                 
         # Add with the corresponding forcing term to get the temp
         temp_ts[:,:,t] = damp_term[:,:,t] + noise_term[:,:,t]
@@ -1069,5 +1076,5 @@ def calc_autocorr(sst,lags,basemonth):
         tsmodel2 = tsmodel - np.mean(tsmodel,1)[:,None]
         
         # Plot
-        autocorr[model] = proc.calc_lagcovar(tsmodel2,tsmodel2,lags,basemonth,0)
+        autocorr[model] = proc.calc_lagcovar(tsmodel2,tsmodel2,lags,basemonth,1)
     return autocorr
