@@ -180,8 +180,8 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
         damping = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig005_dof894_mode4.npy")
     
     # Load Mixed layer variables (preprocessed in prep_mld.py)
-    mld         = np.load(input_path+"HMXL_hclim.npy") # Climatological MLD
-    kprevall    = np.load(input_path+"HMXL_kprev.npy") # Entraining Month
+    mld         = np.load(input_path+"FULL_PIC_HMXL_hclim.npy") # Climatological MLD
+    kprevall    = np.load(input_path+"FULL_PIC_HMXL_kprev.npy") # Entraining Month
     
     # ------------------
     # %% Restrict to region --------------------------------------------------
@@ -225,7 +225,10 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
         elif funiform == 3: # NAO (DJFM) regressed to monthly NHFLX
             
             # [lon x lat x pc x mon]
-            naoforcing = np.load(input_path+mconfig+"_NAO_EAP_NHFLX_Forcing_DJFM-MON.npy") #[PC x Ens x Lat x Lon]
+            #naoforcing = np.load(input_path+mconfig+"_NAO_EAP_NHFLX_Forcing_DJFM-MON.npy") #[PC x Ens x Lat x Lon]
+            
+            # Calculated from calc-NAO_PIC_monhtly.py.... Fixed NAO Pattern
+            naoforcing = np.load(input_path+mconfig+"_NAO_EAP_NHFLX_Forcing_DJFM-MON_Fix.npy") # New file, magnitude does not vary at each point
             
             # Select PC 1 and 2 # [lon x lat x mon]
             NAO1 = naoforcing[:,:,0,:]
@@ -254,7 +257,10 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
         elif funiform == 5.5: # EAP (DJFM-MON)
             
             # [lon x lat x pc x mon]
-            naoforcing = np.load(input_path+mconfig+"_NAO_EAP_NHFLX_Forcing_DJFM-MON.npy") #[PC x Ens x Lat x Lon]
+            #naoforcing = np.load(input_path+mconfig+"_NAO_EAP_NHFLX_Forcing_DJFM-MON.npy") #[PC x Ens x Lat x Lon]
+            
+            # Calculated from calc-NAO_PIC_monhtly.py.... Fixed NAO Pattern
+            naoforcing = np.load(input_path+mconfig+"_NAO_EAP_NHFLX_Forcing_DJFM-MON_Fix.npy") # New file, magnitude does not vary at each point
             
             # Select PC 2 # [lon x lat x 2 x mon]
             NAO1 = naoforcing[:,:,1,:]
@@ -264,13 +270,18 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
             # [lon x lat x pc]
             naoforcing = np.load(input_path+mconfig+"_NAO_EAP_NHFLX_Forcing_DJFM.npy") #[PC x Ens x Lat x Lon]
             
+            
             # Select PC 1 and 2 # [lon x lat x 2]
             NAO1 = naoforcing[:,:,[0,1]]
             
         elif funiform == 7: # DJFM Index, Monthly NHFLX
             
             # [lon x lat x pc x mon]
-            naoforcing = np.load(input_path+mconfig+"_NAO_EAP_NHFLX_Forcing_DJFM-MON.npy") #[PC x Ens x Lat x Lon]
+            #naoforcing = np.load(input_path+mconfig+"_NAO_EAP_NHFLX_Forcing_DJFM-MON.npy") #[PC x Ens x Lat x Lon]
+            
+            # Calculated from calc-NAO_PIC_monhtly.py.... Fixed NAO Pattern
+            naoforcing = np.load(input_path+mconfig+"_NAO_EAP_NHFLX_Forcing_DJFM-MON_Fix.npy") # New file, magnitude does not vary at each point
+            
             
             # Select PC 1 and 2 # [lon x lat x 2 x mon]
             NAO1 = naoforcing[:,:,[0,1],:]
