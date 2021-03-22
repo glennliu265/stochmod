@@ -13,7 +13,7 @@ import time
 import glob
 #%% Determine System
 startall = time.time()
-stormtrack = 1
+stormtrack = 0
 if stormtrack == 0:
     projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 #    scriptpath  = projpath + '03_Scripts/stochmod/'
@@ -35,7 +35,7 @@ import stochmod_region as sr
 # # of runs
 pointmode = 0 # Set to 1 to output data for the point speficied below
 points    = [-30,50] # Lon, aLat for pointmode
-naoscale  = 10 # Number to scale NAO and other forcings by
+naoscale  = 1 # Number to scale NAO and other forcings by
 parallel  = False
 
 # Integration Options
@@ -44,8 +44,8 @@ fstd     = 0.3         # Standard deviation of the forcing
 bboxsim  = [-100,20,-20,90] # Simulation Box
 
 # Do a stormtrackloop
-runids    = ["202"]
-funiforms = [5.5,7]
+runids    = ["300"]
+funiforms = [1,3,5.5,7]
 applyfac  = 2
 mconfig   = "SLAB_PIC"#"FULL_HTR"
 
