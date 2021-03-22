@@ -341,6 +341,7 @@ ko,ka     = proc.find_latlon(query[0]+360,query[1],lon360,lat)
 cesmauto2 = cesmslabac[kmonth,:,ka,ko]
 cesmauto  = cesmauto2[lags]
 
+
 # Plot some differences
 xtk2       = np.arange(0,37,2)
 fig,ax     = plt.subplots(1,1)
@@ -363,6 +364,60 @@ plt.savefig(outpath+"Default_Autocorrelation.png",dpi=200)
 dampdef = damppt.copy()
 mlddef = mldpt.copy()
 Fptdef = Fpt.copy()
+
+
+#
+# %% Advance plot with confidence levels
+#
+conf  =0.95
+tails = 2
+
+def calc_conflag(ac,conf,tails,n):
+    cflags = np.zeros((len(ac),2))
+    for l in range(len(ac)):
+        rhoin = ac[l]
+        cfout = proc.calc_pearsonconf(rhoin,conf,tails,n)
+        cflags[l,:] = cfout
+    return cflags
+
+
+
+
+nlags   = len(lags)
+cfstoch = np.zeros([4,nlags,2])
+for m in range(4):
+    inac = ac[m]
+    n = int(len(sst[m])/12)
+    cfs = calc_conflag(inac,conf,tails,n)
+    cfstoch[m,:,:] = cfs
+cfslab = calc_conflag(cesmauto2,conf,tails,898)
+cffull = calc_conflag(fullauto,conf,tails,1798)
+
+fig,ax     = plt.subplots(1,1)
+title      = "SST Autocorrelation (Lag 0 = %s)" % (mons3[mldpt.argmax()])
+ax,ax2 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title)
+ax.plot(lags,cesmauto2[lags],label="CESM SLAB",color='k')
+ax.fill_between(lags,cfslab[lags,0],cfslab[lags,1],color='k',alpha=0.10)
+
+ax.plot(lags,fullauto,color='k',label='CESM Full',ls='dashdot')
+ax.fill_between(lags,cffull[lags,0],cffull[lags,1],color='k',alpha=0.10)
+
+for i in range(1,4):
+    ax.plot(lags,ac[i],label=labels[i],color=expcolors[i])
+    ax.fill_between(lags,cfstoch[i,:,0],cfstoch[i,:,1],color=expcolors[i],alpha=0.25)
+
+ax.legend()
+ax3.set_ylabel("Mixed Layer Depth (m)")
+ax3.yaxis.label.set_color('gray')
+ax.legend(fontsize=8)
+plt.tight_layout()
+plt.savefig(outpath+"Default_Autocorrelation_CF.png",dpi=200)
+
+# Save Default Values
+dampdef = damppt.copy()
+mlddef = mldpt.copy()
+Fptdef = Fpt.copy()
+
 
 #
 #%% Run the Experiment
@@ -455,8 +510,6 @@ def calc_conflag(ac,conf,tails,n):
         cfout = proc.calc_pearsonconf(rhoin,conf,tails,n)
         cflags[l,:] = cfout
     return cflags
-
-
 cfslab = calc_conflag(cesmauto2,conf,tails,898)
 cffull = calc_conflag(fullauto,conf,tails,1798)
 #for l,lag in enumerate(lags)
