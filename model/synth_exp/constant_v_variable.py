@@ -640,4 +640,28 @@ for i,e in enumerate([4,5,6,7]):
 plt.suptitle("Stochastic Model (with Entrainment)",fontsize=14)
 plt.tight_layout()
 plt.savefig("%sAutocorrelation_ConstvVary_Entrain.png"%outpath,dpi=150)
-    
+
+
+#%% Plot the variables
+
+fig,axs=plt.subplots(3,1,sharex=True)
+
+ax = axs[0]
+ax.plot(mons3,Fpt,color='k')
+ax.set_title("Forcing $(W/m^{2})$, mean=%.2f"%(Fpt.mean()))
+ax.grid(True,ls='dotted')
+ax.set_xlim([0,11])
+
+ax = axs[1]
+ax.plot(mons3,mldpt,color='b')
+ax.set_title("MLD (m), mean=%.2f"%(mldpt.mean()))
+ax.grid(True,ls='dotted')
+ax.set_xlim([0,11])
+
+ax = axs[2]
+ax.plot(mons3,damppt,color='r')
+ax.set_title("Damping $(W/m^{2})$, mean=%.2f"%(damppt.mean()))
+ax.grid(True,ls='dotted')
+ax.set_xlim([0,11])
+plt.tight_layout()
+plt.savefig(outpath+"Stochmod_Inputs.png",dpi=150)

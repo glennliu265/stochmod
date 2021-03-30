@@ -34,7 +34,7 @@ projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 datpath     = projpath + '01_Data/'
 input_path  = datpath + 'model_input/'
 output_path = datpath + 'model_output/'
-outpath = projpath + '02_Figures/20210322_AMVTeleconf/'
+outpath = projpath + '02_Figures/20210330/'
 
 # Load in control data for 50N 30W
 #fullauto =np.load(datpath+"Autocorrelation_30W50N_FULL_PIC_12805.npy",allow_pickle=True)
@@ -321,6 +321,7 @@ def make_axtime(ax,htax,dtin):
     dtday = 3600*24
     dtyr  = dtday*365
     
+    
     fnamefull = ("Millennium","Century","Decade","Year","Month")
     fs = [1/(dtyr*1000),1/(dtyr*100),1/(dtyr*10),1/(dtyr),1/(dtday*30)]
     per = [ "%.2e \n (%s) " % (int(1/fs[i]/(dtday*30)),fnamefull[i]) for i in range(len(fnamefull))]
@@ -362,6 +363,7 @@ def set_monthlyspec(ax,htax):
 #% ------------
 #%% Clean Run
 #% ------------
+
 #% Load some data into the local workspace for plotting
 query   = config['query']
 mconfig = config['mconfig']
@@ -373,7 +375,7 @@ locstringtitle = "Lon: %.1f Lat: %.1f" % (query[0],query[1])
 # Run Model
 #config['Fpt'] = np.roll(Fpt,1)
 ac,sst,dmp,frc,ent,Td,kmonth,params=synth_stochmod(config)
-[o,a],damppt,mldpt,kprev,Fpt = params
+[o,a],damppt,mldpt,kprev,Fpt       =params
 
 # Read in CESM autocorrelation for all points'
 kmonth = np.argmax(mldpt)
@@ -484,8 +486,9 @@ for i in range(4):
 
     if axopt != 1:
         #dt = 12*365*3600
-        ax,htax=make_axtime(ax,htax,dt)
-        #ax,htax=adjust_axis(ax,htax,dt,1.2)
+        dtin = 3600*24*365
+        #ax,htax=make_axtime(ax,htax,dt)
+        ax,htax=make_axtime(ax,htax,dtin)
     
     #ax.semilogx(freqcesmfull,freqcesmfull*Pcesmfull,'gray',label="CESM-FULL")
     #vlv = [1/(100*dt*12),1/(10*12*dt),1/(12*dt)]
@@ -567,6 +570,7 @@ fig,ax = plt.subplots(1,1)
 ax.set_ylabel("Frequency x Power",fontsize=13)
 
 for i in np.arange(1,4):
+    print(specs[i].sum())
     ax.semilogx(freqs[i],freqs[i]*specs[i],label=labels[i],color=expcolors[i],lw=0.75)
 ax.semilogx(freqcesmfull,Pcesmfull*freqcesmfull,label="CESM-FULL",color='k',lw=0.75)
 ax.semilogx(freqcesmslab,Pcesmslab*freqcesmslab,label="CESM-SLAB",color='gray',lw=0.75)
@@ -880,16 +884,17 @@ fig,ax=plt.subplots(1,1,figsize=(8,3))
 for i in [1,2,3]:
     
     sstann = proc.ann_avg(sst[i],0)
-    
+    plabel = labels[i] + r", 1$\sigma=%.2f$" % np.std(sstann)
     win = np.ones(10)/10
     sstann = np.convolve(sstann,win,mode='valid')
     
     yrs = np.arange(0,sstann.shape[0])
     
-    plabel = labels[i] + r", 1$\sigma=%.2f$" % np.std(sstann)
-    ax.plot(sstann,label=plabel,lw=0.5,color=expcolors[i])
     
+    ax.plot(sstann,label=plabel,lw=0.5,color=expcolors[i])
+    #ax.plot(sst[i],label=plabel,lw=0.5,color=expcolors[i])
     print("Std for %s is %.2f"%(labels[i],np.std(sst[i])))
+    print("Std for Ann mean %s is %.2f"%(labels[i],np.std(sstann)))
 ax.legend(fontsize=8,ncol=3)
 ax.set_xlabel("Years")
 ax.set_ylabel("degC")
@@ -897,3 +902,18 @@ ax.set_title("Stochastic Model SST (10-year Running Mean)")
 ax.grid(True,ls='dotted')
 plt.tight_layout()
 plt.savefig("%sStochasticModelSST_comparison.png"%(outpath),dpi=150)
+
+
+#%% Check the area under the curve
+
+
+for i in [1,2,3]:
+    freq = freqs[i]*dt
+    spec = specs[i]/dt
+    nf = len(spec)
+    df = np.abs((freq[:-1]-freq[1:])).mean()
+    svar = (freq*df).sum()
+    
+    
+    sstvar = sst[i].var()
+
