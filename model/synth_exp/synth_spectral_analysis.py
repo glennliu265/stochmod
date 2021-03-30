@@ -315,35 +315,61 @@ def adjust_axis(ax,htax,dt,multiple):
             a.set_xticklabels(xtkm)
     return ax,htax
 
-def make_axtime(ax,htax,dtin):
+def make_axtime(ax,htax,denom='year'):
     
     # Units in Seconds
     dtday = 3600*24
     dtyr  = dtday*365
     
-    
     fnamefull = ("Millennium","Century","Decade","Year","Month")
-    fs = [1/(dtyr*1000),1/(dtyr*100),1/(dtyr*10),1/(dtyr),1/(dtday*30)]
-    per = [ "%.2e \n (%s) " % (int(1/fs[i]/(dtday*30)),fnamefull[i]) for i in range(len(fnamefull))]
+    if denom == 'month':
+        
+        # Set frequency (by 10^n months, in seconds)
+        fs = [1/(dtyr*1000),1/(dtyr*100),1/(dtyr*10),1/(dtyr),1/(dtday*30)]
+        xtk      = np.array(fs)#/dtin
+        
+        # Set frequency tick labels
+        fsl = ["%.1e" % s for s in xtk]
+        
+        # Set period tick labels
+        per = [ "%.2e \n (%s) " % (int(1/fs[i]/(dtday*30)),fnamefull[i]) for i in range(len(fnamefull))]
+        
+        # Set axis names
+        axl_bot = "Frequency (cycles/sec)" # Axis Label
+        axl_top = "Period (Months)"
+        
+        
+    elif denom == 'year':
+        
+        # Set frequency (by 10^n years, in seconds)
+        denoms = [1000,100,10,1,.1]
+        fs = [1/(dtyr*1000),1/(dtyr*100),1/(dtyr*10),1/(dtyr),1/(dtyr*.1)]
+        xtk      = np.array(fs)#/dtin
+        
+        # Set tick labels for frequency axis
+        fsl = ["%.3f" % (fs[i]*dtyr) for i in range(len(fs))]
+        
+        # Set period tick labels
+        per = [ "%.2e \n (%s) " % (denoms[i],fnamefull[i]) for i in range(len(fnamefull))]
+        
+        # Set axis labels
+        axl_bot = "Frequency (cycles/year)" # Axis Label
+        axl_top = "Period (Years)"
+
     
-    xtk      = np.array(fs)#/dtin
-    xtkl     = ["%.1e" % s for s in xtk]
     
     for i,a in enumerate([ax,htax]):
         a.set_xticks(xtk)
         if i == 0:
-            a.set_xticklabels(xtkl)
+            a.set_xticklabels(fsl)
+            a.set_xlabel("")
+            a.set_xlabel(axl_bot)
         else:
             a.set_xticklabels(per)
+            a.set_xlabel("")
+            a.set_xlabel(axl_top)
     return ax,htax
-    
-    
-    
 
-# def return_cfcurve(freq,P,dof,r1,clvl):
-#     CC = ybx.yo_speccl(freq,P,dof,r1,clvl)
-#     CC*dt
-#     return CC
     
 def set_monthlyspec(ax,htax):
 
@@ -596,7 +622,7 @@ htax.set_xlabel("Period (%s)"%tunit,fontsize=13)
 ax.legend()
 
 
-ax,htax=make_axtime(ax,htax,dt)
+ax,htax=make_axtime(ax,htax)
 #ax,htax=adjust_axis(ax,htax,dt,1.2)
 
 #ax.semilogx(freqcesmfull,freqcesmfull*Pcesmfull,'gray',label="CESM-FULL")
@@ -609,7 +635,7 @@ for vv in vlv:
     
     ax.grid(True,which='both',ls='dotted')
 
-ax.set_xlabel("Frequency (cycles/sec)",fontsize=13)
+#ax.set_xlabel("Frequency (cycles/sec)",fontsize=13)
 ax.set_ylabel(r"Frequency x Power $(^{\circ}C)^{2}$",fontsize=13)
 ax.set_title("Power Spectrum \n" + "nsmooth=%i, taper=%.2f" % (nsmooth,pct))
 plt.tight_layout()
