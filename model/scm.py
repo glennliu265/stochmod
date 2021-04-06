@@ -63,7 +63,6 @@ def calc_Td(t,index,values,prevmon=False,debug=False):
     # Loop for each month
     Td = []
     mcnts = [1,0] # Amount to add to get the index
-    #mcnts = [0,-1]
     for mcount,m in enumerate(months):
         mcnt = mcnts[mcount]
         if debug:
@@ -947,7 +946,7 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,returnresults=
     latr = np.load(datpath+"lat.npy")
     
     # Load MLD Data
-    mld = np.load(rawpath+"HMXL_hclim.npy") # Climatological MLD
+    mld = np.load(rawpath+"FULL_PIC_HMXL_hclim.npy") # Climatological MLD
     
     # Load Damping Data for lat/lon
     loaddamp = loadmat(rawpath+"ensavg_nhflxdamping_monwin3_sig020_dof082_mode4.mat")
@@ -1078,3 +1077,5 @@ def calc_autocorr(sst,lags,basemonth):
         # Plot
         autocorr[model] = proc.calc_lagcovar(tsmodel2,tsmodel2,lags,basemonth,1)
     return autocorr
+
+
