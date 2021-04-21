@@ -57,6 +57,7 @@ genrand   = 0  # Set to 1 to regenerate white noise time series, with runid abov
 # 4 = NAO-like NHFLX Forcing, with NAO (Monthly) and NHFLX (Monthly)
 funiform = 6     # Forcing Mode (see options above)
 fscale   = 10    # Value to scale forcing by
+mconfig = 'FULL_PIC'
 
 # Integration Options
 nyr      = 1000        # Number of years to integrate over
@@ -79,7 +80,7 @@ latN = 90
 projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath = projpath + '03_Scripts/stochmod/'
 datpath    = projpath + '01_Data/'
-outpath    = projpath + '02_Figures/20200823/'
+outpath    = projpath + '02_Figures/20210420/'
 
 # Set input path
 input_path  = datpath + 'model_input/'
@@ -107,11 +108,16 @@ dampmat     = 'ensavg_nhflxdamping_monwin3_sig020_dof082_mode4.mat'
 loaddamp    = loadmat(input_path+dampmat)
 LON         = np.squeeze(loaddamp['LON1'])
 LAT         = np.squeeze(loaddamp['LAT'])
-damping     = loaddamp['ensavg']
+#damping     = loaddamp['ensavg']
+damping     = np.load(input_path+"SLAB_PIC"+"_NHFLX_Damping_monwin3_sig005_dof894_mode4.npy")
 
 # Load Mixed layer variables (preprocessed in prep_mld.py)
-mld         = np.load(input_path+"HMXL_hclim.npy") # Climatological MLD
-kprevall    = np.load(input_path+"HMXL_kprev.npy") # Entraining Month
+if "PIC" in mconfig:
+    mld = np.load(input_path+"FULL_PIC_HMXL_hclim.npy")
+    kprevall    = np.load(input_path+"FULL_PIC_HMXL_kprev.npy") # Entraining Month
+else: # Load Historical
+    mld         = np.load(input_path+"HMXL_hclim.npy") # Climatological MLD
+    kprevall    = np.load(input_path+"HMXL_kprev.npy") # Entraining Month
 
 # Save Options are here
 saveforcing = 0 # Save Forcing for each point
@@ -259,22 +265,54 @@ NAO1 = NAO1[None,:,:] # [1 x Lat x Lon]
 NAO1 = np.transpose(NAO1,(2,1,0))
 lon180,NAO1 = proc.lon360to180(lon360,NAO1)
 BOTHDJFM = NAO1[klon[:,None],klat[None,:],:].copy()
-#%% Make input plot for Mixed layer Depth
+#%% Make input plot for Mixed layer Depth Range
 
 invar = hclim.max(2) - hclim.min(2)
-bbox = [-80,0,0,90]
-cint = np.concatenate([np.arange(0,100,20),np.arange(100,1200,100)])
+bbox = [-80,0,0,80]
+#cint = np.concatenate([np.arange(0,100,20),np.arange(100,1800,300)])
+cint = [0,25,50,100,250,500,750,1000,1250,1500]
 cmap = cmocean.cm.dense
 
-fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(5,4))
-ax = viz.init_map(bbox,ax=ax)
-pcm = ax.contourf(lonr,latr,invar.T,cint,cmap=cmap)
-cl = ax.contour(lonr,latr,invar.T,cint,colors="k",linewidths = 0.5)     
-ax.clabel(cl,fmt="%i",fontsize=8)
-ax.add_feature(cfeature.LAND,color='k')
-ax.set_title("$MLD_{max} - MLD_{min}$" + "\n 40-member Ensemble Average",fontsize=12)
-plt.colorbar(pcm,ax=ax,orientation='horizontal',fraction=0.040, pad=0.05)
-plt.savefig(outpath+"MLD_MaxDiff.png",dpi=200)
+# Old Figsize was 5 x 4
+fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(8,5))
+ax = viz.add_coast_grid(ax,bbox=bbox)
+#ax = viz.init_map(bbox,ax=ax)
+#pcm = ax.contourf(lonr,latr,invar.T,cint,cmap=cmap)
+pcm = ax.pcolormesh(lonr,latr,invar.T,vmin=0,vmax=1500,cmap=cmap)
+cl = ax.contour(lonr,latr,invar.T,cint,colors="k",linewidths = .75)
+#cl = ax.contour(lonr,latr,invar.T,cint,colors="k",linewidths = 0.5)     
+ax.clabel(cl,fmt="%i",fontsize=9)
+#ax.add_feature(cfeature.LAND,color='k')
+#ax.set_title("$MLD_{max} - MLD_{min}$" + "\n 40-member Ensemble Average",fontsize=12)
+ax.set_title("$MLD_{max} - MLD_{min}$" + "\n %s"% mconfig,fontsize=12)
+
+plt.colorbar(pcm,ax=ax,orientation='horizontal',fraction=0.040, pad=0.10)
+plt.savefig(outpath+"MLD_RangeDiff.png",dpi=200)
+
+#%% MLD Maximum
+
+invar = hclim.max(2)
+bbox = [-80,0,0,80]
+#cint = np.concatenate([np.arange(0,100,20),np.arange(100,1800,300)])
+cint = [0,25,50,100,250,500,750,1000,1250,1500]
+cmap = cmocean.cm.dense
+
+# Old Figsize was 5 x 4
+fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(8,5))
+ax = viz.add_coast_grid(ax,bbox=bbox)
+#ax = viz.init_map(bbox,ax=ax)
+#pcm = ax.contourf(lonr,latr,invar.T,cint,cmap=cmap)
+pcm = ax.pcolormesh(lonr,latr,invar.T,vmin=0,vmax=1500,cmap=cmap)
+cl = ax.contour(lonr,latr,invar.T,cint,colors="k",linewidths = .75)
+#cl = ax.contour(lonr,latr,invar.T,cint,colors="k",linewidths = 0.5)     
+ax.clabel(cl,fmt="%i",fontsize=9)
+#ax.add_feature(cfeature.LAND,color='k')
+#ax.set_title("$MLD_{max} - MLD_{min}$" + "\n 40-member Ensemble Average",fontsize=12)
+ax.set_title("$MLD_{max} - MLD_{min}$" + "\n %s"% mconfig,fontsize=12)
+
+plt.colorbar(pcm,ax=ax,orientation='horizontal',fraction=0.040, pad=0.10)
+plt.savefig(outpath+"MLD_Max.png",dpi=200)
+
 
 #%% Mini MLD Map (maximum)
 invar = hclim.max(2)
@@ -538,3 +576,10 @@ ax[1].set_title("Mixed Layer Depth (m)")
 ax[1].legend()
 
 plt.show()
+
+
+
+
+
+#%%
+
