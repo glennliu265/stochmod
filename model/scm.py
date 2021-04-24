@@ -204,7 +204,7 @@ def make_naoforcing(NAOF,randts,fscale,nyr):
             
     return F,Fseas
 
-def set_stochparams(h,damping,dt,ND=True,rho=1000,cp0=4218,hfix=50,usemax=False):
+def set_stochparams(h,damping,dt,ND=True,rho=1000,cp0=4218,hfix=50,usemax=False,hmean=None):
     """
     Given MLD and Heat Flux Feedback, Calculate Parameters
     
@@ -245,15 +245,17 @@ def set_stochparams(h,damping,dt,ND=True,rho=1000,cp0=4218,hfix=50,usemax=False)
         hmax = hmax[:,:,None]
         
         ## Find Mean MLD during the year
-        hmean = np.nanmean(h,axis=2)
-        hmean = hmean[:,:,None]
+        if hmean is None:
+            hmean = np.nanmean(h,axis=2)
+            hmean = hmean[:,:,None]
         
     else:
         beta = np.log( h / np.roll(h,1,axis=0) )
         
         # Find Maximum MLD during the year
         hmax = np.nanmax(np.abs(h))
-        hmean = np.nanmean(h)
+        if hmean is None:
+            hmean = np.nanmean(h)
     
     
     # Set non-entraining months to zero

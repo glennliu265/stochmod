@@ -183,6 +183,10 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     mld         = np.load(input_path+"FULL_PIC_HMXL_hclim.npy") # Climatological MLD
     kprevall    = np.load(input_path+"FULL_PIC_HMXL_kprev.npy") # Entraining Month
     
+    # Load MLD from SLAB run
+    hblt     = np.load(input_path+"SLAB_PIC_hblt.npy")
+    
+    
     # ------------------
     # %% Restrict to region --------------------------------------------------
     # ------------------
@@ -191,6 +195,8 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     dampingr,lonr,latr = proc.sel_region(damping,LON,LAT,bboxsim)
     hclim,_,_ = proc.sel_region(mld,LON,LAT,bboxsim)
     kprev,_,_ = proc.sel_region(kprevall,LON,LAT,bboxsim)
+    hbltr,_,_ = proc.sel_region(hblt,LON,LAT,bboxsim)
+    hbltr = hbltr.mean(2) # Take mean along month dimensions
     
     # Get lat and long sizes
     lonsize = lonr.shape[0]
@@ -210,8 +216,6 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
             # [lon x lat x mon]
             NAO1 = np.load(input_path+mconfig+"_NHFLXSTD_Forcing_Mon.npy")
             
-            
-        
         # # Load Longitude for processing
         # lon360 =  np.load(datpath+"CESM_lon360.npy")
         if funiform == 2: # Load (NAO-NHFLX)_DJFM Forcing
@@ -307,8 +311,9 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
                 NAOF[i]  = NAO1[:,:,0,...].copy() # NAO Forcing
                 NAOF1[i] = NAO1[:,:,1,...].copy() # EAP Forcing
             else:
+
                 NAOF[i] = NAO1.copy()
-            
+        
     else: # Apply seasonal MLD cycle and convert
         
         if funiform >= 6: # Separately convert NAO and EAP forcing
@@ -330,7 +335,7 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     # %% Set-up damping parameters
     # ----------------------------
     
-    lbd,lbd_entr,FAC,beta = scm.set_stochparams(hclim,dampingr,dt,ND=1,rho=rho,cp0=cp0,hfix=hfix)
+    lbd,lbd_entr,FAC,beta = scm.set_stochparams(hclim,dampingr,dt,ND=1,rho=rho,cp0=cp0,hfix=hfix,hmean=hbltr[:,:,None])
     
     """
     Out Format:
@@ -435,6 +440,7 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
         kpreva   = kprev[ko,ka,:]
         lbd_entr = lbd_entr[ko,ka,:]
         beta     = beta[ko,ka,:]
+        hblta = hbltr[ko,ka]
         #naoa     = NAO1[ko,ka,...]
         
         # Select forcing at point
@@ -465,6 +471,7 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
         hclima    = np.nanmean(hclim,(0,1))    # Take lon,lat mean, ignoring nans
         kpreva    = scm.find_kprev(hclima)[0]  # Recalculate entrainment month
         dampinga  = np.nanmean(dampingr,(0,1)) # Repeat for damping
+        hblta = np.nanmean(hbltr,(0,1)) # Repeat for slab mld
         #naoa      = np.nanmean(NAO1,(0,1))     # Repeat for nao forcing
         
         # Get regionally averaged forcing based on mld config
@@ -490,7 +497,7 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
 
         
         # Convert units
-        lbd,lbd_entr,FAC,beta = scm.set_stochparams(hclima,dampinga,dt,ND=0,rho=rho,cp0=cp0,hfix=hfix)
+        lbd,lbd_entr,FAC,beta = scm.set_stochparams(hclima,dampinga,dt,ND=0,rho=rho,cp0=cp0,hfix=hfix,hmean=hblta)
     
     
     """
