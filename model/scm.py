@@ -391,7 +391,7 @@ def find_kprev(h,debug=False):
 
 
 
-def convert_NAO(hclim,naopattern,dt,rho=1000,cp0=4218,hfix=50,usemax=False):
+def convert_NAO(hclim,naopattern,dt,rho=1000,cp0=4218,hfix=50,usemax=False,hmean=None):
     """
     Convert NAO forcing pattern [naopattern] from (W/m2) to (degC/S) 
     given seasonal MLD (hclim)
@@ -404,6 +404,7 @@ def convert_NAO(hclim,naopattern,dt,rho=1000,cp0=4218,hfix=50,usemax=False):
         5) cp0                   - Specific Heat of water [J/(K*kg)]
         6) hfix                  - Fixed Mixed layer Depth
         7) usemax (optional)     - Set to True to use max seasonal MLD
+        8) hmean (optional) [3-d array] - MLD vaue to use
     Output:
         1) NAOF [dict]    - Dictionary of arrays [lon x lat x mon], where 
             0 = fixed MLD
@@ -419,9 +420,16 @@ def convert_NAO(hclim,naopattern,dt,rho=1000,cp0=4218,hfix=50,usemax=False):
     # Set up MLD[lon x lat x mon x hvarmode]
     mld = np.ones((patshape[0],patshape[1],12,3))
     mld[:,:,:,0]  *= hfix # Fixed MLD
-    mld[:,:,:,1]  = np.tile(hclim.mean(2)[:,:,None],12) # Mean MLD
-    if usemax:
-        mld[:,:,:,1]  = np.tile(hclim.max(2)[:,:,None],12) # Max MLD
+    
+
+    if hmean is None:
+        mld[:,:,:,1]  = np.tile(hclim.mean(2)[:,:,None],12) # Mean MLD
+        if usemax:
+            mld[:,:,:,1]  = np.tile(hclim.max(2)[:,:,None],12) # Max MLD
+    else:
+        mld[:,:,:,1]  = np.tile(hmean,12) # Mean MLD
+        
+        
     mld[:,:,:,2]  = hclim.copy() # Clim MLD
     
     # Convert NAO to correct units...

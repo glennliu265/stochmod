@@ -317,11 +317,11 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
     else: # Apply seasonal MLD cycle and convert
         
         if funiform >= 6: # Separately convert NAO and EAP forcing
-            NAOF  = scm.convert_NAO(hclim,NAO1[:,:,0],dt,rho=rho,cp0=cp0,hfix=hfix) # NAO Forcing
-            NAOF1 = scm.convert_NAO(hclim,NAO1[:,:,1],dt,rho=rho,cp0=cp0,hfix=hfix) # EAP Forcing
+            NAOF  = scm.convert_NAO(hclim,NAO1[:,:,0],dt,rho=rho,cp0=cp0,hfix=hfix,hmean=hbltr[:,;,None]) # NAO Forcing
+            NAOF1 = scm.convert_NAO(hclim,NAO1[:,:,1],dt,rho=rho,cp0=cp0,hfix=hfix,hmean=hbltr[:,;,None]) # EAP Forcing
     
         else:
-            NAOF = scm.convert_NAO(hclim,NAO1,dt,rho=rho,cp0=cp0,hfix=hfix)
+            NAOF = scm.convert_NAO(hclim,NAO1,dt,rho=rho,cp0=cp0,hfix=hfix,hmean=hbltr[:,;,None])
 
     # Out: Dict. (keys 0-2) with [lon x lat x mon]
     """     
