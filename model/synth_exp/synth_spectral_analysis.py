@@ -436,53 +436,130 @@ Fptdef = Fpt.copy()
 
 sstall = sst
 # --------------------
-#%% Calculate Spectra
+#%% Autocorrelation Plot with Confidence Intervals
 # --------------------
+conf  =0.95
+tails = 2
+
+def calc_conflag(ac,conf,tails,n):
+    cflags = np.zeros((len(ac),2))
+    for l in range(len(ac)):
+        rhoin = ac[l]
+        cfout = proc.calc_pearsonconf(rhoin,conf,tails,n)
+        cflags[l,:] = cfout
+    return cflags
+
+
+
+
+nlags   = len(lags)
+cfstoch = np.zeros([4,nlags,2])
+for m in range(4):
+    inac = ac[m]
+    n = int(len(sst[m])/12)
+    cfs = calc_conflag(inac,conf,tails,n)
+    cfstoch[m,:,:] = cfs
+cfslab = calc_conflag(cesmauto2,conf,tails,898)
+cffull = calc_conflag(fullauto,conf,tails,1798)
+
+fig,ax     = plt.subplots(1,1)
+title      = "SST Autocorrelation %s \n (Lag 0 = %s)" % (locstringtitle,mons3[mldpt.argmax()])
+ax,ax2 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title)
+ax.plot(lags,cesmauto2[lags],label="CESM SLAB",color='k')
+ax.fill_between(lags,cfslab[lags,0],cfslab[lags,1],color='k',alpha=0.10)
+
+ax.plot(lags,fullauto,color='k',label='CESM Full',ls='dashdot')
+ax.fill_between(lags,cffull[lags,0],cffull[lags,1],color='k',alpha=0.10)
+
+for i in range(1,4):
+    ax.plot(lags,ac[i],label=labels[i],color=expcolors[i])
+    ax.fill_between(lags,cfstoch[i,:,0],cfstoch[i,:,1],color=expcolors[i],alpha=0.25)
+
+ax.legend()
+ax3.set_ylabel("Mixed Layer Depth (m)")
+ax3.yaxis.label.set_color('gray')
+ax.legend(fontsize=8)
+plt.tight_layout()
+plt.savefig(outpath+"Default_Autocorrelation_CF_%s.png"%locstring,dpi=200)
+
+# Save Default Values
+dampdef = damppt.copy()
+mlddef = mldpt.copy()
+Fptdef = Fpt.copy()
 
 #% ----------------------
-#%% Do spectral analysis
+#%% Prepare to Do spectral analysis
 #% ------------------------
 
 # Parameters
 pct     = 0.10
-nsmooth = 200
+nsmooth = 100
 opt     = 1
 dt      = 3600*24*30
 tunit   = "Months"
 clvl    = [0.95]
 axopt   = 3
 clopt   = 1
+specnames = "nsmooth%i_taper%i" % (nsmooth,pct*100)
 
+# # -------------------------------------------
+# # First calculate for CESM1 (full and slab)
+# # -------------------------------------------
+# fullpic  = "FULL_PIC_SST_lon330_lat50.npy"
+# slabpic  = "SLAB_PIC_SST_lon330_lat50.npy"
+# cesmfull = np.load(datpath+fullpic)
+# cesmslab = np.load(datpath+slabpic)
+# freq1s,P1s,CLs = [],[],[]
+# for sstin in [cesmfull,cesmslab]:
+#     sps = ybx.yo_spec(sstin,opt,nsmooth,pct,debug=False)
+#     P,freq,dof,r1=sps
+    
+#     CC = ybx.yo_speccl(freq,P,dof,r1,clvl)
+#     #pps = ybx.yo_specplot(freq,P,dof,r1,tunit,dt=dt,clvl=clvl,axopt=axopt,clopt=clopt)
+    
+#     P    = P*dt
+#     freq = freq/dt
+#     CC   = CC*dt
+    
+#     P1s.append(P)
+#     freq1s.append(freq)
+#     CLs.append(CC)
+# Pcesmfull,Pcesmslab = P1s
+# freqcesmfull,freqcesmslab = freq1s
+# clfull,clslab = CLs
 
 # -------------------------------------------
-# First calculate for CESM1 (full and slab)
+# Load results from cesm slab
 # -------------------------------------------
-fullpic  = "FULL_PIC_SST_lon330_lat50.npy"
-slabpic  = "SLAB_PIC_SST_lon330_lat50.npy"
-cesmfull = np.load(datpath+fullpic)
-cesmslab = np.load(datpath+slabpic)
-freq1s,P1s,CLs = [],[],[]
-for sstin in [cesmfull,cesmslab]:
-    sps = ybx.yo_spec(sstin,opt,nsmooth,pct,debug=False)
-    P,freq,dof,r1=sps
-    
-    CC = ybx.yo_speccl(freq,P,dof,r1,clvl)
-    #pps = ybx.yo_specplot(freq,P,dof,r1,tunit,dt=dt,clvl=clvl,axopt=axopt,clopt=clopt)
-    
-    P    = P*dt
-    freq = freq/dt
-    CC   = CC*dt
-    
-    P1s.append(P)
-    freq1s.append(freq)
-    CLs.append(CC)
-Pcesmfull,Pcesmslab = P1s
-freqcesmfull,freqcesmslab = freq1s
-clfull,clslab = CLs
+ld = np.load("%s/model_output/CESM_PIC_Spectra_%s.npz"%(datpath,specnames),allow_pickle=True)
+Pcesmfulla    = ld['specfull']
+Pcesmslaba    = ld['specslab']
+freqcesmfulla = ld['freqfull']
+freqcesmslaba = ld['freqslab']
+
+
+# Retrieve Data For Point
+lonf = query[0]
+latf = query[1]
+klon360,klat   = proc.find_latlon(lonf+360,latf,lon360,lat) # Global, 360 lon
+
+Pcesmfull    = Pcesmfulla[:,klat,klon360]
+Pcesmslab    = Pcesmslaba[:,klat,klon360]
+freqcesmfull = freqcesmfulla[:,klat,klon360]
+freqcesmslab = freqcesmslaba[:,klat,klon360]
+
+
+# -------------
+# Location Plot
+# -------------
+fig, ax= plt.subplots(1,1)
+ax.pcolormesh(lon360,lat,Pcesmfulla[0,:,:])
+ax.scatter(lonf+360,latf,100,marker="x",color='r')
+
 
 
 # -----------------------------------------------------------------
-# Calculate and make individual plots for stochastic model output
+# %%Calculate and make individual plots for stochastic model output
 # -----------------------------------------------------------------
 nsmooth=nsmooth*10/2
 specparams  = []
@@ -499,16 +576,16 @@ for i in range(4):
     freqs.append(freq/dt)
     pps = ybx.yo_specplot(freq,P,dof,r1,tunit,dt=dt,clvl=clvl,axopt=axopt,clopt=clopt)
     splotparams.append(pps)
-        
+    fig,ax,h,hcl,htax,hleg = pps
     
     if i < 2:
         l1 =ax.semilogx(freqcesmslab,Pcesmslab*freqcesmslab,label="CESM-SLAB",color='gray',lw=0.75)
-        l2 =ax.semilogx(freqcesmslab,clslab[:,0]*freqcesmslab,label="CESM-SLAB (AR1)",color='red',lw=0.75,alpha=0.4)
-        l3 =ax.semilogx(freqcesmslab,clslab[:,1]*freqcesmslab,label="CESM-SLAB (95%)",color='blue',lw=0.75,alpha=0.4)
+        #l2 =ax.semilogx(freqcesmslab,clslab[:,0]*freqcesmslab,label="CESM-SLAB (AR1)",color='red',lw=0.75,alpha=0.4)
+        #l3 =ax.semilogx(freqcesmslab,clslab[:,1]*freqcesmslab,label="CESM-SLAB (95%)",color='blue',lw=0.75,alpha=0.4)
     else:
         l1 =ax.semilogx(freqcesmfull,Pcesmfull*freqcesmfull,label="CESM-FULL",color='gray',lw=0.75)
-        l2 =ax.semilogx(freqcesmfull,clfull[:,0]*freqcesmfull,label="CESM-FULL (AR1)",color='red',lw=0.75,alpha=0.4)
-        l3 =ax.semilogx(freqcesmfull,clfull[:,1]*freqcesmfull,label="CESM-FULL (95%)",color='blue',lw=0.75,alpha=0.4)
+        #l2 =ax.semilogx(freqcesmfull,clfull[:,0]*freqcesmfull,label="CESM-FULL (AR1)",color='red',lw=0.75,alpha=0.4)
+        #l3 =ax.semilogx(freqcesmfull,clfull[:,1]*freqcesmfull,label="CESM-FULL (95%)",color='blue',lw=0.75,alpha=0.4)
 
     if axopt != 1:
         #dt = 12*365*3600
@@ -640,7 +717,7 @@ for vv in vlv:
 ax.set_ylabel(r"Frequency x Power $(^{\circ}C)^{2}$",fontsize=13)
 ax.set_title("Power Spectrum \n" + "nsmooth=%i, taper=%.2f" % (nsmooth,pct))
 plt.tight_layout()
-plt.savefig("%sPowerSpectra_%s_nsmooth%i_pct%03d_axopt%i.png"%(outpath,'COMPARISON',nsmooth,pct*100,axopt),dpi=200)
+plt.savefig("%sPowerSpectra_%s_nsmooth%i_pct%03d_axopt%i_%s.png"%(outpath,'COMPARISON',nsmooth,pct*100,axopt,locstring),dpi=200)
 
 
 # --------------------------------------------------
