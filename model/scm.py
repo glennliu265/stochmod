@@ -248,6 +248,8 @@ def set_stochparams(h,damping,dt,ND=True,rho=1000,cp0=4218,hfix=50,usemax=False,
         if hmean is None:
             hmean = np.nanmean(h,axis=2)
             hmean = hmean[:,:,None]
+        else:
+            print("Using Slab MLD %f = 54.61" % hmean[56,74])
         
     else:
         beta = np.log( h / np.roll(h,1,axis=0) )
@@ -427,9 +429,9 @@ def convert_NAO(hclim,naopattern,dt,rho=1000,cp0=4218,hfix=50,usemax=False,hmean
         if usemax:
             mld[:,:,:,1]  = np.tile(hclim.max(2)[:,:,None],12) # Max MLD
     else:
-        mld[:,:,:,1]  = np.tile(hmean,12) # Mean MLD
-        
-        
+        mld[:,:,:,1]  = np.tile(hmean,12) # Mean MLD (Slab)
+        print("Using Slab MLD %f = 54.61" % mld[56,74,0,1])
+    
     mld[:,:,:,2]  = hclim.copy() # Clim MLD
     
     # Convert NAO to correct units...
