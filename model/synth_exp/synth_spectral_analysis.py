@@ -38,7 +38,9 @@ outpath = projpath + '02_Figures/20210424/'
 
 # Load in control data for 50N 30W
 #fullauto =np.load(datpath+"Autocorrelation_30W50N_FULL_PIC_12805.npy",allow_pickle=True)
-fullauto = np.load(datpath+"FULL_PIC_autocorr_lon330_lat50_lags0to36_month2.npy")
+#fullauto = np.load(datpath+"FULL_PIC_autocorr_lon330_lat50_lags0to36_month2.npy")
+fullauto = np.load(datpath+"CESM_clim/TS_FULL_Autocorrelation.npy")
+
 
 mons3=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
 labels=["MLD Fixed","MLD Mean","MLD Seasonal","MLD Entrain"]
@@ -410,6 +412,7 @@ _,_,lon,lat,lon360,cesmslabac,damping,_,_ = load_data(mconfig,ftype)
 ko,ka     = proc.find_latlon(query[0]+360,query[1],lon360,lat)
 cesmauto2 = cesmslabac[kmonth,:,ka,ko]
 cesmauto  = cesmauto2[lags]
+cesmautofull = fullauto[kmonth,lags,ka,ko]
 
 # Plot some differences
 xtk2       = np.arange(0,37,2)
@@ -417,7 +420,7 @@ fig,ax     = plt.subplots(1,1)
 title      = "SST Autocorrelation at %s (Lag 0 = %s)" % (locstringtitle,mons3[mldpt.argmax()])
 ax,ax2,ax3 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,loopvar=params[2],title=title)
 ax.plot(lags,cesmauto2[lags],label="CESM SLAB",color='k')
-ax.plot(lags,fullauto,color='k',label='CESM Full',ls='dashdot')
+ax.plot(lags,cesmautofull,color='k',label='CESM Full',ls='dashdot')
 
 for i in range(1,4):
     ax.plot(lags,ac[i],label=labels[i],color=expcolors[i])
@@ -460,15 +463,15 @@ for m in range(4):
     cfs = calc_conflag(inac,conf,tails,n)
     cfstoch[m,:,:] = cfs
 cfslab = calc_conflag(cesmauto2,conf,tails,898)
-cffull = calc_conflag(fullauto,conf,tails,1798)
+cffull = calc_conflag(cesmautofull,conf,tails,1798)
 
 fig,ax     = plt.subplots(1,1)
-title      = "SST Autocorrelation %s \n (Lag 0 = %s)" % (locstringtitle,mons3[mldpt.argmax()])
+title      = "SST Autocorrelation (%s) \n Lag 0 = %s" % (locstringtitle,mons3[mldpt.argmax()])
 ax,ax2 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title)
 ax.plot(lags,cesmauto2[lags],label="CESM SLAB",color='k')
 ax.fill_between(lags,cfslab[lags,0],cfslab[lags,1],color='k',alpha=0.10)
 
-ax.plot(lags,fullauto,color='k',label='CESM Full',ls='dashdot')
+ax.plot(lags,cesmautofull,color='k',label='CESM Full',ls='dashdot')
 ax.fill_between(lags,cffull[lags,0],cffull[lags,1],color='k',alpha=0.10)
 
 for i in range(1,4):
@@ -529,7 +532,7 @@ specnames = "nsmooth%i_taper%i" % (nsmooth,pct*100)
 # clfull,clslab = CLs
 
 # -------------------------------------------
-# Load results from cesm slab
+#%% Load results from cesm slab
 # -------------------------------------------
 ld = np.load("%s/model_output/CESM_PIC_Spectra_%s.npz"%(datpath,specnames),allow_pickle=True)
 Pcesmfulla    = ld['specfull']
@@ -541,7 +544,9 @@ freqcesmslaba = ld['freqslab']
 # Retrieve Data For Point
 lonf = query[0]
 latf = query[1]
-klon360,klat   = proc.find_latlon(lonf+360,latf,lon360,lat) # Global, 360 lon
+if lonf < 0:
+    lonf += 360
+klon360,klat   = proc.find_latlon(lonf,latf,lon360,lat) # Global, 360 lon
 
 Pcesmfull    = Pcesmfulla[:,klat,klon360]
 Pcesmslab    = Pcesmslaba[:,klat,klon360]
@@ -554,7 +559,7 @@ freqcesmslab = freqcesmslaba[:,klat,klon360]
 # -------------
 fig, ax= plt.subplots(1,1)
 ax.pcolormesh(lon360,lat,Pcesmfulla[0,:,:])
-ax.scatter(lonf+360,latf,100,marker="x",color='r')
+ax.scatter(lonf,latf,100,marker="x",color='r')
 
 
 
@@ -606,63 +611,63 @@ for i in range(4):
     ax.set_ylabel(r"Frequency x Power $(^{\circ}C)^{2}$",fontsize=13)
     ax.set_title("Power Spectrum for %s" % labels[i] + "\n" + "nsmooth=%i, taper=%.2f" % (nsmooth,pct))
     plt.tight_layout()
-    plt.savefig("%sPowerSpectra_%s_nsmooth%i_pct%03d_axopt%i.png"%(outpath,labels[i],nsmooth,pct*100,axopt),dpi=200)
+    plt.savefig("%sPowerSpectra_%s_nsmooth%i_pct%03d_axopt%i_%s.png"%(outpath,labels[i],nsmooth,pct*100,axopt,locstring),dpi=200)
 
 #%% Plot spectra for SST from PIC
 
-fullpic  = "FULL_PIC_SST_lon330_lat50.npy"
-slabpic  = "SLAB_PIC_SST_lon330_lat50.npy"
-cesmfull = np.load(datpath+fullpic)
-cesmslab = np.load(datpath+slabpic)
+# fullpic  = "FULL_PIC_SST_lon330_lat50.npy"
+# slabpic  = "SLAB_PIC_SST_lon330_lat50.npy"
+# cesmfull = np.load(datpath+fullpic)
+# cesmslab = np.load(datpath+slabpic)
 
 
 
-sstin = cesmfull
-sps = ybx.yo_spec(sstin,opt,nsmooth,pct,debug=False)
-P,freq,dof,r1=sps
-pps = ybx.yo_specplot(freq,P,dof,r1,tunit,dt=dt,clvl=clvl,axopt=axopt,clopt=clopt)
-splotparams.append(pps)
-fig,ax,h,hcl,htax,hleg = pps
+# sstin = cesmfull
+# sps = ybx.yo_spec(sstin,opt,nsmooth,pct,debug=False)
+# P,freq,dof,r1=sps
+# pps = ybx.yo_specplot(freq,P,dof,r1,tunit,dt=dt,clvl=clvl,axopt=axopt,clopt=clopt)
+# splotparams.append(pps)
+# fig,ax,h,hcl,htax,hleg = pps
 
-def set_monthlyspec(ax,htax):
+# def set_monthlyspec(ax,htax):
     
-    # Divisions of time
-    # dt  = 3600*24*30
-    # fs  = dt*12
-    # xtk      = np.array([1/fs/100,1/fs/50, 1/fs/25, 1/fs/10 , 1/fs/5, 1/fs])
-    # xtkm    = ["%i" % np.round(i) for i in 1/xtk/dt]
-    # xtklabel = ['%.1e \n (century)'%xtk[0],'%.1e \n (50yr)'%xtk[1],'%.1e \n (25yr)'%xtk[2],'%.1e \n (decade)'%xtk[3],'%.1e \n (5year)'%xtk[4],'%.2e \n (year)'%xtk[5]]
+#     # Divisions of time
+#     # dt  = 3600*24*30
+#     # fs  = dt*12
+#     # xtk      = np.array([1/fs/100,1/fs/50, 1/fs/25, 1/fs/10 , 1/fs/5, 1/fs])
+#     # xtkm    = ["%i" % np.round(i) for i in 1/xtk/dt]
+#     # xtklabel = ['%.1e \n (century)'%xtk[0],'%.1e \n (50yr)'%xtk[1],'%.1e \n (25yr)'%xtk[2],'%.1e \n (decade)'%xtk[3],'%.1e \n (5year)'%xtk[4],'%.2e \n (year)'%xtk[5]]
     
-    # Orders of 10
-    dt = 3600*24*30
-    fs = dt*3
-    xtk      = np.array([1/(fs*10**-p) for p in np.arange(-11+7,-6+7,1)])
-    xtkm     = ["%.1f"% s for s in np.round(1/xtk/dt)]
-    xtkl     = ["%.1e" % s for s in xtk]
-    for i,a in enumerate([ax,htax]):
+#     # Orders of 10
+#     dt = 3600*24*30
+#     fs = dt*3
+#     xtk      = np.array([1/(fs*10**-p) for p in np.arange(-11+7,-6+7,1)])
+#     xtkm     = ["%.1f"% s for s in np.round(1/xtk/dt)]
+#     xtkl     = ["%.1e" % s for s in xtk]
+#     for i,a in enumerate([ax,htax]):
         
-        a.set_xticks(xtk)
-        if i == 0:
+#         a.set_xticks(xtk)
+#         if i == 0:
             
-            a.set_xticklabels(xtkl)
-        else:
-            a.set_xticklabels(xtkm)
-    return ax,htax
-if axopt != 1:
-    ax,htax = set_monthlyspec(ax,htax)
+#             a.set_xticklabels(xtkl)
+#         else:
+#             a.set_xticklabels(xtkm)
+#     return ax,htax
+# if axopt != 1:
+#     ax,htax = set_monthlyspec(ax,htax)
 
-#xt
-vlv = [1/(100*12*dt),1/(12*10*dt),1/(12*dt)]
-vll = ["Century","Decade","Year"]
-for vv in vlv:
-    ax.axvline(vv,color='k',ls='dashed',label=vll,lw=0.75)
+# #xt
+# vlv = [1/(100*12*dt),1/(12*10*dt),1/(12*dt)]
+# vll = ["Century","Decade","Year"]
+# for vv in vlv:
+#     ax.axvline(vv,color='k',ls='dashed',label=vll,lw=0.75)
 
 
-ax.set_xlabel("Frequency (cycles/sec)",fontsize=13)
-ax.set_ylabel(r"Frequency x Power $(^{\circ}C)^{2}$",fontsize=13)
-ax.set_title("Power Spectrum for %s" % labels[i] + "\n" + "nsmooth=%i, taper=%.2f" % (nsmooth,pct))
-plt.tight_layout()
-plt.savefig("%sPowerSpectra_%s_nsmooth%i_pct%03d_axopt%i.png"%(outpath,'CESM_FULL',nsmooth,pct*100,axopt),dpi=200)
+# ax.set_xlabel("Frequency (cycles/sec)",fontsize=13)
+# ax.set_ylabel(r"Frequency x Power $(^{\circ}C)^{2}$",fontsize=13)
+# ax.set_title("Power Spectrum for %s" % labels[i] + "\n" + "nsmooth=%i, taper=%.2f" % (nsmooth,pct))
+# plt.tight_layout()
+# plt.savefig("%sPowerSpectra_%s_nsmooth%i_pct%03d_axopt%i.png"%(outpath,'CESM_FULL',nsmooth,pct*100,axopt),dpi=200)
 
 #%% Plot all experiments together
 
@@ -715,7 +720,7 @@ for vv in vlv:
 
 #ax.set_xlabel("Frequency (cycles/sec)",fontsize=13)
 ax.set_ylabel(r"Frequency x Power $(^{\circ}C)^{2}$",fontsize=13)
-ax.set_title("Power Spectrum \n" + "nsmooth=%i, taper=%.2f" % (nsmooth,pct))
+ax.set_title("Power Spectrum at %s \n" % (locstringtitle) + "nsmooth=%i, taper=%.2f" % (nsmooth,pct))
 plt.tight_layout()
 plt.savefig("%sPowerSpectra_%s_nsmooth%i_pct%03d_axopt%i_%s.png"%(outpath,'COMPARISON',nsmooth,pct*100,axopt,locstring),dpi=200)
 
