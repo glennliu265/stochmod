@@ -34,7 +34,7 @@ projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 datpath     = projpath + '01_Data/'
 input_path  = datpath + 'model_input/'
 output_path = datpath + 'model_output/'
-outpath = projpath + '02_Figures/20210330/'
+outpath = projpath + '02_Figures/20210424/'
 
 # Load in control data for 50N 30W
 #fullauto =np.load(datpath+"Autocorrelation_30W50N_FULL_PIC_12805.npy",allow_pickle=True)
@@ -234,7 +234,7 @@ def synth_stochmod(config,verbose=False,viz=False,
                 Fh[h] = randts * np.tile(Fpt/mldpt,nyrs) * (dt/(cp0*rho))
     
     # Convert Parameters
-    lbd,lbd_entr,FAC,beta = scm.set_stochparams(mldpt,damppt,dt,ND=False,hfix=hfix)
+    lbd,lbd_entr,FAC,beta = scm.set_stochparams(mldpt,damppt,dt,ND=False,hfix=hfix,hmean=mldmean)
     if verbose:
         print("Completed parameter setup!")
     
@@ -499,7 +499,7 @@ for i in range(4):
     freqs.append(freq/dt)
     pps = ybx.yo_specplot(freq,P,dof,r1,tunit,dt=dt,clvl=clvl,axopt=axopt,clopt=clopt)
     splotparams.append(pps)
-    fig,ax,h,hcl,htax,hleg = pps
+        
     
     if i < 2:
         l1 =ax.semilogx(freqcesmslab,Pcesmslab*freqcesmslab,label="CESM-SLAB",color='gray',lw=0.75)
@@ -514,7 +514,7 @@ for i in range(4):
         #dt = 12*365*3600
         dtin = 3600*24*365
         #ax,htax=make_axtime(ax,htax,dt)
-        ax,htax=make_axtime(ax,htax,dtin)
+        ax,htax=make_axtime(ax,htax)
     
     #ax.semilogx(freqcesmfull,freqcesmfull*Pcesmfull,'gray',label="CESM-FULL")
     #vlv = [1/(100*dt*12),1/(10*12*dt),1/(12*dt)]
@@ -537,6 +537,7 @@ fullpic  = "FULL_PIC_SST_lon330_lat50.npy"
 slabpic  = "SLAB_PIC_SST_lon330_lat50.npy"
 cesmfull = np.load(datpath+fullpic)
 cesmslab = np.load(datpath+slabpic)
+
 
 
 sstin = cesmfull
