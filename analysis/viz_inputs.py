@@ -80,7 +80,7 @@ latN = 90
 projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath = projpath + '03_Scripts/stochmod/'
 datpath    = projpath + '01_Data/'
-outpath    = projpath + '02_Figures/20210420/'
+outpath    = projpath + '02_Figures/20210424/'
 
 # Set input path
 input_path  = datpath + 'model_input/'
@@ -118,6 +118,9 @@ if "PIC" in mconfig:
 else: # Load Historical
     mld         = np.load(input_path+"HMXL_hclim.npy") # Climatological MLD
     kprevall    = np.load(input_path+"HMXL_kprev.npy") # Entraining Month
+
+# Load Slab Mixed Layer Depths
+
 
 # Save Options are here
 saveforcing = 0 # Save Forcing for each point
