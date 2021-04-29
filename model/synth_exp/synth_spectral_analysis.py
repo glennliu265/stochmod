@@ -47,8 +47,9 @@ labels=["MLD Fixed","MLD Mean","MLD Seasonal","MLD Entrain"]
 #labels=["MLD (MAX)","MLD Seasonal","MLD Entrain"]
 #colors=["red","orange","magenta","blue"]
 expcolors = ('blue','orange','magenta','red')
-hblt = 54.61088498433431 # Meters, the mixed layer depth used in CESM Slab
+#hblt = 54.61088498433431 # Meters, the mixed layer depth used in CESM Slab
 
+# Set up Configuration
 config = {}
 config['mconfig']     = "SLAB_PIC" # Model Configuration
 config['ftype']       = "DJFM-MON" # Forcing Type
@@ -58,7 +59,7 @@ config['t_end']       = 120000    # Number of months in simulation
 config['runid']       = "syn001"  # White Noise ID
 config['fname']       = "FLXSTD" #['NAO','EAP,'EOF3','FLXSTD']
 config['pointmode']   = 1
-config['query']       = [-30,50]
+config['query']       = [-45,15]
 config['applyfac']    = 2 # Apply Integration Factor and MLD to forcing
 config['lags']        = np.arange(0,37,1)
 config['output_path'] = projpath + '02_Figures/20210223/'
@@ -402,17 +403,17 @@ locstringtitle = "Lon: %.1f Lat: %.1f" % (query[0],query[1])
 
 # Run Model
 #config['Fpt'] = np.roll(Fpt,1)
-ac,sst,dmp,frc,ent,Td,kmonth,params=synth_stochmod(config)
+ac,sst,dmp,frc,ent,Td,kmonth,params=scm.synth_stochmod(config,projpath=projpath)
 [o,a],damppt,mldpt,kprev,Fpt       =params
 
 # Read in CESM autocorrelation for all points'
 kmonth = np.argmax(mldpt)
 print("Kmonth is %i"%kmonth)
-_,_,lon,lat,lon360,cesmslabac,damping,_,_ = load_data(mconfig,ftype)
+_,_,lon,lat,lon360,cesmslabac,damping,_,_ = scm.load_data(mconfig,ftype)
 ko,ka     = proc.find_latlon(query[0]+360,query[1],lon360,lat)
 cesmauto2 = cesmslabac[kmonth,:,ka,ko]
 cesmauto  = cesmauto2[lags]
-cesmautofull = fullauto[kmonth,lags,ka,ko]
+cesmautofull = fullauto[kmonth,lags,ko,ka]
 
 # Plot some differences
 xtk2       = np.arange(0,37,2)
@@ -467,7 +468,8 @@ cffull = calc_conflag(cesmautofull,conf,tails,1798)
 
 fig,ax     = plt.subplots(1,1)
 title      = "SST Autocorrelation (%s) \n Lag 0 = %s" % (locstringtitle,mons3[mldpt.argmax()])
-ax,ax2 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title)
+#ax,ax2,ax3 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title,loopvar=damppt)
+ax,ax2= viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title)
 ax.plot(lags,cesmauto2[lags],label="CESM SLAB",color='k')
 ax.fill_between(lags,cfslab[lags,0],cfslab[lags,1],color='k',alpha=0.10)
 
@@ -479,8 +481,8 @@ for i in range(1,4):
     ax.fill_between(lags,cfstoch[i,:,0],cfstoch[i,:,1],color=expcolors[i],alpha=0.25)
 
 ax.legend()
-ax3.set_ylabel("Mixed Layer Depth (m)")
-ax3.yaxis.label.set_color('gray')
+#ax3.set_ylabel("Heat Flux Feedback ($W/m^{2}$)")
+#ax3.yaxis.label.set_color('gray')
 ax.legend(fontsize=8)
 plt.tight_layout()
 plt.savefig(outpath+"Default_Autocorrelation_CF_%s.png"%locstring,dpi=200)
@@ -489,6 +491,31 @@ plt.savefig(outpath+"Default_Autocorrelation_CF_%s.png"%locstring,dpi=200)
 dampdef = damppt.copy()
 mlddef = mldpt.copy()
 Fptdef = Fpt.copy()
+
+#
+# %% Plot Two Variables Together (Seasonal Cycle)
+#
+
+fig,ax = plt.subplots(1,1,figsize=(6,2))
+
+ax.plot(mons3,mldpt,color='b')
+ax.set_ylabel("Mixed-Layer Depth ($m$)")
+ax.yaxis.label.set_color('b')
+ax.set_xlim([0,11])
+
+ax2 = ax.twinx()
+ax2.plot(mons3,Fpt,color='r')
+ax2.yaxis.label.set_color('r')
+ax2.plot(mons3,damppt,color='gray',ls='dashed',label="$\lambda_a \, (W/m^{2})$")
+ax2.legend()
+ax2.set_ylabel("Forcing ($1\sigma,\,W/m^{2}$)")
+ax2.set_xlim([0,11])
+ax.grid(True,ls='dotted')
+
+ax.set_title("Seasonal Cycle at %s"%locstringtitle)
+plt.tight_layout()
+plt.savefig(outpath+"Scycle_MLD_Forcing_%s.png"%locstring,dpi=150)
+
 
 #% ----------------------
 #%% Prepare to Do spectral analysis

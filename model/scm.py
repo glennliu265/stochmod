@@ -1090,4 +1090,218 @@ def calc_autocorr(sst,lags,basemonth):
         autocorr[model] = proc.calc_lagcovar(tsmodel2,tsmodel2,lags,basemonth,1)
     return autocorr
 
+#%% Synthetic Stochastic Model Wrapper
+
+def load_data(mconfig,ftype,projpath=None):
+    
+    """
+    Inputs
+    ------
+    mconfig : STR
+        Model Configuration (SLAB_PIC or FULL_HTR)
+    ftype : STR
+        Forcing Type ('DJFM-MON' or ... )
+    projpath : STR (optional)
+        Path to project folder (default uses path on laptop)
+    
+    Outputs
+    -------
+    mld : ARRAY 
+        Monhtly Mean Mixed Layer Depths
+    kprevall : ARRAY
+        Detrainment Months
+    lon : ARRAY
+        Longitudes (-180 to 180)
+    lat : ARRAY
+        Latitudes
+    lon360 : ARRAY
+        Longitudes (0 to 360)
+    cesmslabac : ARRAY
+        Autocorrelation at each point in the CESM Slab
+    damping : ARRAY
+        Monthly ensemble mean Heat flux feedback
+    forcing : ARRAY
+        Monthly forcing at each point (NAO, EAP, EOF3)
+    """
+    
+    # Set Paths
+    if projpath is None:
+        projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
+    datpath     = projpath + '01_Data/'
+    input_path  = datpath + 'model_input/'
+    
+    # Load Data (MLD and kprev) [lon x lat x month]
+    if mconfig == "FULL_HTR": # Load ensemble mean historical MLDs
+        mld            = np.load(input_path+"%s_HMXL_hclim.npy"% mconfig) # Climatological MLD
+        kprevall       = np.load(input_path+"%s_HMXL_kprev.npy"% mconfig) # Entraining Month
+    else: # Load PIC MLDs 
+        mld            = np.load(input_path+"FULL_PIC_HMXL_hclim.npy") # Climatological MLD
+        kprevall       = np.load(input_path+"FULL_PIC_HMXL_kprev.npy") # Entraining Month
+    
+    mld1kmean      = np.load(input_path+"FULL_PIC_HMXL_hclim_400to1400mean.npy") # Entraining Month
+    
+    # Load Lat/Lon, autocorrelation
+    dampmat        = 'ensavg_nhflxdamping_monwin3_sig020_dof082_mode4.mat'
+    loaddamp       = loadmat(input_path+dampmat)
+    lon            = np.squeeze(loaddamp['LON1'])
+    lat            = np.squeeze(loaddamp['LAT'])
+    cesmslabac     = np.load(datpath+"CESM_clim/TS_SLAB_Autocorrelation.npy") #[mon x lag x lat x lon]
+    lon360         = loadmat("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/CESM1_LATLON.mat")['LON'].squeeze()
+    
+    # Load damping [lon x lat x mon]
+    if mconfig == "SLAB_PIC":
+        damping = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig005_dof894_mode4.npy")
+    elif mconfig=="FULL_HTR":
+        damping = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig020_dof082_mode4.npy")
+    
+    # Load Forcing  [lon x lat x pc x month]
+    forcing = np.load(input_path+mconfig+ "_NAO_EAP_NHFLX_Forcing_%s.npy" % ftype)#[:,:,0,:]
+    
+    return mld,kprevall,lon,lat,lon360,cesmslabac,damping,forcing,mld1kmean
+
+def synth_stochmod(config,verbose=False,viz=False,
+                   dt=3600*24*30,rho=1026,cp0=3996,hfix=50,T0=0,projpath=None):
+    """
+    Parameters
+    ----------
+    config : DICT
+        'mconfig'
+        'ftype'
+        'genrand'
+        'fstd'
+        't_end'
+        'runid'
+        'fname'
+    dt : INT (optional)
+        Timestep in seconds (monthly timestep by default)
+        
+'output_path'        
+
+    Returns
+    -------
+    None.
+    """
+    
+    if projpath is None:
+        projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
+    datpath     = projpath + '01_Data/'
+    input_path  = datpath + 'model_input/'
+    output_path = datpath + 'model_output/'
+    
+    # Load data
+    # ---------
+    mld,kprevall,lon,lat,lon360,cesmslabac,damping,forcing,mld1kmean = load_data(config['mconfig'],config['ftype'])
+    hblt  = np.load(datpath+"SLAB_PIC_hblt.npy")
+    
+    if verbose:
+        print("Loaded Data")
+    
+    # Generate Random Forcing
+    # -----------------------
+    if config['genrand']:
+        randts = np.random.normal(0,config['fstd'],config['t_end'])
+        np.save(config['output_path'] + "Forcing_fstd%.2f_%s.npy"% (config['fstd'],config['runid']),randts)
+        if verbose:
+            print("Generating New Forcing")
+    else:
+        randts = np.load(output_path+"Forcing_fstd%.2f_%s.npy"% (config['fstd'],config['runid']))
+        if verbose:
+            print("Loading Old Forcing")
+    
+    # Select Forcing [lon x lat x mon]
+    if config['fname'] == 'NAO':
+        forcing = forcing[:,:,0,:]
+    elif config['fname'] == 'EAP':
+        forcing = forcing[:,:,1,:]
+    elif config['fname'] == 'EOF3':
+        forcing = forcing[:,:,2,:]
+    elif config['fname'] == 'FLXSTD':
+        forcing = np.load("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/SLAB_PIC_NHFLXSTD_Forcing_MON.npy")
+    
+    # Restrict input parameters to point (or regional average)
+    params = get_data(config['pointmode'],config['query'],lat,lon,
+                          damping,mld,kprevall,forcing)
+    [o,a],damppt,mldpt,kprev,Fpt = params
+    kmonth = mldpt.argmax()
+    print("Restricted Parameters to Point. Kmonth is %i"%kmonth)
+    
+    # Apply 3 month smoothing if option is set
+    if config['smooth_forcing'] == True:
+        Fpt = np.convolve(np.hstack([Fpt[-1],Fpt,Fpt[0]]),np.ones(3)/3,mode='valid')
+        #params[4] = Fpt
+    
+    # Check for synthetic points, and assign to variable if it exists
+    synthflag = []
+    if 'mldpt' in config:
+        mldpt = config['mldpt']
+        synthflag.append('mld')
+    if 'Fpt' in config:
+        Fpt = config['Fpt']
+        synthflag.append('forcing')
+    if 'damppt' in config:
+        damppt = config['damppt']
+        synthflag.append('damping')
+    if verbose:
+        print("Detected synthetic forcings for %s"%str(synthflag))
+    
+    if viz:
+        synth = [damppt,mldpt,Fpt]
+        fig,ax = viz.summarize_params(lat,lon,params,synth=synth)
+    
+    # Prepare forcing
+    mldmean = hblt[o,a,:].mean()
+    Fh = {}
+    nyrs = int(config['t_end']/12)
+    
+    if config['applyfac'] in [0,3]: # White Noise Forcing, unscaled by MLD
+        for h in range(3):
+            Fh[h] = randts * np.tile(Fpt,nyrs)
+    else: # White Noise Forcing + MLD
+        for h in range(3):
+            if h == 0: # Fixed 50 meter MLD
+                Fh[h] = randts * np.tile(Fpt,nyrs) * (dt/(cp0*rho*hfix))
+            elif h == 1: # Seasonal Mean MLD
+                Fh[h] = randts * np.tile(Fpt,nyrs) * (dt/(cp0*rho*mldmean))
+            elif h == 2: # Seasonall Varying mean MLD
+                Fh[h] = randts * np.tile(Fpt/mldpt,nyrs) * (dt/(cp0*rho))
+    
+    # Convert Parameters
+    lbd,lbd_entr,FAC,beta = set_stochparams(mldpt,damppt,dt,ND=False,hfix=hfix,hmean=mldmean)
+    if verbose:
+        print("Completed parameter setup!")
+    
+    # Run the stochastic model
+    multFAC = 0
+    if config['applyfac'] > 1: # Apply Integration factor
+        multFAC = 1
+    
+    
+    sst         = {}
+    dampingterm = {}
+    forcingterm = {}
+    for i in range(3): # No Entrainment Cases
+        sst[i],forcingterm[i],dampingterm[i] = noentrain(config['t_end'],lbd[i],T0,Fh[i],FAC[i],multFAC=multFAC,debug=True)
+    
+    sst[3],dampingterm[3],forcingterm[3],entrainterm,Td=entrain(config['t_end'],
+                       lbd[3],T0,Fh[2],
+                       beta,mldpt,kprev,
+                       FAC[3],multFAC=multFAC,
+                       debug=True,debugprint=False)
+    if verbose:
+        print("Model Runs Complete!")
+    
+    # Reassign Params
+    params = ([o,a],damppt,mldpt,kprev,Fpt)
+    
+    
+    ## Basically no effect, so commented out..
+    # #Detrend again to be sure
+    # for i in range(4):
+    #     sst[i] = signal.detrend(sst[i],type='linear')
+    
+    # Calculate Autocorrelation
+    autocorr = calc_autocorr(sst,config['lags'],kmonth+1)
+    if verbose:
+        print("Autocorrelation Calculations Complete!")
+    return autocorr,sst,dampingterm,forcingterm,entrainterm,Td,kmonth,params
 
