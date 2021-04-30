@@ -9,7 +9,7 @@ Created on Tue Jan 12 03:46:45 2021
 """
 
 import numpy as np
-from scipy.io import loadmat
+from scipy.io import loadmat,savemat
 import matplotlib.pyplot as plt
 import sys
 sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -299,6 +299,30 @@ def interp_quad(ts):
     return tsquad
     #ax.set_xticklabels()
     
+    
+    
+def adjust_axis(ax,htax,dt,multiple):
+    
+    # Divisions of time
+    # dt  = 3600*24*30
+    # fs  = dt*12
+    # xtk      = np.array([1/fs/100,1/fs/50, 1/fs/25, 1/fs/10 , 1/fs/5, 1/fs])
+    # xtkm    = ["%i" % np.round(i) for i in 1/xtk/dt]
+    # xtklabel = ['%.1e \n (century)'%xtk[0],'%.1e \n (50yr)'%xtk[1],'%.1e \n (25yr)'%xtk[2],'%.1e \n (decade)'%xtk[3],'%.1e \n (5year)'%xtk[4],'%.2e \n (year)'%xtk[5]]
+    
+    fs = dt*multiple
+    xtk      = np.array([1/(fs*10**-p) for p in np.arange(-11+7,-6+7,1)])
+    xtkm     = ["%.1f"% s for s in np.round(1/xtk/dt)]
+    xtkl     = ["%.1e" % s for s in xtk]
+    for i,a in enumerate([ax,htax]):
+        
+        a.set_xticks(xtk)
+        if i == 0:
+            
+            a.set_xticklabels(xtkl)
+        else:
+            a.set_xticklabels(xtkm)
+    return ax,htax
 #%% Clean Run
 
 #% Load some data into the local workspace for plotting
@@ -337,6 +361,8 @@ plt.tight_layout()
 plt.savefig(outpath+"Default_Autocorrelation.png",dpi=200)
 
 
+
+
 # --------------------------------------------------
 #%% Quick comparison plot of the autocorrelation
 # -------------------------------------------------
@@ -361,19 +387,34 @@ plt.savefig(outpath+"Compare_Autocorrelation_CESM.png",dpi=200)
 
 #%% Quick plot of the output
 
-fig,ax=plt.subplots(1,1,figsize=(6,2))
-for i in range(1,4):
-    ax.plot(sst[i],label=labels[i],color=expcolors[i],lw=0.5)
+fig,ax=plt.subplots(1,1,figsize=(8,3))
+
+for i in [1,2,3]:
+    
+    sstann = proc.ann_avg(sst[i],0)
+    
+    win = np.ones(12)/12
+    sstann = np.convolve(sstann,win,mode='valid')
+    
+    yrs = np.arange(0,sstann.shape[0])
+    
+    plabel = labels[i] + r", 1$\sigma=%.2f$" % np.std(sst[i])
+    ax.plot(sstann,label=plabel,lw=0.5,color=expcolors[i])
+    
     print("Std for %s is %.2f"%(labels[i],np.std(sst[i])))
 ax.legend(fontsize=8,ncol=3)
-
-
+ax.set_xlabel("Years")
+ax.set_ylabel("degC")
+ax.set_title("Stochastic Model SST (12-year Running Mean)")
+plt.tight_layout()
+plt.savefig("%sStochasticModelSST_comparison.png"%(outpath),dpi=150)
+# -------------------------
 #%% # Run some experiments
+# -------------------------
 
 testparam  = "smooth_forcing"
 testvalues = [False,True]
 testcolors = ['b','orange']
-
 
 acall     = []
 sstall    = []
@@ -418,6 +459,7 @@ config['smooth_forcing'] = False
 # %% Try different damping
 # -------------------------
 
+# Load data from prep_HF in hfdamping module
 from scipy.io import loadmat
 mt1 = loadmat(datpath+'model_input/'+"SLAB_PIC_nhflxdamping_monwin3_sig005_dof020_mode4_lag1.mat")
 lon1 = mt1['LON1'][0]
@@ -458,7 +500,7 @@ ax,ax2,ax3 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,loopvar=paramsall[1][4],titl
 ax.plot(lags,cesmauto2[lags],label="CESM SLAB",color='k')
 for i,val in enumerate(testvalues):
     ax.plot(acall[i][1],label="%s" % (testnames[i]),color=testcolors[i])
-ax3.set_ylabel("Forcing (W/m2)")
+ax3.set_ylabel("Dampiing (W/m2)")
 ax3.yaxis.label.set_color('gray')
 ax.legend(fontsize=8)
 plt.tight_layout()
@@ -470,10 +512,10 @@ for i in range(3):
     ax.plot(mons3,paramsall[i][1],label=testnames[i],color=testcolors[i])
 ax.legend()
 ax.grid(True,ls='dotted')
-ax.set_ylabel("Forcing (W/m2)")
-plt.savefig(outpath+"Forcing_Differences_%s_test%s.png"%(locstring,testparam),dpi=200)
-config['smooth_forcing'] = False
-
+ax.set_ylabel("Damping (W/m2)")
+plt.savefig(outpath+"Damping_Differences_%s_test%s.png"%(locstring,testparam),dpi=200)
+config['damppt'] = False
+#plt.savefig(outpath+"Dampingvalues_WithSEAS_MLD_%s_test%s_dampingtest.png"%(locstring,testparam),dpi=200)
 
 #%% Plot Autocorrelation (All Models)
 
@@ -521,29 +563,6 @@ ax.legend(fontsize=8)
 plt.tight_layout()
 plt.savefig(outpath+"AC_byTerm_MLD_%s.png"%(locstring),dpi=200)
 
-#%% Compare differences using the 1kyr mean
-
-# config['mldpt'] = mld1kmean[o,a].mean() * np.ones(12)
-# config['genrand'] = 0
-# st = time.time()
-# ac1,sst1,dmp1,frc1,ent1,Td1,kmonth1,params1=synth_stochmod(config)
-# print("Ran script in %.2fs"%(time.time()-st))
-
-# fig,ax = plt.subplots(1,1)
-# ax,ax2,ax3 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,loopvar=Fpt,title=title)
-# ax.plot(lags,cesmauto2[lags],label="CESM SLAB",color='k')
-# for i in [1]:
-#     ax.plot(ac[i],label=labels[i] + " seasonal mean MLD",color=colors[i])
-#     ax.plot(ac1[i],label=labels[i] + " 400-1400 mean MLD",color='blue',ls='dashed')
-# #ax.legend(ncol=3,fontsize=10)
-# #ax3.set_ylabel("MLD (m)")
-# #ax3.set_ylabel("Damping (W/m2)")
-# ax3.set_ylabel("Forcing (W/m2)")
-# ax3.yaxis.label.set_color('gray')
-# ax.legend(fontsize=8)
-# plt.tight_layout()
-# plt.savefig(outpath+"AC_MLD_comparison_%s.png"%(locstring),dpi=200)
-
 #%% Try Sliding Autocorrelation Around to find the best match
 
 sstmod = sst[1]
@@ -566,9 +585,10 @@ for km in range(12):
 plt.tight_layout()
 plt.savefig(outpath+"Testing_Lag0_Slabmodel_Finstantaneous_%s.png"%locstring,dpi=200)
     
+
+# ---------------------------
 #%% Try different damping (4x)
-
-
+# ---------------------------
 # custdamp = np.array([22.55689888, 14.7803278 , 11.66007557,  9.64517097*1.5,  9.59150019,
 #         7.84583902,  7.60521469, 10.24848289, 16.25020237, 22.80579529*1.5,
 #        27.11528091*2, 26.625214  ])
@@ -592,7 +612,9 @@ plt.tight_layout()
 plt.savefig(outpath+"AC_DampingTest_%s.png"%(locstring),dpi=200)
 
 config.pop('damppt',None)
+# ---------------------------
 #%% FORCING MODIFICATION Experiments
+# ---------------------------
 
 Fori  = np.array([53.36403275, 50.47200521, 43.19549306, 32.95324516, 26.30336189,
            22.53761546, 22.93124771, 26.54155223, 32.79647001, 39.71981049,
@@ -659,11 +681,9 @@ ax.legend(fontsize=8)
 plt.tight_layout()
 plt.savefig(outpath+"AC_WithSEAS_MLD_%s_test%s.png"%(locstring,testparam),dpi=200)
 
-
-
-
-
+# ---------------------------
 #%% Try forcing interpolation
+# ---------------------------
 
 Fquad = interp_quad(Fpt)
 dampquad = interp_quad(damppt)
@@ -720,8 +740,10 @@ plt.savefig(outpath+"%s_Differences_%s_test%s.png"%(testparam,locstring,testpara
 
 config.pop('damppt',None)
 config.pop('Fpt',None)
-#%% Update Plot for stohastic model (compare sinusoidal vs updated version)
 
+# ---------------------------
+#%% Update Plot for stohastic model (compare sinusoidal vs updated version)
+# ---------------------------
 xtks = np.arange(1,13,1)
 Fpt1 = np.sin(-1*np.pi*xtks/6+10)*0.3*20*-1
 plt.plot(mons3,Fpt1)
@@ -783,148 +805,63 @@ ax.grid(True,ls='dotted')
 ax.set_ylabel("Forcing (W/m2)")
 plt.savefig(outpath+"%s_%s_Differences_%s_test%s.png"%(expname,testparam,locstring,testparam),dpi=200)
 
-#%%
+# -------------------------
+# %% Try Fixed and NonFixed Damping
+# -------------------------
+
+testparam  = "damppt"
+testvalues = [damppt,np.ones(12)*damppt.mean()]
+testnames  = ['DampingVar',"DampingFix"]
+testcolors = ['b','orange']
 
 
 
-# if viz:
-#     fig,ax = viz.summarize_params(lat,lon,params,synth=synth)
-#     plt.tight_layout()
-# #Visualize points (raw)
-# #fig,ax = viz.summarize_params(lat,lon,params)
-# #plt.tight_layout()
+acall     = []
+sstall    = []
+kmonthall = []
+paramsall = []
 
-# # Synthetic Parameters Prep **************************************************
-# # Set synthetic parameters if any
-
-# # 3 = max in march
-# xtks = np.arange(1,13,1)
-# #Fpt = np.sin(-1*np.pi*xtks/6+10)*0.3*20*-1
-
-# #Fpt = np.ones(12)
-
-# # Make up forcing for now
-# #F = np.random.normal(0,1,size=mld.shape)
-# #F = np.ones(mld.shape)
-# # F = np.ones(mld.shape)* np.array([0,0,211,
-# #                                    212,0,0,
-# #                                    0,0,0,
-# #                                    0,0,0])[None,None,:]
-
-# #Fpt[10]=15
-# ##Fpt[11]=25
-# #Fpt[9] =10
-# #Fpt[0]=15
-# #Fh     = Fh[None,None,:] * np.ones(288,192,1)
-
-# # Synthetic Damping
-# #damppt = damppt*2
-# #damppt = np.ones(12) * np.mean(damppt)
-# #damppt = np.sin(-1*np.pi*xtks/6+11)*-1*10+15
-# # damppt = np.array([13,13,13,
-# #                     13,13,13,
-# #                     13,13,13,
-# #                     13,26,26])
-
-# #Visualize model inputs
-# # Synthetic Forcing
-# #mldpt = np.ones(12)*params[2].max() # Indicate the Mixed layer depth that is used
-# mldpt = np.ones(12)*hclim.mean()
-# #mldpt = hclim
-
-# synth = [damppt,mldpt,Fpt] #[damping,mld,forcing]
-
-# fig,ax = viz.summarize_params(lat,lon,params,synth=synth)
-# #ax.set_title(i)
-# plt.tight_layout()
-# #plt.savefig(outpath+"AC_Slab_Stoch_Comparison_NAOForce_SeasDamp_Params.png",dpi=200)
-
-# ****************************************************************************
-
-# Prepare Forcing
-#randts = np.abs(randts)
+for i,val in enumerate(testvalues):
+    st = time.time()
+    config[testparam] = val
+    ac,sst,dmp,frc,ent,Td,kmonth,params=synth_stochmod(config)
+    acall.append(ac)
+    sstall.append(sst)
+    kmonthall.append(kmonth)
+    paramsall.append(params)
+    print("Ran script for %s = %s in %.2fs"%(testparam,str(val),time.time()-st))
 
 
-Fh = randts * np.tile(Fpt,int(t_end/12)) * (dt/(3850*1025*mldpt[0]))*100
-#plt.plot(randts,lw=0.5)
-
-# Convert Parameters
-lbd,lbd_entr,FAC,beta = scm.set_stochparams(mldpt,damppt,dt,ND=False,hfix=hfix)
-
-Fh = {}
-for i in range(3):
-    
-    if i == 0:
-        Fh[i] = randts * np.tile(Fpt,int(t_end/12)) * (dt/(3850*1025*50))
-    elif i == 1:
-        Fh[i] = randts * np.tile(Fpt,int(t_end/12)) * (dt/(3850*1025*mldpt.max()))
-    elif i == 2:
-        Fh[i] = randts * np.tile(Fpt*mldpt,int(t_end/12)) * (dt/(3850*1025))
-    
-    
-    
-    
-# Run the stochastic model
-sst = {}
-for i in range(3):
-    if i > 1:
-        multFAC =1
-    else:
-        multFAC = 0
-    sst[i] = scm.noentrain(t_end,lbd[i],T0,Fh[i],FAC[i],multFAC=multFAC,debug=False)
-    
-    if i == 1:
-        
-        # Additional Pure White Noise Time Series
-        sst[4] = scm.noentrain(t_end,lbd[i],T0,randts,FAC[i],multFAC=multFAC,debug=False)
-        
-    
-    
-sst[3]=scm.entrain(t_end,lbd[3],T0,Fh[2],beta,hclim,kprev,FAC[3],multFAC=multFAC,debug=False,debugprint=False)
+# Run Additional experiment with fixed damping AND forcing
+config['Fpt'] = np.ones(12)*Fpt.mean()
+ac,sst,dmp,frc,ent,Td,kmonth,params=synth_stochmod(config)
+sstall.append(sst)
 
 
+# Plot some differences
+xtk2 = np.arange(0,37,2)
+fig,ax = plt.subplots(1,1)
+title      = "SST Autocorrelation at %s (Lag 0 = %s)" % (locstringtitle,mons3[mldpt.argmax()])
+ax,ax2,ax3 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,loopvar=paramsall[1][4],title=title)
+ax.plot(lags,cesmauto2[lags],label="CESM SLAB",color='k')
+for i,val in enumerate(testvalues):
+    ax.plot(acall[i][1],label="%s" % (testnames[i]),color=testcolors[i])
+ax3.set_ylabel("Forcing (W/m2)")
+ax3.yaxis.label.set_color('gray')
+ax.legend(fontsize=8)
+plt.tight_layout()
+plt.savefig(outpath+"AC_WithSEAS_MLD_%s_test%s_dampingtest.png"%(locstring,testparam),dpi=200)
 
-# Calculate Autocorrelation
-kmonth = hclim.argmax()
-autocorr = scm.calc_autocorr(sst,lags,kmonth+1)
+# Plot Differences in parameter
+fig,ax = plt.subplots(1,1)
+for i in range(2):
+    ax.plot(mons3,paramsall[i][1],label=testnames[i],color=testcolors[i])
+ax.legend()
+ax.grid(True,ls='dotted')
+ax.set_ylabel("Damping (W/m2)")
+config['damppt'] = False
 
-# Load inautocorrelation values from CESM Slab
-#cesmauto = np.load(projpath + "01_Data/CESM-SLAB_PIC_autocorrelation_pointlon330_lat50.npy")
-
-# Read in CESM autocorrelation for all points
-ko,ka     = proc.find_latlon(query[0]+360,query[1],lon360,lat)
-cesmauto2 = cesmslabac[kmonth,:,ka,ko]
-cesmauto = cesmauto2[lags]
-# fig,ax = plt.subplots(1,1)
-# ax.plot(cesmauto,label="old")
-# ax.plot(cesmauto2[lags],label="new")
-# ax.legend()
-
-# Section below was scrap used to write the init_acplot function
-# mons3=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
-# mons3tile = np.tile(np.array(mons3),int(np.floor(len(lags)/12))) 
-# mons3tile = np.concatenate([np.roll(mons3tile,-kmonth),[mons3[kmonth]]])
-# xtk2 = np.arange(0,37,2)
-
-# fig,ax = plt.subplots(1,1)
-
-# # Set up second axis
-# ax2 = ax.twiny()
-# ax2.set_xticks(xtk2)
-# ax2.set_xticklabels(mons3tile[xtk2], rotation = 45)
-# ax2.set_axisbelow(True)
-# ax2.grid(zorder=0,alpha=0)
-
-# for i in range(4):
-#     ax.plot(autocorr[i])
-
-# ax.set_xticks(xtk2)
-# ax.set_xlim([xtk2[0],xtk2[-1]])
-# ax.set_title("SST Autocorrelation, Lag 0 = %s" % (mons3[kmonth]))
-# ax.set_xlabel("Lags (Months)")
-# ax.set_ylabel("Correlation")
-# ax.grid(True,linestyle='dotted')
-# plt.tight_layout()
+dampvarsst = sstall.copy()
 
 #%% Plot Autocorrelatiom (Just Slab)
 
@@ -1102,403 +1039,403 @@ for mm in tqdm(range(12)):
     ax.legend()
     plt.savefig(outpath+"Sinusoida_Forcing_Slab_mm%i.png"%(mm),dpi=200)
     
-# **********************************
-#%% Grid Sweep Experiments : Damping
-# **********************************
-testvalues = np.arange(1,26,1)
-testparam  = 'damppt'
+# # **********************************
+# #%% Grid Sweep Experiments : Damping
+# # **********************************
+# testvalues = np.arange(1,26,1)
+# testparam  = 'damppt'
 
-acall     = []
-sstall    = []
-kmonthall = []
-paramsall = []
+# acall     = []
+# sstall    = []
+# kmonthall = []
+# paramsall = []
 
-for i,val in tqdm(enumerate(testvalues)):
-    #config['Fpt'] = np.ones(12)*37.24208402633666
-    st = time.time()
-    config[testparam] = np.ones(12)*val
-    ac,sst,dmp,frc,ent,Td,kmonth,params=synth_stochmod(config)
-    acall.append(ac)
-    sstall.append(sst)
-    kmonthall.append(kmonth)
-    paramsall.append(params)
+# for i,val in tqdm(enumerate(testvalues)):
+#     #config['Fpt'] = np.ones(12)*37.24208402633666
+#     st = time.time()
+#     config[testparam] = np.ones(12)*val
+#     ac,sst,dmp,frc,ent,Td,kmonth,params=synth_stochmod(config)
+#     acall.append(ac)
+#     sstall.append(sst)
+#     kmonthall.append(kmonth)
+#     paramsall.append(params)
     
-    print("Ran script for %s = %s in %.2fs"%(testparam,str(val),time.time()-st))
+#     print("Ran script for %s = %s in %.2fs"%(testparam,str(val),time.time()-st))
 
-#%% Visualize the results
-import cmocean
-model = 1
-expname="DampingCVary"
-nlag = len(config['lags'])
-nexp = len(testvalues)
+# #%% Visualize the results
+# import cmocean
+# model = 1
+# expname="DampingCVary"
+# nlag = len(config['lags'])
+# nexp = len(testvalues)
 
-acalls = np.zeros((nexp,nlag))
-for e,ac in enumerate(acall):
-    acalls[e,:] = acall[e][model]
-
-
-# Pcolor Plot
-fig,ax = plt.subplots(1,1)
-pcm = ax.pcolormesh(config['lags'],testvalues,acalls,vmin=0,vmax=1,cmap='magma')
-fig.colorbar(pcm,ax=ax)
-ax.set_ylabel("Damping (W/m2)")
-ax.set_xlabel("Lag (months)")
-ax.set_title("SST Autocorrelation (Lag 0 = Feb)")
-plt.savefig("%sLag_v_Damping_pcolor_%s.png"%(outpath,expname),dpi=200)
+# acalls = np.zeros((nexp,nlag))
+# for e,ac in enumerate(acall):
+#     acalls[e,:] = acall[e][model]
 
 
-# Pcolor Plot, differences
-fig,ax = plt.subplots(1,1)
-pcm = ax.pcolormesh(config['lags'],testvalues,acalls-cesmauto,vmin=-.5,vmax=.5,cmap=cmocean.cm.balance)
-fig.colorbar(pcm,ax=ax)
-ax.set_ylabel("Damping (W/m2)")
-ax.set_xlabel("Lag (months)")
-ax.set_title("SST Autocorrelation (Stochastic Model - CESM) \n (Lag 0 = Feb)")
-plt.tight_layout()
-plt.savefig("%sLag_v_Damping_pcolor_diff_%s.png"%(outpath,expname),dpi=200)
-
-# Plot minimum RMSE
-rmses = np.mean(np.sqrt((acalls-cesmauto)**2),1)
-print("Minumum RMSE was for %i with value %f" % (np.argmin(rmses),rmses.min()))
+# # Pcolor Plot
+# fig,ax = plt.subplots(1,1)
+# pcm = ax.pcolormesh(config['lags'],testvalues,acalls,vmin=0,vmax=1,cmap='magma')
+# fig.colorbar(pcm,ax=ax)
+# ax.set_ylabel("Damping (W/m2)")
+# ax.set_xlabel("Lag (months)")
+# ax.set_title("SST Autocorrelation (Lag 0 = Feb)")
+# plt.savefig("%sLag_v_Damping_pcolor_%s.png"%(outpath,expname),dpi=200)
 
 
-# Line Plots
-fig,ax = plt.subplots(1,1)
-ax.plot(lags,cesmauto,color='k',label='CESM-SLAB')
-for lam in range(25):
-    ax.plot(config['lags'],acalls[lam,:],label="",alpha=(lam/25)*.5,color='b')
+# # Pcolor Plot, differences
+# fig,ax = plt.subplots(1,1)
+# pcm = ax.pcolormesh(config['lags'],testvalues,acalls-cesmauto,vmin=-.5,vmax=.5,cmap=cmocean.cm.balance)
+# fig.colorbar(pcm,ax=ax)
+# ax.set_ylabel("Damping (W/m2)")
+# ax.set_xlabel("Lag (months)")
+# ax.set_title("SST Autocorrelation (Stochastic Model - CESM) \n (Lag 0 = Feb)")
+# plt.tight_layout()
+# plt.savefig("%sLag_v_Damping_pcolor_diff_%s.png"%(outpath,expname),dpi=200)
+
+# # Plot minimum RMSE
+# rmses = np.mean(np.sqrt((acalls-cesmauto)**2),1)
+# print("Minumum RMSE was for %i with value %f" % (np.argmin(rmses),rmses.min()))
+
+
+# # Line Plots
+# fig,ax = plt.subplots(1,1)
+# ax.plot(lags,cesmauto,color='k',label='CESM-SLAB')
+# for lam in range(25):
+#     ax.plot(config['lags'],acalls[lam,:],label="",alpha=(lam/25)*.5,color='b')
     
-ax.plot(lags,acalls[np.argmin(rmses),:],color='r',label="Best, (%f)"%testvalues[np.argmin(rmses)])
-ax.legend()
-ax.set_ylabel("Correlation")
-ax.set_xlabel("Lag (months)")   
-ax.set_title("SST Autocorrelation by Damping (W/m2) \n Lag 0 = Feb")
-ax.grid(True,ls='dotted')
-plt.savefig("%sLag_v_Damping_lineplot_%s.png"%(outpath,expname),dpi=200)
+# ax.plot(lags,acalls[np.argmin(rmses),:],color='r',label="Best, (%f)"%testvalues[np.argmin(rmses)])
+# ax.legend()
+# ax.set_ylabel("Correlation")
+# ax.set_xlabel("Lag (months)")   
+# ax.set_title("SST Autocorrelation by Damping (W/m2) \n Lag 0 = Feb")
+# ax.grid(True,ls='dotted')
+# plt.savefig("%sLag_v_Damping_lineplot_%s.png"%(outpath,expname),dpi=200)
 
-XX,YY = np.meshgrid(config['lags'],testvalues[1:])
-fig,ax = plt.subplots(1,1,subplot_kw={'projection':'3d'},figsize=(12,4))
-surf = ax.plot_surface(XX,YY,acalls[1:,...],cmap='magma')
-fig.colorbar(surf,ax=ax,orientation='horizontal',fraction=0.02)
-ax.set_ylim(25,0)
-ax.set_xlim(0,38)
-ax.set_zlim(0,1)
-ax.set_xticks(np.arange(0,37,6))
-ax.set_ylabel("Damping $(W/m^{2})$")
-ax.set_xlabel("Lag (months)")
-ax.set_zlabel("Correlation")
-ax.set_title("SST Autocorrelation by Damping (W/m2) \n Lag 0 = Feb")
-plt.tight_layout()
-plt.savefig("%sLag_v_Damping_3Dplot_%s.png"%(outpath,expname),dpi=200)
+# XX,YY = np.meshgrid(config['lags'],testvalues[1:])
+# fig,ax = plt.subplots(1,1,subplot_kw={'projection':'3d'},figsize=(12,4))
+# surf = ax.plot_surface(XX,YY,acalls[1:,...],cmap='magma')
+# fig.colorbar(surf,ax=ax,orientation='horizontal',fraction=0.02)
+# ax.set_ylim(25,0)
+# ax.set_xlim(0,38)
+# ax.set_zlim(0,1)
+# ax.set_xticks(np.arange(0,37,6))
+# ax.set_ylabel("Damping $(W/m^{2})$")
+# ax.set_xlabel("Lag (months)")
+# ax.set_zlabel("Correlation")
+# ax.set_title("SST Autocorrelation by Damping (W/m2) \n Lag 0 = Feb")
+# plt.tight_layout()
+# plt.savefig("%sLag_v_Damping_3Dplot_%s.png"%(outpath,expname),dpi=200)
 
-# *********************************************************
-#%% Grid Sweep Experiments II : Damping, Seasonal Magnitude
-# *********************************************************
-testvalues = np.arange(0.1,2.1,.1)#[0.25,0.5,1,2,4,8,16,32,64,128]
+# # *********************************************************
+# #%% Grid Sweep Experiments II : Damping, Seasonal Magnitude
+# # *********************************************************
+# testvalues = np.arange(0.1,2.1,.1)#[0.25,0.5,1,2,4,8,16,32,64,128]
 
-testparam  = 'damppt'
+# testparam  = 'damppt'
 
-acall     = []
-sstall    = []
-kmonthall = []
-paramsall = []
+# acall     = []
+# sstall    = []
+# kmonthall = []
+# paramsall = []
 
-for i,val in tqdm(enumerate(testvalues)):
-    st = time.time()
-    config[testparam] = damppt*val
-    ac,sst,dmp,frc,ent,Td,kmonth,params=synth_stochmod(config)
-    acall.append(ac)
-    sstall.append(sst)
-    kmonthall.append(kmonth)
-    paramsall.append(params)
+# for i,val in tqdm(enumerate(testvalues)):
+#     st = time.time()
+#     config[testparam] = damppt*val
+#     ac,sst,dmp,frc,ent,Td,kmonth,params=synth_stochmod(config)
+#     acall.append(ac)
+#     sstall.append(sst)
+#     kmonthall.append(kmonth)
+#     paramsall.append(params)
     
-    print("Ran script for %s = %s in %.2fs"%(testparam,str(val),time.time()-st))
+#     print("Ran script for %s = %s in %.2fs"%(testparam,str(val),time.time()-st))
 
-#%% Visualize the results
+# #%% Visualize the results
 
-model = 1
-expname="DampingVVary"
-nlag = len(config['lags'])
-nexp = len(testvalues)
+# model = 1
+# expname="DampingVVary"
+# nlag = len(config['lags'])
+# nexp = len(testvalues)
 
-acalls = np.zeros((nexp,nlag))
-for e,ac in enumerate(acall):
-    acalls[e,:] = acall[e][model]
+# acalls = np.zeros((nexp,nlag))
+# for e,ac in enumerate(acall):
+#     acalls[e,:] = acall[e][model]
 
-#ytk=np.arange(0,len(testvalues),1)
-ytk = np.arange(.1,2.2,.2)
+# #ytk=np.arange(0,len(testvalues),1)
+# ytk = np.arange(.1,2.2,.2)
 
-# Pcolor Plot
-fig,ax = plt.subplots(1,1,figsize=(8,8))
-im = ax.pcolormesh(config['lags'],testvalues,acalls,vmin=0,vmax=1,cmap='magma')
-#im = ax.imshow(acalls,cmap='magma',vmin=0,vmax=1)
-fig.colorbar(im,ax=ax,fraction=0.015)
-#ax.set_yticklabels(ytk)
-#ax.set_yticklabels(testvalues,fontsize=10)
-#plt.gca().invert_yaxis()
-ax.set_ylabel("Damping Multiplier")
-ax.set_xlabel("Lag (months)")
-ax.set_title("SST Autocorrelation (Lag 0 = Feb)")
-plt.savefig("%sLag_v_Damping_pcolor_%s.png"%(outpath,expname),dpi=200)
+# # Pcolor Plot
+# fig,ax = plt.subplots(1,1,figsize=(8,8))
+# im = ax.pcolormesh(config['lags'],testvalues,acalls,vmin=0,vmax=1,cmap='magma')
+# #im = ax.imshow(acalls,cmap='magma',vmin=0,vmax=1)
+# fig.colorbar(im,ax=ax,fraction=0.015)
+# #ax.set_yticklabels(ytk)
+# #ax.set_yticklabels(testvalues,fontsize=10)
+# #plt.gca().invert_yaxis()
+# ax.set_ylabel("Damping Multiplier")
+# ax.set_xlabel("Lag (months)")
+# ax.set_title("SST Autocorrelation (Lag 0 = Feb)")
+# plt.savefig("%sLag_v_Damping_pcolor_%s.png"%(outpath,expname),dpi=200)
 
-# Pcolor Plot, differences
-fig,ax = plt.subplots(1,1,figsize=(8,4))
-im = ax.pcolormesh(config['lags'],testvalues,acalls-cesmauto,vmin=-.5,vmax=.5,cmap=cmocean.cm.balance)
-#im = ax.imshow(acalls-cesmauto,cmap=cmocean.cm.balance,vmin=-.5,vmax=.5)
-fig.colorbar(im,ax=ax,fraction=0.015)
-#ax.set_yticks(ytk)
-#ax.set_yticklabels(testvalues,fontsize=10)
-#plt.gca().invert_yaxis()
-ax.set_ylabel("Damping Multiplier")
-ax.set_xlabel("Lag (months)")
-ax.set_title("SST Autocorrelation (Stochastic Model - CESM) \n (Lag 0 = Feb)")
-plt.savefig("%sLag_v_Damping_pcolordiff_%s.png"%(outpath,expname),dpi=200)
+# # Pcolor Plot, differences
+# fig,ax = plt.subplots(1,1,figsize=(8,4))
+# im = ax.pcolormesh(config['lags'],testvalues,acalls-cesmauto,vmin=-.5,vmax=.5,cmap=cmocean.cm.balance)
+# #im = ax.imshow(acalls-cesmauto,cmap=cmocean.cm.balance,vmin=-.5,vmax=.5)
+# fig.colorbar(im,ax=ax,fraction=0.015)
+# #ax.set_yticks(ytk)
+# #ax.set_yticklabels(testvalues,fontsize=10)
+# #plt.gca().invert_yaxis()
+# ax.set_ylabel("Damping Multiplier")
+# ax.set_xlabel("Lag (months)")
+# ax.set_title("SST Autocorrelation (Stochastic Model - CESM) \n (Lag 0 = Feb)")
+# plt.savefig("%sLag_v_Damping_pcolordiff_%s.png"%(outpath,expname),dpi=200)
 
-# Plot minimum RMSE
-rmses = np.mean(np.sqrt((acalls-cesmauto)**2),1)
-print("Minumum RMSE was for %i with value %f" % (testvalues[np.argmin(rmses)],rmses.min()))
+# # Plot minimum RMSE
+# rmses = np.mean(np.sqrt((acalls-cesmauto)**2),1)
+# print("Minumum RMSE was for %i with value %f" % (testvalues[np.argmin(rmses)],rmses.min()))
 
 
-# Line Plots
-fig,ax = plt.subplots(1,1)
-ax.plot(lags,cesmauto,color='k',label='CESM-SLAB')
-for lam in range(len(testvalues)):
-    ax.plot(config['lags'],acalls[lam,:],label="",alpha=(lam/len(testvalues))*.5,color='b')
+# # Line Plots
+# fig,ax = plt.subplots(1,1)
+# ax.plot(lags,cesmauto,color='k',label='CESM-SLAB')
+# for lam in range(len(testvalues)):
+#     ax.plot(config['lags'],acalls[lam,:],label="",alpha=(lam/len(testvalues))*.5,color='b')
     
-ax.plot(lags,acalls[np.argmin(rmses),:],color='r',label="Best, (%f)" % testvalues[np.argmin(rmses)])
-ax.legend()
-ax.set_ylabel("Correlation")
-ax.set_xlabel("Lag (months)")   
-ax.set_title("SST Autocorrelation by Damping (W/m2) \n Lag 0 = Feb")
-ax.grid(True,ls='dotted')
-plt.savefig("%sLag_v_Damping_lineplot_%s.png"%(outpath,expname),dpi=200)
+# ax.plot(lags,acalls[np.argmin(rmses),:],color='r',label="Best, (%f)" % testvalues[np.argmin(rmses)])
+# ax.legend()
+# ax.set_ylabel("Correlation")
+# ax.set_xlabel("Lag (months)")   
+# ax.set_title("SST Autocorrelation by Damping (W/m2) \n Lag 0 = Feb")
+# ax.grid(True,ls='dotted')
+# plt.savefig("%sLag_v_Damping_lineplot_%s.png"%(outpath,expname),dpi=200)
 
-XX,YY = np.meshgrid(config['lags'],testvalues[1:])
-fig,ax = plt.subplots(1,1,subplot_kw={'projection':'3d'},figsize=(12,4))
-surf = ax.plot_surface(XX,YY,acalls[1:,...],cmap='magma',vmin=0,vmax=1)
-fig.colorbar(surf,ax=ax,orientation='horizontal',fraction=0.02)
-ax.set_ylim(testvalues[-1],testvalues[0])
-ax.set_xlim(0,38)
-ax.set_zlim(0,1)
-ax.set_xticks(np.arange(0,37,6))
-ax.set_ylabel("Damping Multiplier")
-ax.set_xlabel("Lag (months)")
-ax.set_zlabel("Correlation")
-ax.set_title("SST Autocorrelation by Damping (W/m2) \n Lag 0 = Feb")
-plt.tight_layout()
-plt.savefig("%sLag_v_Damping_3Dplot_%s.png"%(outpath,expname),dpi=200)
+# XX,YY = np.meshgrid(config['lags'],testvalues[1:])
+# fig,ax = plt.subplots(1,1,subplot_kw={'projection':'3d'},figsize=(12,4))
+# surf = ax.plot_surface(XX,YY,acalls[1:,...],cmap='magma',vmin=0,vmax=1)
+# fig.colorbar(surf,ax=ax,orientation='horizontal',fraction=0.02)
+# ax.set_ylim(testvalues[-1],testvalues[0])
+# ax.set_xlim(0,38)
+# ax.set_zlim(0,1)
+# ax.set_xticks(np.arange(0,37,6))
+# ax.set_ylabel("Damping Multiplier")
+# ax.set_xlabel("Lag (months)")
+# ax.set_zlabel("Correlation")
+# ax.set_title("SST Autocorrelation by Damping (W/m2) \n Lag 0 = Feb")
+# plt.tight_layout()
+# plt.savefig("%sLag_v_Damping_3Dplot_%s.png"%(outpath,expname),dpi=200)
 
 
-# Plot damping values
-fig,ax = plt.subplots(1,1)
-for i in range(len(testvalues)):
-    ax.plot(mons3,paramsall[i][1],label="",alpha=(i/len(testvalues))*.5,color='b')
-ax.plot(mons3,damppt,color='k',label='Original Seasonal Cycle')
-ax.plot(mons3,paramsall[np.argmin(rmses)][1],color='r',label="Best, (%.2fx)" % testvalues[np.argmin(rmses)])
-ax.legend()
-ax.set_ylabel("Damping (W/m2)")    
-ax.grid(True,ls='dotted')
-plt.savefig("%sDamping_Values_%s.png"%(outpath,expname),dpi=200)
+# # Plot damping values
+# fig,ax = plt.subplots(1,1)
+# for i in range(len(testvalues)):
+#     ax.plot(mons3,paramsall[i][1],label="",alpha=(i/len(testvalues))*.5,color='b')
+# ax.plot(mons3,damppt,color='k',label='Original Seasonal Cycle')
+# ax.plot(mons3,paramsall[np.argmin(rmses)][1],color='r',label="Best, (%.2fx)" % testvalues[np.argmin(rmses)])
+# ax.legend()
+# ax.set_ylabel("Damping (W/m2)")    
+# ax.grid(True,ls='dotted')
+# plt.savefig("%sDamping_Values_%s.png"%(outpath,expname),dpi=200)
 
-# **********************************
-#%% Grid Sweep Experiments III : Forcing
-# **********************************
-testvalues = np.arange(10,101,1)
-testparam  = 'Fpt'
+# # **********************************
+# #%% Grid Sweep Experiments III : Forcing
+# # **********************************
+# testvalues = np.arange(10,101,1)
+# testparam  = 'Fpt'
 
-acall     = []
-sstall    = []
-kmonthall = []
-paramsall = []
+# acall     = []
+# sstall    = []
+# kmonthall = []
+# paramsall = []
 
-for i,val in tqdm(enumerate(testvalues)):
-    #config['Fpt'] = np.ones(12)*37.24208402633666
-    st = time.time()
-    config[testparam] = np.ones(12)*val
-    ac,sst,dmp,frc,ent,Td,kmonth,params=synth_stochmod(config)
-    acall.append(ac)
-    sstall.append(sst)
-    kmonthall.append(kmonth)
-    paramsall.append(params)
+# for i,val in tqdm(enumerate(testvalues)):
+#     #config['Fpt'] = np.ones(12)*37.24208402633666
+#     st = time.time()
+#     config[testparam] = np.ones(12)*val
+#     ac,sst,dmp,frc,ent,Td,kmonth,params=synth_stochmod(config)
+#     acall.append(ac)
+#     sstall.append(sst)
+#     kmonthall.append(kmonth)
+#     paramsall.append(params)
     
-    print("Ran script for %s = %s in %.2fs"%(testparam,str(val),time.time()-st))
+#     print("Ran script for %s = %s in %.2fs"%(testparam,str(val),time.time()-st))
 
-#%% Visualize the results
-import cmocean
-model = 1
-expname="ForcingCVary"
-nlag = len(config['lags'])
-nexp = len(testvalues)
+# #%% Visualize the results
+# import cmocean
+# model = 1
+# expname="ForcingCVary"
+# nlag = len(config['lags'])
+# nexp = len(testvalues)
 
-acalls = np.zeros((nexp,nlag))
-for e,ac in enumerate(acall):
-    acalls[e,:] = acall[e][model]
-
-
-# Pcolor Plot
-fig,ax = plt.subplots(1,1)
-pcm = ax.pcolormesh(config['lags'],testvalues,acalls,vmin=0,vmax=1,cmap='magma')
-fig.colorbar(pcm,ax=ax)
-ax.set_ylabel("Forcing (W/m2)")
-ax.set_xlabel("Lag (months)")
-ax.set_title("SST Autocorrelation (Lag 0 = Feb)")
-plt.savefig("%sLag_v_Forcing_pcolor_%s.png"%(outpath,expname),dpi=200)
+# acalls = np.zeros((nexp,nlag))
+# for e,ac in enumerate(acall):
+#     acalls[e,:] = acall[e][model]
 
 
-# Pcolor Plot, differences
-fig,ax = plt.subplots(1,1)
-pcm = ax.pcolormesh(config['lags'],testvalues,acalls-cesmauto,vmin=-.5,vmax=.5,cmap=cmocean.cm.balance)
-fig.colorbar(pcm,ax=ax)
-ax.set_ylabel("Forcing (W/m2)")
-ax.set_xlabel("Lag (months)")
-ax.set_title("SST Autocorrelation (Stochastic Model - CESM) \n (Lag 0 = Feb)")
-plt.tight_layout()
-plt.savefig("%sLag_v_Forcing_pcolor_diff_%s.png"%(outpath,expname),dpi=200)
-
-# Plot minimum RMSE
-rmses = np.mean(np.sqrt((acalls-cesmauto)**2),1)
-print("Minumum RMSE was for %i with value %f" % (np.argmin(rmses),rmses.min()))
+# # Pcolor Plot
+# fig,ax = plt.subplots(1,1)
+# pcm = ax.pcolormesh(config['lags'],testvalues,acalls,vmin=0,vmax=1,cmap='magma')
+# fig.colorbar(pcm,ax=ax)
+# ax.set_ylabel("Forcing (W/m2)")
+# ax.set_xlabel("Lag (months)")
+# ax.set_title("SST Autocorrelation (Lag 0 = Feb)")
+# plt.savefig("%sLag_v_Forcing_pcolor_%s.png"%(outpath,expname),dpi=200)
 
 
-# Line Plots
-fig,ax = plt.subplots(1,1)
-ax.plot(lags,cesmauto,color='k',label='CESM-SLAB')
-for lam in range(25):
-    ax.plot(config['lags'],acalls[lam,:],label="",alpha=(lam/25)*.5,color='b')
+# # Pcolor Plot, differences
+# fig,ax = plt.subplots(1,1)
+# pcm = ax.pcolormesh(config['lags'],testvalues,acalls-cesmauto,vmin=-.5,vmax=.5,cmap=cmocean.cm.balance)
+# fig.colorbar(pcm,ax=ax)
+# ax.set_ylabel("Forcing (W/m2)")
+# ax.set_xlabel("Lag (months)")
+# ax.set_title("SST Autocorrelation (Stochastic Model - CESM) \n (Lag 0 = Feb)")
+# plt.tight_layout()
+# plt.savefig("%sLag_v_Forcing_pcolor_diff_%s.png"%(outpath,expname),dpi=200)
+
+# # Plot minimum RMSE
+# rmses = np.mean(np.sqrt((acalls-cesmauto)**2),1)
+# print("Minumum RMSE was for %i with value %f" % (np.argmin(rmses),rmses.min()))
+
+
+# # Line Plots
+# fig,ax = plt.subplots(1,1)
+# ax.plot(lags,cesmauto,color='k',label='CESM-SLAB')
+# for lam in range(25):
+#     ax.plot(config['lags'],acalls[lam,:],label="",alpha=(lam/25)*.5,color='b')
     
-ax.plot(lags,acalls[np.argmin(rmses),:],color='r',label="Best, (%f)"%testvalues[np.argmin(rmses)])
-ax.legend()
-ax.set_ylabel("Correlation")
-ax.set_xlabel("Lag (months)")   
-ax.set_title("SST Autocorrelation by Forcing (W/m2) \n Lag 0 = Feb")
-ax.grid(True,ls='dotted')
-plt.savefig("%sLag_v_Forcing_lineplot_%s.png"%(outpath,expname),dpi=200)
+# ax.plot(lags,acalls[np.argmin(rmses),:],color='r',label="Best, (%f)"%testvalues[np.argmin(rmses)])
+# ax.legend()
+# ax.set_ylabel("Correlation")
+# ax.set_xlabel("Lag (months)")   
+# ax.set_title("SST Autocorrelation by Forcing (W/m2) \n Lag 0 = Feb")
+# ax.grid(True,ls='dotted')
+# plt.savefig("%sLag_v_Forcing_lineplot_%s.png"%(outpath,expname),dpi=200)
 
-XX,YY = np.meshgrid(config['lags'],testvalues[1:])
-fig,ax = plt.subplots(1,1,subplot_kw={'projection':'3d'},figsize=(12,4))
-surf = ax.plot_surface(XX,YY,acalls[1:,...],cmap='magma')
-fig.colorbar(surf,ax=ax,orientation='horizontal',fraction=0.02)
-ax.set_ylim(100,0)
-ax.set_xlim(0,38)
-ax.set_zlim(0,1)
-ax.set_xticks(np.arange(0,37,6))
-ax.set_ylabel("Forcing $(W/m^{2})$")
-ax.set_xlabel("Lag (months)")
-ax.set_zlabel("Correlation")
-ax.set_title("SST Autocorrelation by Damping (W/m2) \n Lag 0 = Feb")
-plt.tight_layout()
-plt.savefig("%sLag_v_Forcing_3Dplot_%s.png"%(outpath,expname),dpi=200)
+# XX,YY = np.meshgrid(config['lags'],testvalues[1:])
+# fig,ax = plt.subplots(1,1,subplot_kw={'projection':'3d'},figsize=(12,4))
+# surf = ax.plot_surface(XX,YY,acalls[1:,...],cmap='magma')
+# fig.colorbar(surf,ax=ax,orientation='horizontal',fraction=0.02)
+# ax.set_ylim(100,0)
+# ax.set_xlim(0,38)
+# ax.set_zlim(0,1)
+# ax.set_xticks(np.arange(0,37,6))
+# ax.set_ylabel("Forcing $(W/m^{2})$")
+# ax.set_xlabel("Lag (months)")
+# ax.set_zlabel("Correlation")
+# ax.set_title("SST Autocorrelation by Damping (W/m2) \n Lag 0 = Feb")
+# plt.tight_layout()
+# plt.savefig("%sLag_v_Forcing_3Dplot_%s.png"%(outpath,expname),dpi=200)
 
 
-# *********************************************************
-#%% Grid Sweep Experiments IV : Forcing, Seasonal Magnitude
-# *********************************************************
-testvalues = np.arange(0.1,2.1,.1)*10#[0.25,0.5,1,2,4,8,16,32,64,128]
-#vals = np.ones(12)
-testparam  = 'Fpt'
+# # *********************************************************
+# #%% Grid Sweep Experiments IV : Forcing, Seasonal Magnitude
+# # *********************************************************
+# testvalues = np.arange(0.1,2.1,.1)*10#[0.25,0.5,1,2,4,8,16,32,64,128]
+# #vals = np.ones(12)
+# testparam  = 'Fpt'
 
-acall     = []
-sstall    = []
-kmonthall = []
-paramsall = []
+# acall     = []
+# sstall    = []
+# kmonthall = []
+# paramsall = []
 
-for i,val in tqdm(enumerate(testvalues)):
-    st = time.time()
-    #vals[7]  = val
-    config[testparam] = Fpt*testvalues[i]
-    ac,sst,dmp,frc,ent,Td,kmonth,params=synth_stochmod(config)
-    acall.append(ac)
-    sstall.append(sst)
-    kmonthall.append(kmonth)
-    paramsall.append(params)
+# for i,val in tqdm(enumerate(testvalues)):
+#     st = time.time()
+#     #vals[7]  = val
+#     config[testparam] = Fpt*testvalues[i]
+#     ac,sst,dmp,frc,ent,Td,kmonth,params=synth_stochmod(config)
+#     acall.append(ac)
+#     sstall.append(sst)
+#     kmonthall.append(kmonth)
+#     paramsall.append(params)
     
-    print("Ran script for %s = %s in %.2fs"%(testparam,str(val),time.time()-st))
+#     print("Ran script for %s = %s in %.2fs"%(testparam,str(val),time.time()-st))
 
-#%% Visualize the results
+# #%% Visualize the results
 
-model = 1
-expname="ForcingVVary1m"
-nlag = len(config['lags'])
-nexp = len(testvalues)
+# model = 1
+# expname="ForcingVVary1m"
+# nlag = len(config['lags'])
+# nexp = len(testvalues)
 
-acalls = np.zeros((nexp,nlag))
-for e,ac in enumerate(acall):
-    acalls[e,:] = acall[e][model]
+# acalls = np.zeros((nexp,nlag))
+# for e,ac in enumerate(acall):
+#     acalls[e,:] = acall[e][model]
 
-#ytk=np.arange(0,len(testvalues),1)
-ytk = np.arange(.1,2.2,.2)
+# #ytk=np.arange(0,len(testvalues),1)
+# ytk = np.arange(.1,2.2,.2)
 
-# Pcolor Plot
-fig,ax = plt.subplots(1,1,figsize=(8,8))
-im = ax.pcolormesh(config['lags'],testvalues,acalls,vmin=0,vmax=1,cmap='magma')
-#im = ax.imshow(acalls,cmap='magma',vmin=0,vmax=1)
-fig.colorbar(im,ax=ax,fraction=0.015)
-#ax.set_yticklabels(ytk)
-#ax.set_yticklabels(testvalues,fontsize=10)
-#plt.gca().invert_yaxis()
-ax.set_ylabel("Forcing Multiplier")
-ax.set_xlabel("Lag (months)")
-ax.set_title("SST Autocorrelation (Lag 0 = Feb)")
-plt.savefig("%sLag_v_Forcing_pcolor_%s.png"%(outpath,expname),dpi=200)
+# # Pcolor Plot
+# fig,ax = plt.subplots(1,1,figsize=(8,8))
+# im = ax.pcolormesh(config['lags'],testvalues,acalls,vmin=0,vmax=1,cmap='magma')
+# #im = ax.imshow(acalls,cmap='magma',vmin=0,vmax=1)
+# fig.colorbar(im,ax=ax,fraction=0.015)
+# #ax.set_yticklabels(ytk)
+# #ax.set_yticklabels(testvalues,fontsize=10)
+# #plt.gca().invert_yaxis()
+# ax.set_ylabel("Forcing Multiplier")
+# ax.set_xlabel("Lag (months)")
+# ax.set_title("SST Autocorrelation (Lag 0 = Feb)")
+# plt.savefig("%sLag_v_Forcing_pcolor_%s.png"%(outpath,expname),dpi=200)
 
-# Pcolor Plot, differences
-fig,ax = plt.subplots(1,1,figsize=(8,4))
-im = ax.pcolormesh(config['lags'],testvalues,acalls-cesmauto,vmin=-.5,vmax=.5,cmap=cmocean.cm.balance)
-#im = ax.imshow(acalls-cesmauto,cmap=cmocean.cm.balance,vmin=-.5,vmax=.5)
-fig.colorbar(im,ax=ax,fraction=0.015)
-#ax.set_yticks(ytk)
-#ax.set_yticklabels(testvalues,fontsize=10)
-#plt.gca().invert_yaxis()
-ax.set_ylabel("Forcing Multiplier")
-ax.set_xlabel("Lag (months)")
-ax.set_title("SST Autocorrelation (Stochastic Model - CESM) \n (Lag 0 = Feb)")
-plt.savefig("%sLag_v_Forcing_pcolordiff_%s.png"%(outpath,expname),dpi=200)
+# # Pcolor Plot, differences
+# fig,ax = plt.subplots(1,1,figsize=(8,4))
+# im = ax.pcolormesh(config['lags'],testvalues,acalls-cesmauto,vmin=-.5,vmax=.5,cmap=cmocean.cm.balance)
+# #im = ax.imshow(acalls-cesmauto,cmap=cmocean.cm.balance,vmin=-.5,vmax=.5)
+# fig.colorbar(im,ax=ax,fraction=0.015)
+# #ax.set_yticks(ytk)
+# #ax.set_yticklabels(testvalues,fontsize=10)
+# #plt.gca().invert_yaxis()
+# ax.set_ylabel("Forcing Multiplier")
+# ax.set_xlabel("Lag (months)")
+# ax.set_title("SST Autocorrelation (Stochastic Model - CESM) \n (Lag 0 = Feb)")
+# plt.savefig("%sLag_v_Forcing_pcolordiff_%s.png"%(outpath,expname),dpi=200)
 
-# Plot minimum RMSE
-rmses = np.mean(np.sqrt((acalls-cesmauto)**2),1)
-print("Minumum RMSE was for %i with value %f" % (testvalues[np.argmin(rmses)],rmses.min()))
+# # Plot minimum RMSE
+# rmses = np.mean(np.sqrt((acalls-cesmauto)**2),1)
+# print("Minumum RMSE was for %i with value %f" % (testvalues[np.argmin(rmses)],rmses.min()))
 
 
-# Line Plots
-fig,ax = plt.subplots(1,1)
-ax.plot(lags,cesmauto,color='k',label='CESM-SLAB')
-for lam in range(len(testvalues)):
-    ax.plot(config['lags'],acalls[lam,:],label="",alpha=(lam/len(testvalues))*.5,color='b')
+# # Line Plots
+# fig,ax = plt.subplots(1,1)
+# ax.plot(lags,cesmauto,color='k',label='CESM-SLAB')
+# for lam in range(len(testvalues)):
+#     ax.plot(config['lags'],acalls[lam,:],label="",alpha=(lam/len(testvalues))*.5,color='b')
     
-ax.plot(lags,acalls[np.argmin(rmses),:],color='r',label="Best, (%f)" % testvalues[np.argmin(rmses)])
-ax.legend()
-ax.set_ylabel("Correlation")
-ax.set_xlabel("Lag (months)")   
-ax.set_title("SST Autocorrelation by Forcing (W/m2) \n Lag 0 = Feb")
-ax.grid(True,ls='dotted')
-plt.savefig("%sLag_v_Forcing_lineplot_%s.png"%(outpath,expname),dpi=200)
+# ax.plot(lags,acalls[np.argmin(rmses),:],color='r',label="Best, (%f)" % testvalues[np.argmin(rmses)])
+# ax.legend()
+# ax.set_ylabel("Correlation")
+# ax.set_xlabel("Lag (months)")   
+# ax.set_title("SST Autocorrelation by Forcing (W/m2) \n Lag 0 = Feb")
+# ax.grid(True,ls='dotted')
+# plt.savefig("%sLag_v_Forcing_lineplot_%s.png"%(outpath,expname),dpi=200)
 
-XX,YY = np.meshgrid(config['lags'],testvalues[1:])
-fig,ax = plt.subplots(1,1,subplot_kw={'projection':'3d'},figsize=(12,4))
-surf = ax.plot_surface(XX,YY,acalls[1:,...],cmap='magma',vmin=0,vmax=1)
-fig.colorbar(surf,ax=ax,orientation='horizontal',fraction=0.02)
-ax.set_ylim(testvalues[-1],testvalues[0])
-ax.set_xlim(0,38)
-ax.set_zlim(0,1)
-ax.set_xticks(np.arange(0,37,6))
-ax.set_ylabel("Forcing Multiplier")
-ax.set_xlabel("Lag (months)")
-ax.set_zlabel("Correlation")
-ax.set_title("SST Autocorrelation by Forcing (W/m2) \n Lag 0 = Feb")
-plt.tight_layout()
-plt.savefig("%sLag_v_Forcing_3Dplot_%s.png"%(outpath,expname),dpi=200)
+# XX,YY = np.meshgrid(config['lags'],testvalues[1:])
+# fig,ax = plt.subplots(1,1,subplot_kw={'projection':'3d'},figsize=(12,4))
+# surf = ax.plot_surface(XX,YY,acalls[1:,...],cmap='magma',vmin=0,vmax=1)
+# fig.colorbar(surf,ax=ax,orientation='horizontal',fraction=0.02)
+# ax.set_ylim(testvalues[-1],testvalues[0])
+# ax.set_xlim(0,38)
+# ax.set_zlim(0,1)
+# ax.set_xticks(np.arange(0,37,6))
+# ax.set_ylabel("Forcing Multiplier")
+# ax.set_xlabel("Lag (months)")
+# ax.set_zlabel("Correlation")
+# ax.set_title("SST Autocorrelation by Forcing (W/m2) \n Lag 0 = Feb")
+# plt.tight_layout()
+# plt.savefig("%sLag_v_Forcing_3Dplot_%s.png"%(outpath,expname),dpi=200)
 
 
-# Plot Forcing values
-fig,ax = plt.subplots(1,1)
-for i in range(len(testvalues)):
-    ax.plot(mons3,paramsall[i][4],label="",alpha=(i/len(testvalues))*.5,color='b')
-ax.plot(mons3,Fpt,color='k',label='Original Seasonal Cycle')
-ax.plot(mons3,paramsall[np.argmin(rmses)][4],color='r',label="Best, (%.2fx)" % testvalues[np.argmin(rmses)])
-ax.legend()
-ax.set_ylabel("Forcing (W/m2)")    
-ax.grid(True,ls='dotted')
-plt.savefig("%sForcing_Values_%s.png"%(outpath,expname),dpi=200)
+# # Plot Forcing values
+# fig,ax = plt.subplots(1,1)
+# for i in range(len(testvalues)):
+#     ax.plot(mons3,paramsall[i][4],label="",alpha=(i/len(testvalues))*.5,color='b')
+# ax.plot(mons3,Fpt,color='k',label='Original Seasonal Cycle')
+# ax.plot(mons3,paramsall[np.argmin(rmses)][4],color='r',label="Best, (%.2fx)" % testvalues[np.argmin(rmses)])
+# ax.legend()
+# ax.set_ylabel("Forcing (W/m2)")    
+# ax.grid(True,ls='dotted')
+# plt.savefig("%sForcing_Values_%s.png"%(outpath,expname),dpi=200)
 
 
 # *********************************************************
@@ -1614,313 +1551,28 @@ ax.grid(True,ls='dotted')
 plt.savefig("%sMLD_Values_%s.png"%(outpath,expname),dpi=200)
 
 
-#% ----------------------
-#%% Do spectral analysis
-#% ------------------------
-
-# Parameters
-pct     = 0.0
-nsmooth = 200
-opt     = 1
-dt      = 3600*24*30
-tunit   = "Months"
-clvl    = [0.95]
-axopt   = 3
-clopt   = 1
 
 
-# -------------------------------------------
-# First calculate for CESM1 (full and slab)
-# -------------------------------------------
-fullpic  = "FULL_PIC_SST_lon330_lat50.npy"
-slabpic  = "SLAB_PIC_SST_lon330_lat50.npy"
-cesmfull = np.load(datpath+fullpic)
-cesmslab = np.load(datpath+slabpic)
-freq1s,P1s, = [],[]
-for sstin in [cesmfull,cesmslab]:
-    sps = ybx.yo_spec(sstin,opt,nsmooth,pct,debug=False)
-    P,freq,dof,r1=sps
-    
-    P    = P*dt
-    freq = freq/dt
-    
-    P1s.append(P)
-    freq1s.append(freq)
-Pcesmfull,Pcesmslab = P1s
-freqcesmfull,freqcesmslab = freq1s
 
-
-# -----------------------------------------------------------------
-# Calculate and make individual plots for stochastic model output
-# -----------------------------------------------------------------
-specparams  = []
-splotparams = []
-specs = []
-freqs = []
-for i in range(4):
-    sstin = sst[i]
-    sps = ybx.yo_spec(sstin,opt,nsmooth,pct,debug=False)
-    specparams.append(sps)
-    
-    P,freq,dof,r1=sps
-    specs.append(P*dt)
-    freqs.append(freq/dt)
-    pps = ybx.yo_specplot(freq,P,dof,r1,tunit,dt=dt,clvl=clvl,axopt=axopt,clopt=clopt)
-    splotparams.append(pps)
-    fig,ax,h,hcl,htax,hleg = pps
-    
-    if i < 2:
-        
-        l1 =ax.semilogx(freqcesmslab,Pcesmslab*freqcesmslab,label="CESM-SLAB",color='gray',lw=0.75)
-    else:
-        l1 =ax.semilogx(freqcesmfull,Pcesmfull*freqcesmfull,label="CESM-FULL",color='gray',lw=0.75)
-    
-    def set_monthlyspec(ax,htax):
-        
-        # Divisions of time
-        # dt  = 3600*24*30
-        # fs  = dt*12
-        # xtk      = np.array([1/fs/100,1/fs/50, 1/fs/25, 1/fs/10 , 1/fs/5, 1/fs])
-        # xtkm    = ["%i" % np.round(i) for i in 1/xtk/dt]
-        # xtklabel = ['%.1e \n (century)'%xtk[0],'%.1e \n (50yr)'%xtk[1],'%.1e \n (25yr)'%xtk[2],'%.1e \n (decade)'%xtk[3],'%.1e \n (5year)'%xtk[4],'%.2e \n (year)'%xtk[5]]
-        
-        # Orders of 10
-        dt = 3600*24*30
-        fs = dt*3
-        xtk      = np.array([1/(fs*10**-p) for p in np.arange(-11+7,-6+7,1)])
-        xtkm     = ["%.1f"% s for s in np.round(1/xtk/dt)]
-        xtkl     = ["%.1e" % s for s in xtk]
-        for i,a in enumerate([ax,htax]):
-            
-            a.set_xticks(xtk)
-            if i == 0:
-                
-                a.set_xticklabels(xtkl)
-            else:
-                a.set_xticklabels(xtkm)
-        return ax,htax
-    if axopt != 1:
-        ax,htax = set_monthlyspec(ax,htax)
-    
-    #ax.semilogx(freqcesmfull,freqcesmfull*Pcesmfull,'gray',label="CESM-FULL")
-    
-    vlv = [1/(100*12*dt),1/(12*10*dt),1/(12*dt)]
-    vll = ["Century","Decade","Year"]
-    for vv in vlv:
-        ax.axvline(vv,color='k',ls='dashed',label=vll,lw=0.75)
-    
-    
-    ax.set_xlabel("Frequency (cycles/sec)",fontsize=13)
-    ax.set_ylabel(r"Frequency x Power $(^{\circ}C)^{2}$",fontsize=13)
-    ax.set_title("Power Spectrum for %s" % labels[i] + "\n" + "nsmooth=%i, taper=%.2f" % (nsmooth,pct))
-    plt.tight_layout()
-    plt.savefig("%sPowerSpectra_%s_nsmooth%i_pct%03d_axopt%i.png"%(outpath,labels[i],nsmooth,pct*100,axopt),dpi=200)
-
-#%% Plot spectra for SST from PIC
-
+# --------------------------------------------
+#%% Save test output for ingestion into matlab
+# --------------------------------------------
 fullpic  = "FULL_PIC_SST_lon330_lat50.npy"
 slabpic  = "SLAB_PIC_SST_lon330_lat50.npy"
 cesmfull = np.load(datpath+fullpic)
 cesmslab = np.load(datpath+slabpic)
 
-
-sstin = cesmfull
-sps = ybx.yo_spec(sstin,opt,nsmooth,pct,debug=False)
-P,freq,dof,r1=sps
-pps = ybx.yo_specplot(freq,P,dof,r1,tunit,dt=dt,clvl=clvl,axopt=axopt,clopt=clopt)
-splotparams.append(pps)
-fig,ax,h,hcl,htax,hleg = pps
-
-def set_monthlyspec(ax,htax):
-    
-    # Divisions of time
-    # dt  = 3600*24*30
-    # fs  = dt*12
-    # xtk      = np.array([1/fs/100,1/fs/50, 1/fs/25, 1/fs/10 , 1/fs/5, 1/fs])
-    # xtkm    = ["%i" % np.round(i) for i in 1/xtk/dt]
-    # xtklabel = ['%.1e \n (century)'%xtk[0],'%.1e \n (50yr)'%xtk[1],'%.1e \n (25yr)'%xtk[2],'%.1e \n (decade)'%xtk[3],'%.1e \n (5year)'%xtk[4],'%.2e \n (year)'%xtk[5]]
-    
-    # Orders of 10
-    dt = 3600*24*30
-    fs = dt*3
-    xtk      = np.array([1/(fs*10**-p) for p in np.arange(-11+7,-6+7,1)])
-    xtkm     = ["%.1f"% s for s in np.round(1/xtk/dt)]
-    xtkl     = ["%.1e" % s for s in xtk]
-    for i,a in enumerate([ax,htax]):
-        
-        a.set_xticks(xtk)
-        if i == 0:
-            
-            a.set_xticklabels(xtkl)
-        else:
-            a.set_xticklabels(xtkm)
-    return ax,htax
-if axopt != 1:
-    ax,htax = set_monthlyspec(ax,htax)
-
-#xt
-vlv = [1/(100*12*dt),1/(12*10*dt),1/(12*dt)]
-vll = ["Century","Decade","Year"]
-for vv in vlv:
-    ax.axvline(vv,color='k',ls='dashed',label=vll,lw=0.75)
-
-
-ax.set_xlabel("Frequency (cycles/sec)",fontsize=13)
-ax.set_ylabel(r"Frequency x Power $(^{\circ}C)^{2}$",fontsize=13)
-ax.set_title("Power Spectrum for %s" % labels[i] + "\n" + "nsmooth=%i, taper=%.2f" % (nsmooth,pct))
-plt.tight_layout()
-plt.savefig("%sPowerSpectra_%s_nsmooth%i_pct%03d_axopt%i.png"%(outpath,'CESM_FULL',nsmooth,pct*100,axopt),dpi=200)
-
-#%%
-
-expcolors = ('blue','orange','magenta','red')
-
-# Set up variance preserving plot
-freq = freqs[0]
-fig,ax = plt.subplots(1,1)
-ax.set_ylabel("Frequency x Power",fontsize=13)
-
-for i in np.arange(1,4):
-    ax.semilogx(freqs[i],freqs[i]*specs[i],label=labels[i],color=expcolors[i],lw=0.75)
-ax.semilogx(freqcesmfull,Pcesmfull*freqcesmfull,label="CESM-FULL",color='k',lw=0.75)
-ax.semilogx(freqcesmslab,Pcesmslab*freqcesmslab,label="CESM-SLAB",color='gray',lw=0.75)
-
-xmin = 10**(np.floor(np.log10(np.min(freq))))
-
-ax.set_xlim([xmin,0.5/dt])
-
-ax.grid(True,ls='dotted')
-freqtick = ax.get_xticks()
-yy = ax.get_ylim()
-# ax.set_xscale("log")
-# ax.set_yscale("linear")
-period =1/freq
-htax   =ax.twiny()
-htax.set_xscale("log")
-htax.set_yscale("linear")
-xtkl = ["%.1f"% s for s in np.fix(1/freqtick/dt)]
-htax.set_xlim([xmin,0.5/dt])
-htax.set_xlabel("Period (%s)"%tunit,fontsize=13)
-ax,htax = set_monthlyspec(ax,htax)
-
-ax.legend()
-
-vlv = [1/(100*12*dt),1/(12*10*dt),1/(12*dt)]
-vll = ["Century","Decade","Year"]
-for vv in vlv:
-    ax.axvline(vv,color='k',ls='dashed',label=vll,lw=0.75)
-
-ax.set_xlabel("Frequency (cycles/sec)",fontsize=13)
-ax.set_ylabel(r"Frequency x Power $(^{\circ}C)^{2}$",fontsize=13)
-ax.set_title("Power Spectrum \n" + "nsmooth=%i, taper=%.2f" % (nsmooth,pct))
-plt.tight_layout()
-plt.savefig("%sPowerSpectra_%s_nsmooth%i_pct%03d_axopt%i.png"%(outpath,'COMPARISON',nsmooth,pct*100,axopt),dpi=200)
-
-
-# --------------------------------------------------
-#%% Spectral Analysis, but using annual averaged data
-# --------------------------------------------------
-slabann = proc.ann_avg(cesmslab,0)
-fullann = proc.ann_avg(cesmfull,0)
-sstann = []
+sst1 =sst[0]
+sst2 =sst[1]
+sst3 =sst[2]
+sst4 =sst[3]
+ssts = []
 for i in range(4):
-    sstann.append(proc.ann_avg(sst[i],0))
-nyr   = sstann[0].shape[0]
-simtime = np.arange(0,sst[0].shape[0])
-years = np.arange(0,nyr) 
+    ssts.append(sst[i])
+ssts = np.array(ssts)
 
-# Check Annual Averaging
-i = 3
-fig,ax = plt.subplots(1,1)
-ax.plot(simtime,sst[i],color='g',lw=0.5)
-ax.plot(simtime[::12],sstann[i],color='k')
-ax.set_xlim([0,120])
-
-# Spectral Analysis
-# Parameters
-pct     = 0.0
-nsmooth = 200
-opt     = 1
-dt      = 3600*24*365
-tunit   = "Years"
-clvl    = [0.95]
-axopt   = 3
-clopt   = 1
-# -------------------------------------------
-# First calculate for CESM1 (full and slab)
-# -------------------------------------------
-freq1s,P1s, = [],[]
-for sstin in [fullann,slabann]:
-    sps = ybx.yo_spec(sstin,opt,nsmooth,pct,debug=False)
-    P,freq,dof,r1=sps
-    
-    P    = P*dt
-    freq = freq/dt
-    
-    P1s.append(P)
-    freq1s.append(freq)
-Pannfull,Pannslab = P1s
-freqannfull,freqannslab = freq1s
-# -------------------------------------------
-# Bextm calculate for the Individual experiments
-# -------------------------------------------
-specparams  = []
-splotparams = []
-specs = []
-freqs = []
-for i in range(4):
-    sstin = sstann[i]
-    sps = ybx.yo_spec(sstin,opt,nsmooth,pct,debug=False)
-    specparams.append(sps)
-    
-    P,freq,dof,r1=sps
-    specs.append(P*dt)
-    freqs.append(freq/dt)
-    pps = ybx.yo_specplot(freq,P,dof,r1,tunit,dt=dt,clvl=clvl,axopt=axopt,clopt=clopt)
-    splotparams.append(pps)
-    fig,ax,h,hcl,htax,hleg = pps
-    
-    if i < 2:
-        
-        l1 =ax.semilogx(freqannslab,Pannslab*freqannslab,label="CESM-SLAB",color='gray',lw=0.75)
-    else:
-        l1 =ax.semilogx(freqannfull,Pannfull*freqannfull,label="CESM-FULL",color='gray',lw=0.75)
-    
-    def adjust_axis(ax,htax,dt,multiple):
-        
-        # Divisions of time
-        # dt  = 3600*24*30
-        # fs  = dt*12
-        # xtk      = np.array([1/fs/100,1/fs/50, 1/fs/25, 1/fs/10 , 1/fs/5, 1/fs])
-        # xtkm    = ["%i" % np.round(i) for i in 1/xtk/dt]
-        # xtklabel = ['%.1e \n (century)'%xtk[0],'%.1e \n (50yr)'%xtk[1],'%.1e \n (25yr)'%xtk[2],'%.1e \n (decade)'%xtk[3],'%.1e \n (5year)'%xtk[4],'%.2e \n (year)'%xtk[5]]
-        
-        fs = dt*multiple
-        xtk      = np.array([1/(fs*10**-p) for p in np.arange(-11+7,-6+7,1)])
-        xtkm     = ["%.1f"% s for s in np.round(1/xtk/dt)]
-        xtkl     = ["%.1e" % s for s in xtk]
-        for i,a in enumerate([ax,htax]):
-            
-            a.set_xticks(xtk)
-            if i == 0:
-                
-                a.set_xticklabels(xtkl)
-            else:
-                a.set_xticklabels(xtkm)
-        return ax,htax
-    if axopt != 1:
-        ax,htax = adjust_axis(ax,htax,dt,1)
-    
-    #ax.semilogx(freqcesmfull,freqcesmfull*Pcesmfull,'gray',label="CESM-FULL")
-    
-    vlv = [1/(100*dt),1/(10*dt),1/(dt)]
-    vll = ["Century","Decade","Year"]
-    for vv in vlv:
-        ax.axvline(vv,color='k',ls='dashed',label=vll,lw=0.75)
-    
-    
-    ax.set_xlabel("Frequency (cycles/sec)",fontsize=13)
-    ax.set_ylabel(r"Frequency x Power $(^{\circ}C)^{2}$",fontsize=13)
-    ax.set_title("Power Spectrum for %s" % labels[i] + "\n" + "nsmooth=%i, taper=%.2f" % (nsmooth,pct))
-    plt.tight_layout()
-    plt.savefig("%sPowerSpectra_Ann_%s_nsmooth%i_pct%03d_axopt%i.png"%(outpath,labels[i],nsmooth,pct*100,axopt),dpi=200)
+fnmat = datpath + "Stochastic_Model_Test_%s.mat" % locstring
+print(fnmat)
+savemat(fnmat,{'ssts':ssts,'cesmfull':cesmfull,'cesmslab':cesmslab})
+fnmat = datpath + "CESM_%s.mat" % locstring
+savemat({'cesmfull':cesmfull,'cesmslab':cesmslab})
