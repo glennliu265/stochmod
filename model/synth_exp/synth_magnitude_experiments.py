@@ -62,14 +62,14 @@ config['mconfig']     = "SLAB_PIC" # Model Configuration
 config['ftype']       = "DJFM-MON" # Forcing Type
 config['genrand']     = 0          # Toggle to generate new random timeseries
 config['fstd']        = 1          # Set the standard deviation N(0,fstd)
-config['t_end']       = 120000     # Number of months in simulation
-config['runid']       = "syn001"   # White Noise ID
+config['t_end']       = 12000     # Number of months in simulation
+config['runid']       = "syn002"   # White Noise ID
 config['fname']       = "FLXSTD"   #['NAO','EAP,'EOF3','FLXSTD']
 config['pointmode']   = 1          # Set to 1 to generate a single point
 config['query']       = [-30,50]   # Point to run model at 
 config['applyfac']    = 2          # Apply Integration Factor and MLD to forcing
 config['lags']        = np.arange(0,37,1)
-config['output_path'] = projpath + '02_Figures/20210223/'
+config['output_path'] = outpath
 config['smooth_forcing'] = False
 
 config.pop('Fpt',None)
@@ -200,10 +200,11 @@ locstringtitle = "Lon: %.1f Lat: %.1f" % (query[0],query[1])
 
 # Run Model
 config.pop('Fpt',None)
-config['Fpt'] = np.array([55.278503, 53.68089 , 42.456623, 33.448967, 22.954145, 22.506973,
-       22.151728, 24.135042, 33.337887, 40.91648 , 44.905064, 51.132706])
-config['Fpt'] = np.array([60.278503, 53.68089 , 42.456623, 33.448967, 22.954145, 22.506973,
-       22.151728, 19.135042, 33.337887, 40.91648 , 50.905064, 58.132706])
+# config['Fpt'] = np.array([55.278503, 53.68089 , 42.456623, 33.448967, 22.954145, 22.506973,
+#        22.151728, 24.135042, 33.337887, 40.91648 , 44.905064, 51.132706])
+
+# config['Fpt'] = np.array([60.278503, 53.68089 , 42.456623, 33.448967, 22.954145, 22.506973,
+#        22.151728, 19.135042, 33.337887, 40.91648 , 50.905064, 58.132706])
 ac,sst,dmp,frc,ent,Td,kmonth,params=scm.synth_stochmod(config,projpath=projpath)
 [o,a],damppt,mldpt,kprev,Fpt       =params
 
@@ -662,4 +663,107 @@ ax.legend()
 ax.set_ylabel("Forcing (W/m2)")    
 ax.grid(True,ls='dotted')
 plt.savefig("%sForcing_Values_%s.png"%(outpath,expname),dpi=200)
+
+
+# ****************************************************************************
+#%% Experiment with a particular ratio of forcing  at a selected month for
+# ****************************************************************************
+expname="ForcingRatioVary"
+model  = [1]
+kmonth_target = 0 # Index of target month
+testratios    = np.arange(0,4.1,.1)
+
+# Use Default Forcing for the selected month
+Fptbase = np.array([55.278503, 53.68089 , 42.456623, 33.448967, 22.954145, 22.506973,
+       22.151728, 24.135042, 33.337887, 40.91648 , 44.905064, 51.132706])
+
+testvalues = testratios
+testparam  = 'Fpt'
+
+acall     = []
+sstall    = []
+kmonthall = []
+paramsall = []
+for i,val in tqdm(enumerate(testvalues)):
+    Fin = Fptbase.copy()
+    Fin[kmonth_target]= Fin[kmonth_target-1]*val
+    config[testparam] = Fin
+    st = time.time()
+    #config[testparam] = np.ones(12)*val
+    ac,sst,dmp,frc,ent,Td,kmonth,params=scm.synth_stochmod(config,projpath=projpath)
+    acall.append(ac[1])
+    sstall.append(sst[1])
+    kmonthall.append(kmonth)
+    paramsall.append(params[1])
+    
+    print("Ran script for %s = %s in %.2fs"%(testparam,str(val),time.time()-st))
+
+config.pop(testparam,None)
+    
+#%% Make the plots
+
+xtk = np.arange(0,13,1)
+
+acalls = np.array(acall)
+
+
+
+# Autocorrelation Plots
+fig,ax = plt.subplots(1,1)
+ax.plot(lags,cesmauto,color='k',label='CESM-SLAB')
+for lam in range(len(testvalues)):
+    ax.plot(config['lags'],acalls[lam,:],label="",alpha=(lam/len(testvalues))*.5,color='b')
+ax.plot(lags,acalls[np.where(testratios==1)[0][0],:],color='r',label="Ratio = 1.0x")
+ax.legend()
+ax.set_ylabel("Correlation")
+ax.set_xlabel("Lag (months)")   
+ax.set_xticks(xtk)
+ax.set_xlim([xtk[0],xtk[-1]])
+ax.set_title("SST Autocorrelation by Forcing (W/m2) \n Lag 0 = Feb; Forcing Change in: %s"%mons3[kmonth_target])
+ax.grid(True,ls='dotted')
+ax.axvline([kmonth_target-kmonth],color='r',ls='dashed')
+plt.savefig("%sForcingRatioSensitivity_Autocorrelation_kmonth%i.png"%(outpath,kmonth_target),dpi=200)
+
+
+# Plot Forcing values
+# fig,ax = plt.subplots(1,1)
+# for i in range(len(testvalues)):
+#     ax.plot(mons3,paramsall[4],label="",alpha=(i/len(testvalues))*.5,color='b')
+# ax.plot(mons3,Fpt,color='k',label='Original Seasonal Cycle')
+# #ax.plot(mons3,paramsall[np.argmin(rmses)][4],color='r',label="Best, (%.2fx)" % testvalues[np.argmin(rmses)])
+# ax.legend()
+# ax.set_ylabel("Forcing (W/m2)")    
+# ax.grid(True,ls='dotted')
+
+# Plot Differences as function of testratio
+refac = acalls[np.where(testratios==1)[0][0],:] # Get Reference Curve (1.0x)
+diffac = acalls - refac[None,:] # Calculate Differences
+diffbyratio = diffac / testratios[:,None]
+
+targetmon = diffac[:,kmonth_target] # Differences for the target month
+fig,ax = plt.subplots(1,1,figsize=(8,8))
+for m in range(12):
+    if m == kmonth_target:
+        ax.plot(testratios,diffac[:,m],label="TARGET Month %i, Lag %i"%(m,m-kmonth),color='k',ls="dashdot")
+    elif m < kmonth_target:
+        ax.plot(testratios,diffac[:,m],label="Month %i, Lag %i"%(m,m-kmonth),ls="dashed",alpha=0.5)
+    elif m > kmonth_target:
+        ax.plot(testratios,diffac[:,m],label="Month %i, Lag %i"%(m,m-kmonth),ls="solid")
+    #ax.plot(testratios,diffac[:,m],label="Month %i, Lag %i"%(m,m-kmonth))
+ax.legend()
+#ax.set_xticks(np.arange(1,13,1))
+ax.set_ylabel("Difference in Correlation relative to 1:1 Ratio")
+ax.set_xlabel("Ratio (F(m) : F(m-1))")
+ax.set_title("Sensitivity of Autocorrelation to Forcing Ratio, %s/%s"%(mons3[kmonth_target],mons3[kmonth_target-1]))
+ax.grid(True,ls='dashed')
+plt.savefig("%sForcingRatioSensitivity_kmonth%i.png"%(outpath,kmonth_target),dpi=200)
+
+
+
+
+
+
+#
+#
+#
 
