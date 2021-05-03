@@ -313,12 +313,28 @@ plt.savefig(outpath+"Scycle_MLD_Forcing_%s_Narrow.png"%locstring,dpi=150)
 
 
 #% ----------------------
+#%% Load PiC Data
+#% ----------------------
+st = time.time()
+# Load full sst data from model
+ld  = np.load(datpath+"FULL_PIC_ENSOREM_TS_lag1_pcs2_monwin3.npz" ,allow_pickle=True)
+sstfull = ld['TS']
+ld2 = np.load(datpath+"SLAB_PIC_ENSOREM_TS_lag1_pcs2_monwin3.npz" ,allow_pickle=True)
+sstslab = ld2['TS']
+
+# Load lat/lon
+lat    = loadmat("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/CESM1_LATLON.mat")['LAT'].squeeze()
+lon360 = loadmat("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/CESM1_LATLON.mat")['LON'].squeeze()
+
+
+print("Loaded PiC Data in %.2fs"%(time.time()-st))
+#% --------------------------------
 #%% Prepare to Do spectral analysis
-#% ------------------------
+#% --------------------------------
 
 # Parameters
 pct     = 0.10
-nsmooth = 100
+nsmooth = 1
 opt     = 1
 dt      = 3600*24*30
 tunit   = "Months"
@@ -328,74 +344,95 @@ clopt   = 1
 specnames = "nsmooth%i_taper%i" % (nsmooth,pct*100)
 
 
-# Load Data from CESM-SLAB
-
-
-
-
 # # -------------------------------------------
 # # First calculate for CESM1 (full and slab)
 # # -------------------------------------------
-# fullpic  = "FULL_PIC_SST_lon330_lat50.npy"
-# slabpic  = "SLAB_PIC_SST_lon330_lat50.npy"
-# cesmfull = np.load(datpath+fullpic)
-# cesmslab = np.load(datpath+slabpic)
-# freq1s,P1s,CLs = [],[],[]
-# for sstin in [cesmfull,cesmslab]:
-#     sps = ybx.yo_spec(sstin,opt,nsmooth,pct,debug=False)
-#     P,freq,dof,r1=sps
-    
-#     CC = ybx.yo_speccl(freq,P,dof,r1,clvl)
-#     #pps = ybx.yo_specplot(freq,P,dof,r1,tunit,dt=dt,clvl=clvl,axopt=axopt,clopt=clopt)
-    
-#     P    = P*dt
-#     freq = freq/dt
-#     CC   = CC*dt
-    
-#     P1s.append(P)
-#     freq1s.append(freq)
-#     CLs.append(CC)
-# Pcesmfull,Pcesmslab = P1s
-# freqcesmfull,freqcesmslab = freq1s
-# clfull,clslab = CLs
+# Key Params
+plotcesm = True
+cnames  = ["CESM1 FULL","CESM1 SLAB"]
+nsmooths = [500,250] # Set Smothing
 
-# -------------------------------------------
-#%% Load results from cesm slab
-# -------------------------------------------
-ld = np.load("%s/model_output/CESM_PIC_Spectra_%s.npz"%(datpath,specnames),allow_pickle=True)
-Pcesmfulla    = ld['specfull']
-Pcesmslaba    = ld['specslab']
-freqcesmfulla = ld['freqfull']
-freqcesmslaba = ld['freqslab']
+# Other Params
+pct     = 0.10
+opt     = 1
+dt      = 3600*24*30
+tunit   = "Months"
+clvl    = [0.95]
+axopt   = 3
+clopt   = 1
 
-
-# Retrieve Data For Point
-lonf = query[0]
-latf = query[1]
+# Retrieve point
+lonf,latf = config['query']
 if lonf < 0:
     lonf += 360
-klon360,klat   = proc.find_latlon(lonf,latf,lon360,lat) # Global, 360 lon
+klon360,klat = proc.find_latlon(lonf,latf,lon360,lat)
+fullpt = sstfull[:,klat,klon360]
+slabpt = sstslab[:,klat,klon360]
 
-Pcesmfull    = Pcesmfulla[:,klat,klon360]
-Pcesmslab    = Pcesmslaba[:,klat,klon360]
-freqcesmfull = freqcesmfulla[:,klat,klon360]
-freqcesmslab = freqcesmslaba[:,klat,klon360]
+# Calculate spectra
+freq1s,P1s,CLs = [],[],[]
+for i,sstin in enumerate([fullpt,slabpt]):
+    
+    # Calculate and Plot
+    sps = ybx.yo_spec(sstin,opt,nsmooths[i],pct,debug=False)
+    P,freq,dof,r1=sps
+    
+    # Plot if option is set
+    if plotcesm:
+        pps = ybx.yo_specplot(freq,P,dof,r1,tunit,dt=dt,clvl=clvl,axopt=axopt,clopt=clopt)
+        fig,ax,h,hcl,htax,hleg = pps
+        ax,htax = viz.make_axtime(ax,htax)
+        ax = viz.add_yrlines(ax)
+        ax.set_title("%s Spectral Estimate \n nsmooth=%i, taper = %.2f" % (cnames[i],nsmooths[i],pct*100) +r"%")
+        plt.tight_layout()
+        plt.savefig("%sSpectralEstimate_%s_nsmooth%i_taper%i.png"%(outpath,cnames[i],nsmooths[i],pct*100),dpi=200)
+    CC = ybx.yo_speccl(freq,P,dof,r1,clvl)
+    P    = P*dt
+    freq = freq/dt
+    CC   = CC*dt
+    P1s.append(P)
+    freq1s.append(freq)
+    CLs.append(CC)
+
+# Read outvariables
+Pcesmfull,Pcesmslab = P1s
+freqcesmfull,freqcesmslab = freq1s
+clfull,clslab = CLs
+
+## Note, section below is commented out as these are precomputed spectra
+# # -------------------------------------------
+# #%% Load results from cesm slab
+# # -------------------------------------------
+# ld = np.load("%s/model_output/CESM_PIC_Spectra_%s.npz"%(datpath,specnames),allow_pickle=True)
+# Pcesmfulla    = ld['specfull']
+# Pcesmslaba    = ld['specslab']
+# freqcesmfulla = ld['freqfull']
+# freqcesmslaba = ld['freqslab']
+
+# # Retrieve Data For Point
+# lonf = query[0]
+# latf = query[1]
+# if lonf < 0:
+#     lonf += 360
+# klon360,klat   = proc.find_latlon(lonf,latf,lon360,lat) # Global, 360 lon
+
+# Pcesmfull    = Pcesmfulla[:,klat,klon360]
+# Pcesmslab    = Pcesmslaba[:,klat,klon360]
+# freqcesmfull = freqcesmfulla[:,klat,klon360]
+# freqcesmslab = freqcesmslaba[:,klat,klon360]
 
 
-# -------------
-# Location Plot
-# -------------
-fig, ax= plt.subplots(1,1)
-ax.pcolormesh(lon360,lat,Pcesmfulla[0,:,:])
-ax.scatter(lonf,latf,100,marker="x",color='r')
-
-
+# # -------------
+# # Location Plot
+# # -------------
+# fig, ax= plt.subplots(1,1)
+# ax.pcolormesh(lon360,lat,Pcesmfulla[0,:,:])
+# ax.scatter(lonf,latf,100,marker="x",color='r')
 
 # -----------------------------------------------------------------
 # %%Calculate and make individual plots for stochastic model output
 # -----------------------------------------------------------------
 sstall = sst
-
 
 #nsmooth=nsmooth*10/2
 specparams  = []
