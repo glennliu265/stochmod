@@ -44,9 +44,11 @@ fullauto = np.load(datpath+"CESM_clim/TS_FULL_Autocorrelation.npy")
 
 mons3=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
 labels=["MLD Fixed","MLD Mean","MLD Seasonal","MLD Entrain"]
+labelsnew = ["h=50m","Constant $h$","Vary $h$","Entraining"]
 #labels=["MLD (MAX)","MLD Seasonal","MLD Entrain"]
 #colors=["red","orange","magenta","blue"]
-expcolors = ('blue','orange','magenta','red')
+expcolors = ('blue','red','magenta','orange')
+els = ["dashdot","solid","dotted","dashed"]
 #hblt = 54.61088498433431 # Meters, the mixed layer depth used in CESM Slab
 
 # Set up Configuration
@@ -245,9 +247,6 @@ def calc_conflag(ac,conf,tails,n):
         cflags[l,:] = cfout
     return cflags
 
-
-
-
 nlags   = len(lags)
 cfstoch = np.zeros([4,nlags,2])
 for m in range(4):
@@ -258,26 +257,27 @@ for m in range(4):
 cfslab = calc_conflag(cesmauto2,conf,tails,898)
 cffull = calc_conflag(cesmautofull,conf,tails,1798)
 
-fig,ax     = plt.subplots(1,1)
-title      = "SST Autocorrelation (%s) \n Lag 0 = %s" % (locstringtitle,mons3[mldpt.argmax()])
+fig,ax     = plt.subplots(1,1,figsize=(6,4))
+title = "SST Autocorrelation: Adding Varying $h$ and Entrainment"
+#title      = "SST Autocorrelation (%s) \n Lag 0 = %s" % (locstringtitle,mons3[mldpt.argmax()])
 #ax,ax2,ax3 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title,loopvar=damppt)
 ax,ax2= viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title)
-ax.plot(lags,cesmauto2[lags],label="CESM SLAB",color='k')
+ax.plot(lags,cesmauto2[lags],label="CESM1 SLAB",color='k',marker="o",markersize=3)
 ax.fill_between(lags,cfslab[lags,0],cfslab[lags,1],color='k',alpha=0.10)
 
-ax.plot(lags,cesmautofull,color='k',label='CESM Full',ls='dashdot')
+ax.plot(lags,cesmautofull,color='k',label='CESM1 Full',ls='dashdot',marker="o",markersize=3)
 ax.fill_between(lags,cffull[lags,0],cffull[lags,1],color='k',alpha=0.10)
 
 for i in range(1,4):
-    ax.plot(lags,ac[i],label=labels[i],color=expcolors[i])
+    ax.plot(lags,ac[i],label=labelsnew[i],color=expcolors[i],ls=els[i],marker="o",markersize=3)
     ax.fill_between(lags,cfstoch[i,:,0],cfstoch[i,:,1],color=expcolors[i],alpha=0.25)
 
 ax.legend()
 #ax3.set_ylabel("Heat Flux Feedback ($W/m^{2}$)")
 #ax3.yaxis.label.set_color('gray')
-ax.legend(fontsize=8)
+ax.legend(fontsize=10,ncol=3)
 plt.tight_layout()
-plt.savefig(outpath+"Default_Autocorrelation_CF_%s.png"%locstring,dpi=200)
+plt.savefig(outpath+"Autocorrelation_MLDComplexity_%s.png"%locstring,dpi=200)
 
 # Save Default Values
 dampdef = damppt.copy()
@@ -288,25 +288,28 @@ Fptdef = Fpt.copy()
 # %% Plot Two Variables Together (Seasonal Cycle)
 #
 
-fig,ax = plt.subplots(1,1,figsize=(6,2))
+#fig,ax = plt.subplots(1,1,figsize=(6,2))
+fig,ax = plt.subplots(1,1,figsize=(4,3))
 
-ax.plot(mons3,mldpt,color='b')
+ax.plot(mons3,mldpt,color='mediumblue',lw=0.75,marker="o",markersize=4)
 ax.set_ylabel("Mixed-Layer Depth ($m$)")
-ax.yaxis.label.set_color('b')
+ax.yaxis.label.set_color('mediumblue')
 ax.set_xlim([0,11])
 
-ax2 = ax.twinx()
-ax2.plot(mons3,Fpt,color='r')
-ax2.yaxis.label.set_color('r')
-ax2.plot(mons3,damppt,color='gray',ls='dashed',label="$\lambda_a \, (W/m^{2})$")
-ax2.legend()
-ax2.set_ylabel("Forcing ($1\sigma,\,W/m^{2}$)")
+ax.tick_params(axis='x', labelrotation=45)
+ax2 = ax.twinx()    
+ax2.plot(mons3,Fpt,color='orangered',ls='solid',lw=0.75,marker="d",markersize=4,label="$1\sigma \; Forcing \; (Wm^{-2}$)")
+ax2.yaxis.label.set_color('k')
+ax2.plot(mons3,damppt,color='limegreen',ls='solid',label="$\lambda_a \; (Wm^{-2} \, ^{\circ} C^{-1})$",
+         marker="x",markersize=5,lw=0.75)
+ax2.legend(fontsize=8)
+ax2.set_ylabel("$1\sigma \; Forcing, \; \lambda_{a}$")
 ax2.set_xlim([0,11])
 ax.grid(True,ls='dotted')
 
 ax.set_title("Seasonal Cycle at %s"%locstringtitle)
 plt.tight_layout()
-plt.savefig(outpath+"Scycle_MLD_Forcing_%s.png"%locstring,dpi=150)
+plt.savefig(outpath+"Scycle_MLD_Forcing_%s_Narrow.png"%locstring,dpi=150)
 
 
 #% ----------------------
@@ -323,6 +326,12 @@ clvl    = [0.95]
 axopt   = 3
 clopt   = 1
 specnames = "nsmooth%i_taper%i" % (nsmooth,pct*100)
+
+
+# Load Data from CESM-SLAB
+
+
+
 
 # # -------------------------------------------
 # # First calculate for CESM1 (full and slab)
@@ -385,7 +394,10 @@ ax.scatter(lonf,latf,100,marker="x",color='r')
 # -----------------------------------------------------------------
 # %%Calculate and make individual plots for stochastic model output
 # -----------------------------------------------------------------
-nsmooth=nsmooth*10/2
+sstall = sst
+
+
+#nsmooth=nsmooth*10/2
 specparams  = []
 splotparams = []
 specs = []
@@ -740,6 +752,10 @@ ax.set_ylabel("Frequency x Power",fontsize=13)
 for i in range(len(labels2)):
     ax.semilogx(freqs[i],freqs[i]*specs[i],label=labels2[i],color=expcolors[i],lw=0.75)
 ax.semilogx(freqcesmslab,Pcesmslab*freqcesmslab,label="CESM-SLAB",color='gray',lw=0.75)
+
+
+    
+
 xmin = 10**(np.floor(np.log10(np.min(freq))))
 ax.set_xlim([xmin,0.5/dt])
 ax.grid(True,ls='dotted')
