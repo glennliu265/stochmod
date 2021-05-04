@@ -88,8 +88,6 @@ def interp_quad(ts):
     return tsquad
     #ax.set_xticklabels()
     
-    
-    
 def adjust_axis(ax,htax,dt,multiple):
     
     # Divisions of time
@@ -113,76 +111,6 @@ def adjust_axis(ax,htax,dt,multiple):
             a.set_xticklabels(xtkm)
     return ax,htax
 
-def make_axtime(ax,htax,denom='year'):
-    
-    # Units in Seconds
-    dtday = 3600*24
-    dtyr  = dtday*365
-    
-    fnamefull = ("Millennium","Century","Decade","Year","Month")
-    if denom == 'month':
-        
-        # Set frequency (by 10^n months, in seconds)
-        fs = [1/(dtyr*1000),1/(dtyr*100),1/(dtyr*10),1/(dtyr),1/(dtday*30)]
-        xtk      = np.array(fs)#/dtin
-        
-        # Set frequency tick labels
-        fsl = ["%.1e" % s for s in xtk]
-        
-        # Set period tick labels
-        per = [ "%.2e \n (%s) " % (int(1/fs[i]/(dtday*30)),fnamefull[i]) for i in range(len(fnamefull))]
-        
-        # Set axis names
-        axl_bot = "Frequency (cycles/sec)" # Axis Label
-        axl_top = "Period (Months)"
-        
-        
-    elif denom == 'year':
-        
-        # Set frequency (by 10^n years, in seconds)
-        denoms = [1000,100,10,1,.1]
-        fs = [1/(dtyr*1000),1/(dtyr*100),1/(dtyr*10),1/(dtyr),1/(dtyr*.1)]
-        xtk      = np.array(fs)#/dtin
-        
-        # Set tick labels for frequency axis
-        fsl = ["%.3f" % (fs[i]*dtyr) for i in range(len(fs))]
-        
-        # Set period tick labels
-        per = [ "%.2e \n (%s) " % (denoms[i],fnamefull[i]) for i in range(len(fnamefull))]
-        
-        # Set axis labels
-        axl_bot = "Frequency (cycles/year)" # Axis Label
-        axl_top = "Period (Years)"
-
-    
-    
-    for i,a in enumerate([ax,htax]):
-        a.set_xticks(xtk)
-        if i == 0:
-            a.set_xticklabels(fsl)
-            a.set_xlabel("")
-            a.set_xlabel(axl_bot)
-        else:
-            a.set_xticklabels(per)
-            a.set_xlabel("")
-            a.set_xlabel(axl_top)
-    return ax,htax
-    
-def set_monthlyspec(ax,htax):
-
-    # Orders of 10
-    dt = 3600*24*30
-    fs = dt*3
-    xtk      = np.array([1/(fs*10**-p) for p in np.arange(-11+7,-6+7,1)])
-    xtkm     = ["%.1f"% s for s in np.round(1/xtk/dt)]
-    xtkl     = ["%.1e" % s for s in xtk]
-    for i,a in enumerate([ax,htax]):
-        a.set_xticks(xtk)
-        if i == 0:
-            a.set_xticklabels(xtkl)
-        else:
-            a.set_xticklabels(xtkm)
-    return ax,htax
 #% ------------
 #%% Clean Run
 #% ------------
@@ -262,7 +190,7 @@ title = "SST Autocorrelation: Adding Varying $h$ and Entrainment"
 #title      = "SST Autocorrelation (%s) \n Lag 0 = %s" % (locstringtitle,mons3[mldpt.argmax()])
 #ax,ax2,ax3 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title,loopvar=damppt)
 ax,ax2= viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title)
-ax.plot(lags,cesmauto2[lags],label="CESM1 SLAB",color='k',marker="o",markersize=3)
+ax.plot(lags,cesmauto2[lags],label="CESM1 SLAB",color='gray',marker="o",markersize=3)
 ax.fill_between(lags,cfslab[lags,0],cfslab[lags,1],color='k',alpha=0.10)
 
 ax.plot(lags,cesmautofull,color='k',label='CESM1 Full',ls='dashdot',marker="o",markersize=3)
@@ -343,6 +271,39 @@ axopt   = 3
 clopt   = 1
 specnames = "nsmooth%i_taper%i" % (nsmooth,pct*100)
 
+# Some related functions
+def plot_whitenoise(ts,ax,
+                    nsmooth=1000,pct=0.10,
+                    dt=3600*24*30):
+    
+    tsvar = np.std(ts)
+    wn    = np.random.normal(0,tsvar,len(ts))
+    
+    sps = ybx.yo_spec(wn,1,nsmooth,pct,debug=False)
+    P,freq,dof,r1=sps
+    P*= dt
+    freq /= dt
+    ax.semilogx(freq,freq*P,label="White Noise ($\sigma=%.2f ^{\circ}C)$"%(tsvar),color='blue',lw=0.5)
+    return ax,P,freq
+    
+def formatspec_generals(ax,htax,fontsize=12,
+                        xlm = [1/(dt*12*15000),1/(dt*1)],
+                        ylm = [-.01,.4]):
+    # Condensed axis adjustments for general exam
+    
+    # Set grid, adjust axis
+    ax.grid(True,which='both',ls='dotted',lw=0.5)
+    ax,htax = viz.make_axtime(ax,htax)
+    
+    # Set Axis limits and labels
+    ax = viz.add_yrlines(ax)
+    ax.set_xlim(xlm)
+    htax.set_xlim(xlm)
+    ax.set_ylim(ylm)
+    ax.set_xlabel(r"Frequency (cycles/year)",fontsize=fontsize)
+    return ax,htax
+
+
 
 # # -------------------------------------------
 # # First calculate for CESM1 (full and slab)
@@ -384,6 +345,8 @@ for i,sstin in enumerate([fullpt,slabpt]):
         ax,htax = viz.make_axtime(ax,htax)
         ax = viz.add_yrlines(ax)
         ax.set_title("%s Spectral Estimate \n nsmooth=%i, taper = %.2f" % (cnames[i],nsmooths[i],pct*100) +r"%")
+        ax.grid(True,which='both',ls='dotted')
+        ax.set_ylabel(r"Frequency x Power $(^{\circ}C)^{2}$",fontsize=13)
         plt.tight_layout()
         plt.savefig("%sSpectralEstimate_%s_nsmooth%i_taper%i.png"%(outpath,cnames[i],nsmooths[i],pct*100),dpi=200)
     CC = ybx.yo_speccl(freq,P,dof,r1,clvl)
@@ -432,114 +395,157 @@ clfull,clslab = CLs
 # -----------------------------------------------------------------
 # %%Calculate and make individual plots for stochastic model output
 # -----------------------------------------------------------------
-sstall = sst
 
-#nsmooth=nsmooth*10/2
+sstall  = sst
+nsmooth = 1000
+pct     = 0.10
+specnames = "nsmooth%i_taper%i" % (nsmooth,pct*100)
+
+
 specparams  = []
 splotparams = []
 specs = []
 freqs = []
+CCs   = []
 for i in range(4):
     sstin = sstall[i]
     sps = ybx.yo_spec(sstin,opt,nsmooth,pct,debug=False)
     specparams.append(sps)
     
     P,freq,dof,r1=sps
+    CC = ybx.yo_speccl(freq,P,dof,r1,clvl)
+    
     specs.append(P*dt)
     freqs.append(freq/dt)
+    
+    CCs.append(CC*dt)
+    
+    #plt.semilogx(freqs[i],CCs[2][:,1]*freqs[i],label="95% Significance (AR1)",color=ecol[i],ls="dashed",alpha=0.7,lw=1)
+    #plt.semilogx(freq,CC[:,1]*freq[i],label="95% Significance (AR1)",color=ecol[i],ls="dashed",alpha=0.7,lw=1)
+    
     pps = ybx.yo_specplot(freq,P,dof,r1,tunit,dt=dt,clvl=clvl,axopt=axopt,clopt=clopt)
     splotparams.append(pps)
     fig,ax,h,hcl,htax,hleg = pps
     
     if i < 2:
         l1 =ax.semilogx(freqcesmslab,Pcesmslab*freqcesmslab,label="CESM-SLAB",color='gray',lw=0.75)
+        ax.semilogx(freqcesmslab,freqcesmslab*CLs[1][:,1],color='gray',label="",ls='dashed')
         #l2 =ax.semilogx(freqcesmslab,clslab[:,0]*freqcesmslab,label="CESM-SLAB (AR1)",color='red',lw=0.75,alpha=0.4)
         #l3 =ax.semilogx(freqcesmslab,clslab[:,1]*freqcesmslab,label="CESM-SLAB (95%)",color='blue',lw=0.75,alpha=0.4)
     else:
         l1 =ax.semilogx(freqcesmfull,Pcesmfull*freqcesmfull,label="CESM-FULL",color='gray',lw=0.75)
+        ax.semilogx(freqcesmfull,freqcesmfull*CLs[0][:,1],color='gray',label="",ls='dashed')
         #l2 =ax.semilogx(freqcesmfull,clfull[:,0]*freqcesmfull,label="CESM-FULL (AR1)",color='red',lw=0.75,alpha=0.4)
         #l3 =ax.semilogx(freqcesmfull,clfull[:,1]*freqcesmfull,label="CESM-FULL (95%)",color='blue',lw=0.75,alpha=0.4)
 
     if axopt != 1:
-        #dt = 12*365*3600
-        dtin = 3600*24*365
-        #ax,htax=make_axtime(ax,htax,dt)
-        ax,htax=make_axtime(ax,htax)
+        ax,htax=viz.make_axtime(ax,htax)
     
-    #ax.semilogx(freqcesmfull,freqcesmfull*Pcesmfull,'gray',label="CESM-FULL")
-    #vlv = [1/(100*dt*12),1/(10*12*dt),1/(12*dt)]
-    vlv = [1/(100*365*24*3600),1/(10*365*24*3600),1/(365*24*3600)]
-    vll = ["Century","Decade","Year"]
-    for vv in vlv:
-        ax.axvline(vv,color='k',ls='dashed',label=vll,lw=0.75)
-    
+    ax = viz.add_yrlines(ax)
     
     ax.grid(True,which='both',ls='dotted')
     ax.set_xlabel("Frequency (cycles/sec)",fontsize=13)
     ax.set_ylabel(r"Frequency x Power $(^{\circ}C)^{2}$",fontsize=13)
-    ax.set_title("Power Spectrum for %s" % labels[i] + "\n" + "nsmooth=%i, taper=%.2f" % (nsmooth,pct))
+    ax.set_title("Spectral Estimate for %s" % labelsnew[i] + "\n" + "nsmooth=%i, taper=%.2f" % (nsmooth,pct*100)+"%")
     plt.tight_layout()
     plt.savefig("%sPowerSpectra_%s_nsmooth%i_pct%03d_axopt%i_%s.png"%(outpath,labels[i],nsmooth,pct*100,axopt,locstring),dpi=200)
 
-#%% Plot spectra for SST from PIC
+# -----------------------------------------------------------------
+#%% Plot Everything Together
+# -----------------------------------------------------------------
 
-# fullpic  = "FULL_PIC_SST_lon330_lat50.npy"
-# slabpic  = "SLAB_PIC_SST_lon330_lat50.npy"
-# cesmfull = np.load(datpath+fullpic)
-# cesmslab = np.load(datpath+slabpic)
+ecol  = expcolors
+ename = labelsnew
 
-
-
-# sstin = cesmfull
-# sps = ybx.yo_spec(sstin,opt,nsmooth,pct,debug=False)
-# P,freq,dof,r1=sps
-# pps = ybx.yo_specplot(freq,P,dof,r1,tunit,dt=dt,clvl=clvl,axopt=axopt,clopt=clopt)
-# splotparams.append(pps)
-# fig,ax,h,hcl,htax,hleg = pps
-
-# def set_monthlyspec(ax,htax):
+# Plot each spectra
+fig,ax = plt.subplots(1,1,figsize=(6,4))
+for i in [1,2,3]:
     
-#     # Divisions of time
-#     # dt  = 3600*24*30
-#     # fs  = dt*12
-#     # xtk      = np.array([1/fs/100,1/fs/50, 1/fs/25, 1/fs/10 , 1/fs/5, 1/fs])
-#     # xtkm    = ["%i" % np.round(i) for i in 1/xtk/dt]
-#     # xtklabel = ['%.1e \n (century)'%xtk[0],'%.1e \n (50yr)'%xtk[1],'%.1e \n (25yr)'%xtk[2],'%.1e \n (decade)'%xtk[3],'%.1e \n (5year)'%xtk[4],'%.2e \n (year)'%xtk[5]]
+    ksig1 = specs[i] > CCs[i][:,1]
+    ksig0 = specs[i] <= CCs[i][:,1]
     
-#     # Orders of 10
-#     dt = 3600*24*30
-#     fs = dt*3
-#     xtk      = np.array([1/(fs*10**-p) for p in np.arange(-11+7,-6+7,1)])
-#     xtkm     = ["%.1f"% s for s in np.round(1/xtk/dt)]
-#     xtkl     = ["%.1e" % s for s in xtk]
-#     for i,a in enumerate([ax,htax]):
-        
-#         a.set_xticks(xtk)
-#         if i == 0:
-            
-#             a.set_xticklabels(xtkl)
-#         else:
-#             a.set_xticklabels(xtkm)
-#     return ax,htax
-# if axopt != 1:
-#     ax,htax = set_monthlyspec(ax,htax)
+    #specsig1 = np.ma.masked_where(specs[i] > CCs[i][:,1], specs[i]*freqs[i])
+    #specsig0 = np.ma.masked_where(specs[i] <= CCs[i][:,1], specs[i]*freqs[i])
+    
+    # Significant Points
+    specsig1 = specs[i].copy()
+    specsig1[ksig0] = np.nan
+    # Insig Points
+    specsig0 = specs[i].copy()
+    specsig0[ksig1] = np.nan
+    
+    #ax.semilogx(freqs[i],CCs[i][:,1]*freqs[i],label=ename[i],color="k",ls='solid')
+    #ax.semilogx(freqs[i],specsig1*freqs[i],label=ename[i],color=ecol[i],ls='solid',lw=0.75)
+    #ax.semilogx(freqs[i],specsig0*freqs[i],label="",color=ecol[i],ls='dotted',alpha=0.7,lw=0.75)
+    #ax.semilogx(freqs[i],CCs[i][:,1]*freqs[i],color=ecol[i],ls='dashed',lw=1)
+    
+    ax.semilogx(freqs[i],specs[i]*freqs[i],label=ename[i] + "$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(sstall[i])),color=ecol[i],ls="solid")
+    #ax.semilogx(freqs[i],freqs[i]*)
+    
+ax.semilogx(freqcesmslab,freqcesmslab*Pcesmslab,color='gray',label="CESM1 SLAB" + "$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(slabpt)))
+#ax.semilogx(freqcesmslab,freqcesmslab*CLs[1][:,1],color='gray',label="",ls='dashed')
+ax.semilogx(freqcesmfull,freqcesmfull*Pcesmfull,color='black',label="CESM1 FULL" + "$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(fullpt)))
+#ax.semilogx(freqcesmfull,freqcesmfull*CLs[0][:,1],color='black',label="",ls='dashed')
 
-# #xt
-# vlv = [1/(100*12*dt),1/(12*10*dt),1/(12*dt)]
-# vll = ["Century","Decade","Year"]
-# for vv in vlv:
-#     ax.axvline(vv,color='k',ls='dashed',label=vll,lw=0.75)
+ax.legend()
+htax = viz.twin_freqaxis(ax,freqs[0],tunit,dt)
+ax.set_ylabel(r"Frequency x Power $(^{\circ}C)^{2}$",fontsize=13)
+ax,htax = formatspec_generals(ax,htax)
 
 
-# ax.set_xlabel("Frequency (cycles/sec)",fontsize=13)
-# ax.set_ylabel(r"Frequency x Power $(^{\circ}C)^{2}$",fontsize=13)
-# ax.set_title("Power Spectrum for %s" % labels[i] + "\n" + "nsmooth=%i, taper=%.2f" % (nsmooth,pct))
-# plt.tight_layout()
-# plt.savefig("%sPowerSpectra_%s_nsmooth%i_pct%03d_axopt%i.png"%(outpath,'CESM_FULL',nsmooth,pct*100,axopt),dpi=200)
+#ax.grid(True,which='both',ls='dotted')
+
+
+#ax,htax = viz.make_axtime(ax,htax)
+#ax = viz.add_yrlines(ax)
+ax.set_title("SST Spectral Estimates, Varying Mixed Layer Complexity")
+plt.tight_layout()
+plt.savefig("%sSpectra_MLD_Complexity_SamePlot_nsmooth%i_taper%i.png"% (outpath,nsmooth,pct*100),dpi=150)
+
+#%% Plot Figure for each one
+xlm = [1/(dt*12*15000),1/(dt*1)]
+ylm = [-.01,.4]
+fig,axs = plt.subplots(1,2,figsize=(10,4))
+
+
+# Slab vs. MLD Const
+ax = axs[0]
+i = 1
+ax.semilogx(freqs[i],specs[i]*freqs[i],label=ename[i],color=ecol[i],ls="solid")
+ax.semilogx(freqs[i],CCs[i][:,1]*freqs[i],label="95% Significance (AR1)",color=ecol[i],ls="dashed",alpha=0.7)
+l1 =ax.semilogx(freqcesmslab,Pcesmslab*freqcesmslab,label="CESM-SLAB",color='gray',lw=1)
+ax.semilogx(freqcesmslab,freqcesmslab*CLs[1][:,1],color='gray',label="",ls='dashed',lw=1)
+ax,Pn,Freqn=plot_whitenoise(sstall[i],ax,nsmooth=nsmooth,pct=pct,dt=dt)
+htax = viz.twin_freqaxis(ax,freqs[0],tunit,dt)
+ax.legend()
+ax.set_title("CESM1 Slab vs. Non-entraining Stochastic Model",fontsize=14)
+ax,htax = formatspec_generals(ax,htax)
+ax.set_ylabel(r"Frequency x Power $(^{\circ}C)^{2}$",fontsize=12)
+
+# Full vs. MLD Entrain
+ax = axs[1]
+i = 3
+ax.semilogx(freqs[i],specs[i]*freqs[i],label=ename[i],color=ecol[i],ls="solid")
+ax.semilogx(freqs[i],CCs[i][:,1]*freqs[i],label="95% Significance (AR1)",color=ecol[i],ls="dashed",alpha=0.7,lw=1)
+l1 =ax.semilogx(freqcesmfull,Pcesmfull*freqcesmfull,label="CESM-FULL",color='black',lw=1)
+ax.semilogx(freqcesmfull,freqcesmfull*CLs[0][:,1],color='black',label="",ls='dashed')
+ax,Pn,Freqn=plot_whitenoise(sstall[i],ax,nsmooth=nsmooth,pct=pct,dt=dt)
+htax = viz.twin_freqaxis(ax,freqs[0],tunit,dt)
+ax.legend()
+ax.set_title("CESM1 Full vs. Entraining Stochastic Model",fontsize=14)
+ax,htax = formatspec_generals(ax,htax)
+
+plt.tight_layout()
+plt.savefig("%sSpectra_Comparison_2panel_nsmooth%i_taper%i.png"% (outpath,nsmooth,pct*100),dpi=150)
+
+
+
+
+#%% Under construction below
 
 #%% Plot all experiments together
 
-expcolors = ('blue','orange','magenta','red')
+#expcolors = ('blue','orange','magenta','red')
 
 # Set up variance preserving plot
 freq = freqs[0]
@@ -820,9 +826,9 @@ plt.tight_layout()
 plt.savefig("%sPowerSpectra_%s_%s_nsmooth%i_pct%03d_axopt%i.png"%(outpath,expname2,'COMPARISON',nsmooth,pct*100,axopt),dpi=200)
 
 
-#
+# ------------------------------
 # %% Quick Plot of CESM Variance
-# 
+# ------------------------------
 
 fullpic  = "FULL_PIC_SST_lon330_lat50.npy"
 slabpic  = "SLAB_PIC_SST_lon330_lat50.npy"
