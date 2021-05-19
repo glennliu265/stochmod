@@ -27,6 +27,7 @@ import time
 import cartopy.crs as ccrs
 
 from scipy import signal
+from scipy.ndimage.filters import uniform_filter1d
 
 #%% Settings
 
@@ -395,8 +396,8 @@ cffull = calc_conflag(fullauto,conf,tails,1798)
 fig,ax     = plt.subplots(1,1)
 title      = "SST Autocorrelation (Lag 0 = %s)" % (mons3[mldpt.argmax()])
 ax,ax2 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title)
-ax.plot(lags,cesmauto2[lags],label="CESM SLAB",color='k')
-ax.fill_between(lags,cfslab[lags,0],cfslab[lags,1],color='k',alpha=0.10)
+ax.plot(lags,cesmauto2[lags],label="CESM SLAB",color='gray')
+ax.fill_between(lags,cfslab[lags,0],cfslab[lags,1],color='gray',alpha=0.10)
 
 ax.plot(lags,fullauto,color='k',label='CESM Full',ls='dashdot')
 ax.fill_between(lags,cffull[lags,0],cffull[lags,1],color='k',alpha=0.10)
@@ -518,7 +519,7 @@ cffull = calc_conflag(fullauto,conf,tails,1798)
 
 
 #%% Plot Model Results, All Together
-model  = 2
+model  = 1
 plotac = acs
 # Plot some differences
 xtk2       = np.arange(0,37,2)
@@ -542,6 +543,7 @@ plt.tight_layout()
 plotacs = acs
 model   = 1
 
+
 figs,axs = plt.subplots(2,2,figsize=(8,8))
 for i,e in enumerate([0,1,2,3]):
     ax     = axs.ravel()[i]
@@ -550,14 +552,14 @@ for i,e in enumerate([0,1,2,3]):
     xtk2       = np.arange(0,37,3)
     ax,ax2 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title)
     
-    ax.plot(lags,cesmauto2[lags],label="CESM SLAB",color='k')
-    ax.scatter(lags,cesmauto2[lags],10,label="",color='k')
+    ax.plot(lags,cesmauto2[lags],label="CESM SLAB",color='gray',marker="o",markersize=4)
+    #ax.scatter(lags,cesmauto2[lags],10,label="",color='gray')
     ax.fill_between(lags,cfslab[lags,0],cfslab[lags,1],color='gray',alpha=0.4)
     ax.set_ylabel("")
     
     cfs = confs[e,model,:,:]
-    ax.plot(lags,plotacs[e][model],label="Stochastic Model",color='b')
-    ax.scatter(lags,plotacs[e][model],10,label="",color='b')
+    ax.plot(lags,plotacs[e][model],label="Stochastic Model",color='b',marker="o",markersize=4)
+    #ax.scatter(lags,plotacs[e][model],10,label="",color='b')
     ax.fill_between(lags,cfs[:,0],cfs[:,1],color='b',alpha=0.4)
     ax.legend()
     if i == 0:
@@ -592,7 +594,7 @@ plotvar = damppt
 ylab =  "Atmopsheric Damping ($W/m^{2}$)"
 
 
-ecol = ["blue",'cyan','magenta','red']
+ecol = ["blue",'cyan','gold','red']
 els  = ["dotted","dashdot","dashed","solid"]
 ename = ["All Constant",
          r"Vary $\alpha$",
@@ -608,8 +610,8 @@ if addvar:
     ax3.yaxis.label.set_color('gray')
 else:
     ax,ax2 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title)
-ax.plot(lags,cesmauto2[lags],label="CESM1 SLAB",color='k',marker="o",size=4.5)
-ax.scatter(lags,cesmauto2[lags],10,label="",color='k')
+ax.plot(lags,cesmauto2[lags],label="CESM1 SLAB",color='gray',marker="o",markersize=4)
+#ax.scatter(lags,cesmauto2[lags],10,label="",color='k')
 ax.fill_between(lags,cfslab[lags,0],cfslab[lags,1],color='gray',alpha=0.4)
 
 for i,e in enumerate([0,1,2,3]):
@@ -620,7 +622,7 @@ for i,e in enumerate([0,1,2,3]):
     ax.set_ylabel("")
     
     cfs = confs[e,model,:,:]
-    ax.plot(lags,plotacs[e][model],label=ename[i],color=ecol[i],ls=els[i],marker="o",size=4.5)
+    ax.plot(lags,plotacs[e][model],label=ename[i],color=ecol[i],ls=els[i],marker="o",markersize=4)
     #ax.scatter(lags,plotacs[e][model],10,label="",color=ecol[i])
     ax.fill_between(lags,cfs[:,0],cfs[:,1],color=ecol[i],alpha=0.2)
     
@@ -634,9 +636,114 @@ for i,e in enumerate([0,1,2,3]):
     # if i == 2:
     #     ax.set_ylabel("Variable Damping",fontsize=14)
 ax.set_ylabel("Correlation")
-plt.suptitle("SST Autocorrelation: Non-Entraining Stochastic Model (Constant $h$)",fontsize=12)
+plt.suptitle("SST Autocorrelation: Non-Entraining Stochastic Model \n Adding Varying Damping and Forcing",fontsize=12)
 plt.tight_layout()
 plt.savefig("%sAutocorrelation_ConstvVary_MLDConst_SamePlot.png"%outpath,dpi=150)
+
+#%% Save as above section, but add each one incrementally
+
+#plotlags = np.arange(0,24)
+lags    = np.arange(0,25,1)
+xtk2    = np.arange(0,25,2)
+for es in range(4):
+    loopis = np.arange(0,es+1)
+    print(loopis)
+    
+    # if es == 0:
+    #     addvar = False
+    # elif es == 1:
+    #     addvar  = True
+    #     plotvar = Fpt
+    #     ylab    = "Forcing ($W/m^{2}$)"
+    # elif es == 2:
+    #     addvar = True
+    #     plotvar = damppt
+    #     ylab =  "Atmopsheric Damping ($W/m^{2} \,/^{\circ}C$)"
+    # elif es == 3:
+    #     addvar = False
+        
+    figs,ax = plt.subplots(1,1,figsize=(6,4))
+    if addvar:
+        ax,ax2,ax3 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title,loopvar=plotvar)
+        ax3.set_ylabel(ylab)
+        ax3.yaxis.label.set_color('gray')
+    else:
+        ax,ax2 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title)
+    ax.plot(lags,cesmauto2[lags],label="CESM1 SLAB",color='gray',marker="o",markersize=4)
+    #ax.scatter(lags,cesmauto2[lags],10,label="",color='k')
+    ax.fill_between(lags,cfslab[lags,0],cfslab[lags,1],color='gray',alpha=0.4)
+    
+    for i,e in enumerate(loopis):
+        
+        title=""
+        ax.set_ylabel("")
+        
+        cfs = confs[e,model,:,:]
+        ax.plot(lags,plotacs[e][model][lags],label=ename[i],color=ecol[i],ls=els[i],marker="o",markersize=4)
+        #ax.scatter(lags,plotacs[e][model],10,label="",color=ecol[i])
+        ax.fill_between(lags,cfs[lags,0],cfs[lags,1],color=ecol[i],alpha=0.2)
+        
+        ax.legend(fontsize=8,ncol=3)
+        
+        # if i == 0:
+        #     ax.set_ylabel("Constant Damping",fontsize=14)
+        #     ax.set_title("Constant Forcing",fontsize=14)
+        # if i == 1:
+        #     ax.set_title("Variable Forcing",fontsize=14)
+        # if i == 2:
+        #     ax.set_ylabel("Variable Damping",fontsize=14)
+    ax.set_ylabel("Correlation")
+    plt.suptitle("SST Autocorrelation: Non-Entraining Stochastic Model \n Adding Varying Damping and Forcing",fontsize=12)
+    plt.tight_layout()
+    plt.savefig("%sAutocorrelation_ConstvVary_MLDConst_SamePlot_%i.png"% (outpath,es),dpi=150)
+    print("Done With %i"% es)
+
+
+#%% Corresponding seasonal cycle plots
+fig,ax = plt.subplots(1,1,figsize=(6,3))
+
+mvar = 1
+fvar = 1
+dvar = 1
+pvarname = "mvar%i_fvar%i_dvar%i" % (mvar,fvar,dvar)
+
+#ax.set_facecolor("black") 
+es = 0
+if mvar:
+    ax.plot(mons3,mldpt,color='magenta',lw=1,marker="o",markersize=4)
+else:
+    ax.plot(mons3,np.ones(12)*hblt,color='magenta',lw=1,marker="o",markersize=4)
+ax.set_ylabel("Mixed-Layer Depth ($m$)")
+ax.yaxis.label.set_color('magenta')
+ax.set_xlim([0,11])
+
+ax.tick_params(axis='x', labelrotation=45)
+ax2 = ax.twinx()    
+if fvar:
+    ax2.plot(mons3,Fpt,color='cyan',ls='solid',lw=1,marker="d",markersize=4,label="$1\sigma \; Forcing \; (Wm^{-2}$)")
+else:
+    ax2.plot(mons3,np.ones(12)*Fpt.mean(),color='cyan',ls='solid',lw=1,marker="d",markersize=4,label="$1\sigma \; Forcing \; (Wm^{-2}$)")
+ax2.yaxis.label.set_color('k')
+
+if dvar:
+    ax2.plot(mons3,damppt,color='gold',ls='solid',label="$\lambda_a \; (Wm^{-2} \, ^{\circ} C^{-1})$",
+             marker="x",markersize=5,lw=1)
+else:
+    ax2.plot(mons3,np.ones(12)*damppt.mean(),color='gold',ls='solid',label="$\lambda_a \; (Wm^{-2} \, ^{\circ} C^{-1})$",
+             marker="x",markersize=5,lw=1)
+
+ax2.legend(fontsize=10)
+ax2.set_ylabel("$1\sigma \; Forcing, \; \lambda_{a}$")
+ax2.set_xlim([0,11])
+ax.grid(True,ls='dotted',lw=0.5)
+
+ax.set_ylim([15,150])
+ax2.set_ylim([0,70])
+
+ax.set_title("Seasonal Cycle at %s"%locstringtitle)
+plt.tight_layout()
+plt.savefig(outpath+"Scycle_MLD_Forcing_%s_Sequence_%s.png"% (locstring,pvarname),dpi=150)
+
 
 
 #%% Plot 4x4 with variable MLD
@@ -759,39 +866,139 @@ plt.tight_layout()
 plt.savefig(outpath+"Stochmod_Inputs.png",dpi=150)
 
 
+
+
+#% ----------------------
+#%% Load PiC Data
+#% ----------------------
+st = time.time()
+# Load full sst data from model
+ld  = np.load(datpath+"FULL_PIC_ENSOREM_TS_lag1_pcs2_monwin3.npz" ,allow_pickle=True)
+sstfull = ld['TS']
+ld2 = np.load(datpath+"SLAB_PIC_ENSOREM_TS_lag1_pcs2_monwin3.npz" ,allow_pickle=True)
+sstslab = ld2['TS']
+
+# Load lat/lon
+lat    = loadmat("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/CESM1_LATLON.mat")['LAT'].squeeze()
+lon360 = loadmat("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/CESM1_LATLON.mat")['LON'].squeeze()
+
+
+print("Loaded PiC Data in %.2fs"%(time.time()-st))
+
+
+
+# # -------------------------------------------
+#%% First calculate for CESM1 (full and slab)
+# # -------------------------------------------
+# Parameters
+pct     = 0.10
+nsmooth = 1
+opt     = 1
+dt      = 3600*24*30
+tunit   = "Months"
+clvl    = [0.95]
+axopt   = 3
+clopt   = 1
+specnames = "nsmooth%i_taper%i" % (nsmooth,pct*100)
+
+# Some related functions
+def plot_whitenoise(ts,ax,
+                    nsmooth=1000,pct=0.10,
+                    dt=3600*24*30):
+    
+    tsvar = np.std(ts)
+    wn    = np.random.normal(0,tsvar,len(ts))
+    
+    sps = ybx.yo_spec(wn,1,nsmooth,pct,debug=False)
+    P,freq,dof,r1=sps
+    P*= dt
+    freq /= dt
+    ax.semilogx(freq,freq*P,label="White Noise ($\sigma=%.2f ^{\circ}C)$"%(tsvar),color='blue',lw=0.5)
+    return ax,P,freq
+    
+def formatspec_generals(ax,htax,fontsize=12,
+                        xlm = [1/(dt*12*15000),1/(dt*1)],
+                        ylm = [-.01,.4]):
+    # Condensed axis adjustments for general exam
+
+    
+    # Set grid, adjust axis
+    ax,htax = viz.make_axtime(ax,htax)
+    
+    # Set Axis limits and labels
+    #ax.grid(True,which='both',ls='dotted',lw=0.5)
+    ax = viz.add_yrlines(ax)
+    ax.set_xlim(xlm)
+    htax.set_xlim(xlm)
+    ax.set_ylim(ylm)
+    
+    ax.set_xlabel(r"Frequency (cycles/year)",fontsize=fontsize)
+    
+    ax.tick_params(axis='x', which='minor', bottom=False)
+    htax.tick_params(axis='x', which='minor', bottom=False)
+    return ax,htax
+
+# Key Params
+plotcesm = True
+cnames  = ["CESM1 FULL","CESM1 SLAB"]
+nsmooths = [500,250] # Set Smothing
+
+# Other Params
+pct     = 0.10
+opt     = 1
+dt      = 3600*24*30
+tunit   = "Months"
+clvl    = [0.95]
+axopt   = 3
+clopt   = 1
+
+# Retrieve point
+lonf,latf = config['query']
+if lonf < 0:
+    lonf += 360
+klon360,klat = proc.find_latlon(lonf,latf,lon360,lat)
+fullpt = sstfull[:,klat,klon360]
+slabpt = sstslab[:,klat,klon360]
+
+# Calculate spectra
+freq1s,P1s,CLs = [],[],[]
+for i,sstin in enumerate([fullpt,slabpt]):
+    
+    # Calculate and Plot
+    sps = ybx.yo_spec(sstin,opt,nsmooths[i],pct,debug=False)
+    P,freq,dof,r1=sps
+    
+    # Plot if option is set
+    if plotcesm:
+        pps = ybx.yo_specplot(freq,P,dof,r1,tunit,dt=dt,clvl=clvl,axopt=axopt,clopt=clopt)
+        fig,ax,h,hcl,htax,hleg = pps
+        #ax,htax = viz.make_axtime(ax,htax)
+        ax = viz.add_yrlines(ax)
+        ax.set_title("%s Spectral Estimate \n nsmooth=%i, taper = %.2f" % (cnames[i],nsmooths[i],pct*100) +r"%")
+        ax.grid(True,which='both',ls='dotted')
+        ax.set_ylabel(r"Frequency x Power $(^{\circ}C)^{2}$",fontsize=13)
+        plt.tight_layout()
+        plt.savefig("%sSpectralEstimate_%s_nsmooth%i_taper%i.png"%(outpath,cnames[i],nsmooths[i],pct*100),dpi=200)
+    CC = ybx.yo_speccl(freq,P,dof,r1,clvl)
+    P    = P*dt
+    freq = freq/dt
+    CC   = CC*dt
+    P1s.append(P)
+    freq1s.append(freq)
+    CLs.append(CC)
+
+# Read outvariables
+Pcesmfull,Pcesmslab = P1s
+freqcesmfull,freqcesmslab = freq1s
+clfull,clslab = CLs
+
+
 #
 # %% Spectral Analysis Plots for constant v vary experiments
 #
 
-# -------------------
-# Load data from CESM
-# -------------------
-specnamesld="nsmooth100_taper10"
-ld = np.load("%smodel_output/CESM_PIC_Spectra_%s.npz"%(datpath,specnamesld),allow_pickle=True)
-Pcesmfulla    = ld['specfull']
-Pcesmslaba    = ld['specslab']
-freqcesmfulla = ld['freqfull']
-freqcesmslaba = ld['freqslab']
-
-# Retrieve Data For Point
-query = config['query']
-lonf = query[0]
-latf = query[1]
-if lonf < 0:
-    lonf += 360
-klon360,klat   = proc.find_latlon(lonf,latf,lon360,lat) # Global, 360 lon
-
-Pcesmfull    = Pcesmfulla[:,klat,klon360]
-Pcesmslab    = Pcesmslaba[:,klat,klon360]
-freqcesmfull = freqcesmfulla[:,klat,klon360]
-freqcesmslab = freqcesmslaba[:,klat,klon360]
-
-# -------------------------------------
-#%% Grab SST for first case, first model
-# -------------------------------------
-
 pct     = 0.10
-nsmooth = 400
+nsmooth = 1000
 opt     = 1
 dt      = 3600*24*30
 tunit   = "Months"
@@ -828,18 +1035,112 @@ for i in range(4):
     
     
     #ax.semilogx(freqs[i],CCs[i][:,1]*freqs[i],label=ename[i],color="k",ls='solid')
-    ax.semilogx(freqs[i],specsig1*freqs[i],label=ename[i],color=ecol[i],ls='solid',lw=0.75)
-    ax.semilogx(freqs[i],specsig0*freqs[i],label="",color=ecol[i],ls='dotted',alpha=0.4,lw=0.75)
+    
+    #ax.semilogx(freqs[i],specsig1*freqs[i],label=ename[i],color=ecol[i],ls='solid',lw=0.75)
+    #ax.semilogx(freqs[i],specsig0*freqs[i],label="",color=ecol[i],ls='dotted',alpha=0.4,lw=0.75)
     
     
-    #ax.semilogx(freqs[i],specs[i]*freqs[i],label=ename[i],color=ecol[i],ls=els[i])
+    ax.semilogx(freqs[i],specs[i]*freqs[i],label=ename[i] + "$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(sstin[i])),color=ecol[i],ls="solid",lw=1)
     #ax.semilogx(freqs[i],freqs[i]*)
     
-ax.semilogx(freqcesmslab,freqcesmslab*Pcesmslab,color='gray',label="CESM1 SLAB")
+ax.semilogx(freqcesmslab,freqcesmslab*Pcesmslab,color='gray',label="CESM1 SLAB" + "$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(slabpt)))
 #ax.semilogx(freqcesmfull,freqcesmfull*Pcesmfull,color='black')
-ax.legend()
+
+ax.legend(fontsize=10)
+
 htax = viz.twin_freqaxis(ax,freqs[0],tunit,dt)
-ax,htax = viz.make_axtime(ax,htax)
-ax.set_title("Spectral Estimates for Non-Entraining Stochastic Model")
+ax.set_ylabel(r"Frequency x Power $(^{\circ}C)^{2}$",fontsize=13)
+
+#ax,htax = formatspec_generals(ax,htax)
+
+#ax.axvline([1/(dt*12*1.6)],color='r')
+
+
+ax.set_title("SST Spectral Estimates, Non-Entraining Stochastic Model")
 plt.tight_layout()
 plt.savefig("%sSpectra_ConstvVary_MLDConst_SamePlot.png"%outpath,dpi=150)
+
+
+
+
+# -------------------------------------
+#%% Grab SST for first case, first model
+# -------------------------------------
+
+pct     = 0.10
+nsmooth = 1000
+opt     = 1
+dt      = 3600*24*30
+tunit   = "Months"
+clvl    = [0.95]
+axopt   = 3
+clopt   = 1
+specnames = "nsmooth%i_taper%i" % (nsmooth,pct*100)
+
+model = 1
+sstin = []
+for i in range(4):
+    sstin.append(ssts[i][model])
+
+
+# Get the spectra
+specs,freqs,CCs,dofs,r1s = scm.quick_spectrum(sstin,nsmooth,pct)
+
+# Plot each spectra
+fig,ax = plt.subplots(1,1)
+for i in range(4):
+    
+    ksig1 = specs[i] > CCs[i][:,1]
+    ksig0 = specs[i] <= CCs[i][:,1]
+    
+    #specsig1 = np.ma.masked_where(specs[i] > CCs[i][:,1], specs[i]*freqs[i])
+    #specsig0 = np.ma.masked_where(specs[i] <= CCs[i][:,1], specs[i]*freqs[i])
+    
+    # Significant Points
+    specsig1 = specs[i].copy()
+    specsig1[ksig0] = np.nan
+    # Insig Points
+    specsig0 = specs[i].copy()
+    specsig0[ksig1] = np.nan
+    
+    
+    #ax.semilogx(freqs[i],CCs[i][:,1]*freqs[i],label=ename[i],color="k",ls='solid')
+    
+    #ax.semilogx(freqs[i],specsig1*freqs[i],label=ename[i],color=ecol[i],ls='solid',lw=0.75)
+    #ax.semilogx(freqs[i],specsig0*freqs[i],label="",color=ecol[i],ls='dotted',alpha=0.4,lw=0.75)
+    
+    
+    ax.semilogx(freqs[i],specs[i]*freqs[i],label=ename[i] + "$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(sstin[i])),color=ecol[i],ls="solid",lw=1)
+    #ax.semilogx(freqs[i],freqs[i]*)
+    
+ax.semilogx(freqcesmslab,freqcesmslab*Pcesmslab,color='gray',label="CESM1 SLAB" + "$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(slabpt)))
+#ax.semilogx(freqcesmfull,freqcesmfull*Pcesmfull,color='black')
+
+ax.legend(fontsize=10)
+htax = viz.twin_freqaxis(ax,freqs[0],tunit,dt)
+ax.set_ylabel(r"Frequency x Power $(^{\circ}C)^{2}$",fontsize=13)
+
+ax,htax = formatspec_generals(ax,htax)
+
+htax.minorticks_off()
+
+
+#ax.axvline([1/(dt*12*1.6)],color='r')
+
+
+ax.set_title("SST Spectral Estimates, Non-Entraining Stochastic Model")
+plt.tight_layout()
+plt.savefig("%sSpectra_ConstvVary_MLDConst_SamePlot.png"%outpath,dpi=150)
+
+
+#%%
+
+from matplotlib.ticker import LogLocator,NullFormatter
+
+fig,ax= plt.subplots(1,1)
+ax.semilogx(freqs[i],freqs[i]*specs[i])
+#ax.set_xticks([1.5e-9,1.5e-8,1.5e-7])
+ax.tick_params(axis='x', which='minor', bottom=False)
+locmin =LogLocator(base=1.5, subs=np.arange(2, 10) * .1,numticks=10)
+ax.xaxis.set_minor_locator(locmin)
+ax.xaxis.set_minor_formatter(NullFormatter())
