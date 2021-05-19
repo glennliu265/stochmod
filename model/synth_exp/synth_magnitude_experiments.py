@@ -53,7 +53,7 @@ mons3=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
 labels=["MLD Fixed","MLD Mean","MLD Seasonal","MLD Entrain"]
 #labels=["MLD (MAX)","MLD Seasonal","MLD Entrain"]
 #colors=["red","orange","magenta","blue"]
-expcolors = ('blue','orange','magenta','red')
+expcolors = ('blue','red','magenta','blue')
 #hblt = 54.61088498433431 # Meters, the mixed layer depth used in CESM Slab
 
 # Set up Configuration
@@ -62,8 +62,8 @@ config['mconfig']     = "SLAB_PIC" # Model Configuration
 config['ftype']       = "DJFM-MON" # Forcing Type
 config['genrand']     = 0          # Toggle to generate new random timeseries
 config['fstd']        = 1          # Set the standard deviation N(0,fstd)
-config['t_end']       = 12000     # Number of months in simulation
-config['runid']       = "syn002"   # White Noise ID
+config['t_end']       = 120000     # Number of months in simulation
+config['runid']       = "syn001"   # White Noise ID
 config['fname']       = "FLXSTD"   #['NAO','EAP,'EOF3','FLXSTD']
 config['pointmode']   = 1          # Set to 1 to generate a single point
 config['query']       = [-30,50]   # Point to run model at 
@@ -234,17 +234,18 @@ cffull = proc.calc_conflag(cesmautofull,conf,tails,1798)
 # Plot the Autocorrelation
 xtk2       = np.arange(0,37,2)
 fig,ax     = plt.subplots(1,1)
+#title = "SST Autocorrelation: Adding variable $h$"
 title      = "SST Autocorrelation (%s) \n Lag 0 = %s" % (locstringtitle,mons3[mldpt.argmax()])
 #ax,ax2,ax3 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title,loopvar=damppt)
 ax,ax2= viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title)
-ax.plot(lags,cesmauto2[lags],label="CESM SLAB",color='k')
+ax.plot(lags,cesmauto2[lags],label="CESM1 SLAB",color='k',marker="o",markersize=3)
 ax.fill_between(lags,cfslab[lags,0],cfslab[lags,1],color='k',alpha=0.10)
 
-ax.plot(lags,cesmautofull,color='k',label='CESM Full',ls='dashdot')
+ax.plot(lags,cesmautofull,color='k',label='CESM1 Full',ls='dashdot',marker="o",markersize=3)
 ax.fill_between(lags,cffull[lags,0],cffull[lags,1],color='k',alpha=0.10)
 
 for i in range(1,4):
-    ax.plot(lags,ac[i],label=labels[i],color=expcolors[i])
+    ax.plot(lags,ac[i],label=labels[i],color=expcolors[i],marker="o",markersize=3)
     ax.fill_between(lags,cfstoch[i,:,0],cfstoch[i,:,1],color=expcolors[i],alpha=0.25)
 
 ax.legend()
@@ -351,7 +352,7 @@ plt.savefig("%sLag_v_Damping_3Dplot_%s.png"%(outpath,expname),dpi=200)
 # *********************************************************
 #%% Grid Sweep Experiments II : Damping, Seasonal Magnitude
 # *********************************************************
-expname="DampingVVary"
+expname="DampingVVary_Fconst"
 
 testvalues = np.arange(0.1,2.1,.1)
 testparam  = 'damppt'
@@ -364,6 +365,7 @@ paramsall = []
 for i,val in tqdm(enumerate(testvalues)):
     st = time.time()
     config[testparam] = damppt*val
+    config['Fpt'] = np.ones(12)*Fpt.mean(0)
     ac,sst,dmp,frc,ent,Td,kmonth,params=scm.synth_stochmod(config,projpath=projpath)
     acall.append(ac)
     sstall.append(sst)
