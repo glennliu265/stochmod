@@ -28,6 +28,15 @@ outpathdat  = datpath + '/proc/'
 outpathfig  = projpath + '02_Figures/20210509/'
 
 
+
+
+# Plot Settings
+plt.style.use("default")
+cmap = cmocean.cm.balance
+cints = np.arange(-.55,.60,.05)
+cintslb = np.arange(-.50,.6,.1)
+
+
 #%% More Params
 
 runids=['303']
@@ -52,7 +61,7 @@ rcolmem = [np.array([189,202,255])/255,
            [.75,.75,.75]]
 
 #funiforms=[0,1,3,5.5,7,]
-funiforms=[1.5]
+funiforms=[2.5]
 fnames=["NAO"]
 #fnames  = ["Random","Uniform","NAO","EAP","NAO+EAP"]
 
@@ -103,10 +112,7 @@ amvid15 = amvload['amvidx_region'].item()[region][model]
 
 #%% Make the plots
 
-plt.style.use("default")
-cmap = cmocean.cm.balance
-cints = np.arange(-.55,.60,.05)
-cintslb = np.arange(-.50,.6,.1)
+
 
 i = 6
 mult=1
@@ -150,7 +156,7 @@ fig.colorbar(pcm,ax=axs.ravel().tolist())
 #%% Loop by model type (assuming just 1 experiment) 
 region = 3
 vscale = 1
-funiform = 1.5
+funiform = 2.5
 
 # # Load AMV Spatial Patterns
 amvsp = {}
@@ -222,7 +228,14 @@ for i,m in enumerate([1,2,3]):
     ax.set_title("%s"%modelnamenew[m],fontsize=14)
 cb = fig.colorbar(cs,ax=axs.ravel().tolist(),orientation='horizontal',shrink=0.5,pad=0.1)
 cb.set_ticks(cintslb)
-plt.suptitle("AMV Patterns ($^{\circ}C / \sigma_{AMV}$)",fontsize=16)
+plt.suptitle("AMV SST' Patterns from the Stochastic Model ($^{\circ}C / \sigma_{AMV}$)",fontsize=16)
 #plt.tight_layout()
 plt.savefig(outpathfig+"AMV_Spatial_Pattern_3panel_%s_runid%s_vscale%i.png"%(fnames[0],runid,vscale),bbox_inches='tight')
-    
+
+
+#%% Make similar plots from other datasets
+
+# AMV (CESM-SLAB)
+
+
+

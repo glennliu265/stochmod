@@ -29,7 +29,8 @@ startyr = 1900 # Start year for AMV Analysis
 bbox    =[-80,0 ,0,65] # AMV bbox
 # Path to SST data from obsv
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
-outpath = projpath + '02_Figures/20200823/'
+outpath = projpath + '02_Figures/20210524/'
+proc.makedir(outpath)
 datpath = projpath + '01_Data/'
 datpath2 = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/"
 
@@ -311,5 +312,48 @@ ax.set_title("HadISST AMV Index (%s to %s)" % (startyr,hyr[0,-1]),fontsize=10)
 outname = '%sHadISST_AMVIDX_%s-%s_dtmethod%i.png' % (outpath,startyr,hyr[0,-1],method)
 plt.savefig(outname, bbox_inches="tight",dpi=200)
     
+
+#%% UPDATE (MAY 24th 2021, Plots for Generals Presentation)
+
+def plot_AMV_generals(lat,lon,amvpattern,vscale=1):
+    """
+    Customized AMV Plot for Generals Presentation (for consistent plotting)
     
+    Parameters
+    ----------
+    lat : TYPE
+        DESCRIPTION.
+    lon : TYPE
+        DESCRIPTION.
+    amvpattern : [lon x alt]
+        DESCRIPTION.
+    vscale : INT
+        Amt of times to scale AMV pattern by
+    Returns
+    -------
+    None.
+    """
+    bbox = [-80,0 ,0,65]
+    
+    # Set up plot params
+    plt.style.use('default')
+    cmap = cmocean.cm.balance
+    cints = np.arange(-.55,.60,.05)
+    cintslb = np.arange(-.50,.6,.1)
+    
+    # Make the plot
+    fig,ax = plt.subplots(1,1,figsize=(5,5),subplot_kw={"projection":ccrs.PlateCarree()})
+    ax,cb = viz.plot_AMV_spatial(amvpattern.T*vscale,lon,lat,bbox,cmap,cint=cints,ax=ax,fmt="%.2f",returncbar=True,
+                                 fontsize=8)
+    cb.set_ticks(cintslb)
+    return fig,ax,cb
+
+fig,ax,cb = plot_AMV_generals(hlat,hlon,h_regr)
+ax.set_title("AMV Pattern (HadISST; 1900 to 2018) \n Contour Interval: 0.05 $\degree C / \sigma_{AMV}$")
+plt.savefig(outpath+"HadISST_AMV_Spatial_Pattern_%i_to_2018_detrend%i.png"%(startyr,method),bbox_inches='tight')
+
+    
+    
+
+
     
