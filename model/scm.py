@@ -16,8 +16,11 @@ from tqdm import tqdm
 
 import sys
 sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
+sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
 from amv import proc
 import time
+import yo_box as ybx
+
 
 #%% Helper Functions/Utilities
 
@@ -1204,7 +1207,7 @@ def synth_stochmod(config,verbose=False,viz=False,
         if verbose:
             print("Generating New Forcing")
     else:
-        randts = np.load(output_path+"Forcing_fstd%.2f_%s.npy"% (config['fstd'],config['runid']))
+        randts = np.load(config['output_path']+"Forcing_fstd%.2f_%s.npy"% (config['fstd'],config['runid']))
         if verbose:
             print("Loading Old Forcing")
     
@@ -1305,3 +1308,147 @@ def synth_stochmod(config,verbose=False,viz=False,
         print("Autocorrelation Calculations Complete!")
     return autocorr,sst,dampingterm,forcingterm,entrainterm,Td,kmonth,params
 
+def quick_spectrum(sst,nsmooth,pct,
+                   opt=1,dt=3600*24*30,clvl=[.95]):
+    """
+    Quick spectral estimate of an array of timeseries
+
+    Parameters
+    ----------
+    sst : ARRAY
+        Array containing timeseries to look thru [[ts1],[ts2],...]
+    nsmooth : INT
+        Number of bands to smooth over 
+    pct : Numeric
+        Percent to taper
+    opt : TYPE, optional
+        Smoothing option
+    dt : INT, optional
+        Time Interval. The default is 3600*24*30.
+    clvl : ARRAY , optional
+        Array of Confidence levels. The default is [.95].
+
+    Returns
+    -------
+    specs : ARRAY
+        Array containing spectrum for each input series
+    freqs : ARRAY
+        Corresponding frequencies for each input
+    CCs : ARRAY
+        Confidence intervals for each input
+    dofs : ARRAY
+        Degrees of freedom for each input
+    r1s : ARRAY
+        AR1 parameter used to estimate CC
+
+    """
+    
+    
+    # -----------------------------------------------------------------
+    # Calculate and make individual plots for stochastic model output
+    # -----------------------------------------------------------------
+    #specparams  = []
+    specs = []
+    freqs = []
+    CCs = []
+    dofs = []
+    r1s = []
+    for i in range(len(sst)):
+        sstin = sst[i]
+        
+        
+        # Calculate Spectrum
+        if len(nsmooth) > 1:
+            sps = ybx.yo_spec(sstin,opt,nsmooth[i],pct,debug=False)
+        else:
+            sps = ybx.yo_spec(sstin,opt,nsmooth,pct,debug=False)
+        
+        # Save spectrum and frequency
+        P,freq,dof,r1=sps
+        specs.append(P*dt)
+        freqs.append(freq/dt)
+        dofs.append(dof)
+        r1s.append(r1)
+        
+        # Calculate Confidence Interval
+        CC = ybx.yo_speccl(freq,P,dof,r1,clvl)
+        CCs.append(CC*dt)
+    return specs,freqs,CCs,dofs,r1s
+
+#%% Data Loading
+
+def load_hadisst(datpath,method=2,startyr=1870,grabpoint=None):
+    
+    hadname  = "%sHadISST_detrend%i_startyr%i.npz" % (datpath,method,startyr)
+    ld = np.load(hadname,allow_pickle=True)
+    
+    hsst = ld['sst']
+    hlat = ld['lat']
+    hlon = ld['lon']
+    
+    if grabpoint is None:
+        return hsst,hlat,hlon
+    else:
+        lonf,latf = grabpoint
+        khlon,khlat = proc.find_latlon(lonf,latf,hlon,hlat)
+        sstpt = hsst[khlon,khlat,:]
+        return sstpt
+
+def load_cesm_pt(datpath,loadname='both',grabpoint=None):
+    """
+    Load CESM Data
+    Inputs:
+        1) datpath [STR] : Path to data
+        2) loadname [STR] : What to load, default is both: ('both','slab','full')
+        3) grabpoint [lonf,latf] : Point to query (optional)
+    Returns:
+        1) ssts [ARR] : [sstfull,sstslab], depending on loadname
+    """
+    
+    
+    st = time.time()
+    
+    # Get lat/lon
+    lat    = loadmat("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/CESM1_LATLON.mat")['LAT'].squeeze()
+    lon360 = loadmat("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/CESM1_LATLON.mat")['LON'].squeeze()
+    print("Loaded PiC Data in %.2fs"%(time.time()-st))
+    
+    # Load SSTs
+    ssts = []
+    if loadname=='both' or loadname=='full': # Load full sst data from model
+        ld  = np.load(datpath+"FULL_PIC_ENSOREM_TS_lag1_pcs2_monwin3.npz" ,allow_pickle=True)
+        sstfull = ld['TS']
+        ssts.append(sstfull)
+        
+    if loadname=='both' or loadname=='slab': # Load slab sst data
+        ld2 = np.load(datpath+"SLAB_PIC_ENSOREM_TS_lag1_pcs2_monwin3.npz" ,allow_pickle=True)
+        sstslab = ld2['TS']
+        ssts.append(sstslab)
+    
+    # Retrieve point information
+    if grabpoint is None:
+        return ssts
+    else:
+        # Query the point
+        lonf,latf = grabpoint
+        if lonf < 0:
+            lonf += 360
+        klon360,klat = proc.find_latlon(lonf,latf,lon360,lat)
+        sstpts = []
+        for sst in ssts:
+            sstpt = sst[:,klat,klon360]
+            sstpts.append(sstpt)
+        return sstpts
+    
+def load_latlon(datpath=None,lon360=False):
+    if datpath is None:
+        datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/"
+    
+    dampmat        = 'ensavg_nhflxdamping_monwin3_sig020_dof082_mode4.mat'
+    loaddamp = loadmat(datpath+dampmat)
+    lon   = np.squeeze(loaddamp['LON1'])
+    lat   = np.squeeze(loaddamp['LAT'])
+    
+    if lon360:
+        lon = loadmat("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/CESM1_LATLON.mat")['LON'].squeeze()
+    return lon,lat
