@@ -3,6 +3,7 @@
 """
 
 Calculate AMV from HadISST Data
+Also save detrended data for stochastic model comparison
 
 Created on Sat Aug 22 21:05:08 2020
 
@@ -17,6 +18,7 @@ import matplotlib.pyplot as plt
 import time
 import cmocean
 import cartopy.crs as ccrs
+import xarray as xr
 
 
 import sys
@@ -25,7 +27,7 @@ from amv import proc,viz
 
 #%% User Edits
 
-startyr = 1900 # Start year for AMV Analysis
+startyr = 1870 # Start year for AMV Analysis
 bbox    =[-80,0 ,0,65] # AMV bbox
 # Path to SST data from obsv
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
@@ -34,15 +36,19 @@ proc.makedir(outpath)
 datpath = projpath + '01_Data/'
 datpath2 = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/"
 
-#%% Load in HadISST Data
 
+## DETRENDING OPTIONS
+method = 2
+
+
+#%% Load in HadISST Data
 
 # Load in observation SST data to compare
 obvhad = loadmat(datpath2+"hadisst.1870_2018.mat")
-hlat = np.squeeze(obvhad['LAT'])
-hlon = np.squeeze(obvhad['LON'])
-hyr  = obvhad['YR']
-hsst = obvhad['SST']
+hlat   = np.squeeze(obvhad['LAT'])
+hlon   = np.squeeze(obvhad['LON'])
+hyr    = obvhad['YR']
+hsst   = obvhad['SST']
 
 # Change hsst to lon x lat x time
 hsst = np.transpose(hsst,(2,1,0))
@@ -75,7 +81,7 @@ dsfirst = np.reshape(dsfirst,(360,180,hsstnew.shape[2]))
 
 # Detrend
 start= time.time()
-dtdsfirst,dsymodall,_,_ = proc.detrend_dim(dsfirst,2)
+dtdsfirst,dsymodall,_,_ = proc.detrend_dim(dsfirst,method)
 print("Detrended in %.2fs" % (time.time()-start))
 
 # # Plot Seasonal Cycle Removal and Detrended
@@ -94,6 +100,15 @@ hlat = hlatnew.copy()
 hsst = dtdsfirst.copy()
 #hsst = dsfirst.copy()
 
+# Save data (MONTHLY)
+hadname  = "%sHadISST_detrend%i_startyr%i.npz" % (datpath,startyr,method)
+np.save(hadname,**{
+    'sst':dtdsfirst,
+    'lat':hlatnew,
+    'lon':hlon,
+    'yr':yrs})
+
+
 h_amv,h_regr = proc.calc_AMVquick(hsst,hlon,hlat,bbox)
 
 #%% Try Another Calculation Method
@@ -101,17 +116,18 @@ h_amv,h_regr = proc.calc_AMVquick(hsst,hlon,hlat,bbox)
 # 0) Regress anomaly onto global mean
 # 1...N) Remove N-degree polynomial
 
-method = 3
+
 
 # Get timedim 
-x = np.arange(0,118,1)
+nyr = int(hsst.shape[2]/12)
+x = np.arange(0,nyr,1)
 
 # First get annual averaged data
 hsstann = proc.ann_avg(hsstnew,2)
 hsstann = hsstann - hsstann.mean(2)[:,:,None]
 
 # Get nan points
-hsstann = hsstann.reshape(360*180,118)
+hsstann = hsstann.reshape(360*180,nyr)
 okdata,knan,okpts = proc.find_nan(hsstann,1)
 
 
@@ -136,10 +152,12 @@ else:
     
 
 # Replace back into data
-hsstdt = np.ones((360*180,118)) * np.nan
+hsstdt = np.ones((360*180,nyr)) * np.nan
 hsstdt[okpts,:] = okdt
-hsstdt = hsstdt.reshape(360,180,118)
+hsstdt = hsstdt.reshape(360,180,nyr)
 
+
+ 
 
 
 # Use this data to calculate amv
@@ -352,7 +370,8 @@ fig,ax,cb = plot_AMV_generals(hlat,hlon,h_regr)
 ax.set_title("AMV Pattern (HadISST; 1900 to 2018) \n Contour Interval: 0.05 $\degree C / \sigma_{AMV}$")
 plt.savefig(outpath+"HadISST_AMV_Spatial_Pattern_%i_to_2018_detrend%i.png"%(startyr,method),bbox_inches='tight')
 
-    
+#%% 
+
     
 
 
