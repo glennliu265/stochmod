@@ -28,6 +28,10 @@ from scipy import signal
 detrend = 2
 startyr = 1870
 
+# ERSST Information
+detrende = 2
+startyre = 1854
+
 # Query Point
 query = [-30,50] # [lon,lat]
 
@@ -48,6 +52,13 @@ tails = 2
 lags  = np.arange(0,37,1)
 xtk2  = np.arange(0,37,2)
 
+# Spectrum options
+enames   = ("HadISST","ERSST","CESM1 FULL","CESM1 SLAB")
+ecolors  = ('b','r','k','gray')
+plotdt   = 3600*24*365
+nsmooths = [50,50,500,250]
+pct      = 0.10
+
 #%% Load Data
 
 # Load Lat/lon
@@ -62,6 +73,9 @@ locstringtitle = "Lon: %.1f Lat: %.1f" % (query[0],query[1])
 # Load HadISST
 hsstpt = scm.load_hadisst(datpath,method=detrend,startyr=startyr,grabpoint=query)
 
+# Load ERSST
+ersstpt = scm.load_ersst(datpath,method=detrende,startyr=startyre,grabpoint=query)
+
 # Load CESM 
 fullpt,slabpt = scm.load_cesm_pt(datpath,loadname='both',grabpoint=query)
 
@@ -73,16 +87,23 @@ kmonth        = mldpt.argmax()
 #%% Calculate Autocorrelation and plot
 
 # Calculate Autocorrelation
-ssts = [hsstpt,fullpt,slabpt]
+ssts = [hsstpt,ersstpt,fullpt,slabpt]
 acs  = scm.calc_autocorr(ssts,lags,kmonth+1)
 hadac = acs[0]
-fullac = acs[1]
-slabac = acs[2]
+ersac = acs[1]
+fullac = acs[2]
+slabac = acs[3]
 
 # Calculate confidence intervals
 cfslab = proc.calc_conflag(slabac,conf,tails,898)
 cffull = proc.calc_conflag(fullac,conf,tails,1798)
 cfhad  = proc.calc_conflag(hadac,conf,tails,hsstpt.shape[0]/12)
+cfers  = proc.calc_conflag(ersac,conf,tails,ersstpt.shape[0]/12)
+cfs = [cfhad,cfers,cffull,cfslab]
+
+
+
+
 
 # Plot Things
 fig,ax     = plt.subplots(1,1,figsize=(6,4))
@@ -91,17 +112,23 @@ title = "SST Autocorrelation at %s \n Lag 0 = %s" % (locstringtitle,mons3[kmonth
 #ax,ax2,ax3 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title,loopvar=damppt)
 
 
-# Plot CESM Data
-ax,ax2= viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title)
-ax.plot(lags,slabac[lags],label="CESM1 SLAB",color='gray',marker="o",markersize=3)
-ax.fill_between(lags,cfslab[lags,0],cfslab[lags,1],color='k',alpha=0.10)
+for i in range(4):
+    
 
-ax.plot(lags,fullac,color='k',label='CESM1 Full',ls='dashdot',marker="o",markersize=3)
-ax.fill_between(lags,cffull[lags,0],cffull[lags,1],color='k',alpha=0.10)
 
-# Plot HadISST Data
-ax.plot(lags,hadac,label="HadISST",color="b",marker="x",markersize=3)
-ax.fill_between(lags,cfhad[:,0],cfhad[:,1],color='b',alpha=0.10)
+# # Plot CESM Data
+# ax,ax2= viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title)
+# ax.plot(lags,slabac[lags],label="CESM1 SLAB",color='gray',marker="o",markersize=3)
+# ax.fill_between(lags,cfslab[lags,0],cfslab[lags,1],color='k',alpha=0.10)
+
+# ax.plot(lags,fullac,color='k',label='CESM1 Full',ls='dashdot',marker="o",markersize=3)
+# ax.fill_between(lags,cffull[lags,0],cffull[lags,1],color='k',alpha=0.10)
+
+# # Plot HadISST Data
+# ax.plot(lags,hadac,label="HadISST",color="b",marker="x",markersize=3)
+# ax.fill_between(lags,cfhad[:,0],cfhad[:,1],color='b',alpha=0.10)
+
+
 
 ax.legend()
 #ax3.set_ylabel("Heat Flux Feedback ($W/m^{2}$)")
@@ -110,29 +137,17 @@ ax.legend(fontsize=10,ncol=3)
 plt.tight_layout()
 plt.savefig(outpath+"Autocorrelation_CompareHadISST_%s.png" % locstring,dpi=200)
 
-#%% Calculate Autospectrum
-
-
-
-
-nsmooths = [50,500,250]
-pct      = 0.10
+#%%  Spectral Estimate Calculation
 
 # Calculate spectra
 specs,freqs,CCs,dofs,r1s = scm.quick_spectrum(ssts,nsmooths,pct)
 
-# Reassign some names
-CLs = CCs[1:]
-
-
+#%% Variance Preserving PLots
 
 # Plot Spectra
-plotdt = 3600*24*365
+
+
 fig,ax = plt.subplots(1,1,figsize=(6,4))
-
-
-enames=("HadISST","CESM1 FULL","CESM1 SLAB")
-ecolors = ('b','k','gray')
 
 for i in range(3):
     ax.semilogx(freqs[i]*plotdt,specs[i]*freqs[i],color=ecolors[i],label=enames[i]+"$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(ssts[i])))
@@ -161,9 +176,63 @@ ylm = [-.01,.4]
 xtkl = ["%.1f" % (1/x) for x in xtick]
 htax.set_xticklabels(xtkl)
 
-ax.set_xlabel("")
-ax.set_title("SST Spectral Estimates (CESM1 vs. HadISST)")
+ax.set_title("SST Spectral Estimates at %s"%(locstringtitle))
 plt.tight_layout()
+plt.savefig(outpath+"Spectrum_VariancePres_CompareHadISST_%s.png" % locstring,dpi=200)
+
+#%% Linear Linear PLots
+
+
+def lin_quickformat(ax,plotdt,freq):
+    # Set tickparams and clone
+    xtick = np.arange(0,1.7,.2)
+    ax.set_xticks(xtick)
+    ax.set_ylabel("Power ($\degree C^{2} / cpy$)",fontsize=12)
+    ax.set_xlabel("Frequency (cycles/year)",fontsize=12)
+    htax = viz.twin_freqaxis(ax,freq,"Years",dt,mode='lin-lin',xtick=xtick)
+    
+    # Set xtick labels
+    xtkl = ["%.1f" % (1/x) for x in xtick]
+    htax.set_xticklabels(xtkl)
+    
+    
+    # Set some key lines
+    ax = viz.add_yrlines(ax,dt=plotdt)
+    
+    ax.legend(fontsize=10)
+    return ax,htax
+
+# Plot Spectra
+fig,ax = plt.subplots(1,1,figsize=(6,4))
+
+for i in range(3):
+    ax.plot(freqs[i]*plotdt,specs[i]/plotdt,color=ecolors[i],label=enames[i]+"$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(ssts[i])))
+    
+    ax.plot(freqs[i]*plotdt,CCs[i][:,1]/plotdt,color=ecolors[i],alpha=0.5,ls='dashed')
+    ax.plot(freqs[i]*plotdt,CCs[i][:,0]/plotdt,color=ecolors[i],alpha=0.5,ls='dotted')
+
+    
+
+# Set x limits
+xtick = np.arange(0,1.7,.2)
+ax.set_xticks(xtick)
+
+# Set Labels
+ax.set_ylabel("Frequency x Power ($\degree C^{2}$)",fontsize=12)
+ax.set_xlabel("Frequency (cycles/year)",fontsize=12)
+htax = viz.twin_freqaxis(ax,freqs[1],"Years",plotdt,mode='lin-lin',xtick=xtick)
+
+
+ax = viz.add_yrlines(ax,dt=plotdt)
+
+#ylm = [-.01,.4]
+# Set xtick labels
+xtkl = ["%.1f" % (1/x) for x in xtick]
+htax.set_xticklabels(xtkl)
+
+ax.set_title("SST Spectral Estimates at %s"%(locstringtitle))
+plt.tight_layout()
+plt.savefig(outpath+"Spectrum_Linear_CompareHadISST_%s.png" % locstring,dpi=200)
 
 
     

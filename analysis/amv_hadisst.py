@@ -80,8 +80,44 @@ dsfirst = dsfirst - np.mean(dsfirst,axis=2)[:,:,None,:]
 dsfirst = np.reshape(dsfirst,(360,180,hsstnew.shape[2]))
 
 # Detrend
+# start= time.time()
+# dtdsfirst,dsymodall,_,_ = proc.detrend_dim(dsfirst,2)
+# print("Detrended in %.2fs" % (time.time()-start))
+
+
+# Detrend
+nlon = 360
+nlat = 180
+nmon = 1776
 start= time.time()
-dtdsfirst,dsymodall,_,_ = proc.detrend_dim(dsfirst,method)
+indata = dsfirst.reshape(nlon*nlat,nmon)
+okdata,knan,okpts = proc.find_nan(indata,1)
+x = np.arange(0,nmon,1)
+
+if method == 0:
+    # Calculate global mean SST
+    glomean = okdata.mean(0)
+    # Regress back to the original data to get the global component
+    beta,b=proc.regress_2d(glomean,okdata)
+    # Subtract this from the original data
+    okdt = okdata - beta[:,None]
+
+    # Calculate quadratic trend
+else: 
+    
+    okdt,model = proc.detrend_poly(x,okdata,method)
+    
+    fig,ax=plt.subplots(1,1)
+    ax.scatter(x,okdata[44,:],label='raw')
+    ax.plot(x,model[44,:],label='fit')
+    ax.scatter(x,okdt[:,44],label='dt')
+    ax.set_title("Visualize Detrending Method %i"%method)
+    okdt = okdt.T
+
+# Replace back into dataset
+dtdata = np.zeros((nlon*nlat,nmon))*np.nan
+dtdata[okpts,:] = okdt
+dtdata = dtdata.reshape(nlon,nlat,nmon)
 print("Detrended in %.2fs" % (time.time()-start))
 
 # # Plot Seasonal Cycle Removal and Detrended
@@ -92,21 +128,21 @@ klon,klat = proc.find_latlon(lonf,latf,hlon,hlatnew)
 fig,ax = plt.subplots(1,1,figsize=(8,4))
 ax.plot(tper,hsstnew[klon,klat,:],color='k',label="raw")
 ax.plot(tper,dsfirst[klon,klat,:],color='b',label="deseasonalized")
-ax.plot(tper,dtdsfirst[klon,klat,:],color='r',label="deseasonalized,detrended")
+ax.plot(tper,dtdata[klon,klat,:],color='r',label="deseasonalized,detrended")
 ax.set_title("Deseasonalize First")
 plt.legend()
 
 hlat = hlatnew.copy()
-hsst = dtdsfirst.copy()
+hsst = dtdata.copy()
 #hsst = dsfirst.copy()
 
 # Save data (MONTHLY)
-hadname  = "%sHadISST_detrend%i_startyr%i.npz" % (datpath,startyr,method)
-np.save(hadname,**{
-    'sst':dtdsfirst,
+hadname  = "%sHadISST_detrend%i_startyr%i.npz" % (datpath,method,startyr)
+np.savez(hadname,**{
+    'sst':dtdata,
     'lat':hlatnew,
     'lon':hlon,
-    'yr':yrs})
+    'yr':hyr},allow_pickle=True)
 
 
 h_amv,h_regr = proc.calc_AMVquick(hsst,hlon,hlat,bbox)

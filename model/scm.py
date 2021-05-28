@@ -1394,6 +1394,26 @@ def load_hadisst(datpath,method=2,startyr=1870,grabpoint=None):
         sstpt = hsst[khlon,khlat,:]
         return sstpt
 
+def load_ersst(datpath,method=2,startyr=1854,grabpoint=None):
+    
+    hadname  = "%sERSST_detrend%i_startyr%i.npz" % (datpath,method,startyr)
+    ld = np.load(hadname,allow_pickle=True)
+    
+    hsst = ld['sst']
+    hlat = ld['lat']
+    hlon = ld['lon']
+    
+    if grabpoint is None:
+        return hsst,hlat,hlon
+    else:
+        lonf,latf = grabpoint
+        if lonf < 0:
+            lonf+=360
+        khlon,khlat = proc.find_latlon(lonf,latf,hlon,hlat)
+        sstpt = hsst[khlon,khlat,:]
+        return sstpt
+
+
 def load_cesm_pt(datpath,loadname='both',grabpoint=None):
     """
     Load CESM Data
