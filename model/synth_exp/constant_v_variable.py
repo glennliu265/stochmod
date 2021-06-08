@@ -36,7 +36,7 @@ projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 datpath     = projpath + '01_Data/'
 input_path  = datpath + 'model_input/'
 output_path = datpath + 'model_output/'
-outpath = projpath + '02_Figures/20210430/'
+outpath = projpath + '02_Figures/20210610/'
 proc.makedir(outpath)
 
 # Load in control data for 50N 30W
@@ -49,6 +49,17 @@ labels=["MLD Fixed","MLD Mean","MLD Seasonal","MLD Entrain"]
 #colors=["red","orange","magenta","blue"]
 expcolors = ('blue','orange','magenta','red')
 hblt = 54.61088498433431 # Meters, the mixed layer depth used in CESM Slab
+
+
+
+# UPDATED Colors and names for generals (5/25/2021)
+ecol = ["blue",'cyan','gold','red']
+els  = ["dotted","dashdot","dashed","solid"]
+ename = ["All Constant",
+         r"Vary $\alpha$",
+         r"Vary $\lambda_a$",
+         "All Varying"]
+
 
 config = {}
 config['mconfig']     = "SLAB_PIC" # Model Configuration
@@ -594,16 +605,11 @@ plotvar = damppt
 ylab =  "Atmopsheric Damping ($W/m^{2}$)"
 
 
-ecol = ["blue",'cyan','gold','red']
-els  = ["dotted","dashdot","dashed","solid"]
-ename = ["All Constant",
-         r"Vary $\alpha$",
-         r"Vary $\lambda_a$",
-         "All Varying"]
+
 
 figs,ax = plt.subplots(1,1,figsize=(6,4))
 
-xtk2       = np.arange(0,37,3)
+xtk2       = np.arange(0,37,2)
 if addvar:
     ax,ax2,ax3 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title,loopvar=plotvar)
     ax3.set_ylabel(ylab)
@@ -613,6 +619,7 @@ else:
 ax.plot(lags,cesmauto2[lags],label="CESM1 SLAB",color='gray',marker="o",markersize=4)
 #ax.scatter(lags,cesmauto2[lags],10,label="",color='k')
 ax.fill_between(lags,cfslab[lags,0],cfslab[lags,1],color='gray',alpha=0.4)
+#ax.grid(minor=True)
 
 for i,e in enumerate([0,1,2,3]):
     
@@ -865,12 +872,10 @@ ax.set_xlim([0,11])
 plt.tight_layout()
 plt.savefig(outpath+"Stochmod_Inputs.png",dpi=150)
 
-
-
-
 #% ----------------------
 #%% Load PiC Data
 #% ----------------------
+
 st = time.time()
 # Load full sst data from model
 ld  = np.load(datpath+"FULL_PIC_ENSOREM_TS_lag1_pcs2_monwin3.npz" ,allow_pickle=True)
@@ -992,7 +997,6 @@ Pcesmfull,Pcesmslab = P1s
 freqcesmfull,freqcesmslab = freq1s
 clfull,clslab = CLs
 
-
 #
 # %% Spectral Analysis Plots for constant v vary experiments
 #
@@ -1063,6 +1067,136 @@ plt.savefig("%sSpectra_ConstvVary_MLDConst_SamePlot.png"%outpath,dpi=150)
 
 
 
+#%% Save the results to visualize in another script (plot_spectra_Generals)
+outdatname = datpath + "/Generals_Report/lower_hierarchy_data_nsmooth%i.npz" % (nsmooth)
+np.savez(outdatname,**{
+    'freqs':freqs,
+    'CCs':CCs,
+    'specs':specs,
+    'sst':sstin,
+    'ecolors' : ecol,
+    'enames':ename},allow_pickle=True)
+
+
+
+
+#%% Redo variance preserving plots with proper ticking
+# For Generals Reports Plots
+plotdt = 3600*24*365
+ecolors = ecol
+enames = ename
+
+
+fig,ax = plt.subplots(1,1,figsize=(6,4))
+
+
+
+for i in range(4):
+    ax.semilogx(freqs[i]*plotdt,specs[i]*freqs[i],color=ecolors[i],label=enames[i]+"$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(sstin[i])))
+    
+    ax.semilogx(freqs[i]*plotdt,CCs[i][:,1]*freqs[i],color=ecolors[i],alpha=0.5,ls='dashed')
+    ax.semilogx(freqs[i]*plotdt,CCs[i][:,0]*freqs[i],color=ecolors[i],alpha=0.5,ls='dotted')
+
+ax.semilogx(freqcesmslab*plotdt,freqcesmslab*Pcesmslab,color='gray',label="CESM1 SLAB" + "$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(slabpt)))
+
+
+# Set x limits
+xtick = [float(10)**(x) for x in np.arange(-4,2)]
+
+# Set Labels
+ax.set_ylabel("Frequency x Power ($\degree C^{2}$)",fontsize=12)
+ax.set_xlabel("Frequency (cycles/year)",fontsize=12)
+htax = viz.twin_freqaxis(ax,freqs[1],"Years",plotdt,mode='log-lin',xtick=xtick)
+
+# Make sure axis limits are the same
+#htax.set_xticks(ax.get_xticks())
+
+
+xtick2 = htax.get_xticks()
+# Set xtick labels
+xtkl = ["%.1f" % (1/x) for x in xtick2]
+htax.set_xticklabels(xtkl)
+
+
+xlm = [5e-4,10]
+ax.set_xlim(xlm)
+htax.set_xlim(xlm)
+ylm = [-.01,.4]
+
+#ax.grid(True,which='both',lw=0.5)
+
+ax.set_title("SST Spectral Estimates, Non-Entraining Stochastic Model")
+plt.tight_layout()
+plt.savefig("%sSpectra_ConstvVary_MLDConst_SamePlot.png"%outpath,dpi=150)
+
+
+
+#%% Remake plot in linear-linear space
+
+
+plotdt = 3600*24*365
+plotcf = True
+fig,ax = plt.subplots(1,1)
+
+for i in [0,1,2,3]:
+    
+    ksig1 = specs[i] > CCs[i][:,1]
+    ksig0 = specs[i] <= CCs[i][:,1]
+    
+    # Significant Points
+    specsig1 = specs[i].copy()
+    specsig1[ksig0] = np.nan
+    # Insig Points
+    specsig0 = specs[i].copy()
+    specsig0[ksig1] = np.nan
+    
+    ax.plot(freqs[i]*plotdt,specs[i]/plotdt,label=ename[i] + "$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(sstin[i])),color=ecol[i],ls="solid")
+    
+    if plotcf:
+        ax.plot(freqs[i]*plotdt,CCs[i][...,0]/plotdt,label="",color=ecol[i],ls=":",alpha=0.5)
+        ax.plot(freqs[i]*plotdt,CCs[i][...,1]/plotdt,label="",color=ecol[i],ls="dashed",alpha=0.5)
+    
+
+
+ax.plot(freqcesmslab*plotdt,Pcesmslab/plotdt,color='gray',label="CESM1 SLAB" + "$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(slabpt)))#ax.semilogx(freqcesmslab,freqcesmslab*CLs[1][:,1],color='gray',label="",ls='dashed')
+#ax.plot(freqcesmfull*plotdt,Pcesmfull/plotdt,color='black',label="CESM1 FULL" + "$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(fullpt)))
+if plotcf:
+    ax.plot(freqcesmslab*plotdt,clslab[:,0]/plotdt,color='gray',label="",ls=":",alpha=0.5)
+    ax.plot(freqcesmslab*plotdt,clslab[:,1]/plotdt,color='gray',label="",ls="dashed",alpha=0.5)
+    
+    
+    # ax.plot(freqcesmfull*plotdt,clfull[:,0]/plotdt,color='black',label="",ls=":",alpha=0.5)
+    # ax.plot(freqcesmfull*plotdt,clfull[:,1]/plotdt,color='black',label="",ls="dashed",alpha=0.5)
+
+#ax.plot(freqcesmfull*plotdt,Pcesmfull*freqcesmfull,color='black',label="CESM1 FULL" + "$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(fullpt)))
+#ax.semilogx(freqcesmfull,freqcesmfull*CLs[0][:,1],color='black',label="",ls='dashed')
+
+# Adjust Axis
+xtick = np.arange(0,1.7,.2)
+ax.set_xticks(xtick)
+ax.set_ylabel("Power ($\degree C^{2} / cpy$)",fontsize=12)
+ax.set_xlabel("Frequency (cycles/year)",fontsize=12)
+htax = viz.twin_freqaxis(ax,freqs[i],"Years",dt,mode='lin-lin',xtick=xtick)
+
+# Set xtick labels
+xtkl = ["%.1f" % (1/x) for x in xtick]
+htax.set_xticklabels(xtkl)
+
+# Set some key lines
+ax = viz.add_yrlines(ax,dt=plotdt)
+ax.set_ylim([0,4.2])
+
+# Other Options
+ax.legend(fontsize=10)
+ax.set_title("SST Spectral Estimates, Stochastic Models with Constant Mixed Layer ")
+plt.tight_layout()
+plt.savefig("%sSpectra_MLD_Constant_SamePlot_Lin-Lin_nsmooth%i_taper%i.png"% (outpath,nsmooth,pct*100),dpi=150)
+
+
+
+
+
+#%% Under COnstruction
 # -------------------------------------
 #%% Grab SST for first case, first model
 # -------------------------------------

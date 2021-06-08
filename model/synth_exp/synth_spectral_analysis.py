@@ -34,14 +34,13 @@ projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 datpath     = projpath + '01_Data/'
 input_path  = datpath + 'model_input/'
 output_path = datpath + 'model_output/'
-outpath     = projpath + '02_Figures/20210518/'
+outpath     = projpath + '02_Figures/20210610/'
 proc.makedir(outpath)
 
 # Load in control data for 50N 30W
 #fullauto =np.load(datpath+"Autocorrelation_30W50N_FULL_PIC_12805.npy",allow_pickle=True)
 #fullauto = np.load(datpath+"FULL_PIC_autocorr_lon330_lat50_lags0to36_month2.npy")
 fullauto = np.load(datpath+"CESM_clim/TS_FULL_Autocorrelation.npy")
-
 
 mons3=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
 labels=["MLD Fixed","MLD Mean","MLD Seasonal","MLD Entrain"]
@@ -71,6 +70,12 @@ config['smooth_forcing'] = False
 config.pop('Fpt',None)
 config.pop('damppt',None)
 config.pop('mldpt',None)
+
+# Confidence Level Calculations
+conf  = 0.95
+tails = 2
+
+
 #%% Functions
 
 def interp_quad(ts):
@@ -162,12 +167,21 @@ mlddef = mldpt.copy()
 Fptdef = Fpt.copy()
 
 sstall = sst
+
+
+# ---------------------------------- ---------------------------
+# %% Load HADISST data for the point, calculate Autocorrelation
+# ---------------------------------- ---------------------------
+lonf,latf = query
+hsstpt = scm.load_hadisst(datpath,method=2,startyr=1870,grabpoint=query)
+
+# Calculate and plot autocorrelation
+hadac = scm.calc_autocorr([hsstpt],lags,kmonth+1)[0]
+cfhad = proc.calc_conflag(hadac,conf,tails,hsstpt.shape[0])
+
 # --------------------
 #%% Autocorrelation Plot with Confidence Intervals
 # --------------------
-conf  = 0.95
-tails = 2
-
 def calc_conflag(ac,conf,tails,n):
     cflags = np.zeros((len(ac),2))
     for l in range(len(ac)):
@@ -175,6 +189,8 @@ def calc_conflag(ac,conf,tails,n):
         cfout = proc.calc_pearsonconf(rhoin,conf,tails,n)
         cflags[l,:] = cfout
     return cflags
+
+plt.style.use('default')
 
 nlags   = len(lags)
 cfstoch = np.zeros([4,nlags,2])
@@ -186,16 +202,24 @@ for m in range(4):
 cfslab = calc_conflag(cesmauto2,conf,tails,898)
 cffull = calc_conflag(cesmautofull,conf,tails,1798)
 
+
 fig,ax     = plt.subplots(1,1,figsize=(6,4))
 title = "SST Autocorrelation: Adding Varying $h$ and Entrainment"
 #title      = "SST Autocorrelation (%s) \n Lag 0 = %s" % (locstringtitle,mons3[mldpt.argmax()])
 #ax,ax2,ax3 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title,loopvar=damppt)
+
+
+# Plot CESM Data
 ax,ax2= viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title)
 ax.plot(lags,cesmauto2[lags],label="CESM1 SLAB",color='gray',marker="o",markersize=3)
 ax.fill_between(lags,cfslab[lags,0],cfslab[lags,1],color='k',alpha=0.10)
 
 ax.plot(lags,cesmautofull,color='k',label='CESM1 Full',ls='dashdot',marker="o",markersize=3)
 ax.fill_between(lags,cffull[lags,0],cffull[lags,1],color='k',alpha=0.10)
+
+# Plot HadISST Data
+ax.plot(lags,hadac,label="HadISST",color="b",marker="x",markersize=3)
+ax.fill_between(lags,cfhad[:,0],cfhad[:,1],color='b',alpha=0.10)
 
 for i in range(1,4):
     ax.plot(lags,ac[i],label=labelsnew[i],color=expcolors[i],ls=els[i],marker="o",markersize=3)
@@ -212,7 +236,6 @@ plt.savefig(outpath+"Autocorrelation_MLDComplexity_%s.png"%locstring,dpi=200)
 dampdef = damppt.copy()
 mlddef = mldpt.copy()
 Fptdef = Fpt.copy()
-
 
 # --------------------
 #%% Step by Step Autocorrelation
@@ -272,6 +295,61 @@ ax.set_title("Seasonal Cycle at %s"%locstringtitle)
 plt.tight_layout()
 plt.savefig(outpath+"Scycle_MLD_Forcing_%s_Narrow.png"%locstring,dpi=150)
 
+#%% Updated Seasonal Cycle Plot with 3 axis
+
+def make_patch_spines_invisible(ax):
+    #https://matplotlib.org/2.0.2/examples/pylab_examples/multiple_yaxis_with_spines.html
+    ax.set_frame_on(True)
+    ax.patch.set_visible(False)
+    for sp in ax.spines.values():
+        sp.set_visible(False)
+
+fig,ax = plt.subplots(1,1,figsize=(5,3))
+fig.subplots_adjust(right=0.75)
+
+ax2 = ax.twinx()
+ax3 = ax.twinx()
+
+# Offset the right spine of par2.  The ticks and label have already been
+# placed on the right by twinx above.
+ax2.spines["right"].set_position(("axes", 1.25))
+# Having been created by twinx, par2 has its frame off, so the line of its
+# detached spine is invisible.  First, activate the frame but make the patch
+# and spines invisible.
+make_patch_spines_invisible(ax2)
+# Second, show the right spine.
+ax2.spines["right"].set_visible(True)
+# Plot first axis
+p1, = ax.plot(mons3,mldpt,color='mediumblue',label='h',lw=0.75,marker="o",markersize=4)
+ax.tick_params(axis='x', labelrotation=45)
+ax.set_ylabel("Mixed-Layer Depth ($m$)",fontsize=10)
+# Plot outer axis
+p2, = ax2.plot(mons3,Fpt,color='orangered',ls='solid',lw=0.75,marker="d",markersize=4,label=r"$ \alpha $")
+ax2.set_ylabel("$Forcing \, Amplitude \, (W/m^2)$",fontsize=10)
+# Plot inner axis
+p3, = ax3.plot(mons3,damppt,color='limegreen',ls='solid',label=r"$\lambda_a$",
+         marker="x",markersize=5,lw=0.75)
+ax3.set_ylabel("$\lambda_{a} (Wm^{-2} \, ^{\circ} C^{-1})$",fontsize=10)
+# Color Labels
+ax.yaxis.label.set_color(p1.get_color())
+ax2.yaxis.label.set_color(p2.get_color())
+ax3.yaxis.label.set_color(p3.get_color())
+# Color Ticks
+tkw = dict(size=4, width=1.5)
+ax.tick_params(axis='y', colors=p1.get_color(), **tkw)
+ax2.tick_params(axis='y', colors=p2.get_color(), **tkw)
+ax3.tick_params(axis='y', colors=p3.get_color(), **tkw)
+ax.tick_params(axis='x', **tkw)
+
+ax.grid(True,ls='dotted')
+
+lines = [p1, p2, p3]
+ax.legend(lines, [l.get_label() for l in lines],loc='upper center')
+
+
+plt.savefig(outpath+"Scycle_MLD_Forcing_%s_Triaxis.png"%locstring,dpi=150,bbox_inches='tight')
+
+
 
 #% ----------------------
 #%% Load PiC Data
@@ -318,6 +396,20 @@ def plot_whitenoise(ts,ax,
     freq /= dt
     ax.semilogx(freq,freq*P,label="White Noise ($\sigma=%.2f ^{\circ}C)$"%(tsvar),color='blue',lw=0.5)
     return ax,P,freq
+
+def plot_whitenoiselin(ts,ax,plotdt,
+                    nsmooth=1000,pct=0.10,
+                    dt=3600*24*30):
+    
+    tsvar = np.std(ts)
+    wn    = np.random.normal(0,tsvar,len(ts))
+    
+    sps = ybx.yo_spec(wn,1,nsmooth,pct,debug=False)
+    P,freq,dof,r1=sps
+    P*= dt
+    freq /= dt
+    ax.plot(freq*plotdt,P/plotdt,label="White Noise ($\sigma=%.2f ^{\circ}C)$"%(tsvar),color='blue',lw=0.5)
+    return ax,P,freq
     
 def formatspec_generals(ax,htax,fontsize=12,
                         xlm = [1/(dt*12*15000),1/(dt*1)],
@@ -344,8 +436,8 @@ def formatspec_generals(ax,htax,fontsize=12,
 # Key Params
 plotcesm = True
 cnames  = ["CESM1 FULL","CESM1 SLAB"]
-#nsmooths = [500,250] # Set Smothing
-nsmooths = [250,125]
+nsmooths = [500,250] # Set Smothing
+#nsmooths = [250,125]
 
 # Other Params
 pct     = 0.10
@@ -432,8 +524,8 @@ clfull,clslab = CLs
 # -----------------------------------------------------------------
 
 sstall  = sst
-#nsmooth = 1000
-nsmooth = 500
+nsmooth = 1000
+#nsmooth = 500
 pct     = 0.10
 specnames = "nsmooth%i_taper%i" % (nsmooth,pct*100)
 
@@ -545,6 +637,20 @@ ax.set_title("SST Spectral Estimates, Varying Mixed Layer Complexity")
 plt.tight_layout()
 plt.savefig("%sSpectra_MLD_Complexity_SamePlot_nsmooth%i_taper%i.png"% (outpath,nsmooth,pct*100),dpi=150)
 
+
+#%% Save the results to visualize in another script (plot_spectra_Generals)
+
+outdatname = datpath + "/Generals_Report/upper_hierarchy_data_nsmooth%i.npz" % (nsmooth)
+np.savez(outdatname,**{
+    'freqs':freqs,
+    'CCs':CCs,
+    'specs':specs,
+    'sst':sstall,
+    'ecolors' : expcolors,
+    'enames':labelsnew},allow_pickle=True)
+
+
+
 #%% Plot Figure for each one
 xlm = [1/(dt*12*15000),1/(dt*1)]
 ylm = [-.01,.4]
@@ -582,10 +688,144 @@ plt.tight_layout()
 plt.savefig("%sSpectra_Comparison_2panel_nsmooth%i_taper%i.png"% (outpath,nsmooth,pct*100),dpi=150)
 
 
-#%% Make linear-linear plots
+#%% Make linear-linear plots (all models together)
 
 plotdt = 3600*24*365
+plotcf = True
 
+fig,ax = plt.subplots(1,1)
+
+for i in [1,2,3]:
+    
+    ksig1 = specs[i] > CCs[i][:,1]
+    ksig0 = specs[i] <= CCs[i][:,1]
+    
+    # Significant Points
+    specsig1 = specs[i].copy()
+    specsig1[ksig0] = np.nan
+    # Insig Points
+    specsig0 = specs[i].copy()
+    specsig0[ksig1] = np.nan
+    
+    ax.plot(freqs[i]*plotdt,specs[i]/plotdt,label=ename[i] + "$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(sstall[i])),color=ecol[i],ls="solid")
+    if plotcf:
+        ax.plot(freqs[i]*plotdt,CCs[i][...,0]/plotdt,label="",color=ecol[i],ls=":",alpha=0.5)
+        ax.plot(freqs[i]*plotdt,CCs[i][...,1]/plotdt,label="",color=ecol[i],ls="dashed",alpha=0.5)
+
+
+ax.plot(freqcesmslab*plotdt,Pcesmslab/plotdt,color='gray',label="CESM1 SLAB" + "$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(slabpt)))
+#ax.semilogx(freqcesmslab,freqcesmslab*CLs[1][:,1],color='gray',label="",ls='dashed')
+ax.plot(freqcesmfull*plotdt,Pcesmfull/plotdt,color='black',label="CESM1 FULL" + "$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(fullpt)))
+#ax.plot(freqcesmfull*plotdt,Pcesmfull*freqcesmfull,color='black',label="CESM1 FULL" + "$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(fullpt)))
+#ax.semilogx(freqcesmfull,freqcesmfull*CLs[0][:,1],color='black',label="",ls='dashed')
+if plotcf:
+    ax.plot(freqcesmslab*plotdt,clslab[:,0]/plotdt,color='gray',label="",ls=":",alpha=0.5)
+    ax.plot(freqcesmslab*plotdt,clslab[:,1]/plotdt,color='gray',label="",ls="dashed",alpha=0.5)
+    
+    
+    ax.plot(freqcesmfull*plotdt,clfull[:,0]/plotdt,color='black',label="",ls=":",alpha=0.5)
+    ax.plot(freqcesmfull*plotdt,clfull[:,1]/plotdt,color='black',label="",ls="dashed",alpha=0.5)
+
+
+
+# Adjust Axis
+xtick = np.arange(0,1.7,.2)
+ax.set_xticks(xtick)
+ax.set_ylabel("Power ($\degree C^{2} / cpy$)",fontsize=12)
+ax.set_xlabel("Frequency (cycles/year)",fontsize=12)
+htax = viz.twin_freqaxis(ax,freqs[i],"Years",dt,mode='lin-lin',xtick=xtick)
+
+# Set xtick labels
+xtkl = ["%.1f" % (1/x) for x in xtick]
+htax.set_xticklabels(xtkl)
+
+ax.set_ylim([0,2.5])
+
+# Set some key lines
+ax = viz.add_yrlines(ax,dt=plotdt)
+
+
+# Other Options
+ax.legend(fontsize=10)
+ax.set_title("SST Spectral Estimates, Varying Mixed Layer Complexity ")
+plt.tight_layout()
+plt.savefig("%sSpectra_MLD_Complexity_SamePlot_Lin-Lin_nsmooth%i_taper%i.png"% (outpath,nsmooth,pct*100),dpi=150)
+
+
+#%% Make 2 panel plot
+
+def lin_quickformat(ax,plotdt):
+    # Set tickparams and clone
+    xtick = np.arange(0,1.7,.2)
+    ax.set_xticks(xtick)
+    ax.set_ylabel("Power ($\degree C^{2} / cpy$)",fontsize=12)
+    ax.set_xlabel("Frequency (cycles/year)",fontsize=12)
+    htax = viz.twin_freqaxis(ax,freqs[i],"Years",dt,mode='lin-lin',xtick=xtick)
+    
+    # Set xtick labels
+    xtkl = ["%.1f" % (1/x) for x in xtick]
+    htax.set_xticklabels(xtkl)
+    
+    
+    # Set some key lines
+    ax = viz.add_yrlines(ax,dt=plotdt)
+    
+    ax.legend(fontsize=10)
+    return ax,htax
+    
+
+
+plotdt = 3600*24*365
+fig,axs = plt.subplots(2,1,figsize=(8,8))
+
+ax = axs[0]
+i = 1
+ax.plot(freqs[i]*plotdt,specs[i]/plotdt,label=ename[i] + "$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(sstall[i])),color=ecol[i],ls="solid")
+ax.plot(freqs[i]*plotdt,CCs[i][:,1]/plotdt,label=ename[i]+" AR1 95% Significance",color=ecol[i],alpha=0.5,ls='dashed')
+ax.plot(freqs[i]*plotdt,CCs[i][:,0]/plotdt,label=ename[i]+" AR1",color=ecol[i],alpha=0.5,ls=':')
+
+ax.plot(freqcesmslab*plotdt,Pcesmslab/plotdt,color='gray',label="CESM1 SLAB" + "$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(slabpt)))
+ax.plot(freqcesmslab*plotdt,CLs[1][:,1]/plotdt,color='gray',label="CESM1 SLAB AR1 95% Significance",ls='dashed')
+ax.plot(freqcesmslab*plotdt,CLs[1][:,0]/plotdt,color='gray',label="CESM1 SLAB AR1",ls=':')
+ax,Pn,Freqn=plot_whitenoiselin(sstall[i],ax,plotdt,nsmooth=1000,pct=pct,dt=dt)
+ax,htax = lin_quickformat(ax,plotdt)
+ax.set_xlabel("")
+ax.set_title("Non Entraining Model vs. CESM1 Slab")
+
+ax = axs[1]
+i = 3
+ax.plot(freqs[i]*plotdt,specs[i]/plotdt,label=ename[i] + "$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(sstall[i])),color=ecol[i],ls="solid")
+ax.plot(freqs[i]*plotdt,CCs[i][:,1]/plotdt,label=ename[i]+" AR1 95% Significance",color=ecol[i],alpha=0.5,ls='dashed')
+ax.plot(freqs[i]*plotdt,CCs[i][:,0]/plotdt,label=ename[i]+" AR1",color=ecol[i],alpha=0.5,ls=':')
+
+ax.plot(freqcesmfull*plotdt,Pcesmfull/plotdt,color='black',label="CESM1 FULL" + "$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(fullpt)))
+ax.plot(freqcesmfull*plotdt,CLs[0][:,1]/plotdt,color='black',label="CESM1 FULL AR1 95% Significance",ls='dashed')
+ax.plot(freqcesmfull*plotdt,CLs[0][:,0]/plotdt,color='black',label="CESM1 FULL AR1",ls=':')
+ax,Pn,Freqn=plot_whitenoiselin(sstall[i],ax,plotdt,nsmooth=1000,pct=pct,dt=dt)
+ax,htax = lin_quickformat(ax,plotdt)
+htax.set_xlabel("")
+ax.set_title("Entraining Stochastic Model vs. CESM1 Full")
+
+
+#ax.semilogx(freqcesmslab,freqcesmslab*CLs[1][:,1],color='gray',label="",ls='dashed')
+#ax.plot(freqcesmfull*plotdt,Pcesmfull*freqcesmfull,color='black',label="CESM1 FULL" + "$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(fullpt)))
+#ax.semilogx(freqcesmfull,freqcesmfull*CLs[0][:,1],color='black',label="",ls='dashed')
+
+# Adjust Axis
+plt.tight_layout()
+
+
+
+
+
+# Other Options
+plt.savefig("%sSpectra_Comparison_2panel_Lin-Lin_nsmooth%i_taper%i.png"% (outpath,nsmooth,pct*100),dpi=150)
+
+
+
+#%% (Re)Make variance preserving plots <NOT WORKING YET>
+
+plotdt = 3600*24*365
 fig,ax = plt.subplots(1,1)
 
 for i in [1,2,3]:
@@ -608,42 +848,37 @@ for i in [1,2,3]:
     #ax.semilogx(freqs[i],specsig0*freqs[i],label="",color=ecol[i],ls='dotted',alpha=0.7,lw=0.75)
     #ax.semilogx(freqs[i],CCs[i][:,1]*freqs[i],color=ecol[i],ls='dashed',lw=1)
     
-    ax.plot(freqs[i]*plotdt,specs[i]/plotdt,label=ename[i] + "$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(sstall[i])),color=ecol[i],ls="solid")
+    ax.semilogx(freqs[i]*plotdt,specs[i]*freqs[i],label=ename[i] + "$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(sstall[i])),color=ecol[i],ls="solid")
     #ax.semilogx(freqs[i],freqs[i]*)
     
-ax.plot(freqcesmslab*plotdt,Pcesmslab/plotdt,color='gray',label="CESM1 SLAB" + "$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(slabpt)))
-#ax.semilogx(freqcesmslab,freqcesmslab*CLs[1][:,1],color='gray',label="",ls='dashed')
-ax.plot(freqcesmfull*plotdt,Pcesmfull/plotdt,color='black',label="CESM1 FULL" + "$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(fullpt)))
+ax.semilogx(freqcesmslab*plotdt,Pcesmslab*freqcesmslab,color='gray',label="CESM1 SLAB" + "$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(slabpt)))
+#ax.semilogx(freqcesmslab*plotdt,freqcesmslab*CLs[1][:,1],color='gray',label="",ls='dashed')
+ax.plot(freqcesmfull*plotdt,Pcesmfull*freqcesmfull,color='black',label="CESM1 FULL" + "$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(fullpt)))
 #ax.plot(freqcesmfull*plotdt,Pcesmfull*freqcesmfull,color='black',label="CESM1 FULL" + "$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(fullpt)))
-#ax.semilogx(freqcesmfull,freqcesmfull*CLs[0][:,1],color='black',label="",ls='dashed')
+#ax.semilogx(freqcesmfull*okit,freqcesmfull*CLs[0][:,1],color='black',label="",ls='dashed')
 
-ax.set_xlim([0,1.5])
-ax.set_xticks(np.arange(0,1.7,.2))
-ax.set_ylabel("Power ($\degree C^{2} / cpy$)")
-ax.set_xlabel("Frequency (cycles/year)")
+# Adjust Axis
+#xtick = np.arange(0,1.7,.2)
+xtk = ax.get_xticks()[2:-2]
+xlm = [1/(dt*12*15000),1/(dt*1)]
+ax.set_ylabel("Frequency x Power ($\degree C^{2}$)",fontsize=12)
+ax.set_xlabel("Frequency (cycles/year)",fontsize=12)
+htax = viz.twin_freqaxis(ax,freqs[0],"Years",plotdt,mode='log-lin',xtick=xtk)
+ax.set_xlm()
+
+# Set xtick labels
+xtkl = ["%.1f" % (1/x) for x in xtick]
+htax.set_xticklabels(xtkl)
+
+# Set some key lines
+ax = viz.add_yrlines(ax,dt=plotdt)
 
 
-
-
+# Other Options
 ax.legend(fontsize=10)
-htax = viz.twin_freqaxis(ax,freqs[0],tunit,dt,mode='lin-lin')
-#ax.set_ylabel(r"Frequency x Power $(^{\circ}C)^{2}$",fontsize=13)
-#ax,htax = formatspec_generals(ax,htax)
+ax.set_title("SST Spectral Estimates, Varying Mixed Layer Complexity ")
 
-ax.minorticks_off()
-htax.minorticks_off()
-#ax.grid(True,which='both',ls='dotted')
-
-
-#ax,htax = viz.make_axtime(ax,htax)
-#ax = viz.add_yrlines(ax)
-ax.set_title("SST Spectral Estimates, Varying Mixed Layer Complexity")
-plt.tight_layout()
-#plt.savefig("%sSpectra_MLD_Complexity_SamePlot_nsmooth%i_taper%i.png"% (outpath,nsmooth,pct*100),dpi=150)
-
-
-
-
+plt.savefig("%sSpectra_MLD_Complexity_SamePlot_Lin-Lin_nsmooth%i_taper%i.png"% (outpath,nsmooth,pct*100),dpi=150)
 
 
 
@@ -728,7 +963,7 @@ ax.set_xlim([0,120])
 
 # Spectral Analysis
 # Parameters
-pct     = 0.0
+pct     = 0.10
 nsmooth = 200
 opt     = 1
 dt      = 3600*24*365
