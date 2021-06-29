@@ -10,7 +10,7 @@ import sys
 
 
 #%%
-stormtrack = 1
+stormtrack = 0
 if stormtrack == 0:
     projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
     datpath     = projpath + '01_Data/model_output/'
@@ -37,14 +37,14 @@ import scm
 lags = np.arange(0,37,1)
 
 # Options to determine the experiment ID
-naoscale  = 10 # Number to scale NAO and other forcings by
+naoscale  = 1 # Number to scale NAO and other forcings by
 nyrs      = 1000        # Number of years to integrate over
 applyfac  = 2
 mconfig   = "SLAB_PIC"
 
 # Do a stormtrackloop
-runids = ["202",]
-funiforms = [0,1,3,5.5,7,]
+runids = ["303",]
+funiforms = [2.5]
 #funiforms=[0,1,2,5,6]
 #runids=['006']
 

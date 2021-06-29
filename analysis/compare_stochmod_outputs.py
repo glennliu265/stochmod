@@ -22,7 +22,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    outpathfig  = projpath + '02_Figures/20200823/'
+    outpathfig  = projpath + '02_Figures/20210322_AMVTeleconf/'
     
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -48,14 +48,14 @@ import scm
 lags = np.arange(0,37,1)
 
 # Options to determine the experiment ID
-naoscale  = 10 # Number to scale NAO and other forcings by
+naoscale  = 1 # Number to scale NAO and other forcings by
 nyrs      = 1000        # Number of years to integrate over
 # Do a stormtrackloop
 #runids = ("003","004","005")
 #funiforms = (0,1,2,5,6)
 
-runids=['100']
-
+runids=['303']
+funiforms=[1.5,3,5.5]
 
 # Set region variables
 bbox_SP = [-60,-15,40,65]
@@ -72,8 +72,12 @@ rcolmem = [np.array([189,202,255])/255,
 
 
 # Set Forcing Names and colors
-funiforms=[0,1,2,5,6]
-fnames  = ["Random","Uniform","NAO (DJFM)","EAP (DJFM)","NAO+EAP (DJFM)"]
+#funiforms=[0,1,2,5,6]
+funiforms=[3]
+#funiforms=[0,1,3,5.5,7,]
+#fnames=["NAO+EAP (DJFM-MON)"]
+#fnames  = ["Random","Uniform","NAO","EAP","NAO+EAP"]
+fnames = ["NAO (DJFM-MON)"]
 fcolors = ["teal","springgreen","b","tomato","m"]
 fstyles = ["dotted","dashed",'solid','solid','solid']
 mconfig = "SLAB_PIC"
@@ -198,6 +202,7 @@ bbox = [-100,40,0,90]
 runid = runids[0]
 cint = np.arange(-.5,.55,.05)
 clabs = np.arange(-.5,.75,.25)
+vscale = 10
 for f in range(len(funiforms)):
     funiform = funiforms[f]
     
@@ -208,31 +213,23 @@ for f in range(len(funiforms)):
     amvpat = amvsp[funiform]
             
     for region in range(4):
-              
-        
+
             #% Make AMV Spatial Plots
             cmap = cmocean.cm.balance
             cmap.set_bad(color='yellow')
-            #cint = np.arange(-1,1.1,0.1)
-            #clab = cint
             fig,axs = plt.subplots(1,4,figsize=(12,1.5),subplot_kw={'projection':ccrs.PlateCarree()})
-            
-            
             for mode in range(4):
                 
                 print("Now on mode %i region %i f %i"% (mode,region,f))
                 
-                varin = np.transpose(amvpat[region][mode],(1,0))
-<<<<<<< Updated upstream
-                viz.plot_AMV_spatial(varin,lonr,latr,bbox,cmap,cint=cint,clab=clabs,pcolor=0,ax=axs[mode],fmt="%.1f",)
-                axs[mode].set_title("MLD %s" % modelname[mode],fontsize=12)   
-=======
+                varin = np.transpose(amvpat[region][mode],(1,0))*vscale
+
+                #viz.plot_AMV_spatial(varin,lonr,latr,bbox,cmap,cint=cint,clab=clabs,pcolor=0,ax=axs[mode],fmt="%.1f",)
                 viz.plot_AMV_spatial(varin,lonr,latr,bbox,cmap,cint=cint,labels=False,pcolor=0,ax=axs[mode],fmt="%.1f",)
-                axs[mode].set_title("%s" % modelname[mode],fontsize=12)   
->>>>>>> Stashed changes
-            #plt.suptitle("AMV Pattern | Forcing: %s; fscale: %ix" % (forcingname[funiform],fscale),ha='center')
-            #fig.tight_layout(rect=[0, 0.03, .75, .95])
-            outname = outpathfig+'%s_AMVpattern_%s_allmodels_region%s.png' % (regions[region],expid)
+                #axs[mode].set_title("MLD %s" % modelname[mode],fontsize=12)
+                axs[mode].set_title("%s" % modelname[mode],fontsize=12)
+
+            outname = outpathfig+'%s_AMVpattern_%s_allmodels_vscale%i.png' % (regions[region],expid,vscale)
             plt.savefig(outname, bbox_inches="tight",dpi=200)
             
             
@@ -244,21 +241,21 @@ for f in range(len(funiforms)):
             fig,axs = plt.subplots(1,4,figsize=(12,1.5))
             for mode in range(4): 
                 
-                viz.plot_AMV(amvidx[region][mode],ax=axs[mode])
+                viz.plot_AMV(amvidx[region][mode]*vscale,ax=axs[mode])
                 axs[mode].set_title("%s" % modelname[mode],fontsize=12)
                 axs[mode].set_xlim(xlm)
                 #axs[mode].set_xticks(xtk)
                 axs[mode].set_xlabel('Year')
-                #axs[mode].set_ylim(ylm)
+                axs[mode].set_ylim(ylm)
             axs[0].set_ylabel('AMV Index')
             #plt.suptitle("AMV Index | Forcing: %s; fscale: %ix" % (forcingname[funiform],fscale))
             #fig.tight_layout(rect=[0, 0.03, 1, 0.95])
-<<<<<<< Updated upstream
-            outname = outpathfig+'%s_AMVIndex_%s_allmodels_region%s.png' % (regions[region],expid)
-=======
+# <<<<<<< Updated upstream
+#             outname = outpathfig+'%s_AMVIndex_%s_allmodels_region%s.png' % (regions[region],expid)
+# =======
             #plt.tight_layout()
-            outname = outpathfig+'%s_AMVIndex_%s_allmodels.png' % (regions[region],expid)
->>>>>>> Stashed changes
+            outname = outpathfig+'%s_AMVIndex_%s_allmodels_vscale%i.png' % (regions[region],expid,vscale)
+# >>>>>>> Stashed changes
             plt.savefig(outname, bbox_inches="tight",dpi=200)
 
 

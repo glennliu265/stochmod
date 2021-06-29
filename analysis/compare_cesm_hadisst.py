@@ -26,11 +26,11 @@ from scipy import signal
 
 # HadISST Inforation
 detrend = 2
-startyr = 1870
+startyr = 1900
 
 # ERSST Information
 detrende = 2
-startyre = 1854
+startyre = 1900
 
 # Query Point
 query = [-30,50] # [lon,lat]
@@ -58,6 +58,10 @@ ecolors  = ('b','r','k','gray')
 plotdt   = 3600*24*365
 nsmooths = [50,50,500,250]
 pct      = 0.10
+
+
+def calc_r1(ts):
+    return np.corrcoef(ts[:-1],ts[1:])[0,1]
 
 #%% Load Data
 
@@ -101,38 +105,16 @@ cfhad  = proc.calc_conflag(hadac,conf,tails,hsstpt.shape[0]/12)
 cfers  = proc.calc_conflag(ersac,conf,tails,ersstpt.shape[0]/12)
 cfs = [cfhad,cfers,cffull,cfslab]
 
-
-
-
-
 # Plot Things
 fig,ax     = plt.subplots(1,1,figsize=(6,4))
-title = "SST Autocorrelation at %s \n Lag 0 = %s" % (locstringtitle,mons3[kmonth])
-#title      = "SST Autocorrelation (%s) \n Lag 0 = %s" % (locstringtitle,mons3[mldpt.argmax()])
-#ax,ax2,ax3 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title,loopvar=damppt)
-
-
-for i in range(4):
-    
-
-
-# # Plot CESM Data
-# ax,ax2= viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title)
-# ax.plot(lags,slabac[lags],label="CESM1 SLAB",color='gray',marker="o",markersize=3)
-# ax.fill_between(lags,cfslab[lags,0],cfslab[lags,1],color='k',alpha=0.10)
-
-# ax.plot(lags,fullac,color='k',label='CESM1 Full',ls='dashdot',marker="o",markersize=3)
-# ax.fill_between(lags,cffull[lags,0],cffull[lags,1],color='k',alpha=0.10)
-
-# # Plot HadISST Data
-# ax.plot(lags,hadac,label="HadISST",color="b",marker="x",markersize=3)
-# ax.fill_between(lags,cfhad[:,0],cfhad[:,1],color='b',alpha=0.10)
-
-
-
-ax.legend()
-#ax3.set_ylabel("Heat Flux Feedback ($W/m^{2}$)")
-#ax3.yaxis.label.set_color('gray')
+title = "SST Autocorrelation at %s (Reanalysis vs. CESM1) \n Lag 0 = %s" % (locstringtitle,mons3[kmonth])
+ax,ax2= viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title)
+for i in range(3):
+    #ax.plot(lags,acs[i],label=enames[i],color=ecolors[i],marker="o",markersize=3)
+    ax.fill_between(lags,cfs[i][lags,0],cfs[i][lags,1],color=ecolors[i],alpha=0.20,zorder=-1)
+for i in range(3):
+    ax.plot(lags,acs[i],label=enames[i],color=ecolors[i],marker="o",markersize=3)
+ax.legend(ncol=2)
 ax.legend(fontsize=10,ncol=3)
 plt.tight_layout()
 plt.savefig(outpath+"Autocorrelation_CompareHadISST_%s.png" % locstring,dpi=200)
@@ -149,23 +131,22 @@ specs,freqs,CCs,dofs,r1s = scm.quick_spectrum(ssts,nsmooths,pct)
 
 fig,ax = plt.subplots(1,1,figsize=(6,4))
 
-for i in range(3):
+for i in range(4):
     ax.semilogx(freqs[i]*plotdt,specs[i]*freqs[i],color=ecolors[i],label=enames[i]+"$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(ssts[i])))
     
     ax.semilogx(freqs[i]*plotdt,CCs[i][:,1]*freqs[i],color=ecolors[i],alpha=0.5,ls='dashed')
     ax.semilogx(freqs[i]*plotdt,CCs[i][:,0]*freqs[i],color=ecolors[i],alpha=0.5,ls='dotted')
 
-    
-
 # Set x limits
-#xlm = [1/(plotdt*),1/(plotdt*1)]
-
 xtick = ax.get_xticks()
 
 # Set Labels
 ax.set_ylabel("Frequency x Power ($\degree C^{2}$)",fontsize=12)
 ax.set_xlabel("Frequency (cycles/year)",fontsize=12)
 htax = viz.twin_freqaxis(ax,freqs[1],"Years",plotdt,mode='log-lin',xtick=xtick)
+
+
+
 
 xlm = [5e-4,10]
 ax.set_xlim(xlm)
@@ -183,29 +164,29 @@ plt.savefig(outpath+"Spectrum_VariancePres_CompareHadISST_%s.png" % locstring,dp
 #%% Linear Linear PLots
 
 
-def lin_quickformat(ax,plotdt,freq):
-    # Set tickparams and clone
-    xtick = np.arange(0,1.7,.2)
-    ax.set_xticks(xtick)
-    ax.set_ylabel("Power ($\degree C^{2} / cpy$)",fontsize=12)
-    ax.set_xlabel("Frequency (cycles/year)",fontsize=12)
-    htax = viz.twin_freqaxis(ax,freq,"Years",dt,mode='lin-lin',xtick=xtick)
+# def lin_quickformat(ax,plotdt,freq):
+#     # Set tickparams and clone
+#     xtick = np.arange(0,1.7,.2)
+#     ax.set_xticks(xtick)
+#     ax.set_ylabel("Power ($\degree C^{2} / cpy$)",fontsize=12)
+#     ax.set_xlabel("Frequency (cycles/year)",fontsize=12)
+#     htax = viz.twin_freqaxis(ax,freq,"Years",dt,mode='lin-lin',xtick=xtick)
     
-    # Set xtick labels
-    xtkl = ["%.1f" % (1/x) for x in xtick]
-    htax.set_xticklabels(xtkl)
+#     # Set xtick labels
+#     xtkl = ["%.1f" % (1/x) for x in xtick]
+#     htax.set_xticklabels(xtkl)
     
     
-    # Set some key lines
-    ax = viz.add_yrlines(ax,dt=plotdt)
+#     # Set some key lines
+#     ax = viz.add_yrlines(ax,dt=plotdt)
     
-    ax.legend(fontsize=10)
-    return ax,htax
+#     ax.legend(fontsize=10)
+#     return ax,htax
 
 # Plot Spectra
 fig,ax = plt.subplots(1,1,figsize=(6,4))
 
-for i in range(3):
+for i in range(4):
     ax.plot(freqs[i]*plotdt,specs[i]/plotdt,color=ecolors[i],label=enames[i]+"$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(ssts[i])))
     
     ax.plot(freqs[i]*plotdt,CCs[i][:,1]/plotdt,color=ecolors[i],alpha=0.5,ls='dashed')
@@ -222,23 +203,53 @@ ax.set_ylabel("Frequency x Power ($\degree C^{2}$)",fontsize=12)
 ax.set_xlabel("Frequency (cycles/year)",fontsize=12)
 htax = viz.twin_freqaxis(ax,freqs[1],"Years",plotdt,mode='lin-lin',xtick=xtick)
 
-
 ax = viz.add_yrlines(ax,dt=plotdt)
 
 #ylm = [-.01,.4]
 # Set xtick labels
 xtkl = ["%.1f" % (1/x) for x in xtick]
 htax.set_xticklabels(xtkl)
-
+ax.legend()
 ax.set_title("SST Spectral Estimates at %s"%(locstringtitle))
 plt.tight_layout()
 plt.savefig(outpath+"Spectrum_Linear_CompareHadISST_%s.png" % locstring,dpi=200)
 
+#%% Log Log Plots
 
+# Plot Spectra
+fig,ax = plt.subplots(1,1,figsize=(6,4))
+
+for i in range(4):
+    ax.loglog(freqs[i]*plotdt,specs[i]/plotdt,color=ecolors[i],label=enames[i]+"$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(ssts[i])))
     
-    
-    
+    ax.loglog(freqs[i]*plotdt,CCs[i][:,1]/plotdt,color=ecolors[i],alpha=0.5,ls='dashed')
+    ax.loglog(freqs[i]*plotdt,CCs[i][:,0]/plotdt,color=ecolors[i],alpha=0.5,ls='dotted')
+
+# Set x limits\
+xtick = ax.get_xticks()
+xtkl = ["%.1f" % (1/x) for x in xtick]
 
 
+# Set Labels
+ax.set_ylabel("Power ($\degree C^{2}$)",fontsize=12)
+ax.set_xlabel("Frequency (cycles/year)",fontsize=12)
+htax = viz.twin_freqaxis(ax,freqs[1],"Years",plotdt,mode='log-log',xtick=xtick)
+htax.set_xticklabels(xtkl)
+
+
+#xlm = [1e-2,10]
+#ax.set_xlim(xlm)
+#htax.set_xlim(xlm)
+
+#ylm = [-.01,.4]
+# Set xtick labels
+
+
+ax.set_title("SST Spectral Estimates at %s"%(locstringtitle))
+plt.tight_layout()
+plt.savefig(outpath+"Spectrum_LogLog_CompareHadISST_%s.png" % locstring,dpi=200)
+
+
+#%% Reformulate R
 
 

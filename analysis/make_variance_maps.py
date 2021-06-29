@@ -29,6 +29,8 @@ sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmo
 sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
 
 
+outpath     = projpath + '02_Figures/20210527/'
+proc.makedir(outpath)
 
 
 #%% Experiment parameters
@@ -163,5 +165,5 @@ fig.colorbar(pcm,ax=ax,fraction=0.046)
 ax.set_title("Non-Entraining Stochastic Model  / CESM1 SLAB")
 
 plt.suptitle("Ratio of SST Variance",fontsize=14)
-plt.savefig("")
+plt.savefig("%sVariance_Maps_CESM1_vs_Stochastic.png"%(outpath),dpi=200,bbox_inches='tight')
 
