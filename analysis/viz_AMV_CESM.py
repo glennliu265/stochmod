@@ -29,17 +29,20 @@ import sys
 sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
 sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
 from amv import proc,viz
+import scm
 import yo_box as ybx
 
 #%% User Edits
 
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
-outpath = projpath + '02_Figures/20210524/'
+outpath = projpath + '02_Figures/20210628/'
 proc.makedir(outpath)
 
 datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/"
 
-bbox = [-80,0 ,0,65]
+bbox = [-80,0 ,0,60]
+
+runmean=True
 
 #% ----------------------
 #%% Load PiC Data
@@ -139,7 +142,7 @@ idxs = []
 pats = []
 for sst in sstas:
     
-    amvidx,amvpattern=proc.calc_AMVquick(sst,lon180,lat,bbox,order=5,cutofftime=10,anndata=False)
+    amvidx,amvpattern=proc.calc_AMVquick(sst,lon180,lat,bbox,order=5,cutofftime=10,anndata=False,runmean=runmean)
     
     idxs.append(amvidx)
     pats.append(amvpattern)
@@ -217,14 +220,25 @@ np.savez(fn,**{
 #%% Do some spectral analysis
 # ---------------------------
 
+# amvid = []
+# for k in amvidx.keys():
+#     amvid.append(amvidx[k])
+# amvid = np.array(amvid)
+    
+
+enumvar = idxs #nassti
+
+
 # # -------------------------------------------
 # # First calculate for CESM1 (full and slab)
 # # -------------------------------------------
 # Key Params
 plotcesm = True
 cnames  = ["CESM1 FULL","CESM1 SLAB"]
-nsmooths = [250,125] # Set Smothing
+nsmooths = [10,10] # Set Smothing
 #nsmooths = [250,125]
+
+timemax = None#250*12
 
 # Other Params
 pct     = 0.10
@@ -239,7 +253,13 @@ dtplot = 3600*24*365
 
 # Calculate spectra
 freq1s,P1s,CLs = [],[],[]
-for i,sstin in enumerate(nassti):
+for i,sstin in enumerate(enumvar):
+    
+    # Limit to maximum time
+    if timemax is None:
+        sstin=sstin
+    else:
+        sstin = sstin[:timemax]
     
     # Calculate and Plot
     sps = ybx.yo_spec(sstin,opt,nsmooths[i],pct,debug=False)
@@ -249,6 +269,7 @@ for i,sstin in enumerate(nassti):
     if plotcesm:
         
         pps = ybx.yo_specplot(freq,P,dof,r1,tunit,dt=dtplot,clvl=clvl,axopt=axopt,clopt=clopt)
+        print(r1)
         fig,ax,h,hcl,htax,hleg = pps
         #ax,htax = viz.make_axtime(ax,htax)
         #ax = viz.add_yrlines(ax)
@@ -309,6 +330,63 @@ ax.set_title("CESM1 NASSTI (SLAB vs. FULL)")
 plt.tight_layout()
 plt.savefig("%sNASSTI_SpectralEstimate_nsmooth%i_taper%i.png"%(outpath,nsmooths[i],pct*100),dpi=200)
 
+#%% Plot Linear, but over a particular range
+
+xlms = [0,0.2]
+xtks = [0,0.02,0.04,0.1,0.2]
+xtkl = 1/np.array(xtks)
+if timemax is None:
+    timemax = 0
+
+def lin_quickformat(ax,plotdt,freq):
+    # Set tickparams and clone
+    xtick = np.arange(0,1.7,.2)
+    ax.set_xticks(xtick)
+    ax.set_ylabel("Power ($\degree C^{2} / cpy$)",fontsize=12)
+    ax.set_xlabel("Frequency (cycles/year)",fontsize=12)
+    htax = viz.twin_freqaxis(ax,freq,"Years",dt,mode='lin-lin',xtick=xtick)
+    
+    # Set xtick labels
+    xtkl = ["%.1f" % (1/x) for x in xtick]
+    htax.set_xticklabels(xtkl)
+    
+    
+    # Set some key lines
+    ax = viz.add_yrlines(ax,dt=plotdt)
+    
+    ax.legend(fontsize=10)
+    return ax,htax
+
+
+plotdt = 3600*24*365
+fig,ax = plt.subplots(1,1,figsize=(6,4))
+
+i = 1
+ax.plot(freqcesmslab*plotdt,Pcesmslab/plotdt,color='gray',label="CESM1 SLAB" + "$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(nassti[-1])))
+ax.plot(freqcesmslab*plotdt,CLs[1][:,1]/plotdt,color='gray',label="CESM1 SLAB AR1 95% Significance",ls='dashed')
+ax.plot(freqcesmslab*plotdt,CLs[1][:,0]/plotdt,color='gray',label="CESM1 SLAB AR1",ls=':')
+ax.plot(freqcesmfull*plotdt,Pcesmfull/plotdt,color='black',label="CESM1 FULL" + "$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(nassti[0])))
+ax.plot(freqcesmfull*plotdt,CLs[0][:,1]/plotdt,color='black',label="CESM1 FULL AR1 95% Significance",ls='dashed')
+ax.plot(freqcesmfull*plotdt,CLs[0][:,0]/plotdt,color='black',label="CESM1 FULL AR1",ls=':')
+#ax,htax = lin_quickformat(ax,plotdt,freqcesmfull)
+ax.set_xlabel("")
+ax.set_title("CESM1 NASSTI (SLAB vs. FULL) \n nsmooth=%i"%(nsmooths[0]))
+
+ax.set_xlim(xlms)
+ax.set_xticks(xtks)
+xtick=np.array(xtks)
+htax = viz.twin_freqaxis(ax,freq,"Years",dt,mode='lin-lin',xtick=xtick)
+# Set xtick labels
+htax.set_xticklabels(xtkl)
+
+ax.set_ylim([0,1])
+
+ax.legend(fontsize=10)
+
+plt.tight_layout()
+plt.savefig("%sNASSTI_SpectralEstimate_nsmooth%i_taper%i_decadal_timemax%i.png"%(outpath,nsmooths[i],pct*100,timemax),dpi=200)
+
+
 
 #%% Remake the plot (variance preserving)
 
@@ -365,12 +443,155 @@ htax.set_xticklabels(xtkl)
 
 #ax,htax = lin_quickformat(ax,plotdt,freqcesmfull)
 ax.set_xlabel("")
-ax.set_title("CESM1 NASSTI (SLAB vs. FULL)")
+ax.set_title("CESM1 NASSTI (SLAB vs. FULL),nsmooth=%i"%nsmooths[0])
 plt.tight_layout()
 #plt.savefig("%sNASSTI_SpectralEstimate_nsmooth%i_taper%i.png"%(outpath,nsmooths[i],pct*100),dpi=200)
 
 
 
+
+
+#%% Load in some stochastic model results, and compare
+
+datpath2  = projpath + '01_Data/model_output/'
+fscale    = 1 # Number to scale NAO and other forcings by
+nyrs      = 1000        # Number of years to integrate over
+applyfac  = 2
+mconfig   = "SLAB_PIC"
+runid     = "303"
+funiform  = 1.5
+expid     = "%s_%iyr_funiform%i_run%s_fscale%03d_applyfac%i" %(mconfig,nyrs,funiform,runid,fscale,applyfac)
+
+
+sst = np.load(datpath2+"stoch_output_%s.npy"%(expid),allow_pickle=True).item()
+lonr = np.load(datpath+"lon.npy")
+latr = np.load(datpath+"lat.npy")
+
+# Select NAtl Region for each model
+
+
+#% Calculate AMV Index
+amvtime = time.time()
+amvidx = {}
+amvpat = {}
+
+for model in range(4):
+    amvidx[model],amvpat[model] = proc.calc_AMVquick(sst[model],lonr,latr,bbox,order=5,cutofftime=10,anndata=False,runmean=runmean)
+    
+print("Calculated AMV variables for region in %.2f" % (time.time()-amvtime))
+
+
+#%% Plot AMV Pattern
+modeln = ["MLD Fixed","MLD Mean", "MLD Seasonal", "Entraining"]
+ecolors = ['blue','r','magenta','orange']
+enames = modeln
+for model in [1,2,3]:
+    
+    fig,ax,cb = plot_AMV_generals(latr,lonr,amvpat[model])
+    ax.set_title("AMV Pattern (Stochastic Model %s) \n Contour Interval: 0.05 $\degree C / \sigma_{AMV}$" % (modeln[model]))
+    plt.savefig(outpath+"Stochmod_AMV_Spatial_Pattern_model%i.png"%model,bbox_inches='tight')
+    
+    
+#%% Calculate Spectra
+
+
+nsmooths2 = np.ones(4)* 1
+specs,freqs,CCs,dofs,r1s = scm.quick_spectrum(amvidx,nsmooths2,pct)
+
+# Plot Spectra
+fig,ax = plt.subplots(1,1,figsize=(6,4))
+
+for i in range(4):
+    ax.plot(freqs[i]*plotdt,specs[i]/plotdt,color=ecolors[i],label=enames[i])
+    
+    ax.plot(freqs[i]*plotdt,CCs[i][:,1]/plotdt,color=ecolors[i],alpha=0.5,ls='dashed')
+    ax.plot(freqs[i]*plotdt,CCs[i][:,0]/plotdt,color=ecolors[i],alpha=0.5,ls='dotted')
+
+    
+
+# Set x limits
+xtick = np.arange(0,1.7,.2)
+ax.set_xticks(xtick)
+
+# Set Labels
+ax.set_ylabel("Frequency x Power ($\degree C^{2}$)",fontsize=12)
+ax.set_xlabel("Frequency (cycles/year)",fontsize=12)
+htax = viz.twin_freqaxis(ax,freqs[1],"Years",plotdt,mode='lin-lin',xtick=xtick)
+
+ax = viz.add_yrlines(ax,dt=plotdt)
+
+#ylm = [-.01,.4]
+# Set xtick labels
+xtkl = ["%.1f" % (1/x) for x in xtick]
+htax.set_xticklabels(xtkl)
+ax.legend()
+ax.set_title("AMV Idx Spectral Estimates (Stochastic Model)")
+plt.tight_layout()
+plt.savefig(outpath+"AMVIDX_Stochastic_Model.png",dpi=200)
+
+
+
+#%% comparitive lin-lin plot
+
+
+xlms = [0,0.2]
+xtks = [0,0.02,0.04,0.1,0.2]
+xtkl = 1/np.array(xtks)
+if timemax is None:
+    timemax = 0
+
+def lin_quickformat(ax,plotdt,freq):
+    # Set tickparams and clone
+    xtick = np.arange(0,1.7,.2)
+    ax.set_xticks(xtick)
+    ax.set_ylabel("Power ($\degree C^{2} / cpy$)",fontsize=12)
+    ax.set_xlabel("Frequency (cycles/year)",fontsize=12)
+    htax = viz.twin_freqaxis(ax,freq,"Years",dt,mode='lin-lin',xtick=xtick)
+    
+    # Set xtick labels
+    xtkl = ["%.1f" % (1/x) for x in xtick]
+    htax.set_xticklabels(xtkl)
+    
+    
+    # Set some key lines
+    ax = viz.add_yrlines(ax,dt=plotdt)
+    
+    ax.legend(fontsize=10)
+    return ax,htax
+
+
+plotdt = 3600*24*365
+fig,ax = plt.subplots(1,1,figsize=(6,4))
+
+
+# Plot CESM
+i = 1
+
+ax.plot(freqcesmslab*plotdt,Pcesmslab/plotdt,color='gray',label="CESM1 SLAB")
+ax.plot(freqcesmslab*plotdt,CLs[1][:,1]/plotdt,color='gray',label="",ls='dashed')
+
+ax.plot(freqcesmfull*plotdt,Pcesmfull/plotdt,color='black',label="CESM1 FULL")
+ax.plot(freqcesmfull*plotdt,CLs[0][:,1]/plotdt,color='black',label="",ls='dashed')
+
+
+
+
+
+
+ax.set_xlabel("")
+#ax.set_title("CESM1 NASSTI (SLAB vs. FULL) \n nsmooth=%i"%(nsmooths[0]))
+
+ax.set_xlim(xlms)
+ax.set_xticks(xtks)
+xtick=np.array(xtks)
+htax = viz.twin_freqaxis(ax,freq,"Years",dt,mode='lin-lin',xtick=xtick)
+# Set xtick labels
+htax.set_xticklabels(xtkl)
+
+ax.legend(fontsize=10)
+
+plt.tight_layout()
+plt.savefig("%sNASSTI_SpectralEstimate_nsmooth%i_taper%i_decadal_timemax%i.png"%(outpath,nsmooths[i],pct*100,timemax),dpi=200)
 
 
 
