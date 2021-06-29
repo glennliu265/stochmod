@@ -121,11 +121,10 @@ def stochmod_noentrain(t_end,lbd,T0,F):
     else:
         noise_ts = []
         damp_ts = []
-        
     
     # Prepare the entrainment term
     explbd = np.exp(-lbd)
-
+    
     # Loop for integration period (indexing convention from matlab)
     for t in range(1,t_end):
         

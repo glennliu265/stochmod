@@ -40,12 +40,12 @@ parallel  = False
 
 # Integration Options
 nyr      = 1000        # Number of years to integrate over
-fstd     = 0.3         # Standard deviation of the forcing
+fstd     = 1         # Standard deviation of the forcing
 bboxsim  = [-100,20,-20,90] # Simulation Box
 
 # Do a stormtrackloop
-runids    = ["300"]
-funiforms = [1,3,5.5,7]
+runids    = ["303"]
+funiforms = [2.5]
 applyfac  = 2
 mconfig   = "SLAB_PIC"#"FULL_HTR"
 

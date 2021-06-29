@@ -24,7 +24,6 @@ from tqdm import tqdm
 import scm
 import time
 
-
 # Set Options
 bboxsim  = [-100,20,-20,90] # Simulation Box
 simpoint = [-30,50]
@@ -152,3 +151,10 @@ ax.set(xlabel='Lag (months)',
 #outname = outpath+'SSTAC_usetau'+str(usetau)+'_mldlinterp_'+ loc_fname +'.png'
 
 ax.set_xlim(0,37)
+
+
+
+fig,ax=plt.subplots(1,1)
+ax.plot(lbdpic,label="PIC lbd")
+ax.plot(lbdhtr,label="HTR lbd")
+ax.legend()

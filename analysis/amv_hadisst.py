@@ -27,7 +27,7 @@ from amv import proc,viz
 
 #%% User Edits
 
-startyr = 1870 # Start year for AMV Analysis
+startyr = 1900 # Start year for AMV Analysis
 bbox    =[-80,0 ,0,65] # AMV bbox
 # Path to SST data from obsv
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
@@ -88,7 +88,7 @@ dsfirst = np.reshape(dsfirst,(360,180,hsstnew.shape[2]))
 # Detrend
 nlon = 360
 nlat = 180
-nmon = 1776
+nmon = nyrs*12
 start= time.time()
 indata = dsfirst.reshape(nlon*nlat,nmon)
 okdata,knan,okpts = proc.find_nan(indata,1)

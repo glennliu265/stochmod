@@ -17,7 +17,6 @@ import glob
 from scipy.io import loadmat
 from tqdm import tqdm
 
-
 # import sys
 # sys.path.append("/home/glliu/00_Scripts/01_Projects/00_Commons/")
 # sys.path.append("/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model/")
@@ -26,7 +25,6 @@ from tqdm import tqdm
 datpath  = "/vortex/jetstream/climate/data1/yokwon/CESM1_LE/downloaded/ocn/proc/tseries/monthly/HMXL/"
 ncsearch = "b.e11.B1850C5CN.f09_g16.005.pop.h.HMXL.*.nc"
 varkeep  = ["HMXL","TLONG","TLAT","time"]
-
 
 # Get file names
 globby = datpath+ncsearch

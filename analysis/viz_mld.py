@@ -36,7 +36,7 @@ import cmocean
 projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath = projpath + '03_Scripts/stochmod/'
 datpath    = projpath + '01_Data/'
-outpath    = projpath + '02_Figures/20210424/'
+outpath    = projpath + '02_Figures/20210509/'
 input_path  = datpath + 'model_input/'
 
 
@@ -105,14 +105,14 @@ pcm = ax.pcolormesh(lon,lat,invar.T,vmin=clevs[0],vmax=clevs[-1],cmap=cmap)
 pcm1 = ax.contourf(lon,lat,invar.T,levels=clevs,cmap=cmap)
 
 cl1 = ax.contour(lon,lat,invar.T,cint1,colors="k",linewidths = .5)
-ax.clabel(cl1,fmt="%i",fontsize=9)
+ax.clabel(cl1,fmt="%i",fontsize=10)
 
 # cl2 = ax.contour(lon,lat,invar.T,cint2,colors="w",linewidths = .5)
 # ax.clabel(cl2,fmt="%i",fontsize=9)
 
 #ax.add_feature(cfeature.LAND,color='gray')
 #ax.set_title("$MLD_{max} - MLD_{min}$" + "\n 40-member Ensemble Average",fontsize=12)
-ax.set_title("%s MLD of Mean Annual Cycle " % vtype + "(%s)"% configname + "\nContour Interval = %i m"%(clevs[1]-clevs[0]),fontsize=12)
+ax.set_title("%s MLD of Mean Annual Cycle " % vtype + "\nContour Interval = %i m"%(clevs[1]-clevs[0]),fontsize=12)
 fig.colorbar(pcm1,ax=ax)
 #plt.colorbar(pcm1,ax=ax,orientation='horizontal',fraction=0.040, pad=0.10)
 #plt.tight_layout()
@@ -153,18 +153,22 @@ plt.savefig(outpath+"MLD_DJFM_std_%s.png"%(mconfig),dpi=200)
 
 damping = np.load(input_path+"SLAB_PIC"+"_NHFLX_Damping_monwin3_sig005_dof894_mode4.npy")
 
-vtype = "Min"
+vtype = "Max"
 invar = damping
 
 if vtype == "Max":
     invar = invar.max(2)
+    cint1 = [0,10,20,30,40]#[0,10,25,50,100,500]
 elif vtype == "Min":
     invar = invar.min(2)
 elif vtype == "Range":
     invar = invar.max(2) - invar.min(2)
+    
+    cint1 = [0,5,10]#[0,10,25,50,100,500]
+    cint2 = [0]#[1000,1500,2000]
 
-cint1 = [0,5,10]#[0,10,25,50,100,500]
-cint2 = [0]#[1000,1500,2000]
+#cint1 = [0,5,10]#[0,10,25,50,100,500]
+#cint2 = [0]#[1000,1500,2000]
 clevs = np.arange(-50,55,5)
 cmap = cmocean.cm.balance
 
@@ -176,14 +180,14 @@ pcm = ax.pcolormesh(lon,lat,invar.T,vmin=clevs[0],vmax=clevs[-1],cmap=cmap)
 pcm1 = ax.contourf(lon,lat,invar.T,levels=clevs,cmap=cmap)
 
 cl1 = ax.contour(lon,lat,invar.T,cint1,colors="k",linewidths = .5)
-ax.clabel(cl1,fmt="%i",fontsize=9)
+ax.clabel(cl1,fmt="%i",fontsize=10)
 
 # cl2 = ax.contour(lon,lat,invar.T,cint2,colors="w",linewidths = .5)
 # ax.clabel(cl2,fmt="%i",fontsize=9)
 
 #ax.add_feature(cfeature.LAND,color='gray')
 #ax.set_title("$MLD_{max} - MLD_{min}$" + "\n 40-member Ensemble Average",fontsize=12)
-ax.set_title("%s Heat Flux Damping " % vtype + "(%s)"% configname + "\nContour Interval = %i $W/m^{2}$"%(clevs[1]-clevs[0]),fontsize=12)
+ax.set_title("%s Heat Flux Damping" % vtype + "\nContour Interval = %i $W/m^{2}/^{\circ}C$"%(clevs[1]-clevs[0]),fontsize=12)
 fig.colorbar(pcm1,ax=ax)
 #plt.colorbar(pcm1,ax=ax,orientation='horizontal',fraction=0.040, pad=0.10)
 #plt.tight_layout()
@@ -196,13 +200,13 @@ plt.savefig(outpath+"Damping_%s_%s.png"%(mconfig,vtype),dpi=200)
 
 forcing = np.load("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/SLAB_PIC_NHFLXSTD_Forcing_MON.npy")
 
-vtype = "Range"
+vtype = "Max"
 invar = forcing
 
 if vtype == "Max":
     invar = invar.max(2)
     cint1 = [25,50,75,100]#[0,10,25,50,100,500]
-    clevs = np.arange(0,105,5)
+    clevs = np.arange(0,75,5)
 elif vtype == "Min":
     invar = invar.min(2)
     
@@ -214,9 +218,9 @@ elif vtype == "Range":
     cint1 = [20,40]#[0,10,25,50,100,500]
     clevs = np.arange(0,55,5)
 
-cint1 = [20,40]#[0,10,25,50,100,500]
-cint2 = [0]#[1000,1500,2000]
-clevs = np.arange(0,55,5)
+#cint1 = [20,40]#[0,10,25,50,100,500]
+#cint2 = [0]#[1000,1500,2000]
+#clevs = np.arange(0,55,5)
 cmap = cmocean.cm.thermal
 
 # Old Figsize was 5 x 4
@@ -227,15 +231,59 @@ pcm = ax.pcolormesh(lon,lat,invar.T,vmin=clevs[0],vmax=clevs[-1],cmap=cmap)
 pcm1 = ax.contourf(lon,lat,invar.T,levels=clevs,cmap=cmap)
 
 cl1 = ax.contour(lon,lat,invar.T,cint1,colors="k",linewidths = .5)
-ax.clabel(cl1,fmt="%i",fontsize=9)
+ax.clabel(cl1,fmt="%i",fontsize=10)
 
 # cl2 = ax.contour(lon,lat,invar.T,cint2,colors="w",linewidths = .5)
 # ax.clabel(cl2,fmt="%i",fontsize=9)
 
 #ax.add_feature(cfeature.LAND,color='gray')
 #ax.set_title("$MLD_{max} - MLD_{min}$" + "\n 40-member Ensemble Average",fontsize=12)
-ax.set_title("%s 1$\sigma$ Forcing of Annual Cycle " % vtype + "(%s)"% configname + "\nContour Interval = %i $W/m^{2}$"%(clevs[1]-clevs[0]),fontsize=12)
+ax.set_title("%s Stochastic Forcing Amplitude" % vtype + "\nContour Interval = %i $W/m^{2}$"%(clevs[1]-clevs[0]),fontsize=12)
 fig.colorbar(pcm1,ax=ax)
 #plt.colorbar(pcm1,ax=ax,orientation='horizontal',fraction=0.040, pad=0.10)
 #plt.tight_layout()
 plt.savefig(outpath+"Forcing_%s_%s.png"%(mconfig,vtype),dpi=200)
+
+
+
+#%% Tinker Ranges
+
+
+
+#%% Plot all 3 together
+
+
+invars = [damping,forcing,hclim]
+vtype  = "Range"
+cmaps  = [cmocean.cm.balance,cmocean.cm.thermal,cmocean.cm.dense]
+cstep  = [5,5,100]
+cints  = []
+
+
+fig,axs = plt.subplots(1,3,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(24,5))
+
+for i in range(3):
+    
+    # Get Variable
+    invar = invars[i]
+    if vtype == "Max":
+        invar = invar.max(2)
+    elif vtype == "Min":
+        invar = invar.min(2)
+    elif vtype == "Range":
+        invar = invar.max(2) - invar.min(2)
+    
+    # Get Plotting Params
+    cmap = cmaps[i]
+    
+    # Start Plotting
+    ax = axs.flatten()[i]
+    ax = viz.add_coast_grid(ax,bbox=bboxplot)
+    
+    
+    
+    
+    
+
+
+

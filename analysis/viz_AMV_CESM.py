@@ -347,13 +347,15 @@ ax.semilogx(freqcesmfull*plotdt,CLs[0][:,1]*freqcesmfull,color='black',label="CE
 ax.semilogx(freqcesmfull*plotdt,CLs[0][:,0]*freqcesmfull,color='black',label="CESM1 FULL AR1",ls=':')
 
 # Set x limits
-xlm = [1/(dt*12*15000),1/(dt*1)]
+#xlm = [1/(plotdt*),1/(plotdt*1)]
+xlm = [5e-4,10]
 ax.set_xlim(xlm)
+ylm = [-.01,.4]
 
 # Set Labels
 ax.set_ylabel("Frequency x Power ($\degree C^{2}$)",fontsize=12)
 ax.set_xlabel("Frequency (cycles/year)",fontsize=12)
-htax = viz.twin_freqaxis(ax,freqcesmfull,"Years",dtplot,mode='log-lin',xtick=xticks)
+htax = viz.twin_freqaxis(ax,freqcesmfull,"Years",dtplot,mode='log-lin')
 
 
 

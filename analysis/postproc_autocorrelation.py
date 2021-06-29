@@ -21,6 +21,7 @@ from tqdm import tqdm
 import cartopy.crs as ccrs
 import cmocean
 from pylab import cm
+
 #%%
 stormtrack = 0
 if stormtrack == 0:
@@ -994,7 +995,5 @@ ax.clabel(cl2,fmt="%.2f")
 fig.colorbar(pcm,ax=ax,fraction=0.045)
 ax.set_title("Spectra %s ($^{\circ}C^{2}$) \n Multidecadal Periods"%(plotname))
 plt.savefig("%sCESM_Spectrum%sDecadal.png"%(outpathfig,plotnamesave),dpi=200)
-
-
 
 

@@ -251,8 +251,8 @@ for es in range(3):
     #title      = "SST Autocorrelation (%s) \n Lag 0 = %s" % (locstringtitle,mons3[mldpt.argmax()])
     #ax,ax2,ax3 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title,loopvar=damppt)
     ax,ax2= viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title)
-    ax.plot(lags,cesmauto2[lags],label="CESM1 SLAB",color='gray',marker="o",markersize=3)
-    ax.fill_between(lags,cfslab[lags,0],cfslab[lags,1],color='k',alpha=0.10)
+    #ax.plot(lags,cesmauto2[lags],label="CESM1 SLAB",color='gray',marker="o",markersize=3)
+    #ax.fill_between(lags,cfslab[lags,0],cfslab[lags,1],color='k',alpha=0.10)
     
     ax.plot(lags,cesmautofull,color='k',label='CESM1 Full',ls='dashdot',marker="o",markersize=3)
     ax.fill_between(lags,cffull[lags,0],cffull[lags,1],color='k',alpha=0.10)

@@ -93,8 +93,6 @@ for config in ["SLAB_PIC","FULL_PIC"]:
 #sst,lat,lon = load_data(mconfig,datpath)
 sst = ssts[1].copy()
 
-
-
 nmon,nlatr,nlonr = sst.shape #[time x lat x lon]
 
 # Loop through each point. and calculate an autocorrelation curve

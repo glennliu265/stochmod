@@ -40,7 +40,7 @@ projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 datpath     = projpath + '01_Data/'
 input_path  = datpath + 'model_input/'
 output_path = datpath + 'model_output/'
-outpath = projpath + '02_Figures/20210430/'
+outpath = projpath + '02_Figures/20210526/'
 proc.makedir(outpath)
 
 # Load in control data for 50N 30W
