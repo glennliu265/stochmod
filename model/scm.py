@@ -394,7 +394,67 @@ def find_kprev(h,debug=False):
     
     return kprev, hout
 
-
+def calc_kprev_lin(h,entrain1=-1,entrain0=0):
+    """
+    Estimate detrainment indices given a timeseries of mixed-layer
+    depths. Uses/Assumptions:
+        - Linear interpolation
+        - Forward direction for entrainment/detrainment (h[t], h[t+1])
+        - For last value, assumes t+1 is the first value (periodic)
+    
+    Inputs
+    ------
+        h : ARRAY [time]
+            Timeseries of mixed layer depth
+        
+        --- Optional ---
+        
+        entrain1 : Numeric (Default = -1)
+            Placeholder value for first time MLD reaches a given depth
+        entrain0 : Numeric (Default = 0)
+            Placeholder value for detraining months
+    Output
+    ------
+        kprev : ARRAY [time]
+            Indices where detrainment occurred    
+    """
+    # Preallocate, get dimensions
+    ntime = h.shape[0]
+    kprev = np.zeros(ntime)*np.nan
+    
+    # Looping for each step, get index of previous step
+    for t in range(ntime):
+        
+        # Wrap around for end value
+        if t >= (ntime-1):
+            dt = h[t]/h[0]
+        else: # Forward step comparison 
+            dt = h[t]/h[t+1]
+        
+        # Skip points where the mixed layer is detraining or unchanging
+        if dt >= 1:
+            kprev[t] = entrain0
+            continue
+        
+        
+        # Find the last index where h had the same value
+        hdiff = h - h[t]
+        hdiff = hdiff[:t] # Restrict to values before current timestep
+        kgreat = np.where(hdiff > 0)[0] # Find values deeper than current MLD
+        if len(kgreat) == 0:  # If no values are found, assume first time entraining to this depth
+            kprev[t] = entrain1
+            continue
+        else:
+            kd  = kgreat[-1] # Take index of most recent value
+            # Linear interpolate to approximate index
+            kfind = np.interp(h[t],[h[kd],h[kd+1]][::-1],[kd,kd+1][::-1])
+            
+            if kfind == float(t):
+                kprev[t] = entrain1
+            else:
+                kprev[t] = kfind
+        # End Loop
+    return kprev
 
 def convert_NAO(hclim,naopattern,dt,rho=1000,cp0=4218,hfix=50,usemax=False,hmean=None):
     """
