@@ -15,8 +15,11 @@ from scipy.io import loadmat
 from tqdm import tqdm
 
 import sys
-sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
-sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
+stormtrack = 1
+if stormtrack == 0:
+    sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
+elif stormtrack == 1:
+    sys.path.append("/home/glliu/00_Scripts/01_Projects/00_Commons/")
 from amv import proc
 import time
 import yo_box as ybx

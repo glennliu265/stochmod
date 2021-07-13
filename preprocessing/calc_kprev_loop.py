@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 
 
 import sys
-stormtrack = 0
+stormtrack = 1
 if stormtrack == 0:
     #projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
     #datpath     = projpath + '01_Data/'
@@ -29,11 +29,9 @@ if stormtrack == 0:
 
 
 elif stormtrack == 1: # NOTE... need to edit this
-    
     datpath = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/HMXL/"
     sys.path.append("/home/glliu/00_Scripts/01_Projects/00_Commons/")
     sys.path.append("/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model/")
-
 import scm
 #%% User Edits
 
