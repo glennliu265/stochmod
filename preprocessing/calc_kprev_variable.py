@@ -173,3 +173,4 @@ ax.legend()
 ax.set_ylabel("MLD (m)")
 ax.set_ylabel("Index")
 ax.set_title("Detrainment Month Calculation for t = %i to %i" % (plotint[0],plotint[-1]) )
+
