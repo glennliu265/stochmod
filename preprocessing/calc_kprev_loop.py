@@ -52,7 +52,7 @@ hmxl  = ds.HMXL.values
 times = ds.time.values
 print("Loaded data in %.2fs"% (time.time()-st))
 
-ds.close()
+#ds.close()
 
 #%% Calculate Kprev for each point
 st    = time.time()
