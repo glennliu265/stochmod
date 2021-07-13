@@ -66,7 +66,6 @@ for o in tqdm.tqdm(range(nlon)): # loop lon
         hpt = hmxl[o,a,:] # get point
         if np.any(np.isnan(hpt)): # Skip Land/Ice Points
             continue
-        break
         kprev = scm.calc_kprev_lin(hpt,entrain1=entrain1,entrain0=entrain0)
         kprevall[o,a,:] = kprev
 print("Calculated kprev in %.2fs"% (time.time()-st))               
