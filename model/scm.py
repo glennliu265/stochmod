@@ -1608,9 +1608,9 @@ def calc_HF(sst,flx,lags,monwin,verbose=True):
     
     Inputs
     ------
-        1) sst     : ARRAY [time x lat x lon] 
+        1) sst     : ARRAY [year x time x lat x lon] 
             sea surface temperature anomalies
-        2) flx     : ARRAY [time x lat x lon]
+        2) flx     : ARRAY [year x time x lat x lon]
             heat flux anomalies
         3) lags    : List of INTs
             lags to calculate for (0-N)
@@ -1632,9 +1632,9 @@ def calc_HF(sst,flx,lags,monwin,verbose=True):
             SST-FLX cross correlation
     """
     # Reshape variables [time x lat x lon] --> [yr x mon x space]
-    ntime,nlat,nlon = sst.shape
-    sst = sst.reshape(int(ntime/12),12,nlat*nlon)
-    flx = flx.reshape(sst.shape)
+    nyr,nmon,nlat,nlon = sst.shape
+    #sst = sst.reshape(int(ntime/12),12,nlat*nlon)
+    #flx = flx.reshape(sst.shape)
     
     # Preallocate
     nlag = len(lags)
@@ -1739,14 +1739,14 @@ def prep_HF(damping,rsst,rflx,p,tails,dof,mode,returnall=False):
         return dampingmasked,mtot,mult
     return dampingmasked
 
-def postprocess(dampingmasked,limask,sellags,lon):
+def postprocess_HF(dampingmasked,limask,sellags,lon):
     
     # Inputs
     ## Dampingmasked [month x lag x lat x lon]
     ## limask [lat x lon]
     
     # Select lags, apply landice mask
-    mchoose = dampingmasked[:,sellags,:,:] * limask[None,:,:]
+    mchoose = dampingmasked[:,sellags,:,:].mean(1) * limask[None,:,:]
     
     # Flip longiude coordinates ([mon lat lon] --> [lon x lat x mon])
     lon1,dampingw = proc.lon360to180(lon,mchoose.transpose(2,1,0))
