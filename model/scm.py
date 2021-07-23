@@ -266,7 +266,6 @@ def set_stochparams(h,damping,dt,ND=True,rho=1000,cp0=4218,hfix=50,usemax=False,
         if hmean is None:
             hmean = np.nanmean(h)
     
-    
     # Set non-entraining months to zero
     beta[beta<0] = 0
     
