@@ -1262,6 +1262,7 @@ def synth_stochmod(config,verbose=False,viz=False,
     mld,kprevall,lon,lat,lon360,cesmslabac,damping,forcing,mld1kmean = load_data(config['mconfig'],config['ftype'])
     hblt  = np.load(datpath+"SLAB_PIC_hblt.npy")
     
+    
     if verbose:
         print("Loaded Data")
     
@@ -1269,11 +1270,11 @@ def synth_stochmod(config,verbose=False,viz=False,
     # -----------------------
     if config['genrand']:
         randts = np.random.normal(0,config['fstd'],config['t_end'])
-        np.save(config['output_path'] + "Forcing_fstd%.2f_%s.npy"% (config['fstd'],config['runid']),randts)
+        np.save(input_path + "Forcing_fstd%.2f_%s.npy"% (config['fstd'],config['runid']),randts)
         if verbose:
             print("Generating New Forcing")
     else:
-        randts = np.load(config['output_path']+"Forcing_fstd%.2f_%s.npy"% (config['fstd'],config['runid']))
+        randts = np.load(input_path + "Forcing_fstd%.2f_%s.npy"% (config['fstd'],config['runid']))
         if verbose:
             print("Loading Old Forcing")
     
