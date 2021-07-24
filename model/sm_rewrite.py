@@ -274,7 +274,7 @@ def make_forcing(alpha,runid,frcname,t_end,input_path):
     if t_end != nmon:
         ntile      = int(t_end/nmon)
         alpha_tile = np.tile(alpha_tile,ntile) #[lon x lat x pc x time]
-    forcing = alpha_tile * randts
+    forcing = alpha_tile * randts[:,:,:N_mode,:]
     
     # Sum the PCs for the forcing
     if N_mode > 1:
@@ -507,56 +507,123 @@ def integrate_entrain(h,kprev,lbd_a,F,T0=0,multFAC=True,debug=False):
 
 # Directories
 input_path = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/"
+output_path = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_output/"
+
+limaskname = "limask180_FULL-HTR.npy" 
 
 # Model Params
 mconfig    = "SLAB_PIC"
-frcname    = "uniform"
-runid      = "test"
+frcname    = "flxeof_5eofs_SLAB-PIC" #"uniform"
+runid      = "001"
 pointmode  = 0 
 points     = [-30,50]
 bboxsim    = [-100,20,-20,90] # Simulation Box
 
 # Additional Constants
-t_end      = 2400 # Sim Length
+t_end      = 12000 # Sim Length
 dt         = 3600*24*30 # Timestep
 T0         = 0 # Init Temp
+
+
+expname    = "%ssm_forcing%s_%iyr_run%s.npz" % (output_path,frcname,int(t_end/12),runid) 
 
 lonf = -30
 latf = 50
 
 debug = True
 #%%
-
-
-
-
-
-# Load data in 
+# Load data in
+# ------------
 lon,lat,h,kprevall,damping,alpha = load_inputs(mconfig,frcname,input_path)
+hblt = np.load(input_path + "SLAB_PIC_hblt.npy") # Slab fixed MLD
+hblt = np.ones(hblt.shape) * hblt.mean(2)[:,:,None]
+
+# Apply landice mask to all inputs
+# --------------------------------
+limask    = np.load(input_path+limaskname)
+h        *= limask[:,:,None]
+kprevall *= limask[:,:,None]
+damping  *= limask[:,:,None]
+alpha    *= limask[:,:,None,None]
+hblt     *= limask[:,:,None]
 
 # Restrict to region or point
-inputs = [h,kprevall,damping,alpha]
+# ---------------------------
+inputs = [h,kprevall,damping,alpha,hblt]
 if pointmode == 0:
     outputs,lonr,latr = cut_regions(inputs,lon,lat,bboxsim,pointmode,points=points)
 else:
     outputs = cut_regions(inputs,lon,lat,bboxsim,pointmode,points=points)
-h,kprev,damping,alpha = outputs
+h,kprev,damping,alpha,hblt = outputs
 
+# Check some params
+# -------------------
 if debug:
+    vnames = ["mld","damping","alpha"]
     klon,klat = proc.find_latlon(lonf,latf,lonr,latr)
+    fig,axs = plt.subplots(3,1)
+    for n,i in enumerate([0,2,3]):
+        ax = axs.flatten()[n]
+        if n < 2:
+            ax.plot(outputs[i][klon,klat])
+        else:
+            ax.plot(outputs[i][klon,klat,0,:])
+        ax.set_title(vnames[n])
 
 # Generate White Noise
+# --------------------
 forcing = make_forcing(alpha,runid,frcname,t_end,input_path)
 
-# Convert to w/m2
-lbd_a   = convert_Wm2(damping,h,dt)
-F       = convert_Wm2(forcing,h,dt)
+T_all = [] # Run 3 experiments
 
-# Integrate Stochastic Model
-T       = integrate_noentrain(lbd_a,F,T0=0,multFAC=True,debug=False)
-T_entr  = integrate_entrain(h,kprev,lbd_a,F,T0=0,multFAC=True,debug=False)
+for exp in range(3):
+    if exp == 0:
+        h_in = hblt.copy() # Used fixed slab model MLD
+    else:
+        h_in = h.copy() # Variable MLD
+    
+    # Convert to w/m2
+    # ---------------
+    lbd_a   = convert_Wm2(damping,h_in,dt)
+    F       = convert_Wm2(forcing,h_in,dt)
+
+    # Integrate Stochastic Model
+    # --------------------------
+    if exp < 2:
+        T   = integrate_noentrain(lbd_a,F,T0=0,multFAC=True,debug=False)
+    else:
+        T   = integrate_entrain(h_in,kprev,lbd_a,F,T0=0,multFAC=True,debug=False)
+    
+    T_all.append(T)
+    
+# Save the results
+np.savez(expname,**{
+    'sst': T_all,
+    'lon' : lonr,
+    'lat' : latr
+    },allow_pickle=True)
+
+#%% Compare some results
 
 
+basemonth = 2
+kmonth   = basemonth - 1
+lags = np.arange(0,37,1)
+
+ssts = [t[klon,klat,:] for t in T_all]
+acs = scm.calc_autocorr(ssts,lags,basemonth)
+
+lat    = np.load(input_path+"CESM1_lat.npy")
+lon180 = np.load(input_path+"CESM1_lon180.npy")
+lon360 = np.load(input_path+"CESM1_lon360.npy")
+
+ko,ka = proc.find_latlon(lonf+360,latf,lon360,lat)
+datpath = input_path + "../"
+fullauto = np.load(datpath+"CESM_clim/TS_FULL_Autocorrelation.npy") #[mon x lag x lat x lon360]
+cesmslabac     = np.load(datpath+"CESM_clim/TS_SLAB_Autocorrelation.npy") #[mon x lag x lat x lon360]
+cesmauto2 = cesmslabac[kmonth,:,ka,ko]
+cesmauto  = cesmauto2[lags]
+cesmautofull = fullauto[kmonth,lags,ko,ka]
 
 # # Restrict to region based on pointmode
 # # Test Conversion
@@ -564,7 +631,10 @@ T_entr  = integrate_entrain(h,kprev,lbd_a,F,T0=0,multFAC=True,debug=False)
 # converted = convert_Wm2(invar,h,dt)
 # #plt.plot(converted[klon,klat])
 
-
-
-
-    
+fig,ax = plt.subplots(1,1)
+ax.plot(cesmauto,label="SLAB")
+ax.plot(cesmautofull,label="FULL")
+ax.plot(acs[0],label="Stoch H-const")
+ax.plot(acs[1],label="Stoch H-vary")
+ax.plot(acs[2],label="Stoch Entr")
+ax.legend()
