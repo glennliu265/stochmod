@@ -108,91 +108,124 @@ ds *= msk[None,:,:]
 dsreg = sel_regionxr(ds,bboxeof)
 
 # Read out data
-st     = time.time()
+st      = time.time()
 flxglob = ds.NHFLX.values
-flxreg = dsreg.NHFLX.values
-lonr    = dsreg.lon.values
-latr    = dsreg.lat.values
+#flxreg = dsreg.NHFLX.values
+lon     = ds.lon.values
+lat     = ds.lat.values
+slpglob = np.load(datpath + "../CESM_proc/PSL_PIC_SLAB.npy")
 print("Loaded data in %.2fs"%(time.time()-st))
 
-# Preprocess
-ntime,nlat,nlon = flxreg.shape
+
+
+#%% Preprocess
+ntime,nlat,nlon = flxglob.shape
+
+#% SLP reshape and apply mask
+
+slpglob = slpglob.reshape(ntime,nlat,nlon) # [yr x mon x lat x lon] to [time lat lon]
+slpglob *= msk[None,...]
 
 # Detrend
-flxa,linmod,beta,intercept = proc.detrend_dim(flxreg,0)
+flxa,linmod,beta,intercept = proc.detrend_dim(flxglob,0)
+slpa,_,_,_ = proc.detrend_dim(slpglob,0)
 # Plot Spatial Map
 if debug: # Appears to be positive into the ocean
     fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()})
     ax = viz.add_coast_grid(ax,bbox=bbox)
-    pcm = ax.pcolormesh(lonr,latr,flxreg[0,:,:],vmin=-500,vmax=500,cmap="RdBu_r")
+    pcm = ax.pcolormesh(lon,lat,flxglob[0,:,:],vmin=-500,vmax=500,cmap="RdBu_r")
     fig.colorbar(pcm,ax=ax)
 
 
 # Plot Detrending
-klon,klat = proc.find_latlon(lonf+360,latf,lonr,latr)
+klon,klat = proc.find_latlon(lonf+360,latf,lon,lat)
 if debug: 
     fig,ax = plt.subplots(1,1)
     t = np.arange(0,ntime)
-    ax.scatter(t,flxreg[:,latf,lonf],label="Raw")
+    ax.scatter(t,flxglob[:,latf,lonf],label="Raw")
     ax.plot(t,linmod[:,latf,lonf],label="Model")
     ax.scatter(t,flxa[:,latf,lonf],label="Detrended")
     ax.legend()
 
 # Apply Area Weight
-wgt = np.sqrt(np.cos(np.radians(latr)))
+wgt = np.sqrt(np.cos(np.radians(lat)))
 #plt.plot(wgt)
 flxwgt = flxa * wgt[None,:,None]
+slpwgt = slpa * wgt[None,:,None]
+
+# Select region
+flxreg,lonr,latr = proc.sel_region(flxwgt.transpose(2,1,0),lon,lat,bboxeof)
+nlonr,nlatr,_ = flxreg.shape
+flxreg = flxreg.transpose(2,1,0) # Back to time x lat x lon
+
 
 # Remove NaN Points [time x npts]
 flxwgt = flxwgt.reshape((ntime,nlat*nlon))
 okdata,knan,okpts = proc.find_nan(flxwgt,0)
 npts = okdata.shape[1]
+flxreg = flxreg.reshape((ntime,nlatr*nlonr)) # Repeat for region
+okdatar,knanr,okptsr = proc.find_nan(flxreg,0)
+nptsr = okdatar.shape[1]
+slpwgt = slpwgt.reshape(ntime,nlat*nlon) # Repeat for slp
+okslp  = slpwgt[:,okpts]
 
 # Calculate Monthly Anomalies, change to [yr x mon x npts]
 nyr = int(ntime/12)
 okdata = okdata.reshape((nyr,12,npts))
 okdata = okdata - okdata.mean(0)[None,:,:]
-
+okdatar = okdatar.reshape((nyr,12,nptsr)) # Repeat for region
+okdatar = okdatar - okdatar.mean(0)[None,:,:]
+okslp = okslp.reshape((nyr,12,npts))
 
 # Prepare for eof anaylsis
 eofall    = np.zeros((N_mode,12,nlat*nlon)) * np.nan
+eofslp    = eofall.copy()
 pcall     = np.zeros((N_mode,12,nyr)) * np.nan
 varexpall = np.zeros((N_mode,12)) * np.nan
 # Looping for each month
 for m in tqdm(range(12)):
     
     # Calculate EOF
-    datain = okdata[:,m,:].T # [space x time]
+    datain = okdatar[:,m,:].T # [space x time]
+    regrin = okdata[:,m,:].T
+    slpin  = okdata[:,m,:].T
+    
     eofs,pcs,varexp = proc.eof_simple(datain,N_mode,1)
     
     # Standardize PCs
     pcstd = pcs / pcs.std(0)[None,:]
     
     # Regress back to dataset
-    eof,b = proc.regress_2d(pcstd.T,datain.T)
+    eof,b = proc.regress_2d(pcstd.T,regrin.T)
+    eof_s,_ = proc.regress_2d(pcstd.T,slpin.T)
     
-    if debug:
-        # Check to make sure both regress_2d methods are the same
-        # (comparing looping by PC, and using A= [P x N])
-        eof1 = np.zeros((N_mode,npts))
-        b1  = np.zeros(eof1.shape)
-        # Regress back to the dataset
-        for n in range(N_mode):
-            eof1[n,:],b1[n,:] = proc.regress_2d(pcstd[:,n],datain)
-        print("max diff for eof (matrix vs loop) is %f"%(np.nanmax(np.abs(eof-eof1))))
-        print("max diff for b (matrix vs loop) is %f"%(np.nanmax(np.abs(b-b1))))
+    # if debug:
+    #     # Check to make sure both regress_2d methods are the same
+    #     # (comparing looping by PC, and using A= [P x N])
+    #     eof1 = np.zeros((N_mode,npts))
+    #     b1  = np.zeros(eof1.shape)
+    #     # Regress back to the dataset
+    #     for n in range(N_mode):
+    #         eof1[n,:],b1[n,:] = proc.regress_2d(pcstd[:,n],regrin)
+    #     print("max diff for eof (matrix vs loop) is %f"%(np.nanmax(np.abs(eof-eof1))))
+    #     print("max diff for b (matrix vs loop) is %f"%(np.nanmax(np.abs(b-b1))))
         
     # Save the data
     eofall[:,m,okpts] = eof
+    eofslp[:,m,okpts] = eof_s
     pcall[:,m,:] = pcs.T
     varexpall[:,m] = varexp
 
 # Flip longitude
 eofall = eofall.reshape(N_mode,12,nlat,nlon)
 eofall = eofall.transpose(3,2,1,0) # [lon x lat x mon x N]
-lonr180,eofall1 = proc.lon360to180(lonr,eofall.reshape(nlon,nlat,N_mode*12))
+lon180,eofall = proc.lon360to180(lon,eofall.reshape(nlon,nlat,N_mode*12))
 eofall = eofall.reshape(nlon,nlat,12,N_mode)
-
+# Repeat for SLP eofs
+eofslp = eofslp.reshape(N_mode,12,nlat,nlon)
+eofslp = eofslp.transpose(3,2,1,0) # [lon x lat x mon x N]
+lon180,eofslp = proc.lon360to180(lon,eofslp.reshape(nlon,nlat,N_mode*12))
+eofslp = eofslp.reshape(nlon,nlat,12,N_mode)
 #%% Save the results
 bboxtext = "lon%ito%i_lat%ito%i" % (bbox[0],bbox[1],bbox[2],bbox[3])
 bboxstr  = "Lon %i to %i, Lat %i to %i" % (bbox[0],bbox[1],bbox[2],bbox[3])
@@ -200,10 +233,11 @@ savename = "%sNHFLX_%iEOFsPCs_%s.npz" % (datpath,N_mode,bboxtext)
 
 np.savez(savename,**{
     "eofall":eofall,
+    "eofslp":eofslp,
     "pcall":pcall,
     "varexpall":varexpall,
-    'lon':lonr180,
-    'lat':latr},allow_pickle=True)
+    'lon':lon180,
+    'lat':lat},allow_pickle=True)
 
 #%% Load the data
 bboxtext = "lon%ito%i_lat%ito%i" % (bbox[0],bbox[1],bbox[2],bbox[3])
@@ -212,6 +246,7 @@ savename = "%sNHFLX_%iEOFsPCs_%s.npz" % (datpath,N_mode,bboxtext)
 ld = np.load(savename,allow_pickle=True)
 
 eofall    = ld['eofall']
+eofslp    = ld['eofslp']
 pcall     = ld['pcall']
 varexpall = ld['varexpall']
 
@@ -234,7 +269,7 @@ fig,ax = plt.subplots(1,1)
 
 
 for m in range(12):
-    plt.plot(modes,cvarall[:,m]*100,label="Month %i"% (m+1),marker="o",markersize=3)
+    plt.plot(modes,cvarall[:,m]*100,label="Month %i"% (m+1),marker="o",markersize=4)
 ax.legend(fontsize=8,ncol=2)
 ax.set_ylabel("Cumulative % Variance Explained")
 ax.set_yticks(ytk)
@@ -268,15 +303,45 @@ ax.set_ylabel("# EOFs")
 ax.grid(True,ls='dotted')
 plt.savefig("%sSLAB-PIC_NHFLX_EOFs%i_%s_NumEOFs_%ipctvar_bymon.png"%(outpath,N_mode,bboxtext,vthres*100),dpi=150)
 
-#%% Save outptut as forcing for stochastic model
+#%% Save outptut as forcing for stochastic model, variance based threshold
 
-eofforce = eofall.copy()
-
+eofforce = eofall.copy() # [lon x lat x month x pc]
+cvartest = cvarall.copy()
 for i in range(12):
-    eofforce
+    # Set all points after crossing the variance threshold to zero
+    stop_id = thresid[i]
+    print("Variance of %f  at EOF %i for Month %i "% (cvarall[stop_id,i],stop_id+1,i+1))
+    eofforce[:,:,i,stop_id+1:] = 0
+    cvartest[stop_id+1:,i] = 0
+eofforce = eofforce.transpose(0,1,3,2) # [lon x lat x pc x mon]
 
+savenamefrc = "%sflxeof_%03ipct_SLAB-PIC.npy" % (datpath,vthres*100)
+np.save(savenamefrc,eofforce)
 
+# Test plot maps
+i = 0
+fig,ax = plt.subplots(2,1)
+ax[0].pcolormesh(eofforce[:,:,stop_id,i].T),plt.colorbar()
+ax[1].pcolormesh(eofforce[:,:,stop_id+1,i].T),plt.colorbar()
 
+# Test Plot Cumulative % for indexing chec
+N_modeplot = 20
+modes = np.arange(1,N_mode+1)
+xtk = np.arange(1,N_mode+1,1)
+ytk = np.arange(15,105,5)
+fig,ax = plt.subplots(1,1)
+for m in range(12):
+    plt.plot(modes,cvartest[:,m]*100,label="Month %i"% (m+1))
+ax.legend(fontsize=8,ncol=2)
+ax.set_ylabel("Cumulative % Variance Explained")
+ax.set_yticks(ytk)
+ax.set_xlabel("Mode")
+ax.set_title("NHFLX EOFs, Cumulative Variance Expl. vs. Mode \n %s"% bboxstr)
+ax.grid(True,ls='dotted')
+ax.set_xlim([1,N_modeplot])
+#ax.axhline(80)
+#ax.set_xticks(xtk)
+#plt.savefig("%sSLAB-PIC_NHFLX_EOFs%i_%s_ModevCumuVariance_bymon.png"%(outpath,N_modeplot,bboxtext),dpi=150)
 
 #%% Do some analysis/visualization
 
