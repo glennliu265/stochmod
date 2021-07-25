@@ -525,7 +525,7 @@ dt         = 3600*24*30 # Timestep
 T0         = 0 # Init Temp
 
 
-expname    = "%ssm_forcing%s_%iyr_run%s.npz" % (output_path,frcname,int(t_end/12),runid) 
+expname    = "%sstoch_output_forcing%s_%iyr_run%s.npz" % (output_path,frcname,int(t_end/12),runid) 
 
 lonf = -30
 latf = 50
