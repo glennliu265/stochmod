@@ -25,9 +25,6 @@ from tqdm import tqdm
 
 #%%
 stormtrack = 0
-mconfig    = "SLAB_FULL" 
-
-
 
 if stormtrack == 1:
     # Module Paths
@@ -122,9 +119,8 @@ print("Loaded data in %.2fs"%(time.time()-st))
 ntime,nlat,nlon = flxglob.shape
 
 #% SLP reshape and apply mask
-
 slpglob = slpglob.reshape(ntime,nlat,nlon) # [yr x mon x lat x lon] to [time lat lon]
-slpglob *= msk[None,...]
+#slpglob *= msk[None,...]
 
 # Detrend
 flxa,linmod,beta,intercept = proc.detrend_dim(flxglob,0)
@@ -166,8 +162,9 @@ npts = okdata.shape[1]
 flxreg = flxreg.reshape((ntime,nlatr*nlonr)) # Repeat for region
 okdatar,knanr,okptsr = proc.find_nan(flxreg,0)
 nptsr = okdatar.shape[1]
-slpwgt = slpwgt.reshape(ntime,nlat*nlon) # Repeat for slp
-okslp  = slpwgt[:,okpts]
+nptsall = nlat*nlon
+slpwgt = slpwgt.reshape(ntime,nptsall) # Repeat for slp 
+okslp  = slpwgt#[:,okpts]
 
 # Calculate Monthly Anomalies, change to [yr x mon x npts]
 nyr = int(ntime/12)
@@ -175,7 +172,7 @@ okdata = okdata.reshape((nyr,12,npts))
 okdata = okdata - okdata.mean(0)[None,:,:]
 okdatar = okdatar.reshape((nyr,12,nptsr)) # Repeat for region
 okdatar = okdatar - okdatar.mean(0)[None,:,:]
-okslp = okslp.reshape((nyr,12,npts))
+okslp = okslp.reshape((nyr,12,nptsall))
 
 # Prepare for eof anaylsis
 eofall    = np.zeros((N_mode,12,nlat*nlon)) * np.nan
@@ -188,7 +185,7 @@ for m in tqdm(range(12)):
     # Calculate EOF
     datain = okdatar[:,m,:].T # [space x time]
     regrin = okdata[:,m,:].T
-    slpin  = okdata[:,m,:].T
+    slpin  = okslp[:,m,:].T
     
     eofs,pcs,varexp = proc.eof_simple(datain,N_mode,1)
     
@@ -212,7 +209,7 @@ for m in tqdm(range(12)):
         
     # Save the data
     eofall[:,m,okpts] = eof
-    eofslp[:,m,okpts] = eof_s
+    eofslp[:,m,:] = eof_s
     pcall[:,m,:] = pcs.T
     varexpall[:,m] = varexp
 
@@ -250,9 +247,40 @@ eofslp    = ld['eofslp']
 pcall     = ld['pcall']
 varexpall = ld['varexpall']
 
-lonr = ld['lon']
-latr = ld['lat']
+lon = ld['lon']
+lat = ld['lat']
 
+
+#%%  Flip sign to match NAO+ (negative heat flux out of ocean/ -SLP over SPG)
+
+spgbox = [-60,20,45,80]
+N_modeplot = 5
+
+for N in tqdm(range(N_modeplot)):
+    for m in range(12):
+        
+        sumflx = proc.sel_region(eofall[:,:,[m],N],lon,lat,spgbox,reg_avg=True)
+        sumslp = proc.sel_region(eofslp[:,:,[m],N],lon,lat,spgbox,reg_avg=True)
+        
+        if sumflx > 0:
+            print("Flipping sign for NHFLX, mode %i month %i" % (N+1,m+1))
+            eofall[:,:,m,N]*=-1
+        if sumslp > 0:
+            print("Flipping sign for SLP, mode %i month %i" % (N+1,m+1))
+            eofslp[:,:,m,N]*=-1
+
+
+
+
+#%% Save a select number of EOFs
+
+N_mode_choose = 25
+eofforce      = eofall.copy()
+eofforce      = eofforce.transpose(0,1,3,2) # lon x lat x pc x mon
+eofforce      = eofforce[:,:,:N_mode_choose,:]
+savenamefrc   = "%sflxeof_%ieofs_SLAB-PIC.npy" % (datpath,N_mode_choose)
+np.save(savenamefrc,eofforce)
+print("Saved data to "+savenamefrc)
 #%% Calculate/plot cumulative variance explained
 
 # Calculate cumulative variance at each EOF
@@ -261,7 +289,7 @@ for i in range(N_mode):
     cvarall[i,:] = varexpall[:i+1,:].sum(0)
 
 # Plot Params
-N_modeplot = 10
+N_modeplot = 50
 modes = np.arange(1,N_mode+1)
 xtk = np.arange(1,N_mode+1,1)
 ytk = np.arange(15,105,5)
@@ -347,10 +375,10 @@ ax.set_xlim([1,N_modeplot])
 
 
 # Plot Mode vs. % Variance Exp (for each Month)
-xtk = np.arange(1,11,1)
+xtk = np.arange(1,N_modeplot+1,1)
 fig,ax = plt.subplots(1,1)
 for m in range(12):
-    plt.plot(xtk,varexpall[:,m]*100,label="Month %i"% (m+1),marker="o")
+    plt.plot(xtk,varexpall[:N_modeplot,m]*100,label="Month %i"% (m+1),marker="o")
 ax.legend()
 ax.set_ylabel("% Variance Explained")
 ax.set_xlabel("Mode")
@@ -359,42 +387,95 @@ ax.grid(True,ls='dotted')
 ax.set_xticks(xtk)
 plt.savefig("%sSLAB-PIC_NHFLX_EOFs_%s_ModevVariance_bymon.png"%(outpath,bboxtext),dpi=150)
 
-# Same as above, but cumulative plot
-cvarall = np.zeros(varexpall.shape)
-for i in range(10):
-    cvarall[i,:] = varexpall[:i+1,:].sum(0)
 
-# Plot Month vs. Total % Variance Exp for 10 EOFs)
+# Same as above, but cumulative plot
+#cvarallplot = np.zeros(varexpall.shape)
+#for i in range(N_modeplot):
+#    cvarallplot[i,:] = varexpall[:i+1,:].sum(0)
+
+#%% Plot Month vs. Total % Variance Exp for 10 EOFs)
+N_modeplot=5
 fig,ax = plt.subplots(1,1)
-ax.bar(mons3,varexpall.sum(0)*100,color='cornflowerblue',alpha=0.7)
-ax.set_title("Total % Variance Explained by first 10 EOFs")
+ax.bar(mons3,varexpall[:N_modeplot,:].sum(0)*100,color='cornflowerblue',alpha=0.7)
+ax.set_title("Total Percent Variance Explained by first %i EOFs" % N_modeplot)
 ax.set_ylabel("% Variance Explained")
 ax.set_ylim([0,100])
 ax.set_yticks(np.arange(0,110,10))
 ax.grid(True,ls='dotted')
-plt.savefig("%sSLAB-PIC_NHFLX_EOFs_%s_TotalVarianceEOFs_bymon.png"%(outpath,bboxtext),dpi=150)
+plt.savefig("%sSLAB-PIC_NHFLX_EOFs_%s_TotalVariance_First%iEOFs_bymon.png"%(outpath,bboxtext,N_modeplot),dpi=150)
 
 #%% Plot Net Heat Flux EOF Patterns
 
-vlim = [-20,20]
+vlim = [-30,30]
+#slplevels = np.arange()
+blabels=[1,0,0,1]
+N_modeplot = 5
+slp_int = np.arange(-400,450,50)
+slp_lab = np.arange(-400,500,100)
 
 bboxplot = bbox.copy()
 for i in range(2):
     if bbox[i] > 180:
         bboxplot[i] -= 360
 
-for n in tqdm(range(N_mode)):
+for n in tqdm(range(N_modeplot)):
     plotord = np.roll(np.arange(0,12,1),1)
-    fig,axs = plt.subplots(4,3,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(8,8))
+    fig,axs = plt.subplots(4,3,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(10,12))
     for p,m in enumerate(plotord):
         ax = axs.flatten()[p] # Plot Index
         ax.set_title("%s (%.1f" % (mons3[m],varexpall[n,m]*100) + "%)",fontsize=10)
         ax = viz.add_coast_grid(ax,bbox=bboxplot,blabels=blabels)
-        pcm = ax.pcolormesh(lonr180,latr,eofall[:,:,m,n].T,vmin=vlim[0],vmax=vlim[-1],cmap="RdBu_r")
-        fig.colorbar(pcm,ax=ax,fraction=0.035)
-    plt.suptitle("NHFLX EOF %i (CESM1-SLAB) (W/$m^2$ per $\sigma_{PC}$)" % (n+1),fontsize=14)
-    fig.subplots_adjust(top=0.95)
+        
+        # Plot NHFLX
+        pcm = ax.pcolormesh(lon,lat,eofall[:,:,m,n].T,vmin=vlim[0],vmax=vlim[-1],cmap="RdBu_r")
+        
+        # Plot SLP and Labels
+        cl = ax.contour(lon,lat,eofslp[:,:,m,n].T,levels=slp_int,colors='k',linewidths=1)
+        ax.clabel(cl,levels=slp_lab,fontsize=10)
+        
+        # Scrap
+        #pcm = ax.contourf(lon,lat,eofslp[:,:,m,n].T,levels=slp_int,cmap=cmocean.cm.balance,linewidths=1.)
+        #fig.colorbar(pcm,ax=ax,fraction=0.035)
+    
+    fig.colorbar(pcm,ax=axs.ravel().tolist(),orientation='vertical',shrink=0.85,pad=0.05,anchor=(1.75,0.7))
+    plt.suptitle("NHFLX EOF %i (CESM1-SLAB) (W/$m^2$ per $\sigma_{PC}$) \n SLP Contour Interval: 50 mb" % (n+1),fontsize=14)
+    fig.subplots_adjust(top=0.90)
     plt.savefig("%sSLAB-PIC_NHFLX_EOFs_%s_EOF%iPattern_bymon.png"%(outpath,bboxtext,n+1),dpi=150)
+
+#%% Seasonally Averaged Plots
+
+
+sid = [[11,0,1],[2,3,4],[5,6,7],[8,9,10]]
+snm = ["DJF","MAM","JJA","SON"]
+#blabels=[0,]
+
+n = 0
+fig,axs = plt.subplots(3,4,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(14,8))
+for n in range(3):
+    for p in range(4):
+        ks = sid[p]
+        ax = axs[n,p]
+        ax.set_title("EOF %i: %s (%.1f" % (n+1,snm[p],varexpall[n,ks].mean()*100) + "%)",fontsize=10)
+        if p == 0:
+            blabels=[1,0,0,0]
+        elif n == 2:
+            blabels=[0,0,0,1]
+        elif (n == 2) and (p ==0):
+            blabels=[1,0,0,1]
+        else:
+            blabels=[0,0,0,0]
+        ax = viz.add_coast_grid(ax,bbox=bboxplot,blabels=blabels)
+        
+        # Plot NHFLX
+        pcm = ax.pcolormesh(lon,lat,eofall[:,:,ks,n].mean(2).T,vmin=vlim[0],vmax=vlim[-1],cmap="RdBu_r")
+        
+        # Plot SLP and Labels
+        cl = ax.contour(lon,lat,eofslp[:,:,ks,n].mean(2).T,levels=slp_int,colors='k',linewidths=1)
+        ax.clabel(cl,levels=slp_lab,fontsize=10)
+plt.savefig("%sSLAB-PIC_NHFLX_EOFs1-3_EOFPattern_%s_seasavg.png"%(outpath,bboxtext),dpi=150)
+
+
+
 
 #%% Plot PCs and Spectra
 
@@ -411,3 +492,55 @@ freqs = []
 specs = []
 
 specs,freqs,CCs,dofs,r1s = scm.quick_spectrum(tsin,nsmooth,pct,opt=1,dt=dt,clvl=[.95])
+
+#%% Calculate contribution of each EOF to AMV
+
+# Regional Analysis Settings
+bbox_SP = [-60,-15,40,65]
+bbox_ST = [-80,-10,20,40]
+bbox_TR = [-75,-15,0,20]
+bbox_NA = [-80,0 ,0,65]
+regions = ("SPG","STG","TRO","NAT")        # Region Names
+bboxes = (bbox_SP,bbox_ST,bbox_TR,bbox_NA) # Bounding Boxes
+mons3=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
+
+rids = [0,1,3]
+
+aavg_eof = np.zeros((N_mode,12,len(rids)))*np.nan
+for r in range(len(rids)):
+    rid = rids[r]
+    rbbox = bboxes[rid]
+    for m in range(12):
+        ineof = eofall[:,:,m,:]
+        
+        eofaa = proc.sel_region(ineof,lon,lat,rbbox,reg_avg=1,awgt=1)
+        aavg_eof[:,m,r] = eofaa.copy()
+        
+
+
+step = 1
+ylm = [-30,30]
+xlm = [0,20]
+xtk = np.arange(xlm[0],xlm[-1]+step,step)
+
+m = 0
+for m in range(12):
+    fig,ax = plt.subplots(1,1)
+    for r in range(len(rids)):
+        ax.plot(np.arange(1,N_mode+1),aavg_eof[:,m,r],label="%s AMV Index"%(regions[r]),marker="o")
+    ax.legend()
+    ax.set_xlim(xlm)
+    ax.set_ylim(ylm)
+    ax.set_xticks(xtk)
+    ax.grid(True)
+    
+    ax.set_ylabel("EOF Area Average (W/m2/$\sigma_{PC}$)")
+    ax.set_xlabel("Mode")
+    ax.set_title("Month %s, Area Average of EOF)"% (mons3[m]))
+    plt.savefig("%sEOF_NHFLX_Area_Avg_Mon%02d.png"%(outpath,m+1),dpi=200)
+    
+
+    
+
+
+
