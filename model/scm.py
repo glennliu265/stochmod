@@ -982,7 +982,7 @@ def noentrain_2d(randts,lbd,T0,F,FAC,multFAC=1,debug=False):
     return temp_ts
 
 #%% Postprocessing Utilities
-def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,returnresults=False):
+def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,returnresults=False,preload=None):
     """
     Script to postprocess stochmod output
     
@@ -993,6 +993,9 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,returnresults=
         4) outpathdat - Path to store output data
         5) lags    - lags to compute for autocorrelation
         6) returnresults - option to return results [Bool]
+        7) preloaded - option to provide preloaded data. This is a three
+             element array[lon,lat,ssts], where ssts is an array of sst for 
+             each model [lon180 x lat x time]
     
     Based on portions of analyze_stochoutput.py
     
@@ -1019,13 +1022,16 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,returnresults=
     start = time.time()
     
     # Read in Stochmod SST Data
-    if "forcing" in expid:
-        ld = np.load(datpath+"stoch_output_%s.npz"%(expid),allow_pickle=True)
-        sst = ld["sst"]
+    if preload is None: # Manually Load the data
+        if "forcing" in expid:
+            ld = np.load(datpath+"stoch_output_%s.npz"%(expid),allow_pickle=True)
+            sst = ld["sst"]
+        else:
+            sst = np.load(datpath+"stoch_output_%s.npy"%(expid),allow_pickle=True).item()
+        lonr = np.load(datpath+"lon.npy")
+        latr = np.load(datpath+"lat.npy")
     else:
-        sst = np.load(datpath+"stoch_output_%s.npy"%(expid),allow_pickle=True).item()
-    lonr = np.load(datpath+"lon.npy")
-    latr = np.load(datpath+"lat.npy")
+        lonr,latr,sst = preload
     n_models = len(sst)
     
     # Load MLD Data
@@ -1051,8 +1057,8 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,returnresults=
             sstr[model],_,_=proc.sel_region(tsmodel,lonr,latr,bbox)
         sstregion[r] = sstr
         
+        
     # ---- Calculate autocorrelation and Regional avg SST ----
-    
     kmonths = {}
     autocorr_region = {}
     sstavg_region   = {}
@@ -1072,9 +1078,11 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,returnresults=
             kmonth     = havg.argmax()
             kmonths[r] = kmonth
             
-            
             # Take regional average 
-            tsmodel = np.nanmean(tsmodel,(0,1))
+            #tsmodel = np.nanmean(tsmodel,(0,1))
+            # Take area-weighted regional average
+            tsmodel   = proc.sel_region(sst[model],lonr,latr,bbox,reg_avg=1,awgt=1)
+            
             
             # Commented out below because now first t is Jan.
             ## Temp FIX
