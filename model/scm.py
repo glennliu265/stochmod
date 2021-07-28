@@ -1019,9 +1019,14 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,returnresults=
     start = time.time()
     
     # Read in Stochmod SST Data
-    sst = np.load(datpath+"stoch_output_%s.npy"%(expid),allow_pickle=True).item()
+    if "forcing" in expid:
+        ld = np.load(datpath+"stoch_output_%s.npz"%(expid),allow_pickle=True)
+        sst = ld["sst"]
+    else:
+        sst = np.load(datpath+"stoch_output_%s.npy"%(expid),allow_pickle=True).item()
     lonr = np.load(datpath+"lon.npy")
     latr = np.load(datpath+"lat.npy")
+    n_models = len(sst)
     
     # Load MLD Data
     mld = np.load(rawpath+"FULL_PIC_HMXL_hclim.npy") # Climatological MLD
@@ -1041,7 +1046,7 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,returnresults=
         bbox = bboxes[r]
         
         sstr = {}
-        for model in range(4):
+        for model in range(n_models):
             tsmodel = sst[model]
             sstr[model],_,_=proc.sel_region(tsmodel,lonr,latr,bbox)
         sstregion[r] = sstr
@@ -1056,7 +1061,7 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,returnresults=
         
         autocorr = {}
         sstavg = {}
-        for model in range(4):
+        for model in range(n_models):
             
             # Get sst and havg
             tsmodel = sstregion[r][model]
@@ -1108,7 +1113,7 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,returnresults=
         amvidx = {}
         amvpat = {}
         
-        for model in range(4):
+        for model in range(n_models):
             amvidx[model],amvpat[model] = proc.calc_AMVquick(sst[model],lonr,latr,amvbboxes[region])
         print("Calculated AMV variables for region %s in %.2f" % (regions[region],time.time()-amvtime))
         
@@ -1774,3 +1779,9 @@ def postprocess_HF(dampingmasked,limask,sellags,lon):
     # Multiple by 1 to make positive upwards
     dampingw *= -1
     return dampingw
+
+
+#%% SCM, updated equations
+
+
+
