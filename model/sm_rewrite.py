@@ -446,7 +446,7 @@ def integrate_noentrain(lbd,F,T0=0,multFAC=True,debug=False):
         forcing_term[:,:,t] = FAC[:,:,m-1] * F[:,:,t]
         T[:,:,t] = damping_term[:,:,t] + forcing_term[:,:,t]
     
-    # Apply masked based on damping term
+    # Apply masked based on forcing term
     msk = F.sum(2)
     msk[~np.isnan(msk)] = 1
     T *= msk[:,:,None]
@@ -498,7 +498,14 @@ def integrate_entrain(h,kprev,lbd_a,F,T0=0,multFAC=True,debug=False):
             forcing_term[o,a,:] = noise_ts.copy()
             entrain_term[o,a,:] = entrain_ts.copy()
             Td[o,a,:]           = Td_ts.copy()
-
+    
+    # Apply masked based on forcing term
+    msk = F.sum(2)
+    msk[~np.isnan(msk)] = 1
+    T *= msk[:,:,None]
+    if np.all(np.isnan(T)):
+        print("WARNING ALL ARE NAN")
+    
     if debug:
         return T,damping_term,forcing_term,entrain_term,Td
     return T
@@ -513,8 +520,10 @@ limaskname = "limask180_FULL-HTR.npy"
 
 # Model Params
 mconfig    = "SLAB_PIC"
-frcname    = "flxeof_5eofs_SLAB-PIC" #"uniform"
-runid      = "001"
+frcname    = "flxeof_2eofs_SLAB-PIC" #"uniform" "flxeof_5eofs_SLAB-PIC"
+#"flxeof_5eofs_SLAB-PIC"
+#"flxeof_080pct_SLAB-PIC"
+runid      = "002"
 pointmode  = 0 
 points     = [-30,50]
 bboxsim    = [-100,20,-20,90] # Simulation Box
