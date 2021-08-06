@@ -266,7 +266,6 @@ def set_stochparams(h,damping,dt,ND=True,rho=1000,cp0=4218,hfix=50,usemax=False,
         if hmean is None:
             hmean = np.nanmean(h)
     
-    
     # Set non-entraining months to zero
     beta[beta<0] = 0
     
@@ -983,7 +982,7 @@ def noentrain_2d(randts,lbd,T0,F,FAC,multFAC=1,debug=False):
     return temp_ts
 
 #%% Postprocessing Utilities
-def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,returnresults=False):
+def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,returnresults=False,preload=None):
     """
     Script to postprocess stochmod output
     
@@ -994,6 +993,9 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,returnresults=
         4) outpathdat - Path to store output data
         5) lags    - lags to compute for autocorrelation
         6) returnresults - option to return results [Bool]
+        7) preloaded - option to provide preloaded data. This is a three
+             element array[lon,lat,ssts], where ssts is an array of sst for 
+             each model [lon180 x lat x time]
     
     Based on portions of analyze_stochoutput.py
     
@@ -1020,9 +1022,17 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,returnresults=
     start = time.time()
     
     # Read in Stochmod SST Data
-    sst = np.load(datpath+"stoch_output_%s.npy"%(expid),allow_pickle=True).item()
-    lonr = np.load(datpath+"lon.npy")
-    latr = np.load(datpath+"lat.npy")
+    if preload is None: # Manually Load the data
+        if "forcing" in expid:
+            ld = np.load(datpath+"stoch_output_%s.npz"%(expid),allow_pickle=True)
+            sst = ld["sst"]
+        else:
+            sst = np.load(datpath+"stoch_output_%s.npy"%(expid),allow_pickle=True).item()
+        lonr = np.load(datpath+"lon.npy")
+        latr = np.load(datpath+"lat.npy")
+    else:
+        lonr,latr,sst = preload
+    n_models = len(sst)
     
     # Load MLD Data
     mld = np.load(rawpath+"FULL_PIC_HMXL_hclim.npy") # Climatological MLD
@@ -1042,13 +1052,13 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,returnresults=
         bbox = bboxes[r]
         
         sstr = {}
-        for model in range(4):
+        for model in range(n_models):
             tsmodel = sst[model]
             sstr[model],_,_=proc.sel_region(tsmodel,lonr,latr,bbox)
         sstregion[r] = sstr
         
+        
     # ---- Calculate autocorrelation and Regional avg SST ----
-    
     kmonths = {}
     autocorr_region = {}
     sstavg_region   = {}
@@ -1057,7 +1067,7 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,returnresults=
         
         autocorr = {}
         sstavg = {}
-        for model in range(4):
+        for model in range(n_models):
             
             # Get sst and havg
             tsmodel = sstregion[r][model]
@@ -1068,9 +1078,11 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,returnresults=
             kmonth     = havg.argmax()
             kmonths[r] = kmonth
             
-            
             # Take regional average 
-            tsmodel = np.nanmean(tsmodel,(0,1))
+            #tsmodel = np.nanmean(tsmodel,(0,1))
+            # Take area-weighted regional average
+            tsmodel   = proc.sel_region(sst[model],lonr,latr,bbox,reg_avg=1,awgt=1)
+            
             
             # Commented out below because now first t is Jan.
             ## Temp FIX
@@ -1109,7 +1121,7 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,returnresults=
         amvidx = {}
         amvpat = {}
         
-        for model in range(4):
+        for model in range(n_models):
             amvidx[model],amvpat[model] = proc.calc_AMVquick(sst[model],lonr,latr,amvbboxes[region])
         print("Calculated AMV variables for region %s in %.2f" % (regions[region],time.time()-amvtime))
         
@@ -1218,12 +1230,14 @@ def load_data(mconfig,ftype,projpath=None):
     # Load damping [lon x lat x mon]
     if mconfig == "SLAB_PIC":
         damping = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig005_dof894_mode4.npy")
-    elif mconfig=="FULL_HTR":
+    elif mconfig == "FULL_PIC":
+        damping = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig005_dof1893_mode4.npy")
+    elif mconfig =="FULL_HTR":
         damping = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig020_dof082_mode4.npy")
     
     # Load Forcing  [lon x lat x pc x month]
-    forcing = np.load(input_path+mconfig+ "_NAO_EAP_NHFLX_Forcing_%s.npy" % ftype)#[:,:,0,:]
-    
+    #forcing = np.load(input_path+mconfig+ "_NAO_EAP_NHFLX_Forcing_%s.npy" % ftype)#[:,:,0,:]
+    forcing = np.load(input_path+"SLAB_PIC_NAO_EAP_NHFLX_Forcing_%s.npy" % ftype)#[:,:,0,:]
     return mld,kprevall,lon,lat,lon360,cesmslabac,damping,forcing,mld1kmean
 
 def synth_stochmod(config,verbose=False,viz=False,
@@ -1260,6 +1274,7 @@ def synth_stochmod(config,verbose=False,viz=False,
     mld,kprevall,lon,lat,lon360,cesmslabac,damping,forcing,mld1kmean = load_data(config['mconfig'],config['ftype'])
     hblt  = np.load(datpath+"SLAB_PIC_hblt.npy")
     
+    
     if verbose:
         print("Loaded Data")
     
@@ -1267,11 +1282,11 @@ def synth_stochmod(config,verbose=False,viz=False,
     # -----------------------
     if config['genrand']:
         randts = np.random.normal(0,config['fstd'],config['t_end'])
-        np.save(config['output_path'] + "Forcing_fstd%.2f_%s.npy"% (config['fstd'],config['runid']),randts)
+        np.save(input_path + "Forcing_fstd%.2f_%s.npy"% (config['fstd'],config['runid']),randts)
         if verbose:
             print("Generating New Forcing")
     else:
-        randts = np.load(config['output_path']+"Forcing_fstd%.2f_%s.npy"% (config['fstd'],config['runid']))
+        randts = np.load(input_path + "Forcing_fstd%.2f_%s.npy"% (config['fstd'],config['runid']))
         if verbose:
             print("Loading Old Forcing")
     
@@ -1284,6 +1299,9 @@ def synth_stochmod(config,verbose=False,viz=False,
         forcing = forcing[:,:,2,:]
     elif config['fname'] == 'FLXSTD':
         forcing = np.load("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/SLAB_PIC_NHFLXSTD_Forcing_MON.npy")
+    elif config['fname'] == 'EOF':
+        forcing = np.load()
+    
     
     # Restrict input parameters to point (or regional average)
     params = get_data(config['pointmode'],config['query'],lat,lon,
@@ -1598,7 +1616,7 @@ def indexwindow(invar,m,monwin,combinetime=False,verbose=False):
     return varout
 
 
-def calc_HF(sst,flx,lags,monwin,verbose=True):
+def calc_HF(sst,flx,lags,monwin,verbose=True,posatm=True):
     """
     damping,autocorr,crosscorr=calc_HF(sst,flx,lags,monwin,verbose=True)
     Calculates the heat flux damping given SST and FLX anomalies using the
@@ -1619,9 +1637,10 @@ def calc_HF(sst,flx,lags,monwin,verbose=True):
             (ex. For Jan, monwin=3 is DJF and monwin=1 = J)
         
         --- OPTIONAL ---
-        4) verbose : BOOL
+        5) verbose : BOOL
             set to true to display print messages
-    
+        6) posatm : BOOL
+            check to true to set positive upwards into the atmosphere
     Outputs
     -------     
         1) damping   : ARRAY [month x lag x lat x lon]
@@ -1669,11 +1688,17 @@ def calc_HF(sst,flx,lags,monwin,verbose=True):
     # Reshape output variables
     damping = damping.reshape(12,nlag,nlat,nlon)  
     autocorr = autocorr.reshape(damping.shape)
-    crosscorr = crosscorr.reshape(damping.shape)  
+    crosscorr = crosscorr.reshape(damping.shape)
+    
+    # Check sign
+    if posatm:
+        if np.nansum(np.sign(crosscorr)) < 0:
+            print("WARNING! sst-flx correlation is mostly negative, sign will be flipped")
+            crosscorr*=-1
             
     return damping,autocorr,crosscorr
 
-def prep_HF(damping,rsst,rflx,p,tails,dof,mode,returnall=False):
+def prep_HF(damping,rsst,rflx,p,tails,dof,mode,returnall=False,posatm=True):
     """
     
     Inputs
@@ -1699,6 +1724,8 @@ def prep_HF(damping,rsst,rflx,p,tails,dof,mode,returnall=False):
         --- OPTIONAL ---
         8) returnall BOOL
             Set to True to return masks and frequency
+        6) posatm : BOOL
+            Set to True to ensure positive upwards into the atmosphere
     
     Outputs
     -------
@@ -1710,9 +1737,15 @@ def prep_HF(damping,rsst,rflx,p,tails,dof,mode,returnall=False):
     critval   = stats.t.ppf(ptilde,dof)
     corrthres = np.sqrt(1/ ((dof/np.power(critval,2))+1))
     
+    # Check sign
+    if posatm:
+        if np.nansum(np.sign(rflx)) < 0:
+            print("WARNING! sst-flx correlation is mostly negative, sign will be flipped")
+            rflx*=-1
+    
     # Create Mask
-    msst = np.zeros(damping.shape)
-    mflx = np.zeros(damping.shape)
+    msst = np.zeros(damping.shape) * np.nan
+    mflx = np.zeros(damping.shape) * np.nan
     msst[rsst > corrthres] = 1
     mflx[rflx > corrthres] = 1
     if mode == 1:
@@ -1754,3 +1787,9 @@ def postprocess_HF(dampingmasked,limask,sellags,lon):
     # Multiple by 1 to make positive upwards
     dampingw *= -1
     return dampingw
+
+
+#%% SCM, updated equations
+
+
+
