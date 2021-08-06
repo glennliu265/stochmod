@@ -16,9 +16,9 @@ import matplotlib.pyplot as plt
 
 
 #%% User Edits
-datpath = "/Users/gyl/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/"
+datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/"
 fname   = "HMXL_CESM1-FULL-PIC_lon-30_lat50.npy"
-figpath = "/Users/gyl/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20210715/"
+figpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20210715/"
 
 
 entrain1 = -1 # Value to assign for the first mixing

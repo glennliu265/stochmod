@@ -191,7 +191,6 @@ slp = slp - np.mean(slp,axis=0)
 wgt = np.sqrt(np.cos(np.radians(latr)))
 plt.plot(wgt)
 wgt2 = np.sqrt(np.cos(np.radians(lat)))
-
 slp = slp * wgt[None,None,:,None]
 
 

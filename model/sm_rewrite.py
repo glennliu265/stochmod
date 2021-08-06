@@ -520,10 +520,10 @@ limaskname = "limask180_FULL-HTR.npy"
 
 # Model Params
 mconfig    = "SLAB_PIC"
-frcname    = "flxeof_2eofs_SLAB-PIC" #"uniform" "flxeof_5eofs_SLAB-PIC"
+frcname    = "flxeof_25eofs_SLAB-PIC" #"uniform" "flxeof_5eofs_SLAB-PIC"
 #"flxeof_5eofs_SLAB-PIC"
 #"flxeof_080pct_SLAB-PIC"
-runid      = "002"
+runid      = "003"
 pointmode  = 0 
 points     = [-30,50]
 bboxsim    = [-100,20,-20,90] # Simulation Box

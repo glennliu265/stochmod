@@ -19,15 +19,12 @@ sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons
 from amv import proc,viz
 from matplotlib import gridspec
 
-
-
-
 datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/SLAB_PIC/"
-outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/02_Figures/Weekly_Meetings/"
+outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20210726"
 
 
-
-zz = np.load('%sEOF_AMV_PIC_SLAB.npz'%datpath,allow_pickle=True)
+mconfig = "PIC_SLAB"
+zz = np.load('%sEOF_AMV_%s.npz'% (datpath,mconfig),allow_pickle=True)
 amvpat = zz['patterns']
 amvid  = zz['indices']
 aavgs  = zz['aavg']
@@ -42,8 +39,10 @@ bbox = [280-360, 0, 0, 65]
 cmap = cmocean.cm.balance
 cmap.set_bad(color='yellow')
 #cint = np.arange(-1,1.1,0.1)
-cint = np.arange(-0.5,0.55,0.05)
 
+#cint = np.arange(-0.5,0.55,0.05) # Old CINT
+cint   = np.arange(-0.5,0.55,0.05)
+#cint   = np.arange(-0.3,0.33,0.03) # Used this for 7/26/2021 Meeting
 
 i= 0
 

@@ -18,12 +18,13 @@ import matplotlib.pyplot as plt
 import sys
 stormtrack = 1
 if stormtrack == 0:
+    usr = "gliu"
     #projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
     #datpath     = projpath + '01_Data/'
-    datpath = "/Users/gyl/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/"
-    sys.path.append("/Users/gyl/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
-    sys.path.append("/Users/gyl/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
-    
+    datpath = "/Users/%s/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/" % usr
+    sys.path.append("/Users/%s/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/"% usr)
+    sys.path.append("/Users/%s/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/"% usr)
+
     #sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     #sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
 
@@ -68,10 +69,17 @@ for o in tqdm.tqdm(range(nlon)): # loop lon
             continue
         kprev = scm.calc_kprev_lin(hpt,entrain1=entrain1,entrain0=entrain0)
         kprevall[o,a,:] = kprev
-print("Calculated kprev in %.2fs"% (time.time()-st))               
-        
+print("Calculated kprev in %.2fs"% (time.time()-st))
+
+
+# Save as dataset
+dsproc = xr.DataArray(kprevall,
+                  dims={'lon':lon,'lat':lat,'time':times},
+                  coords={'lon':lon,'lat':lat,'time':times},
+                  name = 'kprev'
+                  )
+dsproc.to_netcdf("%skprev_PIC.nc"%datpath,
+                 encoding={'kprev': {'zlib': True}})
 #%% Save kprev
 
-np.save("%skprev_all_CESM-PIC.npy"%datpath,kprevall)
-        
-        
+#np.save("%skprev_all_CESM-PIC.npy"%datpath,kprevall)
