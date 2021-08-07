@@ -109,6 +109,9 @@ print("Load MLD in %.2fs"%(time.time()-st))
 mld     = hmxl.reshape(288,192,int(hmxl.shape[2]/12),12)
 mldclim = mld.mean(2)
 
+# Convert cm --> meters
+mldclim /= 100 
+
 
 #%% Load the data (temperature)
 
@@ -201,9 +204,9 @@ print("Loaded wind stress data in %.2fs"%(time.time()-st))
 
 
 # Convert stress from stress on OCN on ATM --> ATM on OCN
-
 taux*= -1
 tauy*= -1
+
 #%% Flip EOFs
 
 spgbox = [-60,20,40,80]
@@ -330,7 +333,6 @@ mons3=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
 oint = 5
 aint = 5
 
-
 for im in tqdm(range(12)):
     fig,ax = plt.subplots(1,1,figsize=(6,4),subplot_kw={'projection':ccrs.PlateCarree()})
     ax = viz.add_coast_grid(ax,bbox=bboxplot)
@@ -360,19 +362,24 @@ for im in tqdm(range(12)):
 fig,ax = plt.subplots(1,1,figsize=(8,4),subplot_kw={'projection':ccrs.PlateCarree()})
 ax = viz.add_coast_grid(ax,bbox=[-180,180,-90,90])
 
-oint = 7
-aint = 7
-t = 555
-labeltau = 1
-scaler = 2
-#pcm = ax.pcolormesh
-qv = ax.quiver(lon360[::oint],lat[::aint],
+oint     = 7
+aint     = 7
+t        = 555
+labeltau = 0.1
+scaler   = 2
+
+#Contour the meridional wind
+
+pcm = ax.pcolormesh(lon360,lat,np.mean(fully,(0,1)),vmin=-.2,vmax=.2,cmap="RdBu_r")
+fig.colorbar(pcm,ax=ax,fraction = 0.025)
+qv  = ax.quiver(lon360[::oint],lat[::aint],
                np.mean(fullx[:,:,::aint,::oint],(0,1)),
                np.mean(fully[:,:,::aint,::oint],(0,1)),
                scale=scaler,color='gray',width=.008,
                headlength=5,headwidth=2,zorder=9)
 ax.quiverkey(qv,1.10,1.045,labeltau,"%.2f $Nm^{-2}\sigma_{PC}^{-1}$" % (labeltau))
 ax.quiverkey(qv,1.10,1.045,labeltau,"%.2f $Nm^{-2}\sigma_{PC}^{-1}$" % (labeltau))
+ax.set_title("Meridional Wind Stress (colors) and the wind stress vectors (arrows)")
 # End Result [lon x lat x mon x mode]
 
 
@@ -405,16 +412,27 @@ dSSTdx = dTdx.transpose(1,2,0)
 dSSTdy = dTdy.transpose(1,2,0)
 
 # Calculate ekman heat flux #[lat x lon x mon x N]
-q_ek = cp0 * dividef[:,:,None,None] * (tauy_pat*dSSTdx[:,:,:,None] - tauy_pat*dSSTdy[:,:,:,None])
+q_ek = cp0 * dividef[:,:,None,None] * (tauy_pat*dSSTdx[:,:,:,None] - taux_pat*dSSTdy[:,:,:,None])
 q_ek_msk = q_ek * mskcoastal[:,:,None,None]
+
+
+#%%
+
+fig,ax = plt.subplots(1,1,figsize=(6,4),subplot_kw={'projection':ccrs.PlateCarree()})
+ax = viz.add_coast_grid(ax)
+pcm = ax.pcolormesh(lon360,lat,dividef)
+fig.colorbar(pcm,ax=ax)
+
+
+
 
 #%% Visualize ekman advection
 im = 0
 N  = 0
 
 
-scaler   = 0.0005 
-labeltau = 0.0001
+scaler   = 0.05 
+labeltau = 0.01
 
 
 clevs =np.arange(-30,40,10)
@@ -434,12 +452,12 @@ for im in range(12):
                    v_ek[::aint,::oint,im,N],
                    scale=scaler,color='gray',width=.008,
                    headlength=5,headwidth=2,zorder=9)
-    ax.quiverkey(qv,1.1,1.035,labeltau,"%f $m/s$" % (labeltau))
+    ax.quiverkey(qv,1.1,1.035,labeltau,"%.3f $m/s$" % (labeltau))
     
     qv2 = ax.quiver(lon180[::oint],lat[::aint],
                taux_pat_fin[::oint,::aint,im,N].T,
                tauy_pat_fin[::oint,::aint,im,N].T,
-               scale=1,color='blue',width=.008,
+               scale=0.5,color='blue',width=.008,
                headlength=5,headwidth=2,zorder=9)
     ax.set_title(r"%s $Q_{ek}$ (Contour Interval: 10 $\frac{W}{m^{2}}$)" % (mons3[im]))
     
@@ -447,6 +465,36 @@ for im in range(12):
     plt.savefig(savename,dpi=150,bbox_tight='inches')
     
     
-# 
+
+#%% Save the output
+
+invars  = [q_ek_msk,u_ek,v_ek]
+outvars = []
+for i in tqdm(range(len(invars))):
+    
+    # Get variable
+    invar = invars[i]
+    
+    # Change to lon x lat x otherdims
+    invar = invar.reshape(nlat,nlon,12*N_mode).transpose(1,0,2)
+    
+    # Flip longitude
+    _,invar = proc.lon360to180(lon360,invar)
+    
+    # Uncombine mon x N_mode
+    invar = invar.reshape(nlon,nlat,12,N_mode)
+    outvars.append(invar)
+    
+q_ek180,u_ek180,v_ek180 = outvars
+
+# Save output...
+savename = "%sFULL-PIC_Monthly_NHFLXEOF_Qek.npz" % (rawpath)
+np.savez(savename,**{
+    'q_ek':q_ek180,
+    'u_ek':u_ek180,
+    'v_ek':v_ek180,
+    'lat':lat,
+    'lon':lon180})
+
 
 
