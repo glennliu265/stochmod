@@ -184,7 +184,7 @@ pcm = ax.pcolormesh(lon360,lat,(dTdy)[im,:,:],vmin=-0.5e-4,vmax=0.5e-4,cmap="RdB
 fig.colorbar(pcm,ax=ax)
 ax.set_title(r"Meridional gradient ($\frac{\partial T}{\partial x}$)" + " for %s (degC/meter)" % (mons3[im]) )
 
-#%% Regress the HF EOFs to the wind stress data
+#%% Load the wind stress and the PCs to prepare for regression
 N_mode = 100
 
 
@@ -352,7 +352,35 @@ for im in tqdm(range(12)):
     savename = "%sCESM_FULL-PIC_WindStressMap_EOF%02i_month%02i.png" %(figpath,N+1,im+1)
     plt.savefig(savename,dpi=150,bbox_tight='inches')
 
-#%% Monthly plots
+#%% Seasonal NHFLX-SLP-Windstress plots
+
+season_idx  = [[11,0,1],[2,3,4],[5,6,7],[8,9,10]]
+season_name = ["DJF","MAM","JJA","SON"]
+scaler = 0.5
+fig,axs = plt.subplots(1,4,figsize=(16,3),subplot_kw={'projection':ccrs.PlateCarree()})
+for i in range(4):
+    
+    sid   = season_idx[i]
+    sname = season_name[i]
+    ax    = axs.flatten()[i]
+    
+    ax = viz.add_coast_grid(ax,bbox=bboxplot)
+    pcm = ax.pcolormesh(lon180,lat,eofall[:,:,sid,N].mean(2).T,vmin=flxlim[0],vmax=flxlim[-1],cmap="RdBu_r")
+    cl  = ax.contour(lon180,lat,eofslp[:,:,sid,N].mean(2).T,levels=slplevs,colors='k',linewidth=0.95)
+    
+    qv = ax.quiver(lon180[::oint],lat[::aint],
+               taux_pat_fin[::oint,::aint,sid,N].mean(2).T,
+               tauy_pat_fin[::oint,::aint,sid,N].mean(2).T,
+               scale=scaler,color='gray',width=.008,
+               headlength=5,headwidth=2,zorder=9)
+    #ax.quiverkey(qv,1.10,1.045,labeltau,"%.2f $Nm^{-2}\sigma_{PC}^{-1}$" % (labeltau))
+    
+    ax.set_title(sname)
+
+fig.colorbar(pcm,ax=axs.ravel().tolist(),orientation='vertical',shrink=0.35,pad=0.01)
+plt.suptitle("Seasonal Averages for EOF %i of $Q_{net}$ (colors), $SLP$ (contours), and Wind Stress (quivers)" % (N+1),y=0.74)
+savename = "%sCESM_FULL-PIC_WindStressMap_EOF%02i_seasonal.png" %(figpath,N+1)   
+plt.savefig(savename,dpi=150,bbox_tight='inches')
 
 
 
@@ -369,7 +397,6 @@ labeltau = 0.1
 scaler   = 2
 
 #Contour the meridional wind
-
 pcm = ax.pcolormesh(lon360,lat,np.mean(fully,(0,1)),vmin=-.2,vmax=.2,cmap="RdBu_r")
 fig.colorbar(pcm,ax=ax,fraction = 0.025)
 qv  = ax.quiver(lon360[::oint],lat[::aint],
@@ -398,7 +425,7 @@ yroll = msk * np.roll(msk,-1,axis=0) * np.roll(msk,1,axis=0)
 mskcoastal = msk * xroll * yroll
 
 # Scrap plot to examine values near the equator
-plt.pcolormesh(lon360,lat,dividef),plt.colorbar(),plt.ylim([-20,20])
+#plt.pcolormesh(lon360,lat,dividef),plt.colorbar(),plt.ylim([-20,20])
 
 _,mld360 = proc.lon180to360(lon180,mldclim)
 mld360 = mld360.transpose(1,0,2) # lat x lon x time
@@ -412,7 +439,9 @@ dSSTdx = dTdx.transpose(1,2,0)
 dSSTdy = dTdy.transpose(1,2,0)
 
 # Calculate ekman heat flux #[lat x lon x mon x N]
-q_ek = cp0 * dividef[:,:,None,None] * (tauy_pat*dSSTdx[:,:,:,None] - taux_pat*dSSTdy[:,:,:,None])
+q_ek = cp0 * dividef[:,:,None,None] * (-tauy_pat*dSSTdx[:,:,:,None] + taux_pat*dSSTdy[:,:,:,None])
+
+q_ek = -1* cp0 *(rho*mld360[:,:,:,None]) * (u_ek*dSSTdx[:,:,:,None] + v_ek*dSSTdy[:,:,:,None])
 q_ek_msk = q_ek * mskcoastal[:,:,None,None]
 
 
@@ -423,17 +452,14 @@ ax = viz.add_coast_grid(ax)
 pcm = ax.pcolormesh(lon360,lat,dividef)
 fig.colorbar(pcm,ax=ax)
 
-
-
-
 #%% Visualize ekman advection
 im = 0
 N  = 0
 
 
-scaler   = 0.05 
+scaler   = 0.1 
 labeltau = 0.01
-
+viz_tau  = False
 
 clevs =np.arange(-30,40,10)
 lablevs = np.arange(-30,35,5)
@@ -453,12 +479,12 @@ for im in range(12):
                    scale=scaler,color='gray',width=.008,
                    headlength=5,headwidth=2,zorder=9)
     ax.quiverkey(qv,1.1,1.035,labeltau,"%.3f $m/s$" % (labeltau))
-    
-    qv2 = ax.quiver(lon180[::oint],lat[::aint],
-               taux_pat_fin[::oint,::aint,im,N].T,
-               tauy_pat_fin[::oint,::aint,im,N].T,
-               scale=0.5,color='blue',width=.008,
-               headlength=5,headwidth=2,zorder=9)
+    if viz_tau:
+        qv2 = ax.quiver(lon180[::oint],lat[::aint],
+                   taux_pat_fin[::oint,::aint,im,N].T,
+                   tauy_pat_fin[::oint,::aint,im,N].T,
+                   scale=0.5,color='blue',width=.008,
+                   headlength=5,headwidth=2,zorder=9)
     ax.set_title(r"%s $Q_{ek}$ (Contour Interval: 10 $\frac{W}{m^{2}}$)" % (mons3[im]))
     
     savename = "%sCESM_FULL-PIC_Qek-Map_EOF%02i_month%02i.png" %(figpath,N+1,im+1)
@@ -495,6 +521,76 @@ np.savez(savename,**{
     'v_ek':v_ek180,
     'lat':lat,
     'lon':lon180})
+
+#%% Combine output with net heat flux
+
+q_ek180add = q_ek180.copy()
+q_ek180add[np.isnan(q_ek180)] = 0
+
+# Combine Heat Fluxes and save
+q_comb = eofall + q_ek180add
+
+
+#%% Save a selected # of EOFS
+mcname = "SLAB-PIC"
+N_mode_choose = 20
+eofforce      = q_comb.copy()
+eofforce      = eofforce.transpose(0,1,3,2) # lon x lat x pc x mon
+eofforce      = eofforce[:,:,:N_mode_choose,:]
+savenamefrc   = "%sflxeof_qek_%ieofs_%s.npy" % (rawpath,N_mode_choose,mcname)
+np.save(savenamefrc,eofforce)
+print("Saved data to "+savenamefrc)
+
+
+#%% Load data again (optional) and save just the EOFs for a given season
+
+loadagain       = True
+N_mode_choose   = 25
+mcname          = "SLAB-PIC"
+saveid          = [11,1,2] # Indices of months to average over
+savenamenew     = "%sflxeof_qek_%ieofs_%s_DJF.npy" % (rawpath,N_mode_choose,mcname)
+
+if loadagain:
+    savenamefrc   = "%sflxeof_qek_%ieofs_%s.npy" % (rawpath,N_mode_choose,mcname)
+    eofforce = np.load(savenamefrc)
+
+eofforceseas = np.mean(eofforce[:,:,:,saveid],-1,keepdims=True) # Take mean along month axis
+eofforceseas = np.tile(eofforceseas,12) # Tile along last dimension
+np.save(savenamenew,eofforceseas)
+print("Saved data to "+savenamenew)
+
+
+# Check plot
+N = 0
+bboxplot = [-100,20,0,80]
+fig,axs = plt.subplots(3,4,figsize=(12,4),subplot_kw={'projection':ccrs.PlateCarree()})
+for im in range(12):
+    ax = axs.flatten()[im]
+    ax = viz.add_coast_grid(ax,bbox=bboxplot)
+    ax.pcolormesh(lon180,lat,eofforceseas[:,:,0,im].T,vmin=-30,vmax=30,cmap="RdBu_r")
+    ax.set_title("Mon %i"%(im+1))
+    
+
+
+#%%
+plotvars  = [eofall,q_ek180add,q_comb]
+plotlabs  = ["$Q_{net}$ ($Wm^{-2}$)","$Q_{ek}$ ($Wm^{-2}$)","$Q_{total}$ ($Wm^{-2}$)"]
+
+N = 30
+
+
+for im in tqdm(range(12)):
+    fig,axs = plt.subplots(1,3,figsize=(12,4),subplot_kw={'projection':ccrs.PlateCarree()})
+    for i in range(3):
+        ax = axs.flatten()[i]
+        ax = viz.add_coast_grid(ax,bbox=bboxplot)
+        pcm = ax.pcolormesh(lon180,lat,plotvars[i][:,:,im,N].T,vmin=-5,vmax=5,cmap="RdBu_r")
+        fig.colorbar(pcm,ax=ax,fraction=0.035)
+        ax.set_title(plotlabs[i])
+    plt.suptitle("EOF %i (%s)" % (N+1,mons3[im] ))
+    
+    savename = "%sCESM_FULL-PIC_AddQek_EOF%02i_month%02i.png" %(figpath,N+1,im+1)
+    plt.savefig(savename,dpi=150,bbox_tight='inches')
 
 
 
