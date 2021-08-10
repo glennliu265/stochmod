@@ -23,7 +23,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20210726/"
+    figpath     = projpath + "02_Figures/20210810/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -51,15 +51,14 @@ mconfig   = "SLAB_PIC"
 nyrs      = 1000        # Number of years to integrate over
 runid     = "003"
 
-
 # Analysis (7/26/2021, comparing 80% variance threshold and 5 or 3 EOFs)
 #fnames      = ["flxeof_080pct_SLAB-PIC","flxeof_5eofs_SLAB-PIC","flxeof_3eofs_SLAB-PIC"]
 #frcnamelong = ("80% Variance Threshold","5 EOFs","3 EOFs")
 
-
 # Analysis: Trying different number of EOFs
-neofs       = [1,2,3,5,10,25,50]
-fnames      = ["flxeof_%ieofs_SLAB-PIC" % x for x in neofs]
+neofs       = [1,2,5,10,25,50]#[1,2,3,5,10,25,50]
+fnames      = ["flxeof_qek_%ieofs_SLAB-PIC" % x for x in neofs]
+#fnames      = ["flxeof_%ieofs_SLAB-PIC" % x for x in neofs]
 frcnamelong = ["%i EOFs" % x for x in neofs]
 
 #%% Post Process Outputs (Calculate AMV, Autocorrelation)
@@ -77,17 +76,16 @@ bbox_TR = [-75,-15,0,20]
 bbox_NA = [-80,0 ,0,65]
 regions = ("SPG","STG","TRO","NAT")        # Region Names
 bboxes = (bbox_SP,bbox_ST,bbox_TR,bbox_NA) # Bounding Boxes
-cint   = np.arange(-0.3,0.33,0.03) # Used this for 7/26/2021 Meeting
-cl_int = np.arange(-0.3,0.4,0.1)
+cint   = np.arange(-0.45,0.50,0.05) # Used this for 7/26/2021 Meeting
+cl_int = np.arange(-0.45,0.50,0.05)
 bboxplot = [-100,20,0,80]
 modelnames  = ("Constant h","Vary h","Entraining")
 
-# Experiment names
-
-
+#%% Experiment names
 # -- Select Experiment -- 
-fid   = 6
+fid   = 5
 frcname = fnames[fid]
+runid = "003"
 expid = "forcing%s_%iyr_run%s" % (frcname,nyrs,runid) 
 regid = 3
 
@@ -105,7 +103,7 @@ amvidx = ld['amvidx_region'].item()[regid]
 amvpat = ld['amvpat_region'].item()[regid]
 
 
-fig,axs = plt.subplots(1,3,figsize=(10,5),subplot_kw={'projection':ccrs.PlateCarree()})
+fig,axs = plt.subplots(1,3,figsize=(8,3),subplot_kw={'projection':ccrs.PlateCarree()})
 for p in range(len(amvpat)):
     ax = axs.flatten()[p]
     ax = viz.add_coast_grid(ax,bbox=bboxplot)
@@ -116,10 +114,9 @@ for p in range(len(amvpat)):
     #ax.set_title(modelnames[p])
     #fig.colorbar(pcm,ax=ax,fraction=0.036)
     ax.set_title(modelnames[p])
-fig.colorbar(pcm,ax=axs.ravel().tolist(),orientation='horizontal',shrink=0.60)#,pad=0.015)
-plt.suptitle("%s AMV Pattern ($\circ C$ per $\sigma_{AMV}$, Forcing: %s)"%(regions[regid],frcnamelong[fid]),y=0.80,fontsize=14)
-#plt.tight_layout()
-plt.savefig("%sAMV_Pattern_%s_region%s.png"%(figpath,expid,regions[regid]),dpi=200,bbox_tight='inches')
+fig.colorbar(pcm,ax=axs.ravel().tolist(),orientation='vertical',shrink=0.5,pad=0.01)#,pad=0.015)
+plt.suptitle("%s AMV Pattern ($\circ C$ per $\sigma_{AMV}$, Forcing: %s)"%(regions[regid],frcnamelong[fid]),y=0.85,fontsize=14)
+plt.savefig("%sAMV_Pattern_%s_region%s.png"%(figpath,expid,regions[regid]),dpi=200,bbox_inches = 'tight')
 
 
 
@@ -151,7 +148,8 @@ for p in range(len(amvpat)):
 
 # Load in SSTs for each region
 sstdicts = []
-runids = ["002","002","002","002","002","003","003"] # Accomodate different RunIDs
+runids = np.repeat("003",len(neofs))
+#runids = ["003"]#["002","002","002","002","002","003","003"] # Accomodate different RunIDs
 for f in range(len(neofs)):
     # Load the dictionary
     expid = "forcing%s_%iyr_run%s" % (fnames[f],nyrs,runids[f]) # Get experiment name
@@ -197,7 +195,8 @@ for rid in range(len(regions)):
 #%% Make a plot of the variance... compare for each forcing scenario
 elabels = ["%i EOFs"% x for x in neofs]
 eofaxis = np.arange(0,51,1)
-xtk = [1,2,3,5,10,25,50]
+#xtk = [1,2,3,5,10,25,50]
+xtk = [1,2,5,10,25,50]
 #xtkplot = 
 for rid in range(len(regions)):
     fig,ax  = plt.subplots(1,1,figsize=(8,4))
@@ -221,7 +220,7 @@ nsmooth = 5
 pct     = 0.10
 
 rid = 3
-fid = 0
+fid = 5
 
 dofs = [1000,1000,898,1798] # In number of years
 
