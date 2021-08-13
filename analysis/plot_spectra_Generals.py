@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-
 Plot Spectral Estimates for Generals Exam
 
 Created on Sun Jun  6 13:38:43 2021

@@ -38,7 +38,7 @@ elif stormtrack == 0:
     
     datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/"
     #datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/"
-    outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20210726/"
+    outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20210804/"
 
     lipath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/landicemask_enssum.npy"
     #llpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/"
@@ -76,7 +76,7 @@ def sel_regionxr(ds,bbox):
     return dsreg
 
 #%%
-mconfig = "PIC_SLAB"
+mconfig = "PIC_FULL"
 bbox    = [260,20,0,65]
 bboxeof = [280,20,0,65]
 
@@ -95,23 +95,50 @@ blabels=[0,0,0,0]
 #%% Open the dataset
 
 # Open the dataset
-ds = xr.open_dataset("%sNHFLX_PIC_SLAB_raw.nc" % datpath)
-
-# Apply land/ice mask
-msk = np.load(lipath)
-ds *= msk[None,:,:]
-
-# Select Region
-dsreg = sel_regionxr(ds,bboxeof)
-
-# Read out data
 st      = time.time()
-flxglob = ds.NHFLX.values
-#flxreg = dsreg.NHFLX.values
-lon     = ds.lon.values
-lat     = ds.lat.values
-slpglob = np.load(datpath + "../CESM_proc/PSL_PIC_SLAB.npy")
-print("Loaded data in %.2fs"%(time.time()-st))
+if mconfig == "PIC_SLAB":
+    mcname = "SLAB-PIC"
+    
+    # Open dataset
+    ds = xr.open_dataset("%sNHFLX_PIC_SLAB_raw.nc" % datpath) # time x lat x lon
+
+    # Apply land/ice mask
+    msk = np.load(lipath)
+    ds *= msk[None,:,:]
+    
+    # Select Region
+    dsreg = sel_regionxr(ds,bboxeof)
+    
+    # Read out data
+    flxglob = ds.NHFLX.values
+    #flxreg = dsreg.NHFLX.values
+    lon     = ds.lon.values
+    lat     = ds.lat.values
+    slpglob = np.load(datpath + "../CESM_proc/PSL_PIC_SLAB.npy")
+    print("Loaded data in %.2fs"%(time.time()-st))
+    
+elif mconfig == "PIC_FULL":
+    
+    mcname = "FULL-PIC"
+    
+    # Load Data
+    flxglob = np.load("%s../NHFLX_PIC_FULL.npy"%(datpath)) # yr x mon x lat x lon
+    lon = np.load(datpath+"CESM1_lon360.npy")
+    lon180 = np.load(datpath+"CESM1_lon180.npy")
+    lat    = np.load(datpath+"CESM1_lat.npy") 
+    
+    # Combine time
+    nmon,_,nlat,nlon = flxglob.shape
+    flxglob = flxglob.reshape(nmon*12,nlat,nlon)
+    
+    # Apply a mask
+    msk = np.load(lipath)
+    flxglob *= msk[None,:,:]
+    
+    # Load SLP
+    ds = xr.open_dataset("%s../CESM_proc/PSL_PIC_FULL.nc" % datpath)
+    slpglob = ds.PSL.values
+    print("Loaded data in %.2fs"%(time.time()-st))
 
 
 
@@ -226,7 +253,7 @@ eofslp = eofslp.reshape(nlon,nlat,12,N_mode)
 #%% Save the results
 bboxtext = "lon%ito%i_lat%ito%i" % (bbox[0],bbox[1],bbox[2],bbox[3])
 bboxstr  = "Lon %i to %i, Lat %i to %i" % (bbox[0],bbox[1],bbox[2],bbox[3])
-savename = "%sNHFLX_%iEOFsPCs_%s.npz" % (datpath,N_mode,bboxtext)
+savename = "%sNHFLX_%s_%iEOFsPCs_%s.npz" % (datpath,mcname,N_mode,bboxtext)
 
 np.savez(savename,**{
     "eofall":eofall,
@@ -236,10 +263,20 @@ np.savez(savename,**{
     'lon':lon180,
     'lat':lat},allow_pickle=True)
 
+
+
+
+#%% -------Analysis Section Below
+
 #%% Load the data
+if mconfig == "PIC_SLAB":
+    mcname = "SLAB-PIC"
+elif mconfig == "PIC_FULL":
+    mcname = "FULL-PIC"
+
 bboxtext = "lon%ito%i_lat%ito%i" % (bbox[0],bbox[1],bbox[2],bbox[3])
 bboxstr  = "Lon %i to %i, Lat %i to %i" % (bbox[0],bbox[1],bbox[2],bbox[3])
-savename = "%sNHFLX_%iEOFsPCs_%s.npz" % (datpath,N_mode,bboxtext)
+savename = "%sNHFLX_%s_%iEOFsPCs_%s.npz" % (datpath,mcname,N_mode,bboxtext)
 ld = np.load(savename,allow_pickle=True)
 
 eofall    = ld['eofall']
@@ -253,7 +290,7 @@ lat = ld['lat']
 
 #%%  Flip sign to match NAO+ (negative heat flux out of ocean/ -SLP over SPG)
 
-spgbox = [-60,20,45,80]
+spgbox = [-60,20,40,80]
 N_modeplot = 5
 
 for N in tqdm(range(N_modeplot)):
@@ -265,6 +302,7 @@ for N in tqdm(range(N_modeplot)):
         if sumflx > 0:
             print("Flipping sign for NHFLX, mode %i month %i" % (N+1,m+1))
             eofall[:,:,m,N]*=-1
+            pcall[N,m,:] *= -1
         if sumslp > 0:
             print("Flipping sign for SLP, mode %i month %i" % (N+1,m+1))
             eofslp[:,:,m,N]*=-1
@@ -274,11 +312,11 @@ for N in tqdm(range(N_modeplot)):
 
 #%% Save a select number of EOFs
 
-N_mode_choose = 25
+N_mode_choose = 30
 eofforce      = eofall.copy()
 eofforce      = eofforce.transpose(0,1,3,2) # lon x lat x pc x mon
 eofforce      = eofforce[:,:,:N_mode_choose,:]
-savenamefrc   = "%sflxeof_%ieofs_SLAB-PIC.npy" % (datpath,N_mode_choose)
+savenamefrc   = "%sflxeof_%ieofs_%s.npy" % (datpath,N_mode_choose,mcname)
 np.save(savenamefrc,eofforce)
 print("Saved data to "+savenamefrc)
 #%% Calculate/plot cumulative variance explained
@@ -307,7 +345,7 @@ ax.grid(True,ls='dotted')
 ax.set_xlim([1,N_modeplot])
 #ax.axhline(80)
 #ax.set_xticks(xtk)
-plt.savefig("%sSLAB-PIC_NHFLX_EOFs%i_%s_ModevCumuVariance_bymon.png"%(outpath,N_modeplot,bboxtext),dpi=150)
+plt.savefig("%s%s_NHFLX_EOFs%i_%s_ModevCumuVariance_bymon.png"%(outpath,mcname,N_modeplot,bboxtext),dpi=150)
 
 
 #%% Find index of variance threshold
@@ -329,7 +367,7 @@ ax.set_title("Number of EOFs required \n to explain %i"%(vthres*100)+"% of the N
 ax.set_yticks(ytk)
 ax.set_ylabel("# EOFs")
 ax.grid(True,ls='dotted')
-plt.savefig("%sSLAB-PIC_NHFLX_EOFs%i_%s_NumEOFs_%ipctvar_bymon.png"%(outpath,N_mode,bboxtext,vthres*100),dpi=150)
+plt.savefig("%s%s_NHFLX_EOFs%i_%s_NumEOFs_%ipctvar_bymon.png"%(outpath,mcname,ArithmeticErrorN_mode,bboxtext,vthres*100),dpi=150)
 
 #%% Save outptut as forcing for stochastic model, variance based threshold
 
@@ -343,7 +381,7 @@ for i in range(12):
     cvartest[stop_id+1:,i] = 0
 eofforce = eofforce.transpose(0,1,3,2) # [lon x lat x pc x mon]
 
-savenamefrc = "%sflxeof_%03ipct_SLAB-PIC.npy" % (datpath,vthres*100)
+savenamefrc = "%sflxeof_%03ipct_%s.npy" % (datpath,vthres*100,mcname)
 np.save(savenamefrc,eofforce)
 
 # Test plot maps
@@ -385,7 +423,7 @@ ax.set_xlabel("Mode")
 ax.set_title("NHFLX EOFs, Perc. Variance Expl. vs. Mode \n %s"% bboxstr)
 ax.grid(True,ls='dotted')
 ax.set_xticks(xtk)
-plt.savefig("%sSLAB-PIC_NHFLX_EOFs_%s_ModevVariance_bymon.png"%(outpath,bboxtext),dpi=150)
+plt.savefig("%s%s_NHFLX_EOFs_%s_ModevVariance_bymon.png"%(outpath,mcname,bboxtext),dpi=150)
 
 
 # Same as above, but cumulative plot
@@ -402,7 +440,7 @@ ax.set_ylabel("% Variance Explained")
 ax.set_ylim([0,100])
 ax.set_yticks(np.arange(0,110,10))
 ax.grid(True,ls='dotted')
-plt.savefig("%sSLAB-PIC_NHFLX_EOFs_%s_TotalVariance_First%iEOFs_bymon.png"%(outpath,bboxtext,N_modeplot),dpi=150)
+plt.savefig("%s%s_NHFLX_EOFs_%s_TotalVariance_First%iEOFs_bymon.png"%(outpath,mcname,bboxtext,N_modeplot),dpi=150)
 
 #%% Plot Net Heat Flux EOF Patterns
 
@@ -440,7 +478,7 @@ for n in tqdm(range(N_modeplot)):
     fig.colorbar(pcm,ax=axs.ravel().tolist(),orientation='vertical',shrink=0.85,pad=0.05,anchor=(1.75,0.7))
     plt.suptitle("NHFLX EOF %i (CESM1-SLAB) (W/$m^2$ per $\sigma_{PC}$) \n SLP Contour Interval: 50 mb" % (n+1),fontsize=14)
     fig.subplots_adjust(top=0.90)
-    plt.savefig("%sSLAB-PIC_NHFLX_EOFs_%s_EOF%iPattern_bymon.png"%(outpath,bboxtext,n+1),dpi=150)
+    plt.savefig("%s%s_NHFLX_EOFs_%s_EOF%iPattern_bymon.png"%(outpath,mcname,bboxtext,n+1),dpi=150)
 
 #%% Seasonally Averaged Plots
 
@@ -472,7 +510,7 @@ for n in range(3):
         # Plot SLP and Labels
         cl = ax.contour(lon,lat,eofslp[:,:,ks,n].mean(2).T,levels=slp_int,colors='k',linewidths=1)
         ax.clabel(cl,levels=slp_lab,fontsize=10)
-plt.savefig("%sSLAB-PIC_NHFLX_EOFs1-3_EOFPattern_%s_seasavg.png"%(outpath,bboxtext),dpi=150)
+plt.savefig("%s%s_NHFLX_EOFs1-3_EOFPattern_%s_seasavg.png"%(outpath,mcname,bboxtext),dpi=150)
 
 
 
@@ -518,6 +556,8 @@ for r in range(len(rids)):
         
 
 
+
+
 step = 1
 ylm = [-30,30]
 xlm = [0,20]
@@ -525,7 +565,7 @@ xtk = np.arange(xlm[0],xlm[-1]+step,step)
 
 m = 0
 for m in range(12):
-    fig,ax = plt.subplots(1,1)
+    fig,ax = plt.subplots(1,1,figsize=(6,3))
     for r in range(len(rids)):
         ax.plot(np.arange(1,N_mode+1),aavg_eof[:,m,r],label="%s AMV Index"%(regions[r]),marker="o")
     ax.legend()
@@ -536,7 +576,7 @@ for m in range(12):
     
     ax.set_ylabel("EOF Area Average (W/m2/$\sigma_{PC}$)")
     ax.set_xlabel("Mode")
-    ax.set_title("Month %s, Area Average of EOF)"% (mons3[m]))
+    ax.set_title("%s, Area Average of EOF)"% (mons3[m]))
     plt.savefig("%sEOF_NHFLX_Area_Avg_Mon%02d.png"%(outpath,m+1),dpi=200)
     
 

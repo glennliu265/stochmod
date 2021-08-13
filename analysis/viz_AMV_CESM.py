@@ -146,11 +146,11 @@ datpath     = projpath + '01_Data/model_output/'
 rawpath     = projpath + '01_Data/model_input/'
 outpathdat  = datpath + '/proc/'
 
-
 # Set preloaded inputs, # of lags
 preload = [lon180,lat,sstas]
 lags    = np.arange(0,37,1)
 
+#
 scm.postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,preload=preload)
 
 # -----------------
@@ -475,9 +475,6 @@ plt.savefig("%sNASSTI_SpectralEstimate_nsmooth%i_taper%i_decadal_timemax%i.png"%
 
 
 #%% Remake the plot (variance preserving)
-
-
-
 
 def lin_quickformat(ax,plotdt,freq):
     # Set tickparams and clone
