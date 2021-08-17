@@ -460,6 +460,10 @@ eofforce = eofforce.transpose(0,1,3,2) # [lon x lat x pc x mon]
 
 eofforce *= ampfactor[None,None,None,:]
 
+# Cut to maximum EOF
+nmax = thresid.max()
+eofforce = eofforce[:,:,:nmax+1,:]
+
 savenamefrc = "%sflxeof_%03ipct_%s_eofcorr%i.npy" % (datpath,vthres*100,mcname,eofcorr)
 np.save(savenamefrc,eofforce)
 
