@@ -56,8 +56,9 @@ runid     = "003"
 #frcnamelong = ("80% Variance Threshold","5 EOFs","3 EOFs")
 
 # Analysis: Trying different number of EOFs
-neofs       = [1,2,5,10,25,50]#[1,2,3,5,10,25,50]
-fnames      = ["flxeof_qek_%ieofs_SLAB-PIC" % x for x in neofs]
+neofs       = [1,2,50]#[1,2,3,5,10,25,50]
+#fnames      = ["flxeof_qek_%ieofs_SLAB-PIC" % x for x in neofs]
+fnames      = ["flxeof_qek_%ieofs_SLAB-PIC_JJA" % x for x in neofs]
 #fnames      = ["flxeof_%ieofs_SLAB-PIC" % x for x in neofs]
 frcnamelong = ["%i EOFs" % x for x in neofs]
 
@@ -82,8 +83,8 @@ bboxplot = [-100,20,0,80]
 modelnames  = ("Constant h","Vary h","Entraining")
 
 #%% Experiment names
-# -- Select Experiment -- 
-fid   = 5
+# -- SelectExperiment -- 
+fid   = 2
 frcname = fnames[fid]
 runid = "003"
 expid = "forcing%s_%iyr_run%s" % (frcname,nyrs,runid) 
@@ -108,6 +109,7 @@ for p in range(len(amvpat)):
     ax = axs.flatten()[p]
     ax = viz.add_coast_grid(ax,bbox=bboxplot)
     pcm = ax.contourf(lon,lat,amvpat[p].T,levels=cint,cmap=cmocean.cm.balance)
+    ax.pcolormesh(lon,lat,amvpat[p].T,vmin=cint[0],vmax=cint[-1],cmap=cmocean.cm.balance,zorder=-1)
     #cl = ax.contour(lon,lat,amvpat[p].T,levels=cl_int,colors="k",linewidths=0.5)
     #ax.clabel(cl,levels=cl_int)
     #pcm = ax.pcolormesh(lon,lat,amvpat[p].T,vmin=cint[0],vmax=cint[-1],cmap=cmocean.cm.balance)
@@ -180,7 +182,6 @@ rsst_fn    = "%s/proc/SST_RegionAvg_%s.npy" % (datpath,expid)
 sstcesm    = np.load(rsst_fn,allow_pickle=True).item()
 cesmname   =  ["CESM-FULL","CESM-SLAB"]
 
-
 # Identify the variance for each region and load in numpy arrays
 #sstallcesm  = np.zeros((len(regions),2,nyrs*12)) # Forcing x Region x Model x Time
 sstvarscesm = np.zeros((len(regions),2)) # Forcing x Region x Model
@@ -215,15 +216,12 @@ for rid in range(len(regions)):
     plt.savefig("%svariance_vs_nEOF_by_model_runid%s_nyr%i_region%s.png"%(figpath,runid,nyrs,regions[rid]),dpi=150)
 
 #%% Do some spectral analysis
-
 nsmooth = 5
 pct     = 0.10
 
-rid = 3
-fid = 5
-
+rid  = 3
+fid  = 5
 dofs = [1000,1000,898,1798] # In number of years
-
 
 # Unpack and stack data
 insst = []

@@ -133,11 +133,18 @@ dTdy[:,-1,:] = 0 # Set top latitude to zero (since latitude is not periodic)
 #dTdx = (ts_monmean[:,:,1:] - ts_monmean[:,:,0:-1]) / dx[None,:,:]
 #dTdy = ts_monmean / dy[None,:,:]
 
+
+
+
 # Save output...
 savename = "%sFULL-PIC_Monthly_gradT_lon360.npz" % (rawpath)
+
+
+
 # Save [mon x lat x lon360]
 
 np.savez(savename,**{
+    'ts_monmean':ts_monmean,
     'dTdx':dTdx,
     'dTdy':dTdy,
     'dx':dx,
@@ -151,6 +158,7 @@ np.savez(savename,**{
 # Load output
 savename = "%sFULL-PIC_Monthly_gradT_lon360.npz" % (rawpath)
 ld       = np.load(savename)
+ts_monmean = ld['ts_monmean']
 dTdx     = ld['dTdx']
 dTdy     = ld['dTdy']
 dx       = ld['dx']
@@ -185,11 +193,11 @@ fig.colorbar(pcm,ax=ax)
 ax.set_title(r"Meridional gradient ($\frac{\partial T}{\partial x}$)" + " for %s (degC/meter)" % (mons3[im]) )
 
 #%% Load the wind stress and the PCs to prepare for regression
-N_mode = 100
+N_mode = 200
 
 
 # Load the PCs
-ld = np.load("%sNHFLX_FULL-PIC_100EOFsPCs_lon260to20_lat0to65.npz" % (rawpath),allow_pickle=True)
+ld = np.load("%sNHFLX_FULL-PIC_%sEOFsPCs_lon260to20_lat0to65.npz" % (rawpath,N_mode),allow_pickle=True)
 pcall = ld['pcall'] # [PC x MON x TIME]
 eofall = ld['eofall']
 eofslp = ld['eofslp']
@@ -322,12 +330,12 @@ np.savez(savename,**{
 #%% Individual monthly wind stress plots for EOF N
 
 im = 9
-N  = 0
-scaler =    .75 # # of data units per arrow
+N  = 1
+scaler   =    .75 # # of data units per arrow
 bboxplot = [-100,20,0,80]
 labeltau = 0.10
-slplevs = np.arange(-400,500,100)
-flxlim = [-30,30]
+slplevs  = np.arange(-400,500,100)
+flxlim   = [-30,30]
 mons3=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
 
 oint = 5
@@ -350,7 +358,7 @@ for im in tqdm(range(12)):
     fig.colorbar(pcm,ax=ax,fraction=0.035)
     ax.set_title("%s Wind Stress Associated with NHFLX EOF %i \n CESM-FULL"%(mons3[im],N+1))
     savename = "%sCESM_FULL-PIC_WindStressMap_EOF%02i_month%02i.png" %(figpath,N+1,im+1)
-    plt.savefig(savename,dpi=150,bbox_tight='inches')
+    plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 #%% Seasonal NHFLX-SLP-Windstress plots
 
@@ -445,24 +453,43 @@ q_ek = -1* cp0 *(rho*mld360[:,:,:,None]) * (u_ek*dSSTdx[:,:,:,None] + v_ek*dSSTd
 q_ek_msk = q_ek * mskcoastal[:,:,None,None]
 
 
-#%%
-
+#%% Test plot 1/f
 fig,ax = plt.subplots(1,1,figsize=(6,4),subplot_kw={'projection':ccrs.PlateCarree()})
 ax = viz.add_coast_grid(ax)
 pcm = ax.pcolormesh(lon360,lat,dividef)
 fig.colorbar(pcm,ax=ax)
 
-#%% Visualize ekman advection
+#%% test plot temperature gradient
 im = 0
-N  = 0
+
+fig,ax = plt.subplots(1,1,figsize=(6,4),subplot_kw={'projection':ccrs.PlateCarree()})
+ax = viz.add_coast_grid(ax)
+pcm = ax.pcolormesh(lon360,lat,ts_monmean[im,:,:]*msk)
+fig.colorbar(pcm,ax=ax)
 
 
+#%% Visualize ekman advection
+
+
+
+# Option
+#im = 0 # Month Index (for debugging)
+N  = 0 # Mode Index
+viz_tau  = False # True: Include wind stress quivers
+contour_temp = True # True: contour SST ... False: contour q_ek
+
+# U_ek quiver options
 scaler   = 0.1 
 labeltau = 0.01
-viz_tau  = False
 
+# Q_ek contour levels
 clevs =np.arange(-30,40,10)
 lablevs = np.arange(-30,35,5)
+
+# Temperature contour levels
+tlm = [275,310] 
+tlevs = np.arange(tlm[0],tlm[1]+1,1)
+tlab  = np.arange(tlm[0],tlm[1]+5,5)
 
 # Projection
 for im in range(12):
@@ -470,7 +497,13 @@ for im in range(12):
     fig,ax = plt.subplots(1,1,figsize=(6,4),subplot_kw={'projection':ccrs.PlateCarree()})
     ax = viz.add_coast_grid(ax,bbox=bboxplot)
     pcm = ax.pcolormesh(lon360,lat,(q_ek_msk)[:,:,im,N],vmin=-25,vmax=25,cmap="RdBu_r")
-    cl = ax.contour(lon360,lat,(q_ek_msk)[:,:,im,N],levels=clevs,colors='k',linewidths=0.75)
+    
+    if contour_temp:
+        cl = ax.contour(lon360,lat,ts_monmean[im,:,:]*msk,levels=tlevs,colors='k',linewidths=0.75)
+        ax.clabel(cl,levels=tlab)
+    else:
+        cl = ax.contour(lon360,lat,(q_ek_msk)[:,:,im,N],levels=clevs,colors='k',linewidths=0.75)
+    
     fig.colorbar(pcm,ax=ax,fraction=0.035)
     
     qv = ax.quiver(lon360[::oint],lat[::aint],
@@ -485,10 +518,14 @@ for im in range(12):
                    tauy_pat_fin[::oint,::aint,im,N].T,
                    scale=0.5,color='blue',width=.008,
                    headlength=5,headwidth=2,zorder=9)
-    ax.set_title(r"%s $Q_{ek}$ (Contour Interval: 10 $\frac{W}{m^{2}}$)" % (mons3[im]))
+    if contour_temp:
+        ax.set_title(r"%s $Q_{ek}$ (Contour Interval: 10 $\frac{W}{m^{2}}$; 1 $^{\circ}C$)" % (mons3[im]))
+    else:
+        
+        ax.set_title(r"%s $Q_{ek}$ (Contour Interval: 10 $\frac{W}{m^{2}}$)" % (mons3[im]))
     
     savename = "%sCESM_FULL-PIC_Qek-Map_EOF%02i_month%02i.png" %(figpath,N+1,im+1)
-    plt.savefig(savename,dpi=150,bbox_tight='inches')
+    plt.savefig(savename,dpi=150,bbox_inches='tight')
     
     
 
@@ -533,7 +570,7 @@ q_comb = eofall + q_ek180add
 
 #%% Save a selected # of EOFS
 mcname = "SLAB-PIC"
-N_mode_choose = 20
+N_mode_choose = 50
 eofforce      = q_comb.copy()
 eofforce      = eofforce.transpose(0,1,3,2) # lon x lat x pc x mon
 eofforce      = eofforce[:,:,:N_mode_choose,:]
@@ -545,10 +582,10 @@ print("Saved data to "+savenamefrc)
 #%% Load data again (optional) and save just the EOFs for a given season
 
 loadagain       = True
-N_mode_choose   = 25
+N_mode_choose   = 2
 mcname          = "SLAB-PIC"
-saveid          = [11,1,2] # Indices of months to average over
-savenamenew     = "%sflxeof_qek_%ieofs_%s_DJF.npy" % (rawpath,N_mode_choose,mcname)
+saveid          = [5,6,7] # Indices of months to average over
+savenamenew     = "%sflxeof_qek_%ieofs_%s_JJA.npy" % (rawpath,N_mode_choose,mcname)
 
 if loadagain:
     savenamefrc   = "%sflxeof_qek_%ieofs_%s.npy" % (rawpath,N_mode_choose,mcname)

@@ -76,7 +76,7 @@ def sel_regionxr(ds,bbox):
     return dsreg
 
 #%%
-mconfig = "PIC_FULL"
+mconfig = "PIC_SLAB"
 bbox    = [260,20,0,65]
 bboxeof = [280,20,0,65]
 
@@ -86,7 +86,7 @@ lonf = -30
 latf = 50
 
 # EOF parameters
-N_mode = 100
+N_mode = 200
 
 # Plotting params
 mons3=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
@@ -142,14 +142,14 @@ elif mconfig == "PIC_FULL":
 
 
 
-#%% Preprocess
+#%% Preprocess, EOF Analysis
 ntime,nlat,nlon = flxglob.shape
 
-#% SLP reshape and apply mask
+#% SLP reshape and apply mask ------------------------------------------------
 slpglob = slpglob.reshape(ntime,nlat,nlon) # [yr x mon x lat x lon] to [time lat lon]
 #slpglob *= msk[None,...]
 
-# Detrend
+# Detrend --------------------------------------------------------------------
 flxa,linmod,beta,intercept = proc.detrend_dim(flxglob,0)
 slpa,_,_,_ = proc.detrend_dim(slpglob,0)
 # Plot Spatial Map
@@ -158,8 +158,6 @@ if debug: # Appears to be positive into the ocean
     ax = viz.add_coast_grid(ax,bbox=bbox)
     pcm = ax.pcolormesh(lon,lat,flxglob[0,:,:],vmin=-500,vmax=500,cmap="RdBu_r")
     fig.colorbar(pcm,ax=ax)
-
-
 # Plot Detrending
 klon,klat = proc.find_latlon(lonf+360,latf,lon,lat)
 if debug: 
@@ -170,30 +168,34 @@ if debug:
     ax.scatter(t,flxa[:,latf,lonf],label="Detrended")
     ax.legend()
 
-# Apply Area Weight
+# Apply Area Weight (to region) ----------------------------------------------
 wgt = np.sqrt(np.cos(np.radians(lat)))
-#plt.plot(wgt)
-flxwgt = flxa * wgt[None,:,None]
-slpwgt = slpa * wgt[None,:,None]
 
-# Select region
+#plt.plot(wgt)
+
+flxwgt = flxa * wgt[None,:,None]
+#slpwgt = slpa * wgt[None,:,None] # Don't apply area-weight to regressed variable
+
+# Select region --------------------------------------------------------------
 flxreg,lonr,latr = proc.sel_region(flxwgt.transpose(2,1,0),lon,lat,bboxeof)
 nlonr,nlatr,_ = flxreg.shape
 flxreg = flxreg.transpose(2,1,0) # Back to time x lat x lon
 
-
-# Remove NaN Points [time x npts]
-flxwgt = flxwgt.reshape((ntime,nlat*nlon))
+# Remove NaN Points [time x npts] --------------------------------------------
+flxwgt = flxa.reshape((ntime,nlat*nlon)) # Dont use weighted variable
 okdata,knan,okpts = proc.find_nan(flxwgt,0)
 npts = okdata.shape[1]
-flxreg = flxreg.reshape((ntime,nlatr*nlonr)) # Repeat for region
+
+flxreg = flxreg.reshape((ntime,nlatr*nlonr)) # Use lat weights for EOF region
 okdatar,knanr,okptsr = proc.find_nan(flxreg,0)
 nptsr = okdatar.shape[1]
+
 nptsall = nlat*nlon
-slpwgt = slpwgt.reshape(ntime,nptsall) # Repeat for slp 
+#slpwgt = slpwgt.reshape(ntime,nptsall) # Repeat for slp 
+slpwgt = slpa.reshape(ntime,nptsall) # Repeat for slp 
 okslp  = slpwgt#[:,okpts]
 
-# Calculate Monthly Anomalies, change to [yr x mon x npts]
+# Calculate Monthly Anomalies, change to [yr x mon x npts] -------------------
 nyr = int(ntime/12)
 okdata = okdata.reshape((nyr,12,npts))
 okdata = okdata - okdata.mean(0)[None,:,:]
@@ -201,7 +203,7 @@ okdatar = okdatar.reshape((nyr,12,nptsr)) # Repeat for region
 okdatar = okdatar - okdatar.mean(0)[None,:,:]
 okslp = okslp.reshape((nyr,12,nptsall))
 
-# Prepare for eof anaylsis
+# Prepare for eof anaylsis ---------------------------------------------------
 eofall    = np.zeros((N_mode,12,nlat*nlon)) * np.nan
 eofslp    = eofall.copy()
 pcall     = np.zeros((N_mode,12,nyr)) * np.nan
@@ -240,7 +242,7 @@ for m in tqdm(range(12)):
     pcall[:,m,:] = pcs.T
     varexpall[:,m] = varexp
 
-# Flip longitude
+# Flip longitude ------------------------------------------------------------
 eofall = eofall.reshape(N_mode,12,nlat,nlon)
 eofall = eofall.transpose(3,2,1,0) # [lon x lat x mon x N]
 lon180,eofall = proc.lon360to180(lon,eofall.reshape(nlon,nlat,N_mode*12))
@@ -290,7 +292,7 @@ lat = ld['lat']
 
 #%%  Flip sign to match NAO+ (negative heat flux out of ocean/ -SLP over SPG)
 
-spgbox = [-60,20,40,80]
+spgbox     = [-60,20,40,80]
 N_modeplot = 5
 
 for N in tqdm(range(N_modeplot)):
@@ -312,13 +314,69 @@ for N in tqdm(range(N_modeplot)):
 
 #%% Save a select number of EOFs
 
-N_mode_choose = 30
+N_mode_choose = 1
 eofforce      = eofall.copy()
 eofforce      = eofforce.transpose(0,1,3,2) # lon x lat x pc x mon
 eofforce      = eofforce[:,:,:N_mode_choose,:]
 savenamefrc   = "%sflxeof_%ieofs_%s.npy" % (datpath,N_mode_choose,mcname)
 np.save(savenamefrc,eofforce)
 print("Saved data to "+savenamefrc)
+
+
+
+#%% Check how much variance is explained by each EOF
+
+#eofall.shape = (288, 192, 12, 200)
+#pcall.shape = (200, 12, 901)
+
+
+# Sum N number of modes
+nlon,nlat,_,_ = eofall.shape
+_,_,nyr = pcall.shape
+
+
+N_recon = 100
+#nhflx_recon = np.zeros((nlon,nlat,12,nyr,N_recon))
+nhflx_recon = np.zeros((nlon,nlat,12,nyr))
+for N in tqdm( range(N_recon)):
+    
+    # Get EOF and PC for corresponding mode
+    eofN = eofall[:,:,:,N] # lon x lat x month
+    pcN  = pcall[N,:,:] # month x time
+    
+    # Reconstruct the Net Heat Flux for that mode
+    #nhflx_recon[:,:,:,:,N] = eofN[...,None] * pcN[None,None,...]
+    nhflx_recon[:,:,:,:] += eofN[...,None] * pcN[None,None,...]
+    
+    
+
+
+# Quick preprocess slpa for comparison
+flxa *= msk[None,:,:]
+lon180,flx180 = proc.lon360to180(lon,flxa.transpose(2,1,0))
+flx180 = flx180.reshape(nlon,nlat,nyr,12).transpose(0,1,3,2) # lon x lat x mon x year
+
+
+# Now check the variance percentange
+lonf = -30
+latf = 50
+klon180,klat = proc.find_latlon(lonf,latf,lon180,lat)
+
+
+vrecon = np.var(nhflx_recon[klon180,klat,:,:,],1)
+vorig  = np.var(flx180[klon180,klat,:,:,],1)
+vratio =  vrecon/vorig
+
+plt.plot(vratio)
+
+# Reconstruct net heat flux by multiplying EOFs by PCs (might be a bit intensive...)
+#nhflx_reconstr = eofall[...,None] * pcall.transpose(1,0,2)[None,None,:,:,:]
+
+
+
+
+
+
 #%% Calculate/plot cumulative variance explained
 
 # Calculate cumulative variance at each EOF
@@ -350,26 +408,45 @@ plt.savefig("%s%s_NHFLX_EOFs%i_%s_ModevCumuVariance_bymon.png"%(outpath,mcname,N
 
 #%% Find index of variance threshold
 
-vthres  = 0.80
+vthres  = 0.90
 thresid = np.argmax(cvarall>vthres,axis=0)
-
+thresperc = []
 for i in range(12):
+    
     print("Before")
     print(cvarall[thresid[i]-1,i])
     print("After")
     print(cvarall[thresid[i],i])
+    
+    # Append percentage
+    thresperc.append(cvarall[thresid[i],i])
+thresperc = np.array(thresperc)
 
 
-ytk = np.arange(0,37,2)
+#ytk = np.arange(0,37,2)
 fig,ax = plt.subplots(1,1)
 ax.bar(mons3,thresid,color=[0.56,0.90,0.70],alpha=0.80)
 ax.set_title("Number of EOFs required \n to explain %i"%(vthres*100)+"% of the NHFLX variance")
-ax.set_yticks(ytk)
+#ax.set_yticks(ytk)
 ax.set_ylabel("# EOFs")
 ax.grid(True,ls='dotted')
+
+
+
+
 plt.savefig("%s%s_NHFLX_EOFs%i_%s_NumEOFs_%ipctvar_bymon.png"%(outpath,mcname,ArithmeticErrorN_mode,bboxtext,vthres*100),dpi=150)
 
 #%% Save outptut as forcing for stochastic model, variance based threshold
+
+
+# Calculate correction factor
+eofcorr  = True
+if eofcorr:
+    ampfactor = 1/thresperc
+else:
+    ampfactor = 1
+
+
 
 eofforce = eofall.copy() # [lon x lat x month x pc]
 cvartest = cvarall.copy()
@@ -381,7 +458,9 @@ for i in range(12):
     cvartest[stop_id+1:,i] = 0
 eofforce = eofforce.transpose(0,1,3,2) # [lon x lat x pc x mon]
 
-savenamefrc = "%sflxeof_%03ipct_%s.npy" % (datpath,vthres*100,mcname)
+eofforce *= ampfactor[None,None,None,:]
+
+savenamefrc = "%sflxeof_%03ipct_%s_eofcorr%i.npy" % (datpath,vthres*100,mcname,eofcorr)
 np.save(savenamefrc,eofforce)
 
 # Test plot maps

@@ -60,22 +60,6 @@ import scm
 # "allrandom" : Completely random in space or time
 # "uniform"   : Uniform in space, random in time
 
-
-
-
-
-#%% Inputs Required
-"""
-
-constants: dt, cp0, rho
-
-
-
-
-"""
-
-
-
 #%% Functions
 
 
@@ -519,11 +503,15 @@ output_path = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/
 limaskname = "limask180_FULL-HTR.npy" 
 
 # Model Params
+ampq       = True # Set to true to multiply stochastic forcing by a set value
 mconfig    = "SLAB_PIC"
-frcname    = "flxeof_25eofs_SLAB-PIC" #"uniform" "flxeof_5eofs_SLAB-PIC"
+frcname    = "flxeof_qek_50eofs_SLAB-PIC" #"uniform" "flxeof_5eofs_SLAB-PIC"
+#"flxeof_090pct_SLAB-PIC_eofcorr1"
+
 #"flxeof_5eofs_SLAB-PIC"
 #"flxeof_080pct_SLAB-PIC"
-runid      = "003"
+#flxeof_qek_50eofs_SLAB-PIC
+runid      = "005"
 pointmode  = 0 
 points     = [-30,50]
 bboxsim    = [-100,20,-20,90] # Simulation Box
@@ -594,8 +582,20 @@ for exp in range(3):
     # Convert to w/m2
     # ---------------
     lbd_a   = convert_Wm2(damping,h_in,dt)
-    F       = convert_Wm2(forcing,h_in,dt)
-
+    F       = convert_Wm2(forcing,h_in,dt) # [lon x lat x time]
+    
+    #
+    # If Option is set, amplitfy F to account for underestimation
+    # -----------------------------------------------------------
+    if ampq:
+        a        = 1-lbd_a
+        a        = 1-lbd_a.mean(2)[...,None]
+        underest = 2*a**2 / (1+a) # Var(Q) = underest*Var(q)
+        ntile = int(t_end/a.shape[2])
+        ampmult = np.tile(1/np.sqrt(underest),ntile)
+        F *= ampmult
+        
+    
     # Integrate Stochastic Model
     # --------------------------
     if exp < 2:
@@ -613,7 +613,6 @@ np.savez(expname,**{
     },allow_pickle=True)
 
 #%% Compare some results
-
 
 basemonth = 2
 kmonth   = basemonth - 1

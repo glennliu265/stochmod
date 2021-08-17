@@ -34,7 +34,7 @@ projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 datpath     = projpath + '01_Data/'
 input_path  = datpath + 'model_input/'
 output_path = datpath + 'model_output/'
-outpath     = projpath + '02_Figures/20210610/'
+outpath     = projpath + '02_Figures/20210722/'
 proc.makedir(outpath)
 
 # Load in control data for 50N 30W
@@ -57,14 +57,14 @@ config['mconfig']     = "SLAB_PIC" # Model Configuration
 config['ftype']       = "DJFM-MON" # Forcing Type
 config['genrand']     = 0          # Toggle to generate new random timeseries
 config['fstd']        = 1          # Set the standard deviation N(0,fstd)
-config['t_end']       = 120000     # Number of months in simulation
-config['runid']       = "syn001"   # White Noise ID
+config['t_end']       = 12000     # Number of months in simulation
+config['runid']       = "syn002"   # White Noise ID
 config['fname']       = "FLXSTD"   #['NAO','EAP,'EOF3','FLXSTD']
 config['pointmode']   = 1          # Set to 1 to generate a single point
 config['query']       = [-30,50]   # Point to run model at 
 config['applyfac']    = 2          # Apply Integration Factor and MLD to forcing
 config['lags']        = np.arange(0,37,1)
-config['output_path'] = projpath + '02_Figures/20210223/' # Note need to fix this
+config['output_path'] = projpath + '02_Figures/20210721/' # Note need to fix this
 config['smooth_forcing'] = False
 
 config.pop('Fpt',None)
@@ -168,6 +168,24 @@ Fptdef = Fpt.copy()
 
 sstall = sst
 
+#%%
+
+
+
+
+#%% OPTIONAL: Save inputs from clean run for comparison later
+
+savenames = "%scleanrun_%s_runid%s.npz" % (output_path,config['mconfig'],config['runid'])
+print("Saving clean run to %s" % savenames)
+np.savez(savenames,**{
+    'sst': sst,
+    'dmp': dmp,
+    'frc': frc,
+    'entr' : ent,
+    'Td': Td,
+    'kmonth':kmonth,
+    'params':params
+    }, allow_pickle=True)
 
 # ---------------------------------- ---------------------------
 # %% Load HADISST data for the point, calculate Autocorrelation

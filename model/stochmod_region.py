@@ -218,14 +218,29 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
             
         # # Load Longitude for processing
         # lon360 =  np.load(datpath+"CESM_lon360.npy")
-        if funiform == 2: # Load (NAO-NHFLX)_DJFM Forcing
+        elif funiform == 2: # Load (NAO-NHFLX)_DJFM Forcing
             
             # [lon x lat x pc]
-            naoforcing = np.load(input_path+mconfig+"_NAO_EAP_NHFLX_Forcing_DJFM.npy") #[PC x Ens x Lat x Lon]
+            naoforcing = np.load(input_path+mconfig+"_NAO_EAP_NHFLX_Forcing_DJFM.npy") #[lon x lat x pc]
+            #HTR DATA .. [PC x Ens x Lat x Lon]
             
             # Select PC1 # [lon x lat x 1]
             NAO1 = naoforcing[:,:,[0]]
-                
+            
+        elif funiform ==2.5:
+            
+            # Load djfm reddit
+            naoforcing = np.load(input_path+mconfig+"_NAO_EAP_NHFLX_Forcing_DJFM.npy")[:,:,0] #[lon x lat x pc]
+            
+            # Make into a sign
+            naosign = np.sign(naoforcing)
+            
+            # Next, load the amplitude - based forcing
+            NAO1 = np.load(input_path+mconfig+"_NHFLXSTD_Forcing_Mon.npy")
+            
+            # Apply sign
+            NAO1 *= naosign[:,:,None]
+            
         elif funiform == 3: # NAO (DJFM) regressed to monthly NHFLX
             
             # [lon x lat x pc x mon]
@@ -249,7 +264,7 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
             
             # Select PC1 Take ensemble average
             NAO1 = naoforcing[:,:,:,:,0].mean(0)
-        
+            
         elif funiform == 5: # EAP (DJFM) ONLY
             
             # [lon x lat x pc]
@@ -285,7 +300,6 @@ def stochmod_region(pointmode,funiform,fscale,runid,genrand,nyr,fstd,bboxsim,sto
             
             # Calculated from calc-NAO_PIC_monhtly.py.... Fixed NAO Pattern
             naoforcing = np.load(input_path+mconfig+"_NAO_EAP_NHFLX_Forcing_DJFM-MON_Fix.npy") # New file, magnitude does not vary at each point
-            
             
             # Select PC 1 and 2 # [lon x lat x 2 x mon]
             NAO1 = naoforcing[:,:,[0,1],:]

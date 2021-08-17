@@ -64,8 +64,6 @@ rflx = mat3['rho']
 mat4 = loadmat("%sSST_rho_ensorem1_monwin%i.mat"% (datpath,monwin))
 rsst = mat4['rsst']
 
-
-
 #%% Compute DOF stuff
 
 ptilde    = 1-p/tails
@@ -103,7 +101,7 @@ elif mode == 4:
 if len(lags) > 1:
     lagidx = np.array(lags)-1
 else:
-    lagidx = 0
+    lagidx = [0]
 
 # Apply Mask
 dampmasked = damping * mall
@@ -120,7 +118,7 @@ if save_allens == 1:
                        dims  ={ 'lat':lat, 'lon':lon,  'month':np.arange(1,13,1),'ensemble':np.arange(1,43,1) },
                        name="NHFLX_Damping"
                        )
-    da.to_netcdf(datpath+"allens_nhflxdamping_monwin3_sig020_dof082_mode4.nc")
+    da.to_netcdf(datpath+"allens_nhflxdamping_monwin3_sig020_dof082_mode4_lag1.nc")
     
 
 

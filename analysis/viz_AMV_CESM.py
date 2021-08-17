@@ -35,7 +35,7 @@ import yo_box as ybx
 #%% User Edits
 
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
-outpath = projpath + '02_Figures/20210726/'
+outpath = projpath + '02_Figures/20210810/'
 proc.makedir(outpath)
 
 datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/"
@@ -225,8 +225,10 @@ plt.savefig(outpath+"CESM1-SLAB_AMV_Spatial_Pattern.png",bbox_inches='tight')
 
 #%% Plot AMV but in a different style (7/26/2021 AMV Project Meeting)
 
-cint = np.arange(-.30,.33,.03)
-cl_int = np.arange(-.30,.4,.1)
+#cint = np.arange(-.30,.33,.03)
+#cl_int = np.arange(-.30,.4,.1)
+cint   = np.arange(-0.45,0.50,0.05) # Used this for 8/10/2021 Meeting
+cl_int = np.arange(-0.45,0.50,0.05)
 bboxplot = [-100,20,0,80]
 lon = lon180
 modelnames = ["CESM-FULL","CESM-SLAB"]
