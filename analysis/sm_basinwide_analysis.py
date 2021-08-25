@@ -25,7 +25,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20210818/"
+    figpath     = projpath + "02_Figures/20210824/"
     
     lipath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/landicemask_enssum.npy"
     
@@ -87,6 +87,26 @@ excolors = ["blue",
             "orange",
             "magenta"]
 exoutnameraw = "90pctvariance_qamp_comparison"
+
+
+## Examine effect of using amp across 2 different types of foring
+expids = ["stoch_output_forcingflxstd_SLAB-PIC_1000yr_run006_ampq0.npz",
+          "stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run006_ampq0.npz",
+          "stoch_output_forcingflxstd_SLAB-PIC_1000yr_run006_ampq1.npz",
+          "stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run006_ampq1.npz"]
+
+exnames = ["var(Q) forcing",
+           "EOF-based forcing",
+           "var(Q) forcing (qcorr)",
+           "EOF-based forcing(qcorr)"]
+           # "with q-corr (monthly)",
+          
+excolors = ["cyan",
+            "blue",
+            "magenta",
+            "orange"]
+            #"magenta"]
+exoutnameraw = "old_vs_eof_fullcomparison"
 #%% Settings Part 2
 
 # Experiment information
@@ -126,11 +146,13 @@ mons3       = ('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov'
 
 st   = time.time()
 ssts = scm.load_cesm_pt(cpath)
-
+Qs = []
 for i in tqdm(range(len(expids))):
     ld  = np.load(datpath+expids[i])
     sst = ld['sst']
+    Q   = ld['Q']
     ssts.append(sst[model,...])
+    Qs.append(Q)
 
 print("Loaded data in %.2fs"%(time.time()-st))
 
@@ -169,12 +191,13 @@ for i in tqdm(range(2)):
 
 #%% Examine the variance ratio between both locations
 
-
-
 sstvar = []
 for i in range(len(ssts)):
     sstvar.append(ssts[i].var(2))
-    
+
+Qvar = []
+for i in np.arange(2,len(sstvar)):
+    Qvar.append(Qs[i-2].var(2))
     
 #%% Plot the difference in variance (all three)
 
@@ -183,12 +206,10 @@ bboxplot = [-90,0,0,75]
 vlm = [0,2]
 clvl = np.arange(vlm[0],vlm[-1]+.05,0.05)
 clab = np.arange(vlm[0],vlm[-1]+0.1,0.1)
-
-
 fig,axs = plt.subplots(1,3,figsize=(12,4),subplot_kw={'projection':ccrs.PlateCarree()})
 
-
 for expid in range(len(exnames)):
+    
     ax = axs.flatten()[expid]
     ax = viz.add_coast_grid(ax,bbox=bboxplot)
     
@@ -205,15 +226,72 @@ for expid in range(len(exnames)):
     fig.colorbar(pcm,ax=ax)
     ax.set_title("Ratio of SST Variance \n (%s/%s)" % (enames[expid+2],comparename))
 plt.savefig("%s%s_VarianceRatio_expnum%i.png" % (figpath,exoutname,expid),bbox_inches='tight',dpi=200)
+
+
+#%% Plot the ratio of Qnet (corrected and uncorrected)
+# OR plot the ratio of SST
+
+
+# vlm  = [0,2]
+# clvl = np.arange(vlm[0],vlm[-1]+.05,0.05)
+# clab = np.arange(vlm[0],vlm[-1]+0.1,0.1)
+plot_sstvar = True
+
+plotnum = 0
+
+bboxplot = [-90,0,0,75]
+
+vlm = [0,2]
+clvl = np.arange(vlm[0],vlm[-1]+.05,0.05)
+clab = np.arange(vlm[0],vlm[-1]+0.1,0.1)
+
+#clvl = np.arange(vlm[0],vlm[-1]+.05,0.05)
+#clab = np.arange(vlm[0],vlm[-1]+0.1,0.1)
+
+fig,ax = plt.subplots(1,1,figsize=(12,4),subplot_kw={'projection':ccrs.PlateCarree()})
+
+ax = viz.add_coast_grid(ax,bbox=bboxplot)
+
+if plotnum == 0: #var(Q)-based
+    comparename = "%s"%(enames[2])
+    if plot_sstvar:
+        comparison = sstvar[2]/sstvar[4]
+    else:
+        comparison  = Qvar[0]/Qvar[2]
+    
+else: # EOF-based
+    comparename = "%s"%(enames[3])
+    if plot_sstvar:
+        comparison = sstvar[3]/sstvar[5]
+    else:
+        comparison = Qvar[1]/Qvar[3]
+
+#pcm = ax.pcolormesh(lonr,latr,(sstvar[expid+2]/comparison).T,vmin=vlm[0],vmax=vlm[-1],cmap="RdBu_r")
+#pcm = ax.pcolormesh(lonr,latr,comparison.T,cmap="RdBu_r")
+pcm = ax.contourf(lonr,latr,comparison.T,levels=clvl,cmap="RdBu_r")
+cl = ax.contour(lonr,latr,comparison.T,levels=clab,colors="k",linewidths=0.75)
+ax.clabel(cl)
+fig.colorbar(pcm,ax=ax,pad=0.01)
+if plot_sstvar:
+    ax.set_title("Ratio of $SST_{no q-corr}/SST_{q-corr}$ \n (%s)" % (comparename))
+    plt.savefig("%s%s_expnum%i_sstratio_plotnum%s.png" % (figpath,exoutname,expid,plotnum),bbox_inches='tight',dpi=200)
+else:
+    ax.set_title("Ratio of $Q_{uncorrected}/Q_{corrected}$ \n (%s)" % (comparename))
+    plt.savefig("%s%s_expnum%i_Qratio_plotnum%s.png" % (figpath,exoutname,expid,plotnum),bbox_inches='tight',dpi=200)
+
+
 #%%
 
-
-expid = 2
+#expid = 
 
 bboxplot = [-90,0,0,75]
 #vlm = [.90,1.10]
 #vlm = [0.5,1.5]
+#vlm = [-1,3]
 vlm = [-1,3]
+clvl = np.arange(vlm[0],vlm[-1]+.05,0.05)
+clab = np.arange(vlm[0],vlm[-1]+0.1,0.1)
+
 #clvl = np.arange(vlm[0],vlm[-1]+.05,0.05)
 #clab = np.arange(vlm[0],vlm[-1]+0.1,0.1)
 
@@ -227,11 +305,15 @@ if model < 1: # Non-entraining, compare with CESM-SLAB
 else: # entraining, compare with CESM-FULL
     comparison = sstvar[0]
     comparename = enames[0]
+
+
+    
+
 pcm = ax.pcolormesh(lonr,latr,(sstvar[expid+2]/comparison).T,vmin=vlm[0],vmax=vlm[-1],cmap="RdBu_r")
-#pcm = ax.contourf(lonr,latr,(sstvar[expid+2]/comparison).T,levels=clvl,cmap="RdBu_r")
-#cl = ax.contour(lonr,latr,(sstvar[expid+2]/comparison).T,levels=clab,colors="k",linewidths=0.75)
+pcm = ax.contourf(lonr,latr,(sstvar[expid+2]/comparison).T,levels=clvl,cmap="RdBu_r")
+cl = ax.contour(lonr,latr,(sstvar[expid+2]/comparison).T,levels=clab,colors="k",linewidths=0.75)
 ax.clabel(cl)
-fig.colorbar(pcm,ax=ax)
+fig.colorbar(pcm,ax=ax,pad=0.01)
 ax.set_title("Ratio of SST Variance \n (%s/%s)" % (enames[expid+2],comparename))
 
 plt.savefig("%s%s_expnum%i.png" % (figpath,exoutname,expid),bbox_inches='tight',dpi=200)
