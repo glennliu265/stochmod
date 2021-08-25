@@ -13,6 +13,7 @@ Takes output of sm_rewrite.py and visualizes some relevant quantities at a given
 @author: gliu
 
 """
+
 import numpy as np
 import cartopy.crs as ccrs
 import matplotlib.pyplot as plt
@@ -29,7 +30,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20210810/"
+    figpath     = projpath + "02_Figures/20210824/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -63,32 +64,69 @@ import tbx
 #exoutnameraw = "Q-ek_comparison_50EOF"
 
 ## Compare before/after correctio,n and inclusion of Amp
-expids = ["stoch_output_forcingflxeof_50eofs_SLAB-PIC_1000yr_run003.npz",
-          "stoch_output_forcingflxeof_50eofs_SLAB-PIC_1000yr_run005.npz",
-          "stoch_output_forcingflxeof_50eofs_SLAB-PIC_1000yr_run004.npz",
-          "stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run006.npz"
-          ]
-exnames = ["Before (Incl. Lat-weight)",
-           "After (no q-corr)",
-           "After (with q-corr)",
-           "90% Variance Threshold (no-qcorr)"]
-excolors = ["blue",
-            "orange",
-            "magenta",
-            "red"]
-exoutnameraw = "latweightfix_qamp_comparison_50EOF"
+# expids = ["stoch_output_forcingflxeof_50eofs_SLAB-PIC_1000yr_run003.npz",
+#           "stoch_output_forcingflxeof_50eofs_SLAB-PIC_1000yr_run005.npz",
+#           "stoch_output_forcingflxeof_50eofs_SLAB-PIC_1000yr_run004.npz",
+#           "stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run006.npz",
+#           "stoch_output_forcingflxeof_qek_50eofs_SLAB-PIC_1000yr_run005.npz"
+#           ]
+# exnames = ["Before (Incl. Lat-weight)",
+#            "After (no q-corr)",
+#            "After (with q-corr)",
+#            "90% Variance Threshold (no-qcorr)",
+#            "After (with q-corr and q_ek)"]
+# excolors = ["blue",
+#             "orange",
+#             "magenta",
+#             "red",
+#             "cyan"]
+# exoutnameraw = "latweightfix_qamp_comparison_50EOF"
 
-## Examine zffect of including AMP using variance-based threshold
-expids = ["stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run006.npz",
-          "stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run004.npz",
-          "stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run007.npz"]
+# ## Examine zffect of including AMP using variance-based threshold
+expids = ["stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run006_ampq0.npz",
+          "stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run006_ampq1.npz"]
+         # "stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run007.npz",]
 exnames = ["no q-corr",
-           "with q-corr (monthly)",
-           "with q-corr (avg)"]
+            "with q-corr (avg)"]
+           # "with q-corr (monthly)",
+          
 excolors = ["blue",
-            "orange",
-            "magenta"]
+            "orange"]
+            #"magenta"]
 exoutnameraw = "90pctvariance_qamp_comparison"
+
+
+# ## Examine q-var vs eof-based forcing
+expids = ["stoch_output_forcingflxstd_SLAB-PIC_1000yr_run006_ampq1.npz",
+          "stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run006_ampq1.npz"]
+exnames = ["var(Q) forcing",
+           "EOF-based forcing"]
+           # "with q-corr (monthly)",
+          
+excolors = ["magenta",
+            "orange"]
+            #"magenta"]
+exoutnameraw = "old_vs_eof_comparison"
+
+
+# ## Examine q-var vs eof-based forcing
+expids = ["stoch_output_forcingflxstd_SLAB-PIC_1000yr_run006_ampq0.npz",
+          "stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run006_ampq0.npz",
+          "stoch_output_forcingflxstd_SLAB-PIC_1000yr_run006_ampq1.npz",
+          "stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run006_ampq1.npz"]
+
+exnames = ["var(Q) forcing",
+           "EOF-based forcing",
+           "var(Q) forcing (qcorr)",
+           "EOF-based forcing(qcorr)"]
+           # "with q-corr (monthly)",
+          
+excolors = ["cyan",
+            "blue",
+            "magenta",
+            "orange"]
+            #"magenta"]
+exoutnameraw = "old_vs_eof_fullcomparison"
 #%% Settings Part 2
 # CESM Names
 cnames    = ["CESM-FULL","CESM-SLAB",]
@@ -129,10 +167,11 @@ mons3       = ('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov'
 
 st   = time.time()
 ssts = scm.load_cesm_pt(cpath,grabpoint=[lonf,latf])
-
+Qs = []
 for i in tqdm(range(len(expids))):
     ld  = np.load(datpath+expids[i])
     sst = ld['sst']
+    Qs.append(ld['Q'])
     ssts.append(sst[model,klonr,klatr,:])
 
 print("Loaded data in %.2fs"%(time.time()-st))
@@ -170,8 +209,10 @@ fig,ax     = plt.subplots(1,1,figsize=(6,4))
 title      = "SST Autocorrelation (Lag 0 = %s)" % (mons3[kmonth])
 ax,ax2 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title)
 for i in range(len(enames)):
+    ax.fill_between(lags,cfac[i,:,0],cfac[i,:,1],color=ecolors[i],alpha=0.10)
+for i in range(len(enames)):
     ax.plot(lags,acs[i],label=enames[i],color=ecolors[i])
-    ax.fill_between(lags,cfac[i,:,0],cfac[i,:,1],color=ecolors[i],alpha=0.15)
+    
 ax.legend()
 ax.legend(fontsize=10)
 plt.tight_layout()
@@ -354,7 +395,7 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 # Parameter Choices
 # -----------------
 pct      = 0.10
-nsmooth  = 10
+nsmooth  = 25
 plotdt   = 365*3600*24 # Annual Intervals
 plotconf = True
 specname = "nsmooth%i_taper%03i" % (nsmooth,pct*100)
@@ -372,7 +413,8 @@ xlm      = [5e-3,5]
 fig,ax = plt.subplots(1,1,figsize=(6,4))
 # Plot spectra
 for m in range(len(enames)):
-    ax.plot(freqs[m]*plotdt,specs[m]/plotdt,color=ecolors[m],label=enames[m])
+    ln_lb = "%s (%.3f $\degree C$)" % (enames[m],np.var(ssts[m]))
+    ax.plot(freqs[m]*plotdt,specs[m]/plotdt,color=ecolors[m],label=ln_lb)
     if plotconf:
          ax.plot(freqs[m]*plotdt,CCs[m][:,1]/plotdt,label="",color=ecolors[m],ls="dashed")
 # Set Labels
@@ -400,7 +442,8 @@ xlm      = [0,0.2]
 fig,ax = plt.subplots(1,1,figsize=(6,4))
 # Plot spectra
 for m in range(len(enames)):
-    ax.plot(freqs[m]*plotdt,specs[m]/plotdt,color=ecolors[m],label=enames[m])
+    ln_lb = "%s (%.3f $\degree C$)" % (enames[m],np.var(ssts[m]))
+    ax.plot(freqs[m]*plotdt,specs[m]/plotdt,color=ecolors[m],label=ln_lb)
 
     if plotconf:
          ax.plot(freqs[m]*plotdt,CCs[m][:,1]/plotdt,label="",color=ecolors[m],ls="dashed")
@@ -433,7 +476,8 @@ xlm    = [5e-4,6]
 fig,ax = plt.subplots(1,1,figsize=(6,4))
 # Plot spectra
 for m in range(len(enames)):
-    ax.semilogx(freqs[m]*plotdt,specs[m]*freqs[m],color=ecolors[m],label=enames[m])
+    ln_lb = "%s (%.3f $\degree C$)" % (enames[m],np.var(ssts[m]))
+    ax.semilogx(freqs[m]*plotdt,specs[m]*freqs[m],color=ecolors[m],label=ln_lb)
 
     if plotconf:
          ax.semilogx(freqs[m]*plotdt,CCs[m][:,1]*freqs[m],label="",color=ecolors[m],ls="dashed")
@@ -451,7 +495,7 @@ htax.set_xticklabels(xtkl)
 # Set axis limits
 ax.set_xlim(xlm)
 htax.set_xlim(xlm)  
-ax.legend(fontsize=10,ncol=2)
+ax.legend(fontsize=10,ncol=1)
 ax.set_title("SST Spectra for %s Stochastic Model (%s) \n smoothing = %i bands, taper = %03i " % (modelnames[model],locstring,nsmooth,pct*100),fontsize=14)
 savename = "%sSST_Spectra_Smoothingtest_%s_freqxpower_log-lin_%s.png" % (figpath,exoutname,specname)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
@@ -464,7 +508,8 @@ xlm    = [5e-4,10]
 fig,ax = plt.subplots(1,1,figsize=(6,4))
 # Plot spectra
 for m in range(len(enames)):
-    ax.loglog(freqs[m]*plotdt,specs[m]/plotdt,color=ecolors[m],label=enames[m])
+    ln_lb = "%s (%.3f $\degree C$)" % (enames[m],np.var(ssts[m]))
+    ax.loglog(freqs[m]*plotdt,specs[m]/plotdt,color=ecolors[m],label=ln_lb)
 
     if plotconf:
          ax.loglog(freqs[m]*plotdt,CCs[m][:,1]/plotdt,label="",color=ecolors[m],ls="dashed")
