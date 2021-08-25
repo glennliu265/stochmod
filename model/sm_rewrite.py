@@ -68,6 +68,7 @@ import scm
 def convert_Wm2(invar,h,dt,cp0=3996,rho=1026,verbose=True):
     """
     outvar = convert_Wm2(invar,h,dt,cp0=3996,rho=1026,verbose=True)
+    
     Converts an input array [LON x LAT x TIME] from W/m2 to 1/time
     by multiplying by dt/(rho*cp0*h).
     If input is not 3D, appends dimensions to the front and assumes
@@ -370,6 +371,35 @@ def calc_beta(h):
     beta[beta<0] = 0 # Set non-entraining months to zero
     return beta
 
+def integrate_Q(lbd,F,T,mld,cp0=3996,rho=1026,dt=3600*24*30,debug=False):
+    """
+    Q = integrate_Q(lbd,F,T)\
+        
+        
+    lbd is in 1/mon
+    F is in 1/mon
+    T is in degC
+    
+    Integrate the heat flux applied to the stochastic model, and calculate the ratio
+    
+    """
+    nlon,nlat,ntime = F.shape
+    mld_in = np.tile(mld,int(ntime/12))
+    
+    lbd_ori_units = np.tile(lbd,int(ntime/12))*(rho*cp0*mld_in)/dt # convert back to W/m2 per degC
+    q_ori_units   = F*(rho*cp0*mld_in)/dt # convert back to W/m2
+    
+    
+    Q           = np.zeros((nlon,nlat,ntime)) * np.nan
+    q           = Q.copy()
+    lbdT        = Q.copy()
+    for t in tqdm.tqdm(range(ntime)):
+        q[:,:,t]    = q_ori_units[:,:,t]
+        lbdT[:,:,t] = -lbd_ori_units[:,:,t]*T[:,:,t]
+        Q[:,:,t]    = q[:,:,t] + lbdT[:,:,t]
+    if debug:
+        return Q,q,lbdT
+    return Q
 
 def integrate_noentrain(lbd,F,T0=0,multFAC=True,debug=False):
     """
@@ -505,13 +535,15 @@ limaskname = "limask180_FULL-HTR.npy"
 # Model Params
 ampq       = True # Set to true to multiply stochastic forcing by a set value
 mconfig    = "SLAB_PIC"
-frcname    = "flxeof_qek_50eofs_SLAB-PIC" #"uniform" "flxeof_5eofs_SLAB-PIC"
-#"flxeof_090pct_SLAB-PIC_eofcorr1"
+frcname    = "flxeof_q-ek_090pct_SLAB-PIC_eofcorr1" #"flxeof_090pct_SLAB-PIC_eofcorr1"
 
+#"flxeof_qek_50eofs_SLAB-PIC" #"uniform" "flxeof_5eofs_SLAB-PIC"
+#"flxeof_090pct_SLAB-PIC_eofcorr1"
 #"flxeof_5eofs_SLAB-PIC"
 #"flxeof_080pct_SLAB-PIC"
 #flxeof_qek_50eofs_SLAB-PIC
-runid      = "005"
+
+runid      = "009"
 pointmode  = 0 
 points     = [-30,50]
 bboxsim    = [-100,20,-20,90] # Simulation Box
@@ -522,7 +554,7 @@ dt         = 3600*24*30 # Timestep
 T0         = 0 # Init Temp
 
 
-expname    = "%sstoch_output_forcing%s_%iyr_run%s.npz" % (output_path,frcname,int(t_end/12),runid) 
+expname    = "%sstoch_output_forcing%s_%iyr_run%s_ampq%i.npz" % (output_path,frcname,int(t_end/12),runid,ampq) 
 
 lonf = -30
 latf = 50
@@ -594,7 +626,6 @@ for exp in range(3):
         ntile = int(t_end/a.shape[2])
         ampmult = np.tile(1/np.sqrt(underest),ntile)
         F *= ampmult
-        
     
     # Integrate Stochastic Model
     # --------------------------
@@ -605,11 +636,18 @@ for exp in range(3):
     
     T_all.append(T)
     
+    if exp==0:
+        Q,q,lbdT = integrate_Q(lbd_a,F,T,h_in,debug=True)
+        
+    
 # Save the results
 np.savez(expname,**{
     'sst': T_all,
     'lon' : lonr,
-    'lat' : latr
+    'lat' : latr,
+    'Q': Q,
+    'q':q,
+    'lbdT':lbdT
     },allow_pickle=True)
 
 #%% Compare some results
