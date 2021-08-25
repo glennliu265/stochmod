@@ -22,7 +22,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20210726/"
+    figpath     = projpath + "02_Figures/20210824/"
    
     lipath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/landicemask_enssum.npy"
     
@@ -197,16 +197,17 @@ N_mode = 200
 
 
 # Load the PCs
-ld = np.load("%sNHFLX_FULL-PIC_%sEOFsPCs_lon260to20_lat0to65.npz" % (rawpath,N_mode),allow_pickle=True)
-pcall = ld['pcall'] # [PC x MON x TIME]
+ld     = np.load("%sNHFLX_FULL-PIC_%sEOFsPCs_lon260to20_lat0to65.npz" % (rawpath,N_mode),allow_pickle=True)
+pcall  = ld['pcall'] # [PC x MON x TIME]
 eofall = ld['eofall']
 eofslp = ld['eofslp']
+varexpall = ld['varexpall']
 
 # Load each wind stress component [yr mon lat lon]
-st = time.time()
-dsx = xr.open_dataset(rawpath+"../CESM_proc/TAUX_PIC_FULL.nc")
+st   = time.time()
+dsx  = xr.open_dataset(rawpath+"../CESM_proc/TAUX_PIC_FULL.nc")
 taux = dsx.TAUX.values
-dsx = xr.open_dataset(rawpath+"../CESM_proc/TAUY_PIC_FULL.nc")
+dsx  = xr.open_dataset(rawpath+"../CESM_proc/TAUY_PIC_FULL.nc")
 tauy = dsx.TAUY.values
 print("Loaded wind stress data in %.2fs"%(time.time()-st))
 
@@ -330,7 +331,7 @@ np.savez(savename,**{
 #%% Individual monthly wind stress plots for EOF N
 
 im = 9
-N  = 1
+N  = 0
 scaler   =    .75 # # of data units per arrow
 bboxplot = [-100,20,0,80]
 labeltau = 0.10
@@ -388,7 +389,7 @@ for i in range(4):
 fig.colorbar(pcm,ax=axs.ravel().tolist(),orientation='vertical',shrink=0.35,pad=0.01)
 plt.suptitle("Seasonal Averages for EOF %i of $Q_{net}$ (colors), $SLP$ (contours), and Wind Stress (quivers)" % (N+1),y=0.74)
 savename = "%sCESM_FULL-PIC_WindStressMap_EOF%02i_seasonal.png" %(figpath,N+1)   
-plt.savefig(savename,dpi=150,bbox_tight='inches')
+plt.savefig(savename,dpi=150,bbox_inches='itight')
 
 
 
@@ -470,12 +471,10 @@ fig.colorbar(pcm,ax=ax)
 
 #%% Visualize ekman advection
 
-
-
 # Option
 #im = 0 # Month Index (for debugging)
 N  = 0 # Mode Index
-viz_tau  = False # True: Include wind stress quivers
+viz_tau      = False # True: Include wind stress quivers
 contour_temp = True # True: contour SST ... False: contour q_ek
 
 # U_ek quiver options
@@ -577,6 +576,70 @@ eofforce      = eofforce[:,:,:N_mode_choose,:]
 savenamefrc   = "%sflxeof_qek_%ieofs_%s.npy" % (rawpath,N_mode_choose,mcname)
 np.save(savenamefrc,eofforce)
 print("Saved data to "+savenamefrc)
+
+
+#%% Calculate cumulative variance explained
+
+# Calculate cumulative variance at each EOF
+cvarall = np.zeros(varexpall.shape)
+for i in range(N_mode):
+    cvarall[i,:] = varexpall[:i+1,:].sum(0)
+
+
+modes = np.arange(1,201,1)
+fig,ax = plt.subplots(1,1)
+ax.bar(mons3,thresid,color=[0.56,0.90,0.70],alpha=0.80)
+ax.set_title("Number of EOFs required \n to explain %i"%(vthres*100)+"% of the NHFLX variance")
+#ax.set_yticks(ytk)
+ax.set_ylabel("# EOFs")
+ax.grid(True,ls='dotted')
+
+plt.savefig("%s%s_NHFLX_EOFs%i_%s_NumEOFs_%ipctvar_bymon.png"%(outpath,mcname,N_mode,bboxtext,vthres*100),dpi=150)
+
+#%% Find index of variance threshold
+
+vthres  = 0.90
+thresid = np.argmax(cvarall>vthres,axis=0)
+thresperc = []
+for i in range(12):
+    
+    print("Before")
+    print(cvarall[thresid[i]-1,i])
+    print("After")
+    print(cvarall[thresid[i],i])
+    
+    # Append percentage
+    thresperc.append(cvarall[thresid[i],i])
+thresperc = np.array(thresperc)
+
+#%%
+
+# Calculate correction factor
+eofcorr  = True
+if eofcorr:
+    ampfactor = 1/thresperc
+else:
+    ampfactor = 1
+
+eofforce = q_comb.copy() # [lon x lat x month x pc]
+cvartest = cvarall.copy()
+for i in range(12):
+    # Set all points after crossing the variance threshold to zero
+    stop_id = thresid[i]
+    print("Variance of %f  at EOF %i for Month %i "% (cvarall[stop_id,i],stop_id+1,i+1))
+    eofforce[:,:,i,stop_id+1:] = 0
+    cvartest[stop_id+1:,i] = 0
+eofforce = eofforce.transpose(0,1,3,2) # [lon x lat x pc x mon]
+
+if eofcorr:
+    eofforce *= ampfactor[None,None,None,:]
+
+# Cut to maximum EOF
+nmax = thresid.max()
+eofforce = eofforce[:,:,:nmax+1,:]
+
+savenamefrc = "%sflxeof_q-ek_%03ipct_%s_eofcorr%i.npy" % (datpath,vthres*100,"SLAB-PIC",eofcorr)
+np.save(savenamefrc,eofforce)
 
 
 #%% Load data again (optional) and save just the EOFs for a given season
