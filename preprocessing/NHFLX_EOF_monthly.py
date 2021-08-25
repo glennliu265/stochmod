@@ -38,7 +38,7 @@ elif stormtrack == 0:
     
     datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/"
     #datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/"
-    outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20210804/"
+    outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20210824/"
 
     lipath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/landicemask_enssum.npy"
     #llpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/"
@@ -312,15 +312,7 @@ for N in tqdm(range(N_modeplot)):
 
 
 
-#%% Save a select number of EOFs
 
-N_mode_choose = 1
-eofforce      = eofall.copy()
-eofforce      = eofforce.transpose(0,1,3,2) # lon x lat x pc x mon
-eofforce      = eofforce[:,:,:N_mode_choose,:]
-savenamefrc   = "%sflxeof_%ieofs_%s.npy" % (datpath,N_mode_choose,mcname)
-np.save(savenamefrc,eofforce)
-print("Saved data to "+savenamefrc)
 
 
 
@@ -405,6 +397,25 @@ ax.set_xlim([1,N_modeplot])
 #ax.set_xticks(xtk)
 plt.savefig("%s%s_NHFLX_EOFs%i_%s_ModevCumuVariance_bymon.png"%(outpath,mcname,N_modeplot,bboxtext),dpi=150)
 
+#%% Save a select number of EOFs
+eofcorr = 1
+
+
+N_mode_choose = 50
+
+# # Prepare correction based on variance explained
+# cvar_expl = cvarall[N_mode_choose,:]
+# if eofcorr:
+#     ampfactor = 1/cvar_exp
+# else:
+#     ampfactor = 1
+
+eofforce      = eofall.copy()
+eofforce      = eofforce.transpose(0,1,3,2) # lon x lat x pc x mon
+eofforce      = eofforce[:,:,:N_mode_choose,:]
+savenamefrc   = "%sflxeof_%ieofs_%s.npy" % (datpath,N_mode_choose,mcname)
+np.save(savenamefrc,eofforce)
+print("Saved data to "+savenamefrc)
 
 #%% Find index of variance threshold
 
@@ -431,21 +442,17 @@ ax.set_title("Number of EOFs required \n to explain %i"%(vthres*100)+"% of the N
 ax.set_ylabel("# EOFs")
 ax.grid(True,ls='dotted')
 
-
-
-
-plt.savefig("%s%s_NHFLX_EOFs%i_%s_NumEOFs_%ipctvar_bymon.png"%(outpath,mcname,ArithmeticErrorN_mode,bboxtext,vthres*100),dpi=150)
+plt.savefig("%s%s_NHFLX_EOFs%i_%s_NumEOFs_%ipctvar_bymon.png"%(outpath,mcname,N_mode,bboxtext,vthres*100),dpi=150)
 
 #%% Save outptut as forcing for stochastic model, variance based threshold
 
 
 # Calculate correction factor
-eofcorr  = True
+eofcorr  = False
 if eofcorr:
     ampfactor = 1/thresperc
 else:
     ampfactor = 1
-
 
 
 eofforce = eofall.copy() # [lon x lat x month x pc]
@@ -458,7 +465,8 @@ for i in range(12):
     cvartest[stop_id+1:,i] = 0
 eofforce = eofforce.transpose(0,1,3,2) # [lon x lat x pc x mon]
 
-eofforce *= ampfactor[None,None,None,:]
+if eofcorr:
+    eofforce *= ampfactor[None,None,None,:]
 
 # Cut to maximum EOF
 nmax = thresid.max()
