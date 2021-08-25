@@ -23,7 +23,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20210810/"
+    figpath     = projpath + "02_Figures/20210824/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -49,22 +49,59 @@ lags = np.arange(0,37,1)
 # Options to determine the experiment ID
 mconfig   = "SLAB_PIC"
 nyrs      = 1000        # Number of years to integrate over
-runid     = "003"
+runid     = "006"
 
 # Analysis (7/26/2021, comparing 80% variance threshold and 5 or 3 EOFs)
 #fnames      = ["flxeof_080pct_SLAB-PIC","flxeof_5eofs_SLAB-PIC","flxeof_3eofs_SLAB-PIC"]
 #frcnamelong = ("80% Variance Threshold","5 EOFs","3 EOFs")
 
 # Analysis: Trying different number of EOFs
-neofs       = [1,2,50]#[1,2,3,5,10,25,50]
+#neofs       = [1,2,50]#[1,2,3,5,10,25,50]
+neofs = [90]
 #fnames      = ["flxeof_qek_%ieofs_SLAB-PIC" % x for x in neofs]
-fnames      = ["flxeof_qek_%ieofs_SLAB-PIC_JJA" % x for x in neofs]
+#fnames      = ["flxeof_qek_%ieofs_SLAB-PIC_JJA" % x for x in neofs]
+#fnames = ["flxeof_090pct_SLAB-PIC_eofcorr1"]
+fnames = ["forcingflxeof_qek_50eofs_SLAB-PIC_1000yr_run005",
+          "forcingflxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run007",
+          "forcingflxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run004",
+          "forcingflxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run006"
+          ]
+
+
+# ## Compare types of forcing and effect of applying ampq
+fnames = ["forcingflxstd_SLAB-PIC_1000yr_run006_ampq0",
+          "forcingflxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run006_ampq0",
+          "forcingflxstd_SLAB-PIC_1000yr_run006_ampq1",
+          "forcingflxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run006_ampq1"]
 #fnames      = ["flxeof_%ieofs_SLAB-PIC" % x for x in neofs]
-frcnamelong = ["%i EOFs" % x for x in neofs]
+#frcnamelong = ["%i EOFs" % x for x in neofs]
+frcnamelong = ["50 EOFs (with $Q_{ek}$ and q-corr)",
+               "90% Variance (ann avg. q-corr)",
+               "90% Variance (monthly q-corr)",
+               "90% Variance (no q-corr)"]
+
+frcnamelong = ["var(Q)-based",
+               "90% Variance",
+               "var(Q)-based (q-corr)",
+               "90% Variance (q-corr)"]
+    #"90% Threshold (no-qcorr)"]
+
+
+fnames = ["forcingflxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run006_ampq0",
+          "forcingflxeof_q-ek_090pct_SLAB-PIC_eofcorr1_1000yr_run009_ampq0",
+          "forcingflxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run006_ampq1",
+          "forcingflxeof_q-ek_090pct_SLAB-PIC_eofcorr1_1000yr_run009_ampq1"]
+
+
+frcnamelong = ["90% Variance",
+               "90% Variance (q-ek)",
+               "90% Variance (q-corr)",
+               "90% Variance (q-ek and q-corr)"]
 
 #%% Post Process Outputs (Calculate AMV, Autocorrelation)
 for frcname in fnames:
-    expid = "forcing%s_%iyr_run%s" % (frcname,nyrs,runid) 
+    #expid = "forcing%s_%iyr_run%s" % (frcname,nyrs,runid)
+    expid = frcname
     scm.postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags)
     print("Completed Post-processing for Experiment: %s" % expid)
     
@@ -77,17 +114,17 @@ bbox_TR = [-75,-15,0,20]
 bbox_NA = [-80,0 ,0,65]
 regions = ("SPG","STG","TRO","NAT")        # Region Names
 bboxes = (bbox_SP,bbox_ST,bbox_TR,bbox_NA) # Bounding Boxes
-cint   = np.arange(-0.45,0.50,0.05) # Used this for 7/26/2021 Meeting
-cl_int = np.arange(-0.45,0.50,0.05)
+cint   = np.arange(-0.50,0.55,0.05) # Used this for 7/26/2021 Meeting
+cl_int = np.arange(-0.50,0.55,0.05)
 bboxplot = [-100,20,0,80]
 modelnames  = ("Constant h","Vary h","Entraining")
 
 #%% Experiment names
 # -- SelectExperiment -- 
-fid   = 2
+fid   = 3
 frcname = fnames[fid]
-runid = "003"
-expid = "forcing%s_%iyr_run%s" % (frcname,nyrs,runid) 
+runid = "006"
+expid = fnames[fid]#"forcing%s_%iyr_run%s" % (frcname,nyrs,runid) 
 regid = 3
 
 # Load lat/lon regional
@@ -104,27 +141,26 @@ amvidx = ld['amvidx_region'].item()[regid]
 amvpat = ld['amvpat_region'].item()[regid]
 
 
-fig,axs = plt.subplots(1,3,figsize=(8,3),subplot_kw={'projection':ccrs.PlateCarree()})
+fig,axs = plt.subplots(1,3,figsize=(12,3.5),subplot_kw={'projection':ccrs.PlateCarree()})
 for p in range(len(amvpat)):
     ax = axs.flatten()[p]
     ax = viz.add_coast_grid(ax,bbox=bboxplot)
     pcm = ax.contourf(lon,lat,amvpat[p].T,levels=cint,cmap=cmocean.cm.balance)
     ax.pcolormesh(lon,lat,amvpat[p].T,vmin=cint[0],vmax=cint[-1],cmap=cmocean.cm.balance,zorder=-1)
-    #cl = ax.contour(lon,lat,amvpat[p].T,levels=cl_int,colors="k",linewidths=0.5)
-    #ax.clabel(cl,levels=cl_int)
+    cl = ax.contour(lon,lat,amvpat[p].T,levels=cl_int,colors="k",linewidths=0.5)
+    ax.clabel(cl,levels=cl_int,fontsize=8)
     #pcm = ax.pcolormesh(lon,lat,amvpat[p].T,vmin=cint[0],vmax=cint[-1],cmap=cmocean.cm.balance)
     #ax.set_title(modelnames[p])
     #fig.colorbar(pcm,ax=ax,fraction=0.036)
     ax.set_title(modelnames[p])
-fig.colorbar(pcm,ax=axs.ravel().tolist(),orientation='vertical',shrink=0.5,pad=0.01)#,pad=0.015)
-plt.suptitle("%s AMV Pattern ($\circ C$ per $\sigma_{AMV}$, Forcing: %s)"%(regions[regid],frcnamelong[fid]),y=0.85,fontsize=14)
+fig.colorbar(pcm,ax=axs.ravel().tolist(),orientation='vertical',shrink=0.75,pad=0.01)#,pad=0.015)
+plt.suptitle("%s AMV Pattern ($\circ C$ per $\sigma_{AMV}$, Forcing: %s)"%(regions[regid],frcnamelong[fid]),y=0.90,fontsize=14)
 plt.savefig("%sAMV_Pattern_%s_region%s.png"%(figpath,expid,regions[regid]),dpi=200,bbox_inches = 'tight')
 
 
 
 
 #%% Individual AMV Plots (rather than panel based)
-
 
 for p in range(len(amvpat)):
     fig,ax = plt.subplots(1,1,figsize=(6,4),subplot_kw={'projection':ccrs.PlateCarree()})
@@ -139,8 +175,7 @@ for p in range(len(amvpat)):
     
     ax.set_title(modelnames[p] + " ($\circ C$ per $\sigma_{AMV}$) \n Forcing: %s" % frcnamelong[fid])
     fig.colorbar(pcm,ax=ax,orientation='horizontal',shrink=0.75)#,pad=0.015)
-    plt.savefig("%sAMV_Pattern_%s_region%s_model%s.png"%(figpath,expid,regions[regid],modelnames[p]),dpi=200,bbox_tight='inches')
-
+    plt.savefig("%sAMV_Pattern_%s_region%s_model%s.png"%(figpath,expid,regions[regid],modelnames[p]),dpi=200,bbox_inches='tight')
 
 #%% Load in regional SSTs, and perform spectral analysis
 
@@ -150,11 +185,12 @@ for p in range(len(amvpat)):
 
 # Load in SSTs for each region
 sstdicts = []
-runids = np.repeat("003",len(neofs))
+#runids = np.repeat("006",len(neofs))
 #runids = ["003"]#["002","002","002","002","002","003","003"] # Accomodate different RunIDs
-for f in range(len(neofs)):
+for f in range(len(fnames)):
     # Load the dictionary
-    expid = "forcing%s_%iyr_run%s" % (fnames[f],nyrs,runids[f]) # Get experiment name
+    expid = fnames[f]
+    #expid = "forcing%s_%iyr_run%s" % (fnames[f],nyrs,runids[f]) # Get experiment name
     rsst_fn = "%s/proc/SST_RegionAvg_%s.npy" % (datpath,expid)
     sst = np.load(rsst_fn,allow_pickle=True).item()
     sstdicts.append(sst)
@@ -194,6 +230,7 @@ for rid in range(len(regions)):
         sstvarscesm[rid,model]   = sstvar
         
 #%% Make a plot of the variance... compare for each forcing scenario
+
 elabels = ["%i EOFs"% x for x in neofs]
 eofaxis = np.arange(0,51,1)
 #xtk = [1,2,3,5,10,25,50]
@@ -216,19 +253,26 @@ for rid in range(len(regions)):
     plt.savefig("%svariance_vs_nEOF_by_model_runid%s_nyr%i_region%s.png"%(figpath,runid,nyrs,regions[rid]),dpi=150)
 
 #%% Do some spectral analysis
-nsmooth = 5
+nsmooth = 100
 pct     = 0.10
 
-rid  = 3
-fid  = 5
-dofs = [1000,1000,898,1798] # In number of years
+rid     = 2
+fid     = 3
+dofs    = [1000,1000,898,1798] # In number of years
 
 # Unpack and stack data
 insst = []
+
 for model in range(len(modelnames)):
     insst.append(sstall[fid,rid,model,:]) # Append each stochastic model result
+    #print(np.var(sstall[fid,rid,model,:]))
 insst.append(sstcesm[rid][0]) # Append CESM-FULL
 insst.append(sstcesm[rid][1]) # Append CESM-SLAB 
+
+insstvars = []
+for s in insst:
+    insstvars.append(np.var(s))
+    #print(np.var(s))
 
 # Calculate Spectra and confidence Intervals
 specs,freqs,CCs,dofs,r1s = scm.quick_spectrum(insst,nsmooth,pct)
@@ -237,17 +281,57 @@ bnds = []
 for nu in dofs:
     lower,upper = tbx.confid(alpha,nu*2)
     bnds.append([lower,upper])
-    
-#%% Make the plot
+
+
+#print(insstvars)
+
+#%% Plot the full spectra (Frequency x Power)
+
+
+
+#%% Make the plot (Frequency x Power)
 timemax = None
 xlms = [0,0.2]
 xtks = [0,0.02,0.04,0.1,0.2]
 xtkl = 1/np.array(xtks)
 dt   = 3600*24*30
-
+speccolors = ["b","r","m","k","gray"]
 specnames  = np.hstack([modelnames,cesmname])
-speclabels = ["%s (%.3f $degC^2$)" % (specnames[i],np.var(insst[i])) for i in range(len(insst)) ]
+speclabels = ["%s (%.3f $^{\circ}C^2$)" % (specnames[i],insstvars[i]) for i in range(len(insst)) ]
 
+
+plottitle  = "%s AMV Index Spectra for %s \n nsmooth=%i, taper=%.2f"%(regions[rid],frcnamelong[fid],nsmooth,pct)
+fig,ax = plt.subplots(1,1,figsize=(8,4))
+ax = viz.plot_freqxpower(specs,freqs,speclabels,speccolors,
+                     ax=ax,plotconf=CCs,plottitle=plottitle)
+plt.savefig("%s%s%sspectra_nsmooth%i_taper%03d_freqxpower.png"% (figpath,fnames[fid],regions[rid],nsmooth,pct*100),dpi=200,bbox_inches='tight')
+
+
+#%% Linear-Linear Multidecadal Plot focusing on this band
+
+plottitle  = "%s AMV Index Spectra for %s \n nsmooth=%i, taper=%.2f"%(regions[rid],frcnamelong[fid],nsmooth,pct)
+fig,ax = plt.subplots(1,1,figsize=(8,4))
+ax = viz.plot_freqlin(specs,freqs,speclabels,speccolors,
+                     ax=ax,plotconf=CCs,plottitle=plottitle)
+plt.savefig("%s%s%sspectra_nsmooth%i_taper%03d_linlin.png"% (figpath,fnames[fid],regions[rid],nsmooth,pct*100),dpi=200,bbox_inches='tight')
+
+
+#%%
+
+plottitle  = "%s AMV Index Spectra for %s \n nsmooth=%i, taper=%.2f"%(regions[rid],frcnamelong[fid],nsmooth,pct)
+fig,ax = plt.subplots(1,1,figsize=(8,4))
+ax = viz.plot_freqlog(specs,freqs,speclabels,speccolors,
+                     ax=ax,plotconf=CCs,plottitle=plottitle)
+plt.savefig("%s%s%sspectra_nsmooth%i_taper%03d_loglog.png"% (figpath,fnames[fid],regions[rid],nsmooth,pct*100),dpi=200,bbox_inches='tight')
+
+
+#%%
+
+
+#%%
+
+
+    
 if timemax is None:
     timemax = 0
 
@@ -271,7 +355,7 @@ def lin_quickformat(ax,plotdt,freq):
     return ax,htax
 
 
-speccolors = ["b","r","m","k","gray"]
+
 
 plotdt = 3600*24*365
 freq   = freqs[0]
@@ -310,4 +394,75 @@ plt.savefig("%sPreliminNATSpec"%figpath,dpi=200)
 
 
 
+#%% Make the plot
+timemax = None
+#xlms = [0,0.2]
+xtk    = np.array([1/100,1/10,1/2,1,2,4])
+xlms   = [5e-3,5]
+xtkl   = ["%.1f" % (1/x) for x in xtk]
+dt     = 3600*24*30
+
+specnames  = np.hstack([modelnames,cesmname])
+speclabels = ["%s (%.3f $degC^2$)" % (specnames[i],np.var(insst[i])) for i in range(len(insst)) ]
+
+if timemax is None:
+    timemax = 0
+
+def lin_quickformat(ax,plotdt,freq):
+    # Set tickparams and clone
+    xtick = np.arange(0,1.7,.2)
+    ax.set_xticks(xtick)
+    ax.set_ylabel("Power ($\degree C^{2} / cpy$)",fontsize=12)
+    ax.set_xlabel("Frequency (cycles/year)",fontsize=12)
+    htax = viz.twin_freqaxis(ax,freq,"Years",dt,mode='lin-lin',xtick=xtick)
+    
+    # Set xtick labels
+    xtkl = ["%.1f" % (1/x) for x in xtick]
+    htax.set_xticklabels(xtkl)
+    
+    
+    # Set some key lines
+    ax = viz.add_yrlines(ax,dt=plotdt)
+    
+    ax.legend(fontsize=10)
+    return ax,htax
+
+
+speccolors = ["b","r","m","k","gray"]
+
+plotdt = 3600*24*365
+freq   = freqs[0]
+
+fig,ax = plt.subplots(1,1,figsize=(6,4))
+
+for i in range(len(specs)):
+    ax.semilogx(freqs[i]*plotdt,specs[i]*freqs[i],label=speclabels[i],color=speccolors[i])
+    ax.semilogx(freqs[i]*plotdt,CCs[i][:,1]*freqs[i],label="",color=speccolors[i],ls='dashed')
+    
+ax.legend()
+
+
+
+#i = 1
+#ax.plot(freqcesmslab*plotdt,Pcesmslab/plotdt,color='gray',label="CESM1 SLAB" + "$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(nassti[-1])))
+#ax.plot(freqcesmslab*plotdt,CLs[1][:,1]/plotdt,color='gray',label="CESM1 SLAB AR1 95% Significance",ls='dashed')
+#ax.plot(freqcesmslab*plotdt,CLs[1][:,0]/plotdt,color='gray',label="CESM1 SLAB AR1",ls=':')
+#ax.plot(freqcesmfull*plotdt,Pcesmfull/plotdt,color='black',label="CESM1 FULL" + "$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(nassti[0])))
+#ax.plot(freqcesmfull*plotdt,CLs[0][:,1]/plotdt,color='black',label="CESM1 FULL AR1 95% Significance",ls='dashed')
+#ax.plot(freqcesmfull*plotdt,CLs[0][:,0]/plotdt,color='black',label="CESM1 FULL AR1",ls=':')
+#ax,htax = lin_quickformat(ax,plotdt,freqcesmfull)
+#ax.set_xlabel("")
+#ax.set_title("CESM1 NASSTI (SLAB vs. FULL) \n nsmooth=%i"%(nsmooths[0]))
+
+ax.set_xlim(xlms)
+ax.set_xticks(xtks)
+xtick=np.array(xtks)
+
+htax = viz.twin_freqaxis(ax,freq,"Years",dt,mode='lin-log',xtick=xtick)
+# Set xtick labels
+htax.set_xticklabels(xtkl)
+#ax.set_ylim([0,2])
+ax.legend(fontsize=10)
+plt.tight_layout()
+plt.savefig("%sPreliminNATSpec"%figpath,dpi=200)
 
