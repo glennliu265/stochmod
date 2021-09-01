@@ -25,7 +25,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20210824/"
+    figpath     = projpath + "02_Figures/20210901/"
     
     lipath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/landicemask_enssum.npy"
     
@@ -107,6 +107,27 @@ excolors = ["cyan",
             "orange"]
             #"magenta"]
 exoutnameraw = "old_vs_eof_fullcomparison"
+
+## Same as above, but now correcting locally for eof variance
+expids  = ["stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run006_ampq0.npz",
+           "stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run006_ampq0.npz",
+           "stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run006_ampq1.npz",
+           "stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run006_ampq1.npz"
+          ]
+
+exnames = ["Basinwide Correction",
+           "Local Correction",
+           "Basinwide Correction (with q-corr)",
+           "Local Correction (with q-corr)"
+            ]
+
+excolors = ["cyan",
+            "blue",
+            "magenta",
+            "orange"]
+
+exoutnameraw = "basinwide_vs_local_correction"
+
 #%% Settings Part 2
 
 # Experiment information
@@ -227,6 +248,37 @@ for expid in range(len(exnames)):
     ax.set_title("Ratio of SST Variance \n (%s/%s)" % (enames[expid+2],comparename))
 plt.savefig("%s%s_VarianceRatio_expnum%i.png" % (figpath,exoutname,expid),bbox_inches='tight',dpi=200)
 
+#%% Plot selected ratio,compare with CESM-SLAB
+
+
+plotnum = 2
+bboxplot = [-90,0,0,75]
+
+vlm = [0,2]
+clvl = np.arange(vlm[0],vlm[-1]+.05,0.05)
+clab = np.arange(vlm[0],vlm[-1]+0.1,0.1)
+
+#clvl = np.arange(vlm[0],vlm[-1]+.05,0.05)
+#clab = np.arange(vlm[0],vlm[-1]+0.1,0.1)
+
+fig,ax = plt.subplots(1,1,figsize=(12,4),subplot_kw={'projection':ccrs.PlateCarree()})
+
+ax = viz.add_coast_grid(ax,bbox=bboxplot)
+comparison  = sstvar[plotnum]/sstvar[1]
+comparison = sstvar[2]/sstvar[3]
+comparename = "SST Variance Ratio (%s/CESM-SLAB)" %enames[plotnum]
+
+
+
+#pcm = ax.pcolormesh(lonr,latr,(sstvar[expid+2]/comparison).T,vmin=vlm[0],vmax=vlm[-1],cmap="RdBu_r")
+pcm1 = ax.pcolormesh(lonr,latr,comparison.T,cmap="RdBu_r",vmin=clvl[0],vmax=clvl[-1])
+pcm = ax.contourf(lonr,latr,comparison.T,levels=clvl,cmap="RdBu_r")
+cl = ax.contour(lonr,latr,comparison.T,levels=clab,colors="k",linewidths=0.75)
+ax.clabel(cl)
+fig.colorbar(pcm,ax=ax,pad=0.01)
+
+ax.set_title("%s" % (comparename))
+plt.savefig("%s%s_expnum%i_sstratio_plotnum%s.png" % (figpath,exoutname,expid,plotnum),bbox_inches='tight',dpi=200)
 
 #%% Plot the ratio of Qnet (corrected and uncorrected)
 # OR plot the ratio of SST
@@ -236,7 +288,6 @@ plt.savefig("%s%s_VarianceRatio_expnum%i.png" % (figpath,exoutname,expid),bbox_i
 # clvl = np.arange(vlm[0],vlm[-1]+.05,0.05)
 # clab = np.arange(vlm[0],vlm[-1]+0.1,0.1)
 plot_sstvar = True
-
 plotnum = 0
 
 bboxplot = [-90,0,0,75]
@@ -280,10 +331,9 @@ else:
     plt.savefig("%s%s_expnum%i_Qratio_plotnum%s.png" % (figpath,exoutname,expid,plotnum),bbox_inches='tight',dpi=200)
 
 
-#%%
+#%% 
 
 #expid = 
-
 bboxplot = [-90,0,0,75]
 #vlm = [.90,1.10]
 #vlm = [0.5,1.5]
@@ -305,10 +355,6 @@ if model < 1: # Non-entraining, compare with CESM-SLAB
 else: # entraining, compare with CESM-FULL
     comparison = sstvar[0]
     comparename = enames[0]
-
-
-    
-
 pcm = ax.pcolormesh(lonr,latr,(sstvar[expid+2]/comparison).T,vmin=vlm[0],vmax=vlm[-1],cmap="RdBu_r")
 pcm = ax.contourf(lonr,latr,(sstvar[expid+2]/comparison).T,levels=clvl,cmap="RdBu_r")
 cl = ax.contour(lonr,latr,(sstvar[expid+2]/comparison).T,levels=clab,colors="k",linewidths=0.75)

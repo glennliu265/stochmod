@@ -98,6 +98,21 @@ frcnamelong = ["90% Variance",
                "90% Variance (q-corr)",
                "90% Variance (q-ek and q-corr)"]
 
+## Same as above, but now correcting locally for eof variance
+fnames  = ["flxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run006_ampq0",
+           "flxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run006_ampq0",
+           "flxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run006_ampq1",
+           "flxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run006_ampq1"
+          ]
+
+frcnamelong = ["Basinwide Correction",
+           "Local Correction",
+           "Basinwide Correction (with q-corr)",
+           "Local Correction (with q-corr)"
+            ]
+
+
+
 #%% Post Process Outputs (Calculate AMV, Autocorrelation)
 for frcname in fnames:
     #expid = "forcing%s_%iyr_run%s" % (frcname,nyrs,runid)
