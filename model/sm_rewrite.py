@@ -535,15 +535,16 @@ limaskname = "limask180_FULL-HTR.npy"
 # Model Params
 ampq       = True # Set to true to multiply stochastic forcing by a set value
 mconfig    = "SLAB_PIC"
-frcname    = "flxeof_q-ek_090pct_SLAB-PIC_eofcorr1" #"flxeof_090pct_SLAB-PIC_eofcorr1"
-
+frcname    = "flxeof_090pct_SLAB-PIC_eofcorr2" 
+#"flxeof_090pct_SLAB-PIC_eofcorr1"
+#"flxeof_q-ek_090pct_SLAB-PIC_eofcorr1" #"flxeof_090pct_SLAB-PIC_eofcorr1"
 #"flxeof_qek_50eofs_SLAB-PIC" #"uniform" "flxeof_5eofs_SLAB-PIC"
 #"flxeof_090pct_SLAB-PIC_eofcorr1"
 #"flxeof_5eofs_SLAB-PIC"
 #"flxeof_080pct_SLAB-PIC"
 #flxeof_qek_50eofs_SLAB-PIC
 
-runid      = "009"
+runid      = "006"
 pointmode  = 0 
 points     = [-30,50]
 bboxsim    = [-100,20,-20,90] # Simulation Box

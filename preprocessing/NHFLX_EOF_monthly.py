@@ -437,6 +437,7 @@ month       = 0
 vlm         = [0.5,1]
 
 fig,ax =plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()})
+ax = viz.add_coast_grid(ax,bbox=bbox)
 pcm = ax.pcolormesh(lon180,lat,varflx_ratio[N_mode_plot,month,...],vmin=vlm[0],vmax=vlm[1],cmap="magma")
 fig.colorbar(pcm,ax=ax)
 ax.set_title("Ratio: $var(NHFLX_{EOF})/var(NHFLX_{CESM})$, \n N=%i; Month=%i"%(N_mode_plot+1,month+1))

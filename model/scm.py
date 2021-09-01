@@ -1015,8 +1015,9 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,returnresults=
     bbox_ST = [-80,-10,20,40]
     bbox_TR = [-75,-15,0,20]
     bbox_NA = [-80,0 ,0,65]
-    regions = ("SPG","STG","TRO","NAT")        # Region Names
-    bboxes = (bbox_SP,bbox_ST,bbox_TR,bbox_NA) # Bounding Boxes
+    bbox_NA_new = [-80,0,10,65]
+    regions = ("SPG","STG","TRO","NAT","NNAT")        # Region Names
+    bboxes = (bbox_SP,bbox_ST,bbox_TR,bbox_NA,bbox_NA_new) # Bounding Boxes
     
     #% ---- Read in Data ----
     start = time.time()
