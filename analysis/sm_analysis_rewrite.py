@@ -15,15 +15,14 @@ import matplotlib.pyplot as plt
 import sys
 import cmocean
 
-
-#%%
+#%% Set Paths, Import Custom Modules
 stormtrack = 0
 if stormtrack == 0:
     projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20210824/"
+    figpath     = projpath + "02_Figures/20210913/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -99,10 +98,10 @@ frcnamelong = ["90% Variance",
                "90% Variance (q-ek and q-corr)"]
 
 ## Same as above, but now correcting locally for eof variance
-fnames  = ["flxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run006_ampq0",
-           "flxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run006_ampq0",
-           "flxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run006_ampq1",
-           "flxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run006_ampq1"
+fnames  = ["forcingflxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run006_ampq0",
+           "forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run006_ampq0",
+           "forcingflxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run006_ampq1",
+           "forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run006_ampq1"
           ]
 
 frcnamelong = ["Basinwide Correction",
@@ -127,10 +126,11 @@ bbox_SP = [-60,-15,40,65]
 bbox_ST = [-80,-10,20,40]
 bbox_TR = [-75,-15,0,20]
 bbox_NA = [-80,0 ,0,65]
-regions = ("SPG","STG","TRO","NAT")        # Region Names
-bboxes = (bbox_SP,bbox_ST,bbox_TR,bbox_NA) # Bounding Boxes
-cint   = np.arange(-0.50,0.55,0.05) # Used this for 7/26/2021 Meeting
-cl_int = np.arange(-0.50,0.55,0.05)
+bbox_NNA = [-80,0 ,10,65]
+regions = ("SPG","STG","TRO","NAT","NNAT")        # Region Names
+bboxes = (bbox_SP,bbox_ST,bbox_TR,bbox_NA,bbox_NNA) # Bounding Boxes
+cint   = np.arange(-0.45,0.50,0.05) # Used this for 7/26/2021 Meeting
+cl_int = np.arange(-0.45,0.50,0.05)
 bboxplot = [-100,20,0,80]
 modelnames  = ("Constant h","Vary h","Entraining")
 
@@ -188,9 +188,12 @@ for p in range(len(amvpat)):
     #ax.set_title(modelnames[p])
     #fig.colorbar(pcm,ax=ax,fraction=0.036)
     
-    ax.set_title(modelnames[p] + " ($\circ C$ per $\sigma_{AMV}$) \n Forcing: %s" % frcnamelong[fid])
+    ax.set_title("%s AMV " % (regions[regid]) + modelnames[p] + " ($\circ C$ per $\sigma_{AMV}$) \n Forcing: %s" % frcnamelong[fid])
     fig.colorbar(pcm,ax=ax,orientation='horizontal',shrink=0.75)#,pad=0.015)
     plt.savefig("%sAMV_Pattern_%s_region%s_model%s.png"%(figpath,expid,regions[regid],modelnames[p]),dpi=200,bbox_inches='tight')
+
+#%% End AMV Visualization
+
 
 #%% Load in regional SSTs, and perform spectral analysis
 
@@ -237,7 +240,7 @@ cesmname   =  ["CESM-FULL","CESM-SLAB"]
 #sstallcesm  = np.zeros((len(regions),2,nyrs*12)) # Forcing x Region x Model x Time
 sstvarscesm = np.zeros((len(regions),2)) # Forcing x Region x Model
 
-for rid in range(len(regions)):
+for rid in range(len(regions)-1):
     for model in range(len(cesmname)):
         sstin  = sstcesm[rid][model]
         sstvar = np.var(sstin)
@@ -339,14 +342,10 @@ ax = viz.plot_freqlog(specs,freqs,speclabels,speccolors,
                      ax=ax,plotconf=CCs,plottitle=plottitle)
 plt.savefig("%s%s%sspectra_nsmooth%i_taper%03d_loglog.png"% (figpath,fnames[fid],regions[rid],nsmooth,pct*100),dpi=200,bbox_inches='tight')
 
+#%%
 
 #%%
 
-
-#%%
-
-
-    
 if timemax is None:
     timemax = 0
 
@@ -455,8 +454,6 @@ for i in range(len(specs)):
     ax.semilogx(freqs[i]*plotdt,CCs[i][:,1]*freqs[i],label="",color=speccolors[i],ls='dashed')
     
 ax.legend()
-
-
 
 #i = 1
 #ax.plot(freqcesmslab*plotdt,Pcesmslab/plotdt,color='gray',label="CESM1 SLAB" + "$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(nassti[-1])))
