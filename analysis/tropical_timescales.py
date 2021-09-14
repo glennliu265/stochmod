@@ -235,32 +235,32 @@ plt.savefig("%sTimescaleMaps.png"%(figpath),dpi=150,bbox_inches='tight')
 #%% Plota ratio
 
 
-ratio = corrcs[-1,:,:]/corrcs[0,:,:]
-rname = "TAUY/SST"
+ratio = corrcs[1,:,:]/corrcs[0,:,:]
+rname = "TAUX_SST"
 
 bboxplot = [-90,0,0,75]
 
 fig,axs = plt.subplots(1,3,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(18,18))
 
-levels = np.arange(0,2,0.1)
-vlm = [0,2]
+levels = np.arange(0,1,0.1)
+vlm = [0,1]
 #levels = np.arange(0,13,1)
     
 for i in range(len(lags)):
-    ax = axs[v,i]
+    ax = axs[i]
     ax = viz.add_coast_grid(ax,bbox=bboxplot)
     ax.set_title("%s Lag %i"%(rname,lags[i]))
     
-    pcm = ax.pcolormesh(lon360,lat,timescale[v,i,:,:]*msk,
+    pcm = ax.pcolormesh(lon360,lat,ratio[i,:,:]*msk,
                            vmin=vlm[0],vmax=vlm[-1],cmap=cmocean.cm.thermal)
     
-    cl = ax.contour(lon360,lat,timescale[v,i,:,:]*msk,
+    cl = ax.contour(lon360,lat,ratio[i,:,:]*msk,
                             levels=levels,colors="k",linewidths=0.75)
     # pcm = ax.contourf(lon360,lat,corrcs[v,i,:,:]*msk,
     #                        levels=levels,cmap='inferno')
     ax.clabel(cl)
 fig.colorbar(pcm,ax=axs.ravel().tolist(),orientation='vertical',shrink=0.85,pad=0.01,anchor=(1.5,0.7))
-plt.savefig("%sTimescaleMaps.png"%(figpath),dpi=150,bbox_inches='tight')
+plt.savefig("%sRatioMaps_%s.png"%(figpath,rname),dpi=150,bbox_inches='tight')
 
 
     
