@@ -29,7 +29,7 @@ import cartopy.feature as cfeature
 # Indicate Settings
 flux    = "NHFLX"  # Flux Name
 monwin  = 3        # 3 month smoothing or 1 month only
-dof     = 82       # Degrees of Freedom for Significance Testing
+dof     = 82       # Degrees of Freedom for Significaxnce Testing
 p       = 0.20     # p-value
 tails   = 2        # two-tailed or one-tailed test...
 lags    = [1,2]      # indicate lags to use
@@ -37,7 +37,7 @@ mode    = 4      # (1) No mask (2) SST only (3) Flx only (4) Both
 savevar = 1     # Option to save calulated variable
 # Set Paths
 datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/"
-outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20200823/"
+outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/2020913/"
 # Plotting
 bbox = [280, 360, 0, 90]
 cmap = cmocean.cm.tempo
@@ -97,7 +97,6 @@ elif mode == 4:
 #%% Apply the mask
 
 # Select # of lags and sum over all dimensions
-
 if len(lags) > 1:
     lagidx = np.array(lags)-1
 else:
@@ -119,8 +118,6 @@ if save_allens == 1:
                        name="NHFLX_Damping"
                        )
     da.to_netcdf(datpath+"allens_nhflxdamping_monwin3_sig020_dof082_mode4_lag1.nc")
-    
-
 
 # Take ensemble and lag average
 if len(lags) > 1:

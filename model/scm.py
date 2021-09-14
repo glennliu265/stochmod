@@ -1702,6 +1702,9 @@ def calc_HF(sst,flx,lags,monwin,verbose=True,posatm=True):
 def prep_HF(damping,rsst,rflx,p,tails,dof,mode,returnall=False,posatm=True):
     """
     
+    Mask the damping values using Students T-Test on based on the 
+    SST autocorrelation and SST-FLX cross-correlation
+    
     Inputs
     ------
         1) damping   : ARRAY [month x lag x lat x lon]
@@ -1774,6 +1777,12 @@ def prep_HF(damping,rsst,rflx,p,tails,dof,mode,returnall=False,posatm=True):
     return dampingmasked
 
 def postprocess_HF(dampingmasked,limask,sellags,lon):
+    
+    """
+    Apply a land/ice mask and average across the selected lags
+    
+    """
+    
     
     # Inputs
     ## Dampingmasked [month x lag x lat x lon]
