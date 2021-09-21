@@ -135,6 +135,8 @@ for f in range(len(frcnames)):
     query = glob.glob(expname)
     if len(query) > 0:
         overwrite = input("Found existing file(s) \n %s. \n Overwite? (y/n)" % (str(query)))
+    else:
+        overwrite = 'y'
     # Skip forcing
     if overwrite == 'n':
         continue
