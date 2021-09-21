@@ -83,6 +83,53 @@ print(r_out2)
 r_out3 = calc_FQQ_new(a,omega1,autocalc=True)
 print(r_out3)
 
+
+#%% Additional revisions on 9/17 considering the average of lagged intervals
+
+def method1(lbd,include_b=True):
+    a = 1-lbd
+    b = (1-np.exp(-lbd))/lbd
+    
+    if include_b:
+        mult = ((1-b)**2 + (1-b**2)*a + 2*b*a**2)/(1+a)
+    else:
+        mult = (1+a+b**2*(1-a)-2*(1-a**2))/(1+a)
+    return mult
+
+def method2(lbd,include_b=True,original=True):
+    a = 1-lbd
+    b = (1-np.exp(-lbd))/lbd
+    
+    
+    
+    # Calculate variance of Q
+    if original:
+        mid_term  = (b**2 * (1-a)) / (2 * (1+a)**2)
+    else:
+        mid_term  = (b**2 * (1-a)) / (2)
+    
+    if include_b:
+        last_term = b*(1-a)
+    else:
+        last_term = (1-a)
+    
+    mult = 1 + mid_term - last_term
+    return mult
+
+timescale=2
+lbd      = 1/timescale
+print(method1(lbd)) # Should be ~0.86
+print(method1(lbd,include_b=False)) # Should be ~0.86
+print(method2(lbd)) # Should be ~0.90
+print(method2(lbd,original=False)) # Should be ~0.90
+
+#%%
+timescale=2
+lbd      = 1/timescale
+print(method1(lbd)) # Should be ~0.75
+print(method2(lbd)) # Should be ~0.86
+
+
 #%% For the next section, recreate the theoretical spectral analysis plots
 
 

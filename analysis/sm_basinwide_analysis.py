@@ -25,7 +25,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20210901/"
+    figpath     = projpath + "02_Figures/20210920/"
     
     lipath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/landicemask_enssum.npy"
     
@@ -127,6 +127,20 @@ excolors = ["cyan",
             "orange"]
 
 exoutnameraw = "basinwide_vs_local_correction"
+
+## New Variance Correction Method
+expids  = ["stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run006_ampq1.npz",
+           "stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run006_ampq1.npz",
+           "stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run008_ampq3.npz",
+           "stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run008_ampq3.npz",
+          ]
+
+exnames = ["Basinwide Correction (Old)",
+           "Local Correction (Old)",
+           "Basinwide Correction (New)",
+           "Local Correction (New)"
+            ]
+exoutnameraw = "new_v_old_q-correction"
 
 #%% Settings Part 2
 
@@ -251,7 +265,7 @@ plt.savefig("%s%s_VarianceRatio_expnum%i.png" % (figpath,exoutname,expid),bbox_i
 #%% Plot selected ratio,compare with CESM-SLAB
 
 
-plotnum = 2
+plotnum = 5
 bboxplot = [-90,0,0,75]
 
 vlm = [0,2]
@@ -265,7 +279,7 @@ fig,ax = plt.subplots(1,1,figsize=(12,4),subplot_kw={'projection':ccrs.PlateCarr
 
 ax = viz.add_coast_grid(ax,bbox=bboxplot)
 comparison  = sstvar[plotnum]/sstvar[1]
-comparison = sstvar[2]/sstvar[3]
+#comparison = sstvar[2]/sstvar[3]
 comparename = "SST Variance Ratio (%s/CESM-SLAB)" %enames[plotnum]
 
 

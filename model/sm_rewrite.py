@@ -21,7 +21,6 @@ sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmo
 from amv import proc,viz
 import scm
 
-
 # Run Mode
 # pointmode = 0 # Set to 1 to output data for the point speficied below
 # points=[-30,50] # Lon, Lat for pointmode
@@ -61,9 +60,6 @@ import scm
 # "uniform"   : Uniform in space, random in time
 
 #%% Functions
-
-
-
 
 def convert_Wm2(invar,h,dt,cp0=3996,rho=1026,verbose=True):
     """
@@ -355,10 +351,6 @@ def cut_regions(inputs,lon,lat,bboxsim,pointmode,points=[-30,50],awgt=1):
         return outputs,lonr,latr
     else:
         return outputs
-        
-        
-            
-        
 
 def calc_FAC(lbd,correct=True):
     FAC         = np.nan_to_num((1-np.exp(-lbd))/lbd)
@@ -524,6 +516,36 @@ def integrate_entrain(h,kprev,lbd_a,F,T0=0,multFAC=True,debug=False):
         return T,damping_term,forcing_term,entrain_term,Td
     return T
 
+def method1(lbd,include_b=True):
+    a = 1-lbd
+    b = (1-np.exp(-lbd))/lbd
+    
+    if include_b:
+        mult = ((1-b)**2 + (1-b**2)*a + 2*b*a**2)/(1+a)
+    else:
+        mult = (1+a+b**2*(1-a)-2*(1-a**2))/(1+a)
+    return mult
+
+def method2(lbd,include_b=True,original=True):
+    a = 1-lbd
+    b = (1-np.exp(-lbd))/lbd
+    
+    
+    
+    # Calculate variance of Q
+    if original:
+        mid_term  = (b**2 * (1-a)) / (2 * (1+a)**2)
+    else:
+        mid_term  = (b**2 * (1-a)) / (2)
+    
+    if include_b:
+        last_term = b*(1-a)
+    else:
+        last_term = (1-a)
+    
+    mult = 1 + mid_term - last_term
+    return mult
+
 #%% Testing Inputs
 
 # Directories
@@ -535,7 +557,7 @@ limaskname = "limask180_FULL-HTR.npy"
 # Model Params
 ampq       = True # Set to true to multiply stochastic forcing by a set value
 mconfig    = "SLAB_PIC"
-frcname    = "flxeof_090pct_SLAB-PIC_eofcorr2" 
+frcname    = "flxeof_090pct_SLAB-PIC_eofcorr1" 
 #"flxeof_090pct_SLAB-PIC_eofcorr1"
 #"flxeof_q-ek_090pct_SLAB-PIC_eofcorr1" #"flxeof_090pct_SLAB-PIC_eofcorr1"
 #"flxeof_qek_50eofs_SLAB-PIC" #"uniform" "flxeof_5eofs_SLAB-PIC"
@@ -544,7 +566,7 @@ frcname    = "flxeof_090pct_SLAB-PIC_eofcorr2"
 #"flxeof_080pct_SLAB-PIC"
 #flxeof_qek_50eofs_SLAB-PIC
 
-runid      = "006"
+runid      = "008"
 pointmode  = 0 
 points     = [-30,50]
 bboxsim    = [-100,20,-20,90] # Simulation Box
@@ -554,6 +576,8 @@ t_end      = 12000 # Sim Length
 dt         = 3600*24*30 # Timestep
 T0         = 0 # Init Temp
 
+# Correction Method
+ampq = 3#0 = none 1 = old method, 2 = method 1, 3 = method 2
 
 expname    = "%sstoch_output_forcing%s_%iyr_run%s_ampq%i.npz" % (output_path,frcname,int(t_end/12),runid,ampq) 
 
@@ -605,7 +629,6 @@ if debug:
 forcing = make_forcing(alpha,runid,frcname,t_end,input_path)
 
 T_all = [] # Run 3 experiments
-
 for exp in range(3):
     if exp == 0:
         h_in = hblt.copy() # Used fixed slab model MLD
@@ -623,7 +646,16 @@ for exp in range(3):
     if ampq:
         a        = 1-lbd_a
         a        = 1-lbd_a.mean(2)[...,None]
-        underest = 2*a**2 / (1+a) # Var(Q) = underest*Var(q)
+        if ampq == 1:
+            print("Doing Old Correction")
+            underest = 2*a**2 / (1+a) # Var(Q) = underest*Var(q)
+        elif ampq == 2:
+            print("Correcting with method 1")
+            underest = method1(lbd_a.mean(2)[...,None])
+        elif ampq == 3:
+            print("Correcting with method 2")
+            underest = method2(lbd_a.mean(2)[...,None],original=False)
+            
         ntile = int(t_end/a.shape[2])
         ampmult = np.tile(1/np.sqrt(underest),ntile)
         F *= ampmult
