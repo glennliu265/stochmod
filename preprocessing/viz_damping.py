@@ -25,7 +25,6 @@ import xarray as xr
 import cartopy.feature as cfeature
 #%%
 
-
 # Indicate Settings
 flux    = "NHFLX"  # Flux Name
 monwin  = 3        # 3 month smoothing or 1 month only

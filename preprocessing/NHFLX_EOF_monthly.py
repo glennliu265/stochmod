@@ -610,6 +610,7 @@ for im in range(12):
         pcm = ax.pcolormesh(lon180,lat,thresperc[:,:,im].T,
                             cmap='inferno',vmin=vlm[0],vmax=vlm[-1])
     ax.set_title("%s" % (mons3[im]))
+
 fig.colorbar(pcm,ax=axs.ravel().tolist(),orientation='vertical',shrink=0.85,pad=0.01,anchor=(1.5,0.7))
 plt.savefig("%s%s_NHFLX_EOFs_vratio_%03ipercEOFs_allmon.png"%(outpath,mcname,vthres*100),dpi=150,bbox_inches='tight')
 

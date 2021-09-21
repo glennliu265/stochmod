@@ -119,6 +119,9 @@ ax.legend(fontsize=10,ncol=3)
 plt.tight_layout()
 plt.savefig(outpath+"Autocorrelation_CompareHadISST_%s.png" % locstring,dpi=200)
 
+
+#%% Autocorrelation over a particular region
+
 #%%  Spectral Estimate Calculation
 
 # Calculate spectra
