@@ -26,7 +26,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20210915/"
+    figpath     = projpath + "02_Figures/20210920/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -52,7 +52,7 @@ lags = np.arange(0,37,1)
 # Options to determine the experiment ID
 mconfig   = "SLAB_PIC"
 nyrs      = 1000        # Number of years to integrate over
-runid     = "006"
+runid     = "008"
 
 # Analysis (7/26/2021, comparing 80% variance threshold and 5 or 3 EOFs)
 #fnames      = ["flxeof_080pct_SLAB-PIC","flxeof_5eofs_SLAB-PIC","flxeof_3eofs_SLAB-PIC"]
@@ -114,6 +114,20 @@ frcnamelong = ["Basinwide Correction",
            "Local Correction (with q-corr)"
             ]
 
+## New Variance Correction Method
+fnames  = ["forcingflxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run006_ampq1",
+            "forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run006_ampq1",
+            "forcingflxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run008_ampq3",
+            "forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run008_ampq3",
+          ]
+
+frcnamelong = ["Basinwide Correction (Old)",
+            "Local Correction (Old)",
+            "Basinwide Correction (New)",
+            "Local Correction (New)"
+            ]
+exoutnameraw = "new_v_old_q-correction"
+
 #%% Functions
 def calc_conflag(ac,conf,tails,n):
     cflags = np.zeros((len(ac),2))
@@ -131,7 +145,7 @@ bbox_ST = [-80,-10,20,40]
 bbox_TR = [-75,-15,0,20]
 bbox_NA = [-80,0 ,0,65]
 bbox_NNA = [-80,0 ,10,65]
-regions = ("SPG","STG","TRO","NAT","NNAT")        # Region Names
+regions = ("SPG","STG","TRO","NAT")#,"NNAT")        # Region Names
 regionlong = ("Subpolar","Subtropical","Tropical","North Atlantic","North Atlantic (10N-65N)")
 bboxes = (bbox_SP,bbox_ST,bbox_TR,bbox_NA,bbox_NNA) # Bounding Boxes
 cint   = np.arange(-0.45,0.50,0.05) # Used this for 7/26/2021 Meeting
@@ -371,7 +385,6 @@ for rid in range(len(regions)-1):
 #%% Do some spectral analysis
 nsmooth = 100
 pct     = 0.10
-
 rid     = 2
 fid     = 3
 dofs    = [1000,1000,898,1798] # In number of years
@@ -399,7 +412,7 @@ for nu in dofs:
     
 
 # Loop for each region
-specsall = []
+specsall = [] # array[forcing][region][model]
 freqsall = []
 Cfsall   = []
 bndsall  = []
@@ -444,12 +457,7 @@ for f in range(len(fnames)):
     Cfsall.append(cc)
     bndsall.append(bb)
     sstvarall.append(vv)
-    
-        
-        
-        
-        
-        
+
 
 
 
@@ -463,27 +471,29 @@ speccolors = ["r","b","m","k","gray"]
 specnames  = np.hstack([modelnames,cesmname])
 #speclabels = ["%s (%.3f $^{\circ}C^2$)" % (specnames[i],sstvarall[i]) for i in range(len(insst)) ]
 
-for f in tqdm(range(len(frcnamelong))):
-    fig,axs = plt.subplots(2,2,figsize=(16,8))
-    for rid in range(4):
-        
-        
-        speclabels = ["%s (%.3f $^{\circ}C^2$)" % (specnames[i],sstvarall[f][rid][i]) for i in range(len(insst)) ]
-        ax    = axs.flatten()[rid]
-        ax = viz.plot_freqxpower(specsall[f][rid],freqsall[f][rid],speclabels,speccolors,
-                             ax=ax,plottitle=regionlong[rid])
-        
-        if rid <2:
-            ax.set_xlabel("")
-        if rid%2 == 1:
-            ax.set_ylabel("")
-    plt.suptitle("Regional AMV Index Spectra (unsmoothed, Forcing=%s)"%(frcnamelong[f]))
-    savename = "%sSST_Spectra_Comparison_%s.png" % (figpath,fnames[f])
-    plt.savefig(savename,dpi=150,bbox_inches='tight')
+for f in tqdm(range(len(frcnamelong))): 
+        fig,axs = plt.subplots(2,2,figsize=(16,8))
+        for rid in range(4):
+            
+            
+            
+            for model in range(len(modelnames)):
+                speclabels = ["%s (%.3f $^{\circ}C^2$)" % (specnames[i],sstvarall[f][rid][model]) for i in range(len(modelnames)) ]
+               
+                print(speclabels)
+            ax    = axs.flatten()[rid]
+            ax = viz.plot_freqxpower(specsall[f][rid],freqsall[f][rid],speclabels,speccolors,
+                                 ax=ax,plottitle=regionlong[rid])
+            
+            if rid <2:
+                ax.set_xlabel("")
+            if rid%2 == 1:
+                ax.set_ylabel("")
+        plt.suptitle("Regional AMV Index Spectra (unsmoothed, Forcing=%s)"%(frcnamelong[f]))
+        savename = "%sSST_Spectra_Comparison_%s_model%i.png" % (figpath,fnames[f],mid)
+        plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 #%% Make plot (Linear-Linear Multidecadal)
-
-
 
 for f in tqdm(range(len(frcnamelong))):
     fig,axs = plt.subplots(2,2,figsize=(16,8))

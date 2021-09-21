@@ -24,6 +24,7 @@ elif stormtrack == 1:
 from amv import proc
 import time
 import yo_box as ybx
+import tbx
 
 
 #%% Helper Functions/Utilities
@@ -1055,8 +1056,12 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
         mskreg,_,_ = proc.sel_region(msk,lon,lat,[lonr[0],lonr[-1],latr[0],latr[-1]])
         
         # Apply the mask to SST
-        sst *= mskreg
-        
+        if preload is None:
+            sst *= mskreg[None,:,:,None]
+        else:
+            sst[0] *= msk[:,:,None]
+            sst[1] *= msk[:,:,None]
+    
     print("Data loaded in %.2fs" % (time.time()-start))
     
     #% ---- Get Regional Data ----
@@ -1255,7 +1260,8 @@ def load_data(mconfig,ftype,projpath=None):
     return mld,kprevall,lon,lat,lon360,cesmslabac,damping,forcing,mld1kmean
 
 def synth_stochmod(config,verbose=False,viz=False,
-                   dt=3600*24*30,rho=1026,cp0=3996,hfix=50,T0=0,projpath=None):
+                   dt=3600*24*30,rho=1026,cp0=3996,hfix=50,T0=0,projpath=None,
+                   specparams=None):
     """
     Parameters
     ----------
@@ -1402,7 +1408,29 @@ def synth_stochmod(config,verbose=False,viz=False,
     autocorr = calc_autocorr(sst,config['lags'],kmonth+1)
     if verbose:
         print("Autocorrelation Calculations Complete!")
-    return autocorr,sst,dampingterm,forcingterm,entrainterm,Td,kmonth,params
+        
+        
+    # Calculate Spectra
+    if specparams is None:
+        return autocorr,sst,dampingterm,forcingterm,entrainterm,Td,kmonth,params
+    else:
+        
+        # Unpack SST (dict --> list of arrays)
+        ssts  = []
+        for i in range(len(sst)):
+            ssts.append(sst[i])
+        
+        # Calculate the spectra
+        specout = quick_spectrum(ssts,config['nsmooth'],config['pct'])
+        # specs,freqs,CCs,dofs,r1s = specout
+        dofs = specout[3]
+        bnds = []
+        for nu in dofs:
+            lower,upper = tbx.confid(config['alpha'],nu*2)
+            bnds.append([lower,upper])
+        
+        specout = specout + (bnds,)
+        return autocorr,sst,dampingterm,forcingterm,entrainterm,Td,kmonth,params,specout
 
 def quick_spectrum(sst,nsmooth,pct,
                    opt=1,dt=3600*24*30,clvl=[.95]):
