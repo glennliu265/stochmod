@@ -386,7 +386,7 @@ for rid in range(len(regions)-1):
 nsmooth = 100
 pct     = 0.10
 rid     = 2
-fid     = 3
+fid     = 5
 dofs    = [1000,1000,898,1798] # In number of years
 
 # Unpack and stack data
@@ -423,7 +423,7 @@ for f in range(len(fnames)):
     cc = []
     bb = []
     vv = []
-    for rid in range(len(regions)-1):
+    for rid in range(len(regions)):
         
         # Get SSTs
         insst = []
@@ -474,14 +474,8 @@ specnames  = np.hstack([modelnames,cesmname])
 for f in tqdm(range(len(frcnamelong))): 
         fig,axs = plt.subplots(2,2,figsize=(16,8))
         for rid in range(4):
-            
-            
-            
-            for model in range(len(modelnames)):
-                speclabels = ["%s (%.3f $^{\circ}C^2$)" % (specnames[i],sstvarall[f][rid][model]) for i in range(len(modelnames)) ]
-               
-                print(speclabels)
             ax    = axs.flatten()[rid]
+            speclabels = ["%s (%.3f $^{\circ}C^2$)" % (specnames[i],sstvarall[f][rid][i]) for i in range(len(insst)) ]
             ax = viz.plot_freqxpower(specsall[f][rid],freqsall[f][rid],speclabels,speccolors,
                                  ax=ax,plottitle=regionlong[rid])
             
