@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 
-Calculate EOFs for Surface Heat Flux Anomalies
-
+Calculate EOFs for Surface Heat Flux Anomalies and prepare forcing for the
+stochastic model output
 
 Created on Tue Jul 20 11:49:09 2021
 
@@ -30,6 +30,7 @@ if stormtrack == 1:
     # Module Paths
     sys.path.append("/home/glliu/00_Scripts/01_Projects/00_Commons/")
     sys.path.append("/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model/")
+    
 elif stormtrack == 0:
     # Module Paths
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
@@ -76,14 +77,16 @@ def sel_regionxr(ds,bbox):
     return dsreg
 
 #%%
+
+# Set your configuration
 mconfig = "PIC_SLAB"
 bbox    = [260,20,0,65]
 bboxeof = [280,20,0,65]
 
-debug = True
-
-lonf = -30
-latf = 50
+# Debuggin params
+debug   = True
+lonf    = -30
+latf    = 50
 
 # EOF parameters
 N_mode = 200
@@ -311,10 +314,10 @@ for N in tqdm(range(N_modeplot)):
 # --------------------------------------------------
 #%% Check how much variance is explained by each EOF
 # --------------------------------------------------
+# !! WARNING: Long runtime, not necessary ... see section below
 
 #eofall.shape = (288, 192, 12, 200)
 #pcall.shape = (200, 12, 901)
-
 
 # Sum N_recon number of modes
 N_recon = 100
@@ -337,10 +340,10 @@ for N in tqdm( range(N_recon)):
     nhflx_recon[:,:,:,:] += eofN[...,None] * pcN[None,None,...]
     
 #%% Preprocess net heat flux variable from above
-flxa *= msk[None,:,:]
-lon360 = np.load(datpath+"../CESM_lon360.npy")
+flxa          *= msk[None,:,:]
+lon360        = np.load(datpath+"../CESM_lon360.npy")
 lon180,flx180 = proc.lon360to180(lon360,flxa.transpose(2,1,0))
-flx180 = flx180.reshape(nlon,nlat,nyr,12).transpose(0,1,3,2) # lon x lat x mon x year
+flx180        = flx180.reshape(nlon,nlat,nyr,12).transpose(0,1,3,2) # lon x lat x mon x year
 
 
 #%% Now check the variance percentange for a specific point
@@ -400,8 +403,9 @@ varflx_EOF = ld['varflx_EOF']
 varflx_ori = ld['varflx_ori']
 varflx_ratio = ld['varflx_ratio']
 
-
+# -----------------
 #%% Save as netcdf
+# ------------------
 mode_number = np.arange(1,N_mode+1,1)
 months = np.arange(1,13,1)
 
@@ -449,6 +453,8 @@ plt.savefig(savename,dpi=100)
 # ------------------------------------------------
 #%% Calculate/plot cumulative variance explained
 # ------------------------------------------------
+# mode number (x-axis) vs. %-variance explained (y-axis)
+# separate lines used for each month
 
 # Calculate cumulative variance at each EOF
 cvarall = np.zeros(varexpall.shape)
@@ -476,27 +482,40 @@ ax.set_xlim([1,N_modeplot])
 #ax.set_xticks(xtk)
 plt.savefig("%s%s_NHFLX_EOFs%i_%s_ModevCumuVariance_bymon.png"%(outpath,mcname,N_modeplot,bboxtext),dpi=150)
 
-#%% Save a select number of EOFs
-eofcorr = 1
+# ------------------------------------------------
+# %% Make the Forcings...
+# ------------------------------------------------
 
-N_mode_choose = 50
+# -----------------------------
+#% Save a select number of EOFs
+# -----------------------------
+eofcorr       = 2
+N_mode_choose = 100
 
-# # Prepare correction based on variance explained
-# cvar_expl = cvarall[N_mode_choose,:]
-# if eofcorr:
-#     ampfactor = 1/cvar_exp
-# else:
-#     ampfactor = 1
-
-eofforce      = eofall.copy()
+# Select the mode
+eofforce = eofall.copy()
 eofforce      = eofforce.transpose(0,1,3,2) # lon x lat x pc x mon
 eofforce      = eofforce[:,:,:N_mode_choose,:]
-savenamefrc   = "%sflxeof_%ieofs_%s.npy" % (datpath,N_mode_choose,mcname)
+
+# Prepare correction based on variance explained
+if eofcorr == 1: # Correct based on EOF "basinwide" variance explained
+    perc_in   = varexpall[:N_mode_choose,:].sum(0) # Sum variance for selected modes
+    ampfactor = 1/perc_in # [Months]
+    eofforce  *= ampfactor
+elif eofcorr == 2: # Correct based on the LOCAL variance explained at each point...
+    perc_in   = np.zeros([nlon,nlat,12]) * np.nan
+    for im in range(12): # Loop for each nonth...
+        perc_in[:,:,im] =  varflx_ratio[:,:,im,N_mode_choose]
+    ampfactor = 1/perc_in
+    eofforce  *= ampfactor[:,:,None,:] 
+
+savenamefrc   = "%sflxeof_%ieofs_%s_eofcorr%i.npy" % (datpath,N_mode_choose,mcname,eofcorr)
 np.save(savenamefrc,eofforce)
 print("Saved data to "+savenamefrc)
 
-#%% Find index of variance threshold
-
+# ------------------------------------
+#%% Find indices of variance threshold
+# ------------------------------------
 vthres  = 0.90
 thresid = np.argmax(cvarall>vthres,axis=0)
 thresperc = []
@@ -522,12 +541,14 @@ ax.grid(True,ls='dotted')
 
 plt.savefig("%s%s_NHFLX_EOFs%i_%s_NumEOFs_%ipctvar_bymon.png"%(outpath,mcname,N_mode,bboxtext,vthres*100),dpi=150)
 
+# -------------------------------------------------------------------------
 #%% Save outptut as forcing for stochastic model, variance based threshold
+# -------------------------------------------------------------------------
 
 # Calculate correction factor
 eofcorr  = 2
 if eofcorr == 1: # Flat variance-based correct
-    ampfactor = 1/thresperc
+    ampfactor = 1/vthres#thresperc
 elif eofcorr ==2: # Point[wise variance-based correction
     thresperc = np.zeros([nlon,nlat,12])*np.nan
     for im in range(12):
