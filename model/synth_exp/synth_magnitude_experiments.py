@@ -22,16 +22,12 @@ import time
 import cmocean
 import sys
 
-
 # Custom Modules
 sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
 sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
 from amv import proc,viz
 import yo_box as ybx
 import scm
-
-
-
 
 #%% Settings
 
@@ -40,7 +36,7 @@ projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 datpath     = projpath + '01_Data/'
 input_path  = datpath + 'model_input/'
 output_path = datpath + 'model_output/'
-outpath = projpath + '02_Figures/20210526/'
+outpath = projpath + '02_Figures/20210913/'
 proc.makedir(outpath)
 
 # Load in control data for 50N 30W
@@ -71,6 +67,11 @@ config['applyfac']    = 2          # Apply Integration Factor and MLD to forcing
 config['lags']        = np.arange(0,37,1)
 config['output_path'] = outpath
 config['smooth_forcing'] = False
+
+# Spectral Analysis Parameters
+config['nsmooth'] = 1000
+config['pct']     = 0.10 
+config['alpha']   = 0.05
 
 config.pop('Fpt',None)
 config.pop('damppt',None)
@@ -205,8 +206,9 @@ config.pop('Fpt',None)
 
 # config['Fpt'] = np.array([60.278503, 53.68089 , 42.456623, 33.448967, 22.954145, 22.506973,
 #        22.151728, 19.135042, 33.337887, 40.91648 , 50.905064, 58.132706])
-ac,sst,dmp,frc,ent,Td,kmonth,params=scm.synth_stochmod(config,projpath=projpath)
+ac,sst,dmp,frc,ent,Td,kmonth,params,specout=scm.synth_stochmod(config,projpath=projpath,specparams=[config["nsmooth"],config['pct'],config['alpha']])
 [o,a],damppt,mldpt,kprev,Fpt       =params
+specs,freqs,CCs,dofs,r1s,bnds = specout
 
 # Read in CESM autocorrelation for all points'
 kmonth = np.argmax(mldpt)
@@ -255,6 +257,14 @@ ax.legend(fontsize=8)
 plt.tight_layout()
 #plt.savefig(outpath+"Default_Autocorrelation_CF_%s.png"%locstring,dpi=200)
 
+
+# Make a quick spectra plot
+plottitle  = "AMV Index Spectra for %s \n nsmooth=%i, taper=%.2f"%(locstringtitle,config['nsmooth'],config['pct'])
+fig,ax = plt.subplots(1,1,figsize=(8,4))
+ax = viz.plot_freqxpower(specs,freqs,labels,expcolors,
+                     ax=ax,plotconf=CCs,plottitle=plottitle)
+
+
 # Save Default Values
 dampdef = damppt.copy()
 mlddef = mldpt.copy()
@@ -271,17 +281,19 @@ acall     = []
 sstall    = []
 kmonthall = []
 paramsall = []
+specoutall = []
 
 for i,val in tqdm(enumerate(testvalues)):
     #config['Fpt'] = np.ones(12)*37.24208402633666
     st = time.time()
     config[testparam] = np.ones(12)*val
-    ac,sst,dmp,frc,ent,Td,kmonth,params=scm.synth_stochmod(config,projpath=projpath)
+    ac,sst,dmp,frc,ent,Td,kmonth,params,specout=scm.synth_stochmod(config,projpath=projpath,specparams=config)
     acall.append(ac)
     sstall.append(sst)
     kmonthall.append(kmonth)
     paramsall.append(params)
     config.pop(testparam,None)
+    specoutall.append(specout)
     
     print("Ran script for %s = %s in %.2fs"%(testparam,str(val),time.time()-st))
 
@@ -349,6 +361,36 @@ ax.set_title("SST Autocorrelation by Damping (W/m2) \n Lag 0 = Feb")
 plt.tight_layout()
 plt.savefig("%sLag_v_Damping_3Dplot_%s.png"%(outpath,expname),dpi=200)
 
+
+# Spectra Plot
+#plottitle  = "AMV Index Spectra for %s \n nsmooth=%i, taper=%.2f"%(locstringtitle,config['nsmooth'],config['pct'])
+
+# Get the spectral data out
+nexp = len(specoutall)
+specs = []
+freqs = []
+for i in range(nexp):
+    specs.append(specoutall[i][0][model])
+    freqs.append(specoutall[i][1][model])
+#specs,freqs,CCs,dofs,r1s,bnds = specout
+speccolors = np.repeat('b',nexp)
+speclabels = ["%.1f" % testvalues[i] for i in range(len(testvalues))]
+specalpha  = [(lam/nexp)*.5 for lam in range(nexp)]
+fig,ax = plt.subplots(1,1,figsize=(8,4))
+ax = viz.plot_freqxpower(specs,freqs,speclabels,speccolors,ax=ax,alpha=.7-np.flip(specalpha))
+plt.savefig("%sLag_v_Damping_Spectra_%s.png"%(outpath,expname),dpi=200)
+
+
+# Pplot spectra (loglog)
+fig,ax     = plt.subplots(1,1,figsize=(8,4))
+ax         = viz.plot_freqlog(specs,freqs,speclabels,speccolors,ax=ax,alpha=.7-np.flip(specalpha))
+plt.savefig("%sLag_v_Damping_Spectra_%s_loglog.png"%(outpath,expname),dpi=200)
+
+# Pplot spectra (linlin)
+fig,ax     = plt.subplots(1,1,figsize=(8,4))
+ax         = viz.plot_freqlin(specs,freqs,speclabels,speccolors,ax=ax,alpha=.7-np.flip(specalpha))
+plt.savefig("%sLag_v_Damping_Spectra_%s_linlin.png"%(outpath,expname),dpi=200)
+
 # *********************************************************
 #%% Grid Sweep Experiments II : Damping, Seasonal Magnitude
 # *********************************************************
@@ -361,16 +403,18 @@ acall     = []
 sstall    = []
 kmonthall = []
 paramsall = []
+specoutall = []
 
 for i,val in tqdm(enumerate(testvalues)):
     st = time.time()
     config[testparam] = damppt*val
     config['Fpt'] = np.ones(12)*Fpt.mean(0)
-    ac,sst,dmp,frc,ent,Td,kmonth,params=scm.synth_stochmod(config,projpath=projpath)
+    ac,sst,dmp,frc,ent,Td,kmonth,params,specout=scm.synth_stochmod(config,projpath=projpath,specparams=config)
     acall.append(ac)
     sstall.append(sst)
     kmonthall.append(kmonth)
     paramsall.append(params)
+    specoutall.append(specout)
     print("Ran script for %s = %s in %.2fs"%(testparam,str(val),time.time()-st))
 
 config.pop(testparam,None)
@@ -460,6 +504,22 @@ ax.set_ylabel("Damping (W/m2)")
 ax.grid(True,ls='dotted')
 plt.savefig("%sDamping_Values_%s.png"%(outpath,expname),dpi=200)
 
+# -------------------------
+# Get the spectral data out
+nexp = len(specoutall)
+specs = []
+freqs = []
+for i in range(nexp):
+    specs.append(specoutall[i][0][model])
+    freqs.append(specoutall[i][1][model])
+#specs,freqs,CCs,dofs,r1s,bnds = specout
+speccolors = np.repeat('b',nexp)
+speclabels = ["%.1f" % testvalues[i] for i in range(len(testvalues))] #np.repeat(,nexp)
+specalpha  = [(lam/nexp)*.5 for lam in range(nexp)]
+fig,ax = plt.subplots(1,1,figsize=(8,4))
+ax = viz.plot_freqxpower(specs,freqs,speclabels,speccolors,ax=ax,alpha=.7-np.flip(specalpha))
+plt.savefig("%sLag_v_Damping_seasonalmag_Spectra_%s.png"%(outpath,expname),dpi=200)
+
 # *************************************************
 #%% Grid Sweep Experiments III : Forcing (Constant)
 # *************************************************
@@ -468,21 +528,23 @@ expname="ForcingCVary"
 testvalues = np.arange(10,101,1)
 testparam  = 'Fpt'
 
-acall     = []
-sstall    = []
-kmonthall = []
-paramsall = []
 
+acall      = []
+sstall     = []
+kmonthall  = []
+paramsall  = []
+specoutall = []
 for i,val in tqdm(enumerate(testvalues)):
     
     #config['Fpt'] = np.ones(12)*37.24208402633666
     st = time.time()
     config[testparam] = np.ones(12)*val
-    ac,sst,dmp,frc,ent,Td,kmonth,params=scm.synth_stochmod(config,projpath=projpath)
+    ac,sst,dmp,frc,ent,Td,kmonth,params,specout=scm.synth_stochmod(config,projpath=projpath,specparams=config)
     acall.append(ac)
     sstall.append(sst)
     kmonthall.append(kmonth)
     paramsall.append(params)
+    specoutall.append(specout)
     
     print("Ran script for %s = %s in %.2fs"%(testparam,str(val),time.time()-st))
 
@@ -553,6 +615,23 @@ ax.set_title("SST Autocorrelation by Damping (W/m2) \n Lag 0 = Feb")
 plt.tight_layout()
 plt.savefig("%sLag_v_Forcing_3Dplot_%s.png"%(outpath,expname),dpi=200)
 
+
+# -------------------------
+# Get the spectral data out
+nexp = len(specoutall)
+specs = []
+freqs = []
+for i in range(0,nexp,10):
+    specs.append(specoutall[i][0][model])
+    freqs.append(specoutall[i][1][model])
+#specs,freqs,CCs,dofs,r1s,bnds = specout
+speccolors = np.repeat('r',nexp)
+speclabels = np.repeat("",nexp)#["%.1f" % testvalues[i] for i in range(len(testvalues))] #np.repeat(,nexp)
+specalpha  = [(lam/nexp)*.5 for lam in range(nexp)]
+fig,ax = plt.subplots(1,1,figsize=(8,4))
+ax = viz.plot_freqxpower(specs,freqs,speclabels,speccolors,ax=ax,alpha=.9-np.flip(specalpha))
+plt.savefig("%sLag_v_Forcing_constant_Spectra_%s.png"%(outpath,expname),dpi=200)
+
 # *********************************************************
 #%% Grid Sweep Experiments IV : Forcing, Seasonal Magnitude
 # *********************************************************
@@ -561,21 +640,23 @@ testvalues = np.arange(0.1,2.1,.1)*10#[0.25,0.5,1,2,4,8,16,32,64,128]
 testparam  = 'Fpt'
 expname="ForcingVVary1m"
 
+
 acall     = []
 sstall    = []
 kmonthall = []
 paramsall = []
-
+specoutall = []
 for i,val in tqdm(enumerate(testvalues)):
     st = time.time()
     #vals[7]  = val
     config[testparam] = Fpt*testvalues[i]
-    ac,sst,dmp,frc,ent,Td,kmonth,params=scm.synth_stochmod(config,projpath=projpath)
+    ac,sst,dmp,frc,ent,Td,kmonth,params,specout=scm.synth_stochmod(config,projpath=projpath,specparams=config)
 
     acall.append(ac)
     sstall.append(sst)
     kmonthall.append(kmonth)
     paramsall.append(params)
+    specoutall.append(specout)
     
     print("Ran script for %s = %s in %.2fs"%(testparam,str(val),time.time()-st))
     
@@ -667,6 +748,33 @@ ax.grid(True,ls='dotted')
 plt.savefig("%sForcing_Values_%s.png"%(outpath,expname),dpi=200)
 
 
+# -------------------------
+# Get the spectral data out
+nexp = len(specoutall)
+specs = []
+freqs = []
+for i in range(nexp):
+    specs.append(specoutall[i][0][model])
+    freqs.append(specoutall[i][1][model])
+#specs,freqs,CCs,dofs,r1s,bnds = specout
+speccolors = np.repeat('r',nexp)
+speclabels = np.repeat("",nexp)#["%.1f" % testvalues[i] for i in range(len(testvalues))] #np.repeat(,nexp)
+specalpha  = [(lam/nexp)*.5 for lam in range(nexp)]
+fig,ax     = plt.subplots(1,1,figsize=(8,4))
+ax         = viz.plot_freqxpower(specs,freqs,speclabels,speccolors,ax=ax,alpha=specalpha)
+plt.savefig("%sLag_v_Forcing_seasonal_Spectra_%s.png"%(outpath,expname),dpi=200)
+
+
+# Pplot spectra (loglog)
+fig,ax     = plt.subplots(1,1,figsize=(8,4))
+ax         = viz.plot_freqlog(specs,freqs,speclabels,speccolors,ax=ax,alpha=specalpha)
+plt.savefig("%sLag_v_Forcing_seasonal_Spectra_%s_loglog.png"%(outpath,expname),dpi=200)
+
+# Pplot spectra (linlin)
+fig,ax     = plt.subplots(1,1,figsize=(8,4))
+ax         = viz.plot_freqlin(specs,freqs,speclabels,speccolors,ax=ax,alpha=specalpha)
+plt.savefig("%sLag_v_Forcing_seasonal_Spectra_%s_linlin.png"%(outpath,expname),dpi=200)
+
 # ****************************************************************************
 #%% Experiment with a particular ratio of forcing  at a selected month for
 # ****************************************************************************
@@ -708,8 +816,6 @@ xtk = np.arange(0,13,1)
 
 acalls = np.array(acall)
 
-
-
 # Autocorrelation Plots
 fig,ax = plt.subplots(1,1)
 ax.plot(lags,cesmauto,color='k',label='CESM-SLAB')
@@ -725,7 +831,6 @@ ax.set_title("SST Autocorrelation by Forcing (W/m2) \n Lag 0 = Feb; Forcing Chan
 ax.grid(True,ls='dotted')
 ax.axvline([kmonth_target-kmonth],color='r',ls='dashed')
 plt.savefig("%sForcingRatioSensitivity_Autocorrelation_kmonth%i.png"%(outpath,kmonth_target),dpi=200)
-
 
 # Plot Forcing values
 # fig,ax = plt.subplots(1,1)
