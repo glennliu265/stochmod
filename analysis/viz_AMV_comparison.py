@@ -457,10 +457,6 @@ for f in range(len(fnames)):
     Cfsall.append(cc)
     bndsall.append(bb)
     sstvarall.append(vv)
-
-
-
-
 #%% Make the plot (Frequency x Power)
 timemax = None
 xlms = [0,0.2]

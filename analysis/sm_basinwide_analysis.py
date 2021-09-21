@@ -265,7 +265,7 @@ plt.savefig("%s%s_VarianceRatio_expnum%i.png" % (figpath,exoutname,expid),bbox_i
 #%% Plot selected ratio,compare with CESM-SLAB
 
 
-plotnum = 5
+plotnum = 4
 bboxplot = [-90,0,0,75]
 
 vlm = [0,2]

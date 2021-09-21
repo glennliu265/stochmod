@@ -22,7 +22,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20210913/"
+    figpath     = projpath + "02_Figures/20210920/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -110,10 +110,23 @@ frcnamelong = ["Basinwide Correction",
            "Local Correction (with q-corr)"
             ]
 
+## New Variance Correction Method (derivation)
+fnames  = ["forcingflxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run006_ampq1",
+           "forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run006_ampq1",
+           "forcingflxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run008_ampq3",
+           "forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run008_ampq3",
+          ]
+
+frcnamelong = ["Basinwide Correction (Old)",
+           "Local Correction (Old)",
+           "Basinwide Correction (New)",
+           "Local Correction (New)"
+            ]
+exoutnameraw = "new_v_old_q-correction"
 
 
 #%% Post Process Outputs (Calculate AMV, Autocorrelation)
-for frcname in fnames:
+for frcname in tqdm(fnames):
     expid = frcname
     scm.postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,mask_pacific=True)
     print("Completed Post-processing for Experiment: %s" % expid)
