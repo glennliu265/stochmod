@@ -117,12 +117,12 @@ debug = False
 
 # Loop by forcing
 frcnames = ("flxeof_50eofs_SLAB-PIC_eofcorr2",
-            "flxeof_25eofs_SLAB-PIC_eofcorr2.npy",
-            "flxeof_10eofs_SLAB-PIC_eofcorr2.npy",
-            "flxeof_5eofs_SLAB-PIC_eofcorr2.npy",
-            "flxeof_3eofs_SLAB-PIC_eofcorr2.npy",
-            "flxeof_2eofs_SLAB-PIC_eofcorr2.npy",
-            "flxeof_1eofs_SLAB-PIC_eofcorr2.npy"
+            "flxeof_25eofs_SLAB-PIC_eofcorr2",
+            "flxeof_10eofs_SLAB-PIC_eofcorr2",
+            "flxeof_5eofs_SLAB-PIC_eofcorr2",
+            "flxeof_3eofs_SLAB-PIC_eofcorr2",
+            "flxeof_2eofs_SLAB-PIC_eofcorr2",
+            "flxeof_1eofs_SLAB-PIC_eofcorr2"
             )
 #%%
 st = time.time()
