@@ -4,6 +4,8 @@
 Calculate and Visualize AMV
 from CESM PiC Runs
 
+Postprocesses output the same was as stochastic model output
+
 Created on Mon May 24 22:55:19 2021
 
 @author: gliu
@@ -35,7 +37,7 @@ import yo_box as ybx
 #%% User Edits
 
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
-outpath = projpath + '02_Figures/20210726/'
+outpath = projpath + '02_Figures/20210810/'
 proc.makedir(outpath)
 
 datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/"
@@ -151,7 +153,7 @@ preload = [lon180,lat,sstas]
 lags    = np.arange(0,37,1)
 
 #
-scm.postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,preload=preload)
+scm.postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,preload=preload,mask_pacific=True)
 
 # -----------------
 #%% Calculate AMV
@@ -218,15 +220,16 @@ fig,ax,cb = plot_AMV_generals(lat,lon180,pats[0])
 ax.set_title("AMV Pattern (CESM1-FULL; 400 to 2200) \n Contour Interval: 0.03 $\degree C / \sigma_{AMV}$")
 plt.savefig(outpath+"CESM1-FULL_AMV_Spatial_Pattern.png",bbox_inches='tight')
 
-
 fig,ax,cb = plot_AMV_generals(lat,lon180,pats[-1])
 ax.set_title("AMV Pattern (CESM1-SLAB; 101 to 1001 ) \n Contour Interval: 0.03 $\degree C / \sigma_{AMV}$")
 plt.savefig(outpath+"CESM1-SLAB_AMV_Spatial_Pattern.png",bbox_inches='tight')
 
 #%% Plot AMV but in a different style (7/26/2021 AMV Project Meeting)
 
-cint = np.arange(-.30,.33,.03)
-cl_int = np.arange(-.30,.4,.1)
+#cint = np.arange(-.30,.33,.03)
+#cl_int = np.arange(-.30,.4,.1)
+cint   = np.arange(-0.45,0.50,0.05) # Used this for 8/10/2021 Meeting
+cl_int = np.arange(-0.45,0.50,0.05)
 bboxplot = [-100,20,0,80]
 lon = lon180
 modelnames = ["CESM-FULL","CESM-SLAB"]
@@ -528,7 +531,7 @@ htax.set_xticklabels(xtkl)
 ax.set_xlabel("")
 ax.set_title("CESM1 NASSTI (SLAB vs. FULL),nsmooth=%i"%nsmooths[0])
 plt.tight_layout()
-#plt.savefig("%sNASSTI_SpectralEstimate_nsmooth%i_taper%i.png"%(outpath,nsmooths[i],pct*100),dpi=200)
+plt.savefig("%sNASSTI_SpectralEstimate_nsmooth%i_taper%i.png"%(outpath,nsmooths[i],pct*100),dpi=200)
 
 
 

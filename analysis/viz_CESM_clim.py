@@ -37,6 +37,7 @@ datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_D
 lonpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/CESM1_LATLON.mat"
 mskpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/landicemask_enssum.npy"
 bbox    = [-100,20,-20,90]
+outfigpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20210211/"
 
 snames = ["Variance","Std. Dev.","Mean"]
 mons3  = ('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
@@ -93,7 +94,9 @@ for v in vstats:
     vstatreg.append(vrr)
     vmaxmon.append(vrrmax)
     maxmonid.append(kmonr)
-    
+#%%
+
+
 #%% Save Variable as input into stochastic Model
 
 nhflxstd = vstatglob[1]
@@ -194,4 +197,122 @@ acsel = np.take_along_axis(autocorr,indices.T[None,:,:],axis=2)
 
 #autocor = autocor.transpose(0,1,3,2)
 #indices = maxmonid[i]
+
+#%% Load in mean SST and visualize
+
+fn1 = datpath + "../TS_SLAB_withENSO.npy"
+fn2 = datpath + "../ENSOREM_TS_lag1_pcs2_monwin3.npz"
+
+tsenso1 = np.load(fn1)
+ld2 = np.load(fn2)
+tsenso0 = ld2['TS']
+lon = ld2['lon']
+lat = ld2['lat']
+
+# Reshape to [yr x mon x lat x lon]
+nmon,nlat,nlon = tsenso0.shape
+tsenso0 = tsenso0.reshape(int(nmon/12),12,nlat,nlon)
+
+#%%
+# Visualize each to check
+fig,axs= plt.subplots(1,2,figsize=(10,4))
+
+pcm1 = axs[0].pcolormesh(tsenso0[-1,0,:,:],vmin=-5,vmax=5)
+fig.colorbar(pcm1,ax=axs[0])
+axs[0].set_title("No Enso")
+pcm2 = axs[1].pcolormesh(tsenso1[-2,0,:,:],vmin=-5,vmax=5) # Note offset (tsenso0 is yrs 2-900)
+fig.colorbar(pcm2,ax=axs[1])
+axs[1].set_title("With Enso")
+
+#%% Plot SST at a point (continuous)
+
+lonf=-35+360
+latf = 10
+klon,klat = proc.find_latlon(lonf,latf,lon,lat)
+loctitle = "Lon: %.2f Lat: %2f" % (lon[klon],lat[klat])
+locfn = "lon%i_lat%i" % (lonf,latf)
+
+fig,ax = plt.subplots(1,1,figsize=(12,4))
+ax.plot(tsenso0[:,:,klat,klon].flatten(),label="No ENSO",lw=1)
+ax.plot(tsenso1[2:-1,:,klat,klon].flatten(),label="ENSO",alpha=0.75,lw=0.75)
+ax.set_title("Timeseries at %s"%loctitle)
+ax.legend()
+
+#%% Plot Monthly values
+
+fig,axs = plt.subplots(2,1)
+ax = axs[0]
+ax.plot(mons3,tsenso0[:,:,klat,klon].T,label="No ENSO",color='gray',alpha=0.1)
+ax.plot(mons3,tsenso0[:,:,klat,klon].std(0),label="Stdev",color='k',ls='dashed')
+ax.plot(mons3,tsenso0[:,:,klat,klon].mean(0),label="Mean",color='k',ls='dotted')
+ax.plot(mons3,-1*tsenso0[:,:,klat,klon].std(0),label="",color='k',ls='dashed')
+ax.set_title("Seasonal Cycle at %s (No Enso)"%loctitle)
+#ax.plot(mons3,tsenso1[2:-1,:,klat,klon].T,label="ENSO")
+#ax.legend()
+
+ax = axs[1]
+ax.plot(mons3,tsenso1[:,:,klat,klon].T,label="No ENSO",color='gray',alpha=0.1)
+ax.plot(mons3,tsenso1[:,:,klat,klon].std(0),label="Stdev",color='k',ls='dashed')
+ax.plot(mons3,tsenso1[:,:,klat,klon].mean(0),label="Stdev",color='k',ls='dotted')
+ax.plot(mons3,-1*tsenso1[:,:,klat,klon].std(0),label="",color='k',ls='dashed')
+ax.set_title("Seasonal Cycle at %s (With Enso)"%loctitle)
+
+plt.tight_layout()
+
+
+
+# Just Plot 1 month
+fig,ax = plt.subplots(1,1)
+ax.plot(mons3,tsenso0[:,:,klat,klon].T,label="No ENSO",color='gray',alpha=0.1)
+ax.plot(mons3,tsenso0[:,:,klat,klon].std(0),label="Stdev",color='k',ls='dashed')
+ax.plot(mons3,tsenso0[:,:,klat,klon].mean(0),label="Mean",color='k',ls='dotted')
+ax.plot(mons3,-1*tsenso0[:,:,klat,klon].std(0),label="",color='k',ls='dashed')
+ax.grid(True,ls='dotted')
+ax.set_title("SST Seasonal Cycle at %s (No Enso)"%loctitle)
+plt.savefig("%sSST_Scycle_SLAB_PIC_%s.png"%(outfigpath,locfn),dpi=200)
+
+
+
+#%% Reshape variables
+
+# Calculate autocorrelation for each month
+lags = np.arange(0,61)
+pointsize = 288*192
+nyrs = tsenso0.shape[0]
+
+invars = [tsenso0,tsenso1[2:-1,:,:]]
+acs = []
+for v in invars:
+    # Reshape to [year x mon x space]
+    sstrs = v.reshape(nyrs,12,pointsize)
+
+    startloop = time.time()
+
+    
+    # Transpose to [month x yr x space]
+    oksst = sstrs.transpose(1,0,2)
+
+    # Preallocate and loop for each month...
+    autocorrm = np.ones((12,len(lags),pointsize))
+
+    # Loop for the months
+    for m in tqdm(range(12)):
+        
+        # Calculate autocorrelation for that month
+        autocorrm[m,:,:] = proc.calc_lagcovar_nd(oksst,oksst,lags,m+1,0)
+
+    #msg = "Completed Mon %02d for ENS %02d (Elapsed: %.2fs)" % (m+1,time.time()-startloop)
+    #print(msg,end="\r",flush=True)
+    
+    # Reshape output
+    autocorrm = autocorrm.reshape(12,len(lags),192,288)
+    acs.append(autocorrm)
+
+np.save(datpath+"SLAB_PIC_Autocorr.npy",acs,allow_pickle=True)
+
+#%%
+
+
+
+
 

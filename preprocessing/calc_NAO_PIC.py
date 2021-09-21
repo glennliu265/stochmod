@@ -459,4 +459,25 @@ np.savez(outpath+outname,**{
          'lat':lat}
         )   
 print("Data saved in %.2fs"%(time.time()-st))
-        
+
+
+#%% Save a copy of combined fluxes
+
+
+# Load Fluxes
+flux     = 'NHFLX'
+pcrem    = 2
+ensolag  = 1
+emonwin  = 3
+datpath  = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/01_hfdamping/hfdamping_PIC_SLAB/02_ENSOREM/" # Output Path
+ensoexp  = "lag%i_pcs%i_monwin%i" % (ensolag,pcrem,emonwin)
+filepath = datpath+"ENSOREM_%s_"+ensoexp + ".npz"
+flx      = combineflux(flux,filepath,verbose=True) # [10776 x 192 x 288] [ time x lat x lon]
+
+
+outname = datpath+"ENSOREM_NHFLX_"+ensoexp + ".npy"
+np.save(outname,flx)   
+    
+    
+    
+    

@@ -21,7 +21,6 @@ sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmo
 from amv import proc,viz
 import scm
 
-
 # Run Mode
 # pointmode = 0 # Set to 1 to output data for the point speficied below
 # points=[-30,50] # Lon, Lat for pointmode
@@ -60,30 +59,12 @@ import scm
 # "allrandom" : Completely random in space or time
 # "uniform"   : Uniform in space, random in time
 
-
-
-
-
-#%% Inputs Required
-"""
-
-constants: dt, cp0, rho
-
-
-
-
-"""
-
-
-
 #%% Functions
-
-
-
 
 def convert_Wm2(invar,h,dt,cp0=3996,rho=1026,verbose=True):
     """
     outvar = convert_Wm2(invar,h,dt,cp0=3996,rho=1026,verbose=True)
+    
     Converts an input array [LON x LAT x TIME] from W/m2 to 1/time
     by multiplying by dt/(rho*cp0*h).
     If input is not 3D, appends dimensions to the front and assumes
@@ -370,10 +351,6 @@ def cut_regions(inputs,lon,lat,bboxsim,pointmode,points=[-30,50],awgt=1):
         return outputs,lonr,latr
     else:
         return outputs
-        
-        
-            
-        
 
 def calc_FAC(lbd,correct=True):
     FAC         = np.nan_to_num((1-np.exp(-lbd))/lbd)
@@ -386,6 +363,35 @@ def calc_beta(h):
     beta[beta<0] = 0 # Set non-entraining months to zero
     return beta
 
+def integrate_Q(lbd,F,T,mld,cp0=3996,rho=1026,dt=3600*24*30,debug=False):
+    """
+    Q = integrate_Q(lbd,F,T)\
+        
+        
+    lbd is in 1/mon
+    F is in 1/mon
+    T is in degC
+    
+    Integrate the heat flux applied to the stochastic model, and calculate the ratio
+    
+    """
+    nlon,nlat,ntime = F.shape
+    mld_in = np.tile(mld,int(ntime/12))
+    
+    lbd_ori_units = np.tile(lbd,int(ntime/12))*(rho*cp0*mld_in)/dt # convert back to W/m2 per degC
+    q_ori_units   = F*(rho*cp0*mld_in)/dt # convert back to W/m2
+    
+    
+    Q           = np.zeros((nlon,nlat,ntime)) * np.nan
+    q           = Q.copy()
+    lbdT        = Q.copy()
+    for t in tqdm.tqdm(range(ntime)):
+        q[:,:,t]    = q_ori_units[:,:,t]
+        lbdT[:,:,t] = -lbd_ori_units[:,:,t]*T[:,:,t]
+        Q[:,:,t]    = q[:,:,t] + lbdT[:,:,t]
+    if debug:
+        return Q,q,lbdT
+    return Q
 
 def integrate_noentrain(lbd,F,T0=0,multFAC=True,debug=False):
     """
@@ -510,6 +516,36 @@ def integrate_entrain(h,kprev,lbd_a,F,T0=0,multFAC=True,debug=False):
         return T,damping_term,forcing_term,entrain_term,Td
     return T
 
+def method1(lbd,include_b=True):
+    a = 1-lbd
+    b = (1-np.exp(-lbd))/lbd
+    
+    if include_b:
+        mult = ((1-b)**2 + (1-b**2)*a + 2*b*a**2)/(1+a)
+    else:
+        mult = (1+a+b**2*(1-a)-2*(1-a**2))/(1+a)
+    return mult
+
+def method2(lbd,include_b=True,original=True):
+    a = 1-lbd
+    b = (1-np.exp(-lbd))/lbd
+    
+    
+    
+    # Calculate variance of Q
+    if original:
+        mid_term  = (b**2 * (1-a)) / (2 * (1+a)**2)
+    else:
+        mid_term  = (b**2 * (1-a)) / (2)
+    
+    if include_b:
+        last_term = b*(1-a)
+    else:
+        last_term = (1-a)
+    
+    mult = 1 + mid_term - last_term
+    return mult
+
 #%% Testing Inputs
 
 # Directories
@@ -519,11 +555,18 @@ output_path = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/
 limaskname = "limask180_FULL-HTR.npy" 
 
 # Model Params
+ampq       = True # Set to true to multiply stochastic forcing by a set value
 mconfig    = "SLAB_PIC"
-frcname    = "flxeof_25eofs_SLAB-PIC" #"uniform" "flxeof_5eofs_SLAB-PIC"
+frcname    = "flxeof_090pct_SLAB-PIC_eofcorr1" 
+#"flxeof_090pct_SLAB-PIC_eofcorr1"
+#"flxeof_q-ek_090pct_SLAB-PIC_eofcorr1" #"flxeof_090pct_SLAB-PIC_eofcorr1"
+#"flxeof_qek_50eofs_SLAB-PIC" #"uniform" "flxeof_5eofs_SLAB-PIC"
+#"flxeof_090pct_SLAB-PIC_eofcorr1"
 #"flxeof_5eofs_SLAB-PIC"
 #"flxeof_080pct_SLAB-PIC"
-runid      = "003"
+#flxeof_qek_50eofs_SLAB-PIC
+
+runid      = "008"
 pointmode  = 0 
 points     = [-30,50]
 bboxsim    = [-100,20,-20,90] # Simulation Box
@@ -533,8 +576,10 @@ t_end      = 12000 # Sim Length
 dt         = 3600*24*30 # Timestep
 T0         = 0 # Init Temp
 
+# Correction Method
+ampq = 3#0 = none 1 = old method, 2 = method 1, 3 = method 2
 
-expname    = "%sstoch_output_forcing%s_%iyr_run%s.npz" % (output_path,frcname,int(t_end/12),runid) 
+expname    = "%sstoch_output_forcing%s_%iyr_run%s_ampq%i.npz" % (output_path,frcname,int(t_end/12),runid,ampq) 
 
 lonf = -30
 latf = 50
@@ -584,7 +629,6 @@ if debug:
 forcing = make_forcing(alpha,runid,frcname,t_end,input_path)
 
 T_all = [] # Run 3 experiments
-
 for exp in range(3):
     if exp == 0:
         h_in = hblt.copy() # Used fixed slab model MLD
@@ -594,8 +638,28 @@ for exp in range(3):
     # Convert to w/m2
     # ---------------
     lbd_a   = convert_Wm2(damping,h_in,dt)
-    F       = convert_Wm2(forcing,h_in,dt)
-
+    F       = convert_Wm2(forcing,h_in,dt) # [lon x lat x time]
+    
+    #
+    # If Option is set, amplitfy F to account for underestimation
+    # -----------------------------------------------------------
+    if ampq:
+        a        = 1-lbd_a
+        a        = 1-lbd_a.mean(2)[...,None]
+        if ampq == 1:
+            print("Doing Old Correction")
+            underest = 2*a**2 / (1+a) # Var(Q) = underest*Var(q)
+        elif ampq == 2:
+            print("Correcting with method 1")
+            underest = method1(lbd_a.mean(2)[...,None])
+        elif ampq == 3:
+            print("Correcting with method 2")
+            underest = method2(lbd_a.mean(2)[...,None],original=False)
+            
+        ntile = int(t_end/a.shape[2])
+        ampmult = np.tile(1/np.sqrt(underest),ntile)
+        F *= ampmult
+    
     # Integrate Stochastic Model
     # --------------------------
     if exp < 2:
@@ -605,15 +669,21 @@ for exp in range(3):
     
     T_all.append(T)
     
+    if exp==0:
+        Q,q,lbdT = integrate_Q(lbd_a,F,T,h_in,debug=True)
+        
+    
 # Save the results
 np.savez(expname,**{
     'sst': T_all,
     'lon' : lonr,
-    'lat' : latr
+    'lat' : latr,
+    'Q': Q,
+    'q':q,
+    'lbdT':lbdT
     },allow_pickle=True)
 
 #%% Compare some results
-
 
 basemonth = 2
 kmonth   = basemonth - 1
