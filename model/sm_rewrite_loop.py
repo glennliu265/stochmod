@@ -116,7 +116,8 @@ latf = 50
 debug = False
 
 # Loop by forcing
-frcnames = ("flxeof_50eofs_SLAB-PIC_eofcorr2",
+frcnames = (
+            "flxeof_50eofs_SLAB-PIC_eofcorr2",
             "flxeof_25eofs_SLAB-PIC_eofcorr2",
             "flxeof_10eofs_SLAB-PIC_eofcorr2",
             "flxeof_5eofs_SLAB-PIC_eofcorr2",
@@ -129,6 +130,14 @@ st = time.time()
 for f in range(len(frcnames)):
     frcname    = frcnames[f]
     expname    = "%sstoch_output_forcing%s_%iyr_run%s_ampq%i.npz" % (output_path,frcname,int(t_end/12),runid,ampq) 
+    
+    # Check if results exist
+    query = glob.glob(expname)
+    if len(query) > 0:
+        overwrite = input("Found existing file(s) \n %s. \n Overwite? (y/n)" % (str(query)))
+    # Skip forcing
+    if overwrite == 'n':
+        continue
     
     scm.run_sm_rewrite(expname,mconfig,input_path,limaskname,
                        runid,t_end,frcname,ampq,
