@@ -114,9 +114,8 @@ frcnamelong = ["Basinwide Correction",
 
 #%% Post Process Outputs (Calculate AMV, Autocorrelation)
 for frcname in fnames:
-    #expid = "forcing%s_%iyr_run%s" % (frcname,nyrs,runid)
     expid = frcname
-    scm.postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags)
+    scm.postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,mask_pacific=True)
     print("Completed Post-processing for Experiment: %s" % expid)
     
 #%% Visualize AMV
@@ -147,7 +146,7 @@ lon = np.load(datpath+"lon.npy")
 lat = np.load(datpath+"lat.npy")
 
 # Load post-propcssed output
-# AMV_Region_forcingflxeof_5eofs_SLAB-PIC_1000yr_run001.npz
+
 ldpath = datpath + "proc/AMV_Region_%s.npz" % expid
 ld = np.load(ldpath,allow_pickle=True)
 
@@ -184,10 +183,6 @@ for p in range(len(amvpat)):
     cl = ax.contour(lon,lat,amvpat[p].T,levels=cl_int,colors="k",linewidths=0.5)
     ax.clabel(cl,levels=cl_int,fmt="%.2f",fontsize=8)
     
-    #pcm = ax.pcolormesh(lon,lat,amvpat[p].T,vmin=cint[0],vmax=cint[-1],cmap=cmocean.cm.balance)
-    #ax.set_title(modelnames[p])
-    #fig.colorbar(pcm,ax=ax,fraction=0.036)
-    
     ax.set_title("%s AMV " % (regions[regid]) + modelnames[p] + " ($\circ C$ per $\sigma_{AMV}$) \n Forcing: %s" % frcnamelong[fid])
     fig.colorbar(pcm,ax=ax,orientation='horizontal',shrink=0.75)#,pad=0.015)
     plt.savefig("%sAMV_Pattern_%s_region%s_model%s.png"%(figpath,expid,regions[regid],modelnames[p]),dpi=200,bbox_inches='tight')
@@ -203,8 +198,6 @@ for p in range(len(amvpat)):
 
 # Load in SSTs for each region
 sstdicts = []
-#runids = np.repeat("006",len(neofs))
-#runids = ["003"]#["002","002","002","002","002","003","003"] # Accomodate different RunIDs
 for f in range(len(fnames)):
     # Load the dictionary
     expid = fnames[f]

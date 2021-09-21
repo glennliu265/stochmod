@@ -982,7 +982,9 @@ def noentrain_2d(randts,lbd,T0,F,FAC,multFAC=1,debug=False):
     return temp_ts
 
 #%% Postprocessing Utilities
-def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,returnresults=False,preload=None):
+def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
+                            returnresults=False,preload=None,
+                            mask_pacific=False):
     """
     Script to postprocess stochmod output
     
@@ -996,6 +998,7 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,returnresults=
         7) preloaded - option to provide preloaded data. This is a three
              element array[lon,lat,ssts], where ssts is an array of sst for 
              each model [lon180 x lat x time]
+        8) mask_pacific - Set out True to mask out the tropical pacific below 20N
     
     Based on portions of analyze_stochoutput.py
     
@@ -1043,6 +1046,17 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,returnresults=
     lon = np.squeeze(loaddamp['LON1'])
     lat = np.squeeze(loaddamp['LAT'])
     
+    # Load and apply mask if option is set
+    if mask_pacific:
+        # Load the mask
+        msk = np.load(rawpath+"pacific_limask_180global.npy")
+        
+        # Select the region
+        mskreg,_,_ = proc.sel_region(msk,lon,lat,[lonr[0],lonr[-1],latr[0],latr[-1]])
+        
+        # Apply the mask to SST
+        sst *= mskreg
+        
     print("Data loaded in %.2fs" % (time.time()-start))
     
     #% ---- Get Regional Data ----
@@ -1057,8 +1071,7 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,returnresults=
             tsmodel = sst[model]
             sstr[model],_,_=proc.sel_region(tsmodel,lonr,latr,bbox)
         sstregion[r] = sstr
-        
-        
+    
     # ---- Calculate autocorrelation and Regional avg SST ----
     kmonths = {}
     autocorr_region = {}
