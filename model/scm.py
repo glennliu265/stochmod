@@ -2413,7 +2413,7 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
                 underest = method1(lbd_a.mean(2)[...,None])
             elif ampq == 3:
                 print("Correcting with method 2")
-                underest = method2(lbd_a.mean(2)[...,None],original=False)
+                underest = method2(lbd_a.mean(2)[...,None],original=False) # Original = uncorrected version with error
                 
             ntile = int(t_end/a.shape[2])
             ampmult = np.tile(1/np.sqrt(underest),ntile)

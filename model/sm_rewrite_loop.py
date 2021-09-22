@@ -19,7 +19,7 @@ import time
 
 #%% Set the location
 
-stormtrack = 1
+stormtrack = 0
 
 if stormtrack == 0:
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -125,6 +125,11 @@ frcnames = (
             "flxeof_2eofs_SLAB-PIC_eofcorr2",
             "flxeof_1eofs_SLAB-PIC_eofcorr2"
             )
+
+frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2_DJF',
+            'flxeof_090pct_SLAB-PIC_eofcorr2_MAM',
+            'flxeof_090pct_SLAB-PIC_eofcorr2_JJA',
+            'flxeof_090pct_SLAB-PIC_eofcorr2_SON')
 #%%
 st = time.time()
 for f in range(len(frcnames)):
