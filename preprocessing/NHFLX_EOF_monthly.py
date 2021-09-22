@@ -5,6 +5,11 @@
 Calculate EOFs for Surface Heat Flux Anomalies and prepare forcing for the
 stochastic model output
 
+(**) Indicates section needs to be run if output has not been generated,
+i.e. is optional if the script has been run before output saved elsewhere
+
+(@@) Indicates a plotting section
+
 Created on Tue Jul 20 11:49:09 2021
 
 @author: gliu
@@ -146,6 +151,7 @@ elif mconfig == "PIC_FULL":
 
 #%% Preprocess, EOF Analysis
 ntime,nlat,nlon = flxglob.shape
+nyr = int(ntime/12)
 
 #% SLP reshape and apply mask ------------------------------------------------
 slpglob = slpglob.reshape(ntime,nlat,nlon) # [yr x mon x lat x lon] to [time lat lon]
@@ -170,7 +176,7 @@ if debug:
     ax.scatter(t,flxa[:,latf,lonf],label="Detrended")
     ax.legend()
 
-# Apply Area Weight (to region) ----------------------------------------------
+#%% (**) Apply Area Weight (to region) ----------------------------------------------
 wgt = np.sqrt(np.cos(np.radians(lat)))
 
 #plt.plot(wgt)
@@ -198,7 +204,6 @@ slpwgt = slpa.reshape(ntime,nptsall) # Repeat for slp
 okslp  = slpwgt#[:,okpts]
 
 # Calculate Monthly Anomalies, change to [yr x mon x npts] -------------------
-nyr = int(ntime/12)
 okdata = okdata.reshape((nyr,12,npts))
 okdata = okdata - okdata.mean(0)[None,:,:]
 okdatar = okdatar.reshape((nyr,12,nptsr)) # Repeat for region
@@ -254,7 +259,7 @@ eofslp = eofslp.reshape(N_mode,12,nlat,nlon)
 eofslp = eofslp.transpose(3,2,1,0) # [lon x lat x mon x N]
 lon180,eofslp = proc.lon360to180(lon,eofslp.reshape(nlon,nlat,N_mode*12))
 eofslp = eofslp.reshape(nlon,nlat,12,N_mode)
-#%% Save the results
+#%% (**) Save the results
 bboxtext = "lon%ito%i_lat%ito%i" % (bbox[0],bbox[1],bbox[2],bbox[3])
 bboxstr  = "Lon %i to %i, Lat %i to %i" % (bbox[0],bbox[1],bbox[2],bbox[3])
 savename = "%sNHFLX_%s_%iEOFsPCs_%s.npz" % (datpath,mcname,N_mode,bboxtext)
@@ -292,7 +297,7 @@ lon = ld['lon']
 lat = ld['lat']
 
 
-#%%  Flip sign to match NAO+ (negative heat flux out of ocean/ -SLP over SPG)
+#%% Flip sign to match NAO+ (negative heat flux out of ocean/ -SLP over SPG)
 
 spgbox     = [-60,20,40,80]
 N_modeplot = 5
@@ -312,7 +317,7 @@ for N in tqdm(range(N_modeplot)):
             eofslp[:,:,m,N]*=-1
 
 # --------------------------------------------------
-#%% Check how much variance is explained by each EOF
+#%% (**) Check how much variance is explained by each EOF
 # --------------------------------------------------
 # !! WARNING: Long runtime, not necessary ... see section below
 
@@ -346,7 +351,7 @@ lon180,flx180 = proc.lon360to180(lon360,flxa.transpose(2,1,0))
 flx180        = flx180.reshape(nlon,nlat,nyr,12).transpose(0,1,3,2) # lon x lat x mon x year
 
 
-#%% Now check the variance percentange for a specific point
+#%% (**) Now check the variance percentange for a specific point
 lonf = -30
 latf = 50
 klon180,klat = proc.find_latlon(lonf,latf,lon180,lat)
@@ -370,7 +375,7 @@ ax.legend()
 #nhflx_reconstr = eofall[...,None] * pcall.transpose(1,0,2)[None,None,:,:,:]
 
 
-#%% Now calculate the variance explained using sum of squares
+#%% (**) Now calculate the variance explained using sum of squares
 
 debug = False
 test_mode_index = np.arange(0,N_mode,1)
@@ -404,7 +409,7 @@ varflx_ori = ld['varflx_ori']
 varflx_ratio = ld['varflx_ratio']
 
 # -----------------
-#%% Save as netcdf
+#%% (**) Save as netcdf
 # ------------------
 mode_number = np.arange(1,N_mode+1,1)
 months = np.arange(1,13,1)
@@ -435,7 +440,7 @@ for v,invar in enumerate([varflx_EOF,varflx_ori,varflx_ratio]):
     
     das.append(da)
     
-#%% Make some plots
+#%% (@@) Make some plots (compatible only if it the above section has been run)
 N_mode_plot = 4
 month       = 0
 vlm         = [0.5,1]
@@ -538,7 +543,6 @@ ax.set_title("Number of EOFs required \n to explain %i"%(vthres*100)+"% of the N
 #ax.set_yticks(ytk)
 ax.set_ylabel("# EOFs")
 ax.grid(True,ls='dotted')
-
 plt.savefig("%s%s_NHFLX_EOFs%i_%s_NumEOFs_%ipctvar_bymon.png"%(outpath,mcname,N_mode,bboxtext,vthres*100),dpi=150)
 
 # -------------------------------------------------------------------------
@@ -605,6 +609,25 @@ ax.set_xlim([1,N_modeplot])
 #ax.set_xticks(xtk)
 #plt.savefig("%sSLAB-PIC_NHFLX_EOFs%i_%s_ModevCumuVariance_bymon.png"%(outpath,N_modeplot,bboxtext),dpi=150)
 
+# ------------------------------------------------------------
+# %% Reload and save a monthly version of one of the outputs
+# ------------------------------------------------------------
+
+# Trying to do something fancy, ignore this for now lets hard code it...
+# mons1   = [i[0] for i in mons3]
+# monsave = [11,0,1]
+# monname = np.array(mons1)[monsave].tolist()
+# monname = [''.join(i) for i in monname]
+monids   = [[11,0,1],[2,3,4],[5,6,7],[8,9,10]]
+monnames = ("DJF","MAM","JJA","SON")
+for s in tqdm(range(4)):
+    # Calculate seasonal average
+    eofseas = np.mean(eofforce[:,:,:,monids[s]],-1,keepdims=True)
+    
+    # Save the output
+    savenamefrc = "%sflxeof_%03ipct_%s_eofcorr%i_%s.npy" % (datpath,vthres*100,mcname,eofcorr,monnames[s])
+    print("Saving to %s"%savenamefrc)
+    np.save(savenamefrc,eofforce)
 #%%Do some analysis/visualization
 # Plot the map of ratio  NHFLX(n-percent EOF)/NHFLX_SLAB
 plot_contours = True
