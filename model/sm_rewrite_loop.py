@@ -19,7 +19,7 @@ import time
 
 #%% Set the location
 
-stormtrack = 0
+stormtrack = 1
 
 if stormtrack == 0:
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -116,6 +116,8 @@ latf = 50
 debug = False
 
 # Loop by forcing
+
+# Testing different # of EOFs
 frcnames = (
             "flxeof_50eofs_SLAB-PIC_eofcorr2",
             "flxeof_25eofs_SLAB-PIC_eofcorr2",
@@ -126,10 +128,28 @@ frcnames = (
             "flxeof_1eofs_SLAB-PIC_eofcorr2"
             )
 
-frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2_DJF',
+# Testing seasonal EOFs
+frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2',
+            'flxeof_090pct_SLAB-PIC_eofcorr2_DJF',
             'flxeof_090pct_SLAB-PIC_eofcorr2_MAM',
             'flxeof_090pct_SLAB-PIC_eofcorr2_JJA',
             'flxeof_090pct_SLAB-PIC_eofcorr2_SON')
+
+
+frcnames = ('flxeof_EOF1_SLAB-PIC_eofcorr2',
+            'flxeof_EOF2_SLAB-PIC_eofcorr2')
+
+
+# Testing different # of EOFs, simpler correction
+frcnames = (
+            "flxeof_50eofs_SLAB-PIC_eofcorr1",
+            "flxeof_25eofs_SLAB-PIC_eofcorr1",
+            "flxeof_10eofs_SLAB-PIC_eofcorr1",
+            "flxeof_5eofs_SLAB-PIC_eofcorr1",
+            "flxeof_3eofs_SLAB-PIC_eofcorr1",
+            "flxeof_2eofs_SLAB-PIC_eofcorr1",
+            "flxeof_1eofs_SLAB-PIC_eofcorr1"
+            )
 #%%
 st = time.time()
 for f in range(len(frcnames)):
