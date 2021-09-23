@@ -161,7 +161,7 @@ fnames = (
             "forcingflxeof_1eofs_SLAB-PIC_eofcorr1_1000yr_runtest009_ampq3"
             )
 
-## By Number of EOFs (basinwide correction)
+## By Number of EOFs (no correction)
 fnames = (
             "forcingflxeof_50eofs_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3",
             "forcingflxeof_25eofs_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3",

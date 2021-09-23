@@ -136,8 +136,8 @@ frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2',
             'flxeof_090pct_SLAB-PIC_eofcorr2_SON')
 
 
-frcnames = ('flxeof_EOF1_SLAB-PIC_eofcorr2',
-            'flxeof_EOF2_SLAB-PIC_eofcorr2')
+frcnames = ('flxeof_EOF1_SLAB-PIC_eofcorr1',
+            'flxeof_EOF2_SLAB-PIC_eofcorr1')
 
 
 # Testing different # of EOFs, simpler correction
@@ -149,6 +149,19 @@ frcnames = (
             "flxeof_3eofs_SLAB-PIC_eofcorr1",
             "flxeof_2eofs_SLAB-PIC_eofcorr1",
             "flxeof_1eofs_SLAB-PIC_eofcorr1"
+            )
+
+frcnames = ('flxeof_EOF1_SLAB-PIC_eofcorr1',
+            'flxeof_EOF2_SLAB-PIC_eofcorr1')
+
+frcnames = (
+            "flxeof_50eofs_SLAB-PIC_eofcorr0",
+            "flxeof_25eofs_SLAB-PIC_eofcorr0",
+            "flxeof_10eofs_SLAB-PIC_eofcorr0",
+            "flxeof_5eofs_SLAB-PIC_eofcorr0",
+            "flxeof_3eofs_SLAB-PIC_eofcorr0",
+            "flxeof_2eofs_SLAB-PIC_eofcorr0",
+            "flxeof_1eofs_SLAB-PIC_eofcorr0"
             )
 #%%
 st = time.time()
