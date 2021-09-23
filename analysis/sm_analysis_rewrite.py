@@ -133,7 +133,7 @@ fnames = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_DJF_1000yr_run009_ampq3',
             'forcingflxeof_090pct_SLAB-PIC_eofcorr2_JJA_1000yr_run009_ampq3',
             'forcingflxeof_090pct_SLAB-PIC_eofcorr2_SON_1000yr_run009_ampq3')
 
-## By Number of EOFs
+## By Number of EOFs (local correction)
 fnames = (
             "forcingflxeof_50eofs_SLAB-PIC_eofcorr2_1000yr_runtest009_ampq3",
             "forcingflxeof_25eofs_SLAB-PIC_eofcorr2_1000yr_runtest009_ampq3",
@@ -143,7 +143,23 @@ fnames = (
             "forcingflxeof_2eofs_SLAB-PIC_eofcorr2_1000yr_runtest009_ampq3",
             "forcingflxeof_1eofs_SLAB-PIC_eofcorr2_1000yr_runtest009_ampq3"
             )
+fnames = ("forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run009_ampq3",)
 
+## NAO and EAP
+fnames = ("forcingflxeof_EOF1_SLAB-PIC_eofcorr1_1000yr_runtest009_ampq3",
+          "forcingflxeof_EOF2_SLAB-PIC_eofcorr1_1000yr_runtest009_ampq3")
+
+
+## By Number of EOFs (basinwide correction)
+fnames = (
+            "forcingflxeof_50eofs_SLAB-PIC_eofcorr1_1000yr_runtest009_ampq3",
+            "forcingflxeof_25eofs_SLAB-PIC_eofcorr1_1000yr_runtest009_ampq3",
+            "forcingflxeof_10eofs_SLAB-PIC_eofcorr1_1000yr_runtest009_ampq3",
+            "forcingflxeof_5eofs_SLAB-PIC_eofcorr1_1000yr_runtest009_ampq3",
+            "forcingflxeof_3eofs_SLAB-PIC_eofcorr1_1000yr_runtest009_ampq3",
+            "forcingflxeof_2eofs_SLAB-PIC_eofcorr1_1000yr_runtest009_ampq3",
+            "forcingflxeof_1eofs_SLAB-PIC_eofcorr1_1000yr_runtest009_ampq3"
+            )
 #%% Post Process Outputs (Calculate AMV, Autocorrelation)
 for frcname in tqdm(fnames):
     expid = frcname
