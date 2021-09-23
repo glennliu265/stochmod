@@ -160,6 +160,17 @@ fnames = (
             "forcingflxeof_2eofs_SLAB-PIC_eofcorr1_1000yr_runtest009_ampq3",
             "forcingflxeof_1eofs_SLAB-PIC_eofcorr1_1000yr_runtest009_ampq3"
             )
+
+## By Number of EOFs (basinwide correction)
+fnames = (
+            "forcingflxeof_50eofs_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3",
+            "forcingflxeof_25eofs_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3",
+            "forcingflxeof_10eofs_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3",
+            "forcingflxeof_5eofs_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3",
+            "forcingflxeof_3eofs_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3",
+            "forcingflxeof_2eofs_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3",
+            "forcingflxeof_1eofs_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3"
+            )
 #%% Post Process Outputs (Calculate AMV, Autocorrelation)
 for frcname in tqdm(fnames):
     expid = frcname
