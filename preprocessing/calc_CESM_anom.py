@@ -127,7 +127,7 @@ else:
     
     # Load in values
     st = start()
-    ts    = ds.TS.values
+    ts    = ds[vname].values
     lon   = ds.lon.values
     lat   = ds.lat.values
     times = ds.time.values
