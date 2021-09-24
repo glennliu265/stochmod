@@ -1017,10 +1017,10 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
     allstart = time.time()
     
     # Regional Analysis Settings
-    bbox_SP = [-60,-15,40,65]
-    bbox_ST = [-80,-10,20,40]
-    bbox_TR = [-75,-15,0,20]
-    bbox_NA = [-80,0 ,0,65]
+    bbox_SP     = [-60,-15,40,65]
+    bbox_ST     = [-80,-10,20,40]
+    bbox_TR     = [-75,-15,10,20]
+    bbox_NA     = [-80,0 ,0,65]
     bbox_NA_new = [-80,0,10,65]
     regions = ("SPG","STG","TRO","NAT","NNAT")        # Region Names
     bboxes = (bbox_SP,bbox_ST,bbox_TR,bbox_NA,bbox_NA_new) # Bounding Boxes
@@ -1284,6 +1284,17 @@ def synth_stochmod(config,verbose=False,viz=False,
     -------
     None.
     """
+    debug = False
+    if debug:
+        verbose=False
+        viz=False
+        dt=3600*24*30
+        rho=1026
+        cp0=3996
+        hfix=50
+        T0=0
+        projpath=None
+        specparams=None
     
     if projpath is None:
         projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
@@ -1313,6 +1324,7 @@ def synth_stochmod(config,verbose=False,viz=False,
             print("Loading Old Forcing")
     
     # Select Forcing [lon x lat x mon]
+    forcing_flag = False
     if config['fname'] == 'NAO':
         forcing = forcing[:,:,0,:]
     elif config['fname'] == 'EAP':
@@ -1321,8 +1333,10 @@ def synth_stochmod(config,verbose=False,viz=False,
         forcing = forcing[:,:,2,:]
     elif config['fname'] == 'FLXSTD':
         forcing = np.load("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/SLAB_PIC_NHFLXSTD_Forcing_MON.npy")
-    elif config['fname'] == 'EOF':
-        forcing = np.load()
+    #elif config['fname'] == 'EOF':
+    else:
+        forcing = np.load(input_path+config['fname']) # [lon180, lat, pc, time]
+        forcing_flag = True # Use make forcing
     
     
     # Restrict input parameters to point (or regional average)
@@ -1330,6 +1344,15 @@ def synth_stochmod(config,verbose=False,viz=False,
                           damping,mld,kprevall,forcing)
     [o,a],damppt,mldpt,kprev,Fpt = params
     kmonth = mldpt.argmax()
+    if forcing_flag:# Make special forcing
+        # Find the point
+        fpt_in = forcing[o,a,...]
+        #Fpt = fpt_in
+        # params= list(params)
+        # params[-1] = fpt_in
+        # params = tuple(params)
+        Fpt = make_forcing_pt(fpt_in,config['runid'],config['fname'],config['t_end'],input_path,check=False)
+        
     print("Restricted Parameters to Point. Kmonth is %i"%kmonth)
     
     # Apply 3 month smoothing if option is set
@@ -1345,6 +1368,7 @@ def synth_stochmod(config,verbose=False,viz=False,
     if 'Fpt' in config:
         Fpt = config['Fpt']
         synthflag.append('forcing')
+        forcing_flag=False # Turn off the forcing Flag
     if 'damppt' in config:
         damppt = config['damppt']
         synthflag.append('damping')
@@ -1360,22 +1384,48 @@ def synth_stochmod(config,verbose=False,viz=False,
     Fh = {}
     nyrs = int(config['t_end']/12)
     
-    if config['applyfac'] in [0,3]: # White Noise Forcing, unscaled by MLD
-        for h in range(3):
-            Fh[h] = randts * np.tile(Fpt,nyrs)
-    else: # White Noise Forcing + MLD
-        for h in range(3):
-            if h == 0: # Fixed 50 meter MLD
-                Fh[h] = randts * np.tile(Fpt,nyrs) * (dt/(cp0*rho*hfix))
-            elif h == 1: # Seasonal Mean MLD
-                Fh[h] = randts * np.tile(Fpt,nyrs) * (dt/(cp0*rho*mldmean))
-            elif h == 2: # Seasonall Varying mean MLD
-                Fh[h] = randts * np.tile(Fpt/mldpt,nyrs) * (dt/(cp0*rho))
+    if forcing_flag: # Forcing is already set up
+        if config['applyfac'] in [0,3]: # White Noise Forcing, unscaled by MLD
+            for h in range(3):
+                Fh[h] = Fpt
+        else:
+            for h in range(3):
+
+                
+                if h == 0:# Fixed 50 meter MLD
+                    hmult = hfix
+                if h == 1:
+                    hmult = mldmean
+                if h == 2:
+                    hmult = np.tile(mldpt,nyrs)
+                
+                Fh[h] = Fpt * (dt/(cp0*rho*hmult))
+
+    else:
+        if config['applyfac'] in [0,3]: # White Noise Forcing, unscaled by MLD
+            for h in range(3):
+                Fh[h] = randts * np.tile(Fpt,nyrs)
+        else: # White Noise Forcing + MLD
+            for h in range(3):
+                if h == 0: # Fixed 50 meter MLD
+                    Fh[h] = randts * np.tile(Fpt,nyrs) * (dt/(cp0*rho*hfix))
+                elif h == 1: # Seasonal Mean MLD
+                    Fh[h] = randts * np.tile(Fpt,nyrs) * (dt/(cp0*rho*mldmean))
+                elif h == 2: # Seasonall Varying mean MLD
+                    Fh[h] = randts * np.tile(Fpt/mldpt,nyrs) * (dt/(cp0*rho))
     
     # Convert Parameters
     lbd,lbd_entr,FAC,beta = set_stochparams(mldpt,damppt,dt,ND=False,hfix=hfix,hmean=mldmean)
     if verbose:
         print("Completed parameter setup!")
+    
+    # Apply correction factor (if set)
+    if config['method'] == 3:
+        for i in range(3):
+            
+            underest = method2(lbd[i].mean(),original=False) # Original = uncorrected version with error
+            ampmult = 1/underest
+            Fh[i] *= ampmult
     
     # Run the stochastic model
     multFAC = 0
@@ -1398,6 +1448,8 @@ def synth_stochmod(config,verbose=False,viz=False,
         print("Model Runs Complete!")
     
     # Reassign Params
+    if forcing_flag:
+        Fpt = fpt_in
     params = ([o,a],damppt,mldpt,kprev,Fpt)
     
     
@@ -1961,6 +2013,7 @@ def load_inputs(mconfig,frcname,input_path):
     
     return lon,lat,h,kprevall,damping,alpha
 
+
 def make_forcing(alpha,runid,frcname,t_end,input_path,check=True):
     """
     forcing = make_forcing(alpha,runid,frcname,t_end,input_path)
@@ -2053,6 +2106,90 @@ def make_forcing(alpha,runid,frcname,t_end,input_path,check=True):
     # Remake into 3D [lon x lat x time]
     if len(forcing.shape)<3:
         forcing = forcing[None,None,:]
+    return forcing
+
+
+def make_forcing_pt(alpha,runid,frcname,t_end,input_path,check=True):
+    """
+    1-D version of make_forcing_pt
+    forcing = make_forcing(alpha,runid,frcname,t_end,input_path)
+    
+    Scale a white noise time series N(0,1) of length [t_end] by the
+    given forcing amplitude [alpha]. Checks for existing file in input_path
+    based on runid. "allrandom" forcings will have a separately generated
+    timeseries for each point.
+    
+    Parameters
+    ----------
+    alpha : ARRAY [pc x mon (or time)]
+        Stochastic forcing amplitudes
+    runid : STR
+        ID of the run (user-assigned)
+    frcname : STR
+        Name of forcing. Supports ["allrandom","uniform"] or loads "[frcname].npy"
+    t_end : NUMERIC
+        Length of simulation (in units of dt)
+    input_path : STR
+        Path to load/save white noise timeseries
+    check : BOOL
+        Set to True to check before ovewriting forcing
+    
+    Returns
+    -------
+    forcing : ARRAY [lon180 x lat x pc x time]
+        Forcing for stochastic model, in units of W/m2
+
+    """
+    
+    # Get the dimensions
+    N_mode,nmon = alpha.shape
+    
+    # Append extra symbols for "allrandom" forcing, make filename
+    outname = "%srandts_%s_%imon_pt.npy" % (input_path,runid,t_end)
+    
+    # Check/make random stochastic time series
+    query = glob.glob(outname)
+    if len(query) < 1: # Generate NEW random timeseries if nothing is found
+        print("Generating new forcing for runid %s..."% runid)
+        
+        # Generate white noise
+        randts = np.random.normal(0,1,(N_mode,t_end)) # [pc,time]
+        
+        # Save forcing
+        np.save(outname,randts)
+        
+    else: # Either overwrite or load new timeseries, based on user prompt
+        if check:
+            overwrite = input("Found existing file(s) \n %s. \n Overwite? (y/n)" % (str(query)))
+        else:
+            overwrite = "n" # Don't overwrite for loops, dont ask for prompt
+        
+        if overwrite == "y": # Generate new timeseries
+            print("Generating new forcing for runid %s..."% runid)
+            
+            # Generate white noise
+            randts = np.random.normal(0,1,(N_mode,t_end)) # [1 x 1 x pc x time]
+            
+            # Save forcing
+            np.save(outname,randts)
+        elif overwrite == "n": # Load old series
+            print("Loading existing random timeseries")
+            randts = np.load(outname)
+        else:
+            print("Invalid input, must be 'y' or 'n'")
+    # Resultant randts should be 4-D [lon x lat x pc x time]
+    
+    # Scale the forcing with the timeseries
+    alpha_tile = alpha.copy()
+    if t_end != nmon:
+        ntile      = int(t_end/nmon)
+        alpha_tile = np.tile(alpha_tile,ntile) #[lon x lat x pc x time]
+    forcing = alpha_tile * randts[:N_mode,:]
+    
+    # Sum the PCs for the forcing
+    if N_mode > 1:
+        forcing = forcing.sum(0)
+    forcing = forcing.squeeze()
     return forcing
     
 def cut_regions(inputs,lon,lat,bboxsim,pointmode,points=[-30,50],awgt=1):
