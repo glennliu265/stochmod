@@ -76,47 +76,7 @@ def preprocess(ds):
     ds = ds.isel(lev=-1)
     return ds
 
-def numpy_to_da(invar,time,lat,lon,varname,savenetcdf=None):
-    """
-    from cvd-12860 tutorials
-    Usage: da = numpy_to_da(invar,lon,lat,time,varname)
-    
-    Converts a NumPy array into an xr.DataArray with the same
-    coordinates as the provided arrays.
-    
-    Parameters
-    ----------
-    invar : 3D ARRAY[time x lat x lon]
-        Input variable
-    lon :   1D ARRAY[lon]
-        Longitude
-    lat : 1D ARRAY[lat]
-        Latitude
-    time : 1D ARRAY[time]
-        Time
-    varname : STR
-        Name of the variable
-    savenetcdf : STR 
-        If string argument is provided, saves as netcdf to the
-        path indicated by the string. Default is None.
 
-    Returns
-    -------
-    da : xr.DataArray
-    """
-    
-    da = xr.DataArray(invar,
-                dims={'time':time,'lat':lat,'lon':lon},
-                coords={'time':time,'lat':lat,'lon':lon},
-                name = varname
-                )
-    if savenetcdf is None:
-        return da
-    else:
-        print("Saving netCDF to %s"%savenetcdf)
-        da.to_netcdf(savenetcdf,
-                 encoding={varname: {'zlib': True}})
-        return da
 
 def start():
     return time.time()
@@ -127,7 +87,7 @@ outpath = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/TS/"
 
 # Variable selection
 mconfig   = "FULL"
-vname     = "TS"
+vname     = "wind"
 debug     = True
 varlist   = [vname,'time','lat','lon','lev']
 
@@ -136,7 +96,6 @@ use_loop  = False # Set true to loop and load individually
 # For CESM-SLAB, TS the time differences were quite negligible:
 # open_mfdataset() : 3m 23s
 # loop             : 3m 25s
-
 #%% Main Script
 
 print("Loading %s from PIC-%s" % (vname,mconfig))
@@ -190,8 +149,8 @@ print(tsanom.shape)
 print_time(line="Calculated Anomaly ")
 
 # Create DataArrays
-da_tsanom = numpy_to_da(tsanom,times,lat,lon,vname,savenetcdf=None)
-da_tsclim = numpy_to_da(climts,np.arange(1,13,1),lat,lon,vname+"_clim",savenetcdf=None)
+da_tsanom = proc.numpy_to_da(tsanom,times,lat,lon,vname,savenetcdf=None)
+da_tsclim = proc.numpy_to_da(climts,np.arange(1,13,1),lat,lon,vname+"_clim",savenetcdf=None)
 
 # Save Anomaly NetCDF
 st = start()
@@ -209,6 +168,4 @@ da_tsclim.to_netcdf(savename,
                   })
 print_time(line="Saved to %s " % savename)
 
-
 # Note: for comparisons of compression/precision loss, please use the ipython notebook...
-
