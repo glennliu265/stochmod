@@ -83,11 +83,11 @@ def start():
 #%% User Edits
 
 # Saving location
-outpath = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/TS/"
+outpath = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/wind/"
 
 # Variable selection
 mconfig   = "FULL"
-vname     = "wind"
+vname     = "U"
 debug     = True
 varlist   = [vname,'time','lat','lon','lev']
 
