@@ -4,7 +4,8 @@
 Calculate and Visualize AMV
 from CESM PiC Runs
 
-Postprocesses output the same was as stochastic model output
+- Postprocesses output the same was as stochastic model output
+
 
 Created on Mon May 24 22:55:19 2021
 
@@ -23,8 +24,6 @@ from scipy.io import loadmat
 import sys
 import cartopy.crs as ccrs
 
-
-
 import cmocean
 
 import sys
@@ -36,40 +35,59 @@ import yo_box as ybx
 
 #%% User Edits
 
+# Path to data 
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 outpath = projpath + '02_Figures/20210810/'
 proc.makedir(outpath)
-
 datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/"
 
+
 bbox = [-80,0 ,0,60]
-
+#bboxplot = 
 runmean=True
+ensorem = False # Set to True to use ENSO-removed data
 
+# Use separate landice mask for each
+limasks = (datpath+"CESM-FULL_landicemask360.npy",
+           datpath+"CESM-SLAB_landicemask360.npy"
+           )
 #% ----------------------
 #%% Load PiC Data
 #% ----------------------
 st = time.time()
-# Load full sst data from model
-ld  = np.load(datpath+"FULL_PIC_ENSOREM_TS_lag1_pcs2_monwin3.npz" ,allow_pickle=True)
-sstfull = ld['TS']
-ld2 = np.load(datpath+"SLAB_PIC_ENSOREM_TS_lag1_pcs2_monwin3.npz" ,allow_pickle=True)
-sstslab = ld2['TS']
-
+# Load full sst data from model # [time x lat x lon]
+if ensorem: # Load full field with ENSO removed
+    ld  = np.load(datpath+"FULL_PIC_ENSOREM_TS_lag1_pcs2_monwin3.npz" ,allow_pickle=True)
+    sstfull = ld['TS']
+    ld2 = np.load(datpath+"SLAB_PIC_ENSOREM_TS_lag1_pcs2_monwin3.npz" ,allow_pickle=True)
+    sstslab = ld2['TS']
+    remove_anom=True
+else: # Load anomalies without ENSO removal (~82 sec)
+    ssts     = []
+    mconfigs = ["FULL","SLAB"]
+    for i in range(2):
+        ds = xr.open_dataset(datpath+"CESM_proc/"+"TS_anom_PIC_%s.nc"%(mconfigs[i]))
+        sst = ds.TS.values
+        ssts.append(sst)
+    sstfull,sstslab = ssts
+    remove_anom=False
+    
 # Load lat/lon
 lat    = loadmat("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/CESM1_LATLON.mat")['LAT'].squeeze()
 lon360 = loadmat("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/CESM1_LATLON.mat")['LON'].squeeze()
 
 print("Loaded PiC Data in %.2fs"%(time.time()-st))
-
 # --------------
 #%% Preprocessing
 # --------------
-
-def preproc_CESMPIC(sst):
+st = time.time()
+def preproc_CESMPIC(sst,remove_anom=True,limask=None):
     
     # Apply Land/Ice Mask
-    mask = np.load(datpath+"landicemask_enssum.npy")
+    if limask is None:
+        mask = np.load(datpath+"landicemask_enssum.npy")
+    else:
+        mask = np.load(limask)
     sst = sst * mask[None,:,:]
     
     # Adjust dimensions [time x lat x lon] --> [lon x lat x time]
@@ -82,28 +100,27 @@ def preproc_CESMPIC(sst):
     
     # Remove monthly anomalies
     st = time.time()
-    nlon,nlat,ntime = sst.shape
-    sst = sst.reshape(nlon,nlat,int(ntime/12),12)
-    ssta = sst - sst.mean(2)[:,:,None,:]
-    print("Deseasoned in %.2fs"%(time.time()-st))
-    print("Mean was %e" % (np.nanmax(ssta.mean(2))))
-    
-    ssta = ssta.reshape(nlon,nlat,int(ntime/12)*12)
-    
+    if remove_anom:
+        nlon,nlat,ntime = sst.shape
+        sst = sst.reshape(nlon,nlat,int(ntime/12),12)
+        ssta = sst - sst.mean(2)[:,:,None,:]
+        print("Deseasoned in %.2fs"%(time.time()-st))
+        print("Mean was %e" % (np.nanmax(ssta.mean(2))))
+        ssta = ssta.reshape(nlon,nlat,int(ntime/12)*12)
+    else:
+        ssta = sst
     return ssta,lon180
-
 
 # Preprocess (Apply Land/ice Mask, Adjust Dimensions, Remove Anomalies)
 sstas = []
 for sst in [sstfull,sstslab]:
-    ssta,lon180 = preproc_CESMPIC(sst)
+    ssta,lon180 = preproc_CESMPIC(sst,remove_anom=remove_anom,limask=limasks[i])
     sstas.append(ssta)
 
 sstfulla,sstslaba = sstas
 nlon,nlat,ntimef  = sstfulla.shape
 _,_,ntimes        = sstslaba.shape
-
-
+print("Lpreprocessed PiC Data in %.2fs"%(time.time()-st))
 
 # # # Apply Land/Ice Mask
 # # mask = np.load(datpath+"landicemask_enssum.npy")
@@ -142,7 +159,7 @@ _,_,ntimes        = sstslaba.shape
 # currently written with paths on local device (not stormtrack)
 
 #% ---- Inputs
-expid       = "CESM1-PIC"
+expid       = "CESM1-PIC_ensorem%i" % (ensorem)
 projpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 datpath     = projpath + '01_Data/model_output/'
 rawpath     = projpath + '01_Data/model_input/'
@@ -152,8 +169,69 @@ outpathdat  = datpath + '/proc/'
 preload = [lon180,lat,sstas]
 lags    = np.arange(0,37,1)
 
-#
+# 
 scm.postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,preload=preload,mask_pacific=True)
+#%% Load data preprocessed above
+
+# Load data for CESM1-PIC
+cesmacs= []
+expid      = "CESM1-PIC"
+rsst_fn    = "%s/proc/AMV_Region_%s.npz" % (datpath+"model_output/",expid)
+ldc        = np.load(rsst_fn,allow_pickle=True)
+cesmpat = ldc['amvpat_region'].item()[3] # Just take North Atlantic
+cesmidx = ldc['amvidx_region'].item()[3] # Just take North Atlantic
+
+# Load global lat/lon
+clon,clat  = scm.load_latlon(datpath+"model_input/")
+
+# ------------------------------------------
+# %% Load and postprocess HadISST and ERSST
+# ------------------------------------------
+
+
+# Load in the Datasets **********************
+# Already detrended.
+st = time.time()
+#datpath2 = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/"
+hsst,hlat,hlon = scm.load_hadisst(datpath,method=2,startyr=1900,grabpoint=None)
+print("Completed in %.2fs" % (time.time()-st))
+
+st = time.time()
+#datpath2 = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/"
+esst,elat,elon = scm.load_ersst(datpath,method=2,startyr=1900,grabpoint=None)
+elon,esst = proc.lon360to180(elon,esst)
+print("Completed in %.2fs" % (time.time()-st))
+
+# Load in the Datasets **********************
+# Calculate AMV (North Atlantic)
+
+
+lons = [hlon,elon]
+lats = [hlat,elat]
+ssts = [hsst,esst]
+
+oidxs = []
+opats = []
+for s in range(2):
+    amvidx,amvpattern = proc.calc_AMVquick(ssts[s],lons[s],lats[s],bbox,order=5,cutofftime=10,anndata=False,runmean=runmean)
+    oidxs.append(amvidx)
+    opats.append(amvpattern)
+
+
+
+#%% Set up arrays for plotting
+
+
+amvids = [oid]
+
+
+
+fig,axs = plt.subplots(1,4,subplot_kw={'projection':ccrs.PlateCarree()})
+ax = viz.add_coast_grid(ax,bbox=bboxplot)
+
+
+
+#%% Old Scripts **************************************************************
 
 # -----------------
 #%% Calculate AMV
@@ -165,9 +243,9 @@ pats = []
 for sst in sstas:
     
     amvidx,amvpattern=proc.calc_AMVquick(sst,lon180,lat,bbox,order=5,cutofftime=10,anndata=False,runmean=runmean)
-    
     idxs.append(amvidx)
     pats.append(amvpattern)
+
 
 
 
