@@ -26,7 +26,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20210920/"
+    figpath     = projpath + "02_Figures/20210922/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -128,6 +128,52 @@ frcnamelong = ["Basinwide Correction (Old)",
             ]
 exoutnameraw = "new_v_old_q-correction"
 
+## Seasonal Variation
+fnames =   ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run009_ampq3',
+            'forcingflxeof_090pct_SLAB-PIC_eofcorr2_DJF_1000yr_run009_ampq3',
+            'forcingflxeof_090pct_SLAB-PIC_eofcorr2_MAM_1000yr_run009_ampq3',
+            'forcingflxeof_090pct_SLAB-PIC_eofcorr2_JJA_1000yr_run009_ampq3',
+            'forcingflxeof_090pct_SLAB-PIC_eofcorr2_SON_1000yr_run009_ampq3')
+frcnamelong = ("Annual","Winter","Spring","Summer","Fall")
+exname = "seasonal"
+
+
+# ## By Number of EOFs
+# fnames =  (
+#             "forcingflxeof_50eofs_SLAB-PIC_eofcorr2_1000yr_runtest009_ampq3",
+#             "forcingflxeof_25eofs_SLAB-PIC_eofcorr2_1000yr_runtest009_ampq3",
+#             "forcingflxeof_10eofs_SLAB-PIC_eofcorr2_1000yr_runtest009_ampq3",
+#             "forcingflxeof_5eofs_SLAB-PIC_eofcorr2_1000yr_runtest009_ampq3",
+#             "forcingflxeof_3eofs_SLAB-PIC_eofcorr2_1000yr_runtest009_ampq3",
+#             "forcingflxeof_2eofs_SLAB-PIC_eofcorr2_1000yr_runtest009_ampq3",
+#             "forcingflxeof_1eofs_SLAB-PIC_eofcorr2_1000yr_runtest009_ampq3"
+#             )
+# frcnamelong = ["%02i EOFs" % i for i in [50,25,10,5,3,2,1]]
+# exname = "numEOFs"
+
+
+# NAO and EAF
+fnames = (
+    "forcingflxeof_EOF1_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3",
+    "forcingflxeof_EOF2_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3",
+    "forcingflxeof_2eofs_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3",
+    
+    )
+exname = "NAO_EAP"
+
+# # Number of EOFs (eof1)
+# fnames =  (
+#             "forcingflxeof_50eofs_SLAB-PIC_eofcorr1_1000yr_runtest009_ampq3",
+#             "forcingflxeof_25eofs_SLAB-PIC_eofcorr1_1000yr_runtest009_ampq3",
+#             "forcingflxeof_10eofs_SLAB-PIC_eofcorr1_1000yr_runtest009_ampq3",
+#             "forcingflxeof_5eofs_SLAB-PIC_eofcorr1_1000yr_runtest009_ampq3",
+#             "forcingflxeof_3eofs_SLAB-PIC_eofcorr1_1000yr_runtest009_ampq3",
+#             "forcingflxeof_2eofs_SLAB-PIC_eofcorr1_1000yr_runtest009_ampq3",
+#             "forcingflxeof_1eofs_SLAB-PIC_eofcorr1_1000yr_runtest009_ampq3"
+#             )
+# frcnamelong = ["%02i EOFs" % i for i in [50,25,10,5,3,2,1]]
+# exname = "numEOFs"
+
 #%% Functions
 def calc_conflag(ac,conf,tails,n):
     cflags = np.zeros((len(ac),2))
@@ -142,12 +188,14 @@ def calc_conflag(ac,conf,tails,n):
 # Regional Analysis Settings
 bbox_SP = [-60,-15,40,65]
 bbox_ST = [-80,-10,20,40]
-bbox_TR = [-75,-15,0,20]
+bbox_TR = [-75,-15,10,20]
 bbox_NA = [-80,0 ,0,65]
 bbox_NNA = [-80,0 ,10,65]
-regions = ("SPG","STG","TRO","NAT")#,"NNAT")        # Region Names
+regions = ("SPG","STG","TRO","NAT","NAT")#,"NNAT")        # Region Names
 regionlong = ("Subpolar","Subtropical","Tropical","North Atlantic","North Atlantic (10N-65N)")
 bboxes = (bbox_SP,bbox_ST,bbox_TR,bbox_NA,bbox_NNA) # Bounding Boxes
+bbcol  = ["Blue","Red","Yellow","Black","Black"]
+bbsty  = ["solid","dashed","solid","dotted","dotted"]
 cint   = np.arange(-0.45,0.50,0.05) # Used this for 7/26/2021 Meeting
 cl_int = np.arange(-0.45,0.50,0.05)
 bboxplot = [-100,20,0,80]
@@ -174,6 +222,9 @@ lat = np.load(datpath+"lat.npy")
 # Load global lat/lon
 lon180g,latg  = scm.load_latlon(rawpath)
 
+# -------------------------------------------
+# %% A U T O C O R R E L A T I O N  P L O T S 
+# -------------------------------------------
 #%% Load Autocorrelation
 
 # Load for stochastic model experiments
@@ -261,7 +312,9 @@ for f in range(len(frcnamelong)):
     savename = "%sSST_Autocorrelation_Comparison_%s.png" % (figpath,fnames[f])
     plt.savefig(savename,dpi=150,bbox_inches='tight')
 
-
+# -------------------------------------------
+# %% A M V  P A T T E R N
+# -------------------------------------------
 #%% Next load/plot the AMV Patterns
 
 # Load for stochastic model experiments
@@ -280,16 +333,23 @@ for f in range(len(fnames)):
     amvids.append(amvidx)
 
 # Load data for CESM1-PIC
-cesmacs= []
 expid      = "CESM1-PIC"
 rsst_fn    = "%s/proc/AMV_Region_%s.npz" % (datpath,expid)
 ldc        = np.load(rsst_fn,allow_pickle=True)
 cesmpat = ldc['amvpat_region'].item()
 cesmidx = ldc['amvidx_region'].item()
 
-#%% Plot AMV Patterns
+#%% Plot AMV Patterns (Model vs CESM)
+
+
+sel_rid = 4
+
+
 for f in tqdm(range(len(fnames))):
-    for rid in range(4):
+    for rid in range(5):
+        if rid != sel_rid:
+            continue
+        
         fig,axs = plt.subplots(2,3,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(12,6))
         
         # Plot Stochastic Model Output
@@ -336,7 +396,156 @@ for f in tqdm(range(len(fnames))):
         savename = "%sSST_AMVPattern_Comparison_region%s_%s.png" % (figpath,regions[rid],fnames[f])
         plt.savefig(savename,dpi=150,bbox_inches='tight')
 
+#%% Plot AMV Patterns (Comparing N_EOFs)
 
+rid = 4 # Let's just do NAT
+mid = 0 # Let's just do slab
+cint   = np.arange(-0.45,0.50,0.05) # Used this for 7/26/2021 Meeting
+cl_int = np.arange(-0.45,0.50,0.05)
+
+cint   = np.arange(-1.0,1.05,0.05) # Used this for 7/26/2021 Meeting
+cl_int = np.arange(-1.0,1.05,0.05)
+
+
+def plot_amvpat(amvpat,ax):
+    ax = viz.add_coast_grid(ax,bboxplot)
+    pcm = ax.contourf(lon,lat,amvpat,levels=cint,cmap=cmocean.cm.balance)
+    ax.pcolormesh(lon,lat,amvpat,vmin=cint[0],vmax=cint[-1],cmap=cmocean.cm.balance,zorder=-1)
+    cl = ax.contour(lon,lat,amvpat,levels=cl_int,colors="k",linewidths=0.5)
+    ax.clabel(cl,levels=cl_int,fontsize=8)
+    
+    return pcm,ax
+    
+    
+    
+
+if exname == "numEOFs":
+    
+    fnames = frcnamelong
+    fig,axs = plt.subplots(7,3,sharex=True,sharey=True,
+                          subplot_kw={'projection':ccrs.PlateCarree()},figsize=(10,18))
+    
+    for i in tqdm(range(21)):
+        ax = axs.flatten()[i]
+        ax = viz.add_coast_grid(ax,bboxplot,blabels=[0,0,0,0])
+        
+        pcm,ax=plot_amvpat(amvpats[int(i/3)][rid][i%3].T,ax)
+        ax.set_title("%s (%s; %.4f)" % (modelnames[i%3],fnames[int(i/3)],np.var(amvids[int(i/3)][rid][i%3])))
+    
+    plt.savefig("%snumEOFs_comparison_amvpat.png" % figpath,dpi=150)
+    
+    
+    # Just Plot 6 (1,2,5,10,25,50)
+    fig,axs = plt.subplots(7,3,sharex=True,sharey=True,
+                          subplot_kw={'projection':ccrs.PlateCarree()},figsize=(10,18))
+    
+    
+        
+
+    
+    
+    
+    # # First try some individual plots
+    # for f in range(len(fnames)):
+    #     fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(4,3))
+    #     ax = viz.add_coast_grid(ax,bboxplot)
+    #     #pcm = ax.contourf(lon,lat,amvpats[f][rid][mid].T,levels=cint,cmap=cmocean.cm.balance)
+    #     ax.pcolormesh(lon,lat,amvpats[f][rid][mid].T,vmin=cint[0],vmax=cint[-1],cmap=cmocean.cm.balance,zorder=-1)
+    #    # cl = ax.contour(lon,lat,amvpats[f][rid][mid].T,levels=cl_int,colors="k",linewidths=0.5)
+    #     ax.clabel(cl,levels=cl_int,fontsize=8)
+    #     ax.set_title("%s %s [var(AMV) = %f]"%(fnames[f],modelnames[mid],np.var(amvids[f][rid][mid])))
+    
+#%% Plot AMV Patterns (Seasonality Comparison)
+rid = 4
+
+clmax = .8
+cint   = np.arange(-clmax,clmax+0.05,0.05) # Used this for 7/26/2021 Meeting
+cl_int = np.arange(-clmax,clmax+0.05,0.05)
+
+def plot_amvpat(amvpat,ax):
+    ax = viz.add_coast_grid(ax,bboxplot)
+    pcm = ax.contourf(lon,lat,amvpat,levels=cint,cmap=cmocean.cm.balance)
+    ax.pcolormesh(lon,lat,amvpat,vmin=cint[0],vmax=cint[-1],cmap=cmocean.cm.balance,zorder=-1)
+    cl = ax.contour(lon,lat,amvpat,levels=cl_int,colors="k",linewidths=0.5)
+    ax.clabel(cl,levels=cl_int,fontsize=8)
+    
+    return pcm,ax
+
+if exname == "seasonal":
+    
+    fig,axs = plt.subplots(4,2,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(8,12))
+    
+    # Left Column, Plot Slab
+    mid = 0
+    for f in np.arange(1,5):
+        ax = axs[f-1,mid]
+        ax.set_title("%s (%s,var=%.4f)"%(frcnamelong[f],modelnames[mid],np.var(amvids[f][rid][mid])))
+        ax = viz.add_coast_grid(ax,bboxplot,blabels=[0,0,0,0])
+        pcm,ax = plot_amvpat(amvpats[f][rid][mid].T,ax)
+    
+    mid = 2
+    for f in np.arange(1,5):
+        ax = axs[f-1,mid-1]
+        ax.set_title("%s (%s,var=%.4f)"%(frcnamelong[f],modelnames[mid],np.var(amvids[f][rid][mid])))
+        ax = viz.add_coast_grid(ax,bboxplot,blabels=[0,0,0,0])
+        pcm,ax = plot_amvpat(amvpats[f][rid][mid].T,ax)
+    cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction= 0.03,pad=0.02)
+    cb.set_label("SST ($\degree C$ per $\sigma_{AMV}$)")
+    
+    plt.savefig("%sSeasonal_comparison_amvpat.png" % figpath,dpi=150,bbox_inches='tight')
+    
+    
+#%% Plot NAO-EAP Plots
+
+rid = 4
+mid = 0
+
+
+clmax = 1
+cstep = .1
+cint   = np.arange(-clmax,clmax+cstep,cstep) # Used this for 7/26/2021 Meeting
+cl_int = np.arange(-clmax,clmax+cstep,cstep)
+
+if exname == "NAO_EAP":
+    
+    fig,axs = plt.subplots(2,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(12,7))
+    for f in range(2):
+        ax = axs[f]
+        ax  = viz.add_coast_grid(ax,bbox=bboxplot)
+        pcm,ax = plot_amvpat(amvpats[f][rid][mid].T,ax)
+        ax.set_title("EOF %i AMV (%s)"%(f+1,modelnames[mid]))
+    cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction= 0.03,pad=0.05)
+    cb.set_label("SST ($\degree C$ per $\sigma_{AMV}$)")
+plt.savefig("%sAMV_Patterns_NAO_EAP_model%i.png" % (figpath,mid),dpi=150,bbox_inches='tight')
+
+    
+#%% Plot Bounding Boxes over CESM Slab Pattern
+
+cid = 1
+rid = 4
+
+fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(5,5))
+ax = viz.add_coast_grid(ax,bboxplot)
+
+# Plot the amv pattern
+pcm = ax.contourf(lon180g,latg,cesmpat[rid][cid].T,levels=cint,cmap=cmocean.cm.balance)
+ax.pcolormesh(lon180g,latg,cesmpat[rid][cid].T,vmin=cint[0],vmax=cint[-1],cmap=cmocean.cm.balance,zorder=-1)
+cl = ax.contour(lon180g,latg,cesmpat[rid][cid].T,levels=cl_int,colors="k",linewidths=0.5)
+ax.clabel(cl,levels=cl_int,fontsize=8)
+ax.set_title("Regional Analysis Bounding Boxes")
+cb = fig.colorbar(pcm,ax=ax,orientation='horizontal')
+cb.set_label("CESM-SLAB AMV ($\degree C$ per $\sigma_{AMV}$)")
+
+# 
+ls = []
+for bb in [0,1,2,4]:
+    ax,ll = viz.plot_box(bboxes[bb],ax=ax,leglab=regions[bb],
+                         color=bbcol[bb],linestyle=bbsty[bb],linewidth=2,return_line=True)
+    ls.append(ll)
+    
+ax.legend(ncol=4)
+
+plt.savefig("%sAMV_Bounding_Boxes.png"%figpath,dpi=150,bbox_inches='tight')
 
 #%% Load Stochastic Model Output (Regional SSTs)
 
