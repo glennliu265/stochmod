@@ -44,7 +44,7 @@ elif stormtrack == 0:
     
     datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/"
     #datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/"
-    outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20210901/"
+    outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20210922/"
 
     lipath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/landicemask_enssum.npy"
     #llpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/"
@@ -383,6 +383,7 @@ varflx_EOF = np.zeros((nlon,nlat,12,N_mode)) # [lon x lat x mon x #_of_modes_cum
 for i in tqdm(range(N_mode)):
     eofN = (eofall[:,:,:,:(i+1)]**2).sum(-1)# Sum of squares along mode dimension
     varflx_EOF[:,:,:,i] = eofN.copy()
+    
     if debug:
         if (i+1)%50 == 0:
             print(test_mode_index[:(i+1)])
@@ -391,15 +392,34 @@ for i in tqdm(range(N_mode)):
 varflx_ori       = np.var(flx180,axis=-1,keepdims=True)
 varflx_ratio     =  varflx_EOF / varflx_ori
 
+# Compute variance ratio (non-cumulative) (at each point)
+EOF_var = eofall.copy() **2
+vratio_alone = (EOF_var)/varflx_ori # Calculate the ratio
+eof_corr = eofall.copy()
+eof_corr *= (1/vratio_alone)
+
 # Save all the files
 savename = datpath + "../NHFLX_EOF_Ratios_SLAB-PIC.npz"
 np.savez(savename,**{
     'varflx_EOF':varflx_EOF,
     'varflx_ori':varflx_ori,
     'varflx_ratio':varflx_ratio,
+    'varflx_ratio_alone':vratio_alone,
     'lon':lon180,
     'lat':lat
     })
+
+#%% Corrected Flux with SLP
+savename = "%sNHFLX_%s_%iEOFsPCs_%s_eofcorr2.npz" % (datpath,mcname,N_mode,bboxtext)
+
+np.savez(savename,**{
+    "varflx_ratio_alone":vratio_alone,
+    "eofall":eof_corr,
+    "eofslp":eofslp,
+    "pcall":pcall,
+    "varexpall":varexpall,  
+    'lon':lon180,
+    'lat':lat},allow_pickle=True)
 
 #%% Load the file from above
 savename = datpath + "../NHFLX_EOF_Ratios_SLAB-PIC.npz"
@@ -407,7 +427,8 @@ ld = np.load(savename)
 varflx_EOF = ld['varflx_EOF']
 varflx_ori = ld['varflx_ori']
 varflx_ratio = ld['varflx_ratio']
-
+vratio_alone = ld['varflx_ratio_alone']
+eof_corr     = eofall * 1/vratio_alone
 # -----------------
 #%% (**) Save as netcdf
 # ------------------
@@ -494,8 +515,8 @@ plt.savefig("%s%s_NHFLX_EOFs%i_%s_ModevCumuVariance_bymon.png"%(outpath,mcname,N
 # -----------------------------
 #% Save a select number of EOFs
 # -----------------------------
-eofcorr       = 2
-N_mode_choose = 100
+eofcorr       = 0
+N_mode_choose = 2
 
 # Select the mode
 eofforce = eofall.copy()
@@ -518,6 +539,111 @@ savenamefrc   = "%sflxeof_%ieofs_%s_eofcorr%i.npy" % (datpath,N_mode_choose,mcna
 np.save(savenamefrc,eofforce)
 print("Saved data to "+savenamefrc)
 
+# -----------------------------
+#%% Save a given EOF
+# -----------------------------
+
+eofcorr       = 0
+N_mode_choose = 1
+
+# Select the mode
+eofforce = eofall.copy()
+eofforce = eofforce.transpose(0,1,3,2)   # lon x lat x pc x mon
+eofforce = eofforce[:,:,N_mode_choose,:] # lon x lat x mon
+
+# Prepare correction based on variance explained
+if eofcorr == 1: # Correct based on EOF "basinwide" variance explained
+    perc_in   = varexpall[N_mode_choose,:] # Sum variance for selected modes
+    ampfactor = 1/perc_in # [Months]
+    eofforce  *= ampfactor
+elif eofcorr == 2: # Correct based on the LOCAL variance explained at each point...
+
+    EOF_var = eofforce[:,:,:].copy() **2 # Variance of that EOF mode at each point
+    perc_in = EOF_var/varflx_ori.squeeze() # Percentage of original variance
+    ampfactor = 1/perc_in
+    eofforce *= ampfactor
+
+eofforce = eofforce[:,:,None,:] # lon x lat x pc x mon
+savenamefrc   = "%sflxeof_EOF%i_%s_eofcorr%i.npy" % (datpath,N_mode_choose+1,mcname,eofcorr)
+np.save(savenamefrc,eofforce)
+print("Saved data to "+savenamefrc)
+
+
+
+#%% (@@) Plot the above EOFs
+
+ids = [11,0,1]
+clvl = np.arange(-60,65,5)
+plvl = np.arange(-800,900,100)
+
+titles = ["EOF 1 (NAO, %.2f" % (varexpall[0,ids].mean()*100) + "% Variance)" ,
+          "EOF 2 (EAP, %.2f" % (varexpall[1,ids].mean()*100) + "% Variance)" ]
+fig,axs = plt.subplots(2,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(12,7))
+
+for k in range(2):
+    ax = axs[k]
+    ax  = viz.add_coast_grid(ax,bbox=bbox)
+    pcm = ax.contourf(lon180,lat,eofall[:,:,ids,k].mean(-1).T,levels=clvl,cmap=cmocean.cm.balance)
+    cl  = ax.contour(lon180,lat,eofslp[:,:,ids,k].mean(-1).T,levels=plvl,colors='k',linewidths=.7)
+    ax.clabel(cl,fontsize=10)
+    ax.set_title(titles[k])
+
+
+cb = fig.colorbar(pcm,ax=axs.flatten())
+cb.set_label("$Q_{net}$ ,Interval = 5 $W/m^2$ per $\sigma_{PC}$")
+plt.suptitle("SLP (Contours), Interval = 100 hPa",x=0.6, y=.955,fontsize=14)
+
+plt.savefig("%sEOF1_EOF2_uncorrected.png"%(outpath),dpi=150,bbox_inches='tight')
+
+#%% Plot correction ratio
+
+ids = [11,0,1]
+clvl = np.arange(0,1.5,.1)
+
+titles = ["EOF 1 (NAO, %.2f" % (varexpall[0,ids].mean()*100) + "% Variance)" ,
+          "EOF 2 (EAP, %.2f" % (varexpall[1,ids].mean()*100) + "% Variance)" ]
+fig,axs = plt.subplots(2,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(12,7))
+
+for k in range(2):
+    ax = axs[k]
+    ax  = viz.add_coast_grid(ax,bbox=bbox)
+    pcm = ax.contourf(lon180,lat,vratio_alone[:,:,ids,k].mean(-1).T,levels=clvl,cmap=cmocean.cm.balance)
+    cl  = ax.contour(lon180,lat,vratio_alone[:,:,ids,k].mean(-1).T,levels=clvl,colors='k',linewidths=.7)
+    ax.clabel(cl,fontsize=10) 
+    ax.set_title(titles[k])
+
+
+cb = fig.colorbar(pcm,ax=axs.flatten())
+#cb.set_label("$Q_{net}$ ,Interval = 5 $W/m^2$ per $\sigma_{PC}$")
+#plt.suptitle("SLP (Contours), Interval = 100 hPa",x=0.6, y=.955,fontsize=14)
+
+plt.savefig("%sEOF1_EOF2_vratio.png"%(outpath),dpi=150,bbox_inches='tight')
+
+
+#%%
+ids = [11,0,1]
+clvl = np.arange(-600,650,5)
+plvl = np.arange(-800,900,100)
+
+titles = ["EOF 1 (NAO, %.2f" % (varexpall[0,ids].mean()*100) + "% Variance)" ,
+          "EOF 2 (EAP, %.2f" % (varexpall[1,ids].mean()*100) + "% Variance)" ]
+fig,axs = plt.subplots(2,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(12,7))
+
+for k in range(2):
+    ax = axs[k]
+    ax  = viz.add_coast_grid(ax,bbox=bbox)
+    pcm = ax.contourf(lon180,lat,eof_corr[:,:,ids,k].mean(-1).T,levels=clvl,cmap=cmocean.cm.balance)
+    cl  = ax.contour(lon180,lat,eofslp[:,:,ids,k].mean(-1).T,levels=plvl,colors='k',linewidths=.7)
+    ax.clabel(cl,fontsize=10)
+    ax.set_title(titles[k])
+
+
+cb = fig.colorbar(pcm,ax=axs.flatten())
+cb.set_label("$Q_{net}$ ,Interval = 5 $W/m^2$ per $\sigma_{PC}$")
+plt.suptitle("SLP (Contours), Interval = 100 hPa",x=0.6, y=.955,fontsize=14)
+
+plt.savefig("%sEOF1_EOF2_corrected.png"%(outpath),dpi=150,bbox_inches='tight')
+
 # ------------------------------------
 #%% Find indices of variance threshold
 # ------------------------------------
@@ -537,13 +663,24 @@ thresperc = np.array(thresperc)
 
 
 #ytk = np.arange(0,37,2)
-fig,ax = plt.subplots(1,1)
+fig,ax = plt.subplots(1,1,figsize=(5,4))
 ax.bar(mons3,thresid,color=[0.56,0.90,0.70],alpha=0.80)
-ax.set_title("Number of EOFs required \n to explain %i"%(vthres*100)+"% of the NHFLX variance")
+ax.set_title("Number of EOFs required \n to explain %i"%(vthres*100)+"% of the $Q_{net}$ variance")
 #ax.set_yticks(ytk)
 ax.set_ylabel("# EOFs")
 ax.grid(True,ls='dotted')
-plt.savefig("%s%s_NHFLX_EOFs%i_%s_NumEOFs_%ipctvar_bymon.png"%(outpath,mcname,N_mode,bboxtext,vthres*100),dpi=150)
+
+rects = ax.patches
+labels = thresid
+
+for rect, label in zip(rects, labels):
+    height = rect.get_height()
+    ax.text(
+        rect.get_x() + rect.get_width() / 2, height + -5, label, ha="center", va="bottom"
+    )
+
+
+plt.savefig("%s%s_NHFLX_EOFs%i_%s_NumEOFs_%ipctvar_bymon.png"%(outpath,mcname,N_mode,bboxtext,vthres*100),dpi=150,bbox_inches='tight')
 
 # -------------------------------------------------------------------------
 #%% Save outptut as forcing for stochastic model, variance based threshold
@@ -561,6 +698,7 @@ elif eofcorr ==2: # Point[wise variance-based correction
     ampfactor = 1/thresperc
 else:
     ampfactor = 1
+
 
 eofforce = eofall.copy() # [lon x lat x month x pc]
 cvartest = cvarall.copy()
@@ -609,6 +747,27 @@ ax.set_xlim([1,N_modeplot])
 #ax.set_xticks(xtk)
 #plt.savefig("%sSLAB-PIC_NHFLX_EOFs%i_%s_ModevCumuVariance_bymon.png"%(outpath,N_modeplot,bboxtext),dpi=150)
 
+#%% Plot Amp factor
+
+# Plot for the paper
+
+
+
+bboxplot = [-100,20,0,80]
+clvls    = np.arange(1,1.55,.05)
+#clvls    = np.arange(1,1.55,.05)
+fig,ax   = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(8,4))
+ax       = viz.add_coast_grid(ax=ax,bbox=bboxplot)
+pcm      = ax.contourf(lon180,lat,ampfactor.mean(-1).T,levels=clvls,cmap="Oranges")
+p      = ax.pcolormesh(lon180,lat,ampfactor.mean(-1).T,vmin=clvls[0],vmax=clvls[-1],cmap="Oranges",zorder=-1)
+cb       = fig.colorbar(pcm,ax=ax,orientation='horizontal',fraction=0.055)
+cl       = ax.contour(lon180,lat,ampfactor.mean(-1).T,levels=clvls,colors='k',linewidths=.2)
+ax.clabel(cl,levels=np.arange(1,1.5,.1),fontsize=8)
+#cb.set_label(r"$\frac{q}{Q_{net}}$")
+ax.set_title(r"Annual Mean Variance Correction ($Q_{net}/Q_{EOF}$)"+ "\nContour Interval = 0.05")
+plt.savefig("%sRatio_varcorr_local.png"%outpath,dpi=150,bbox_inches='tight')
+
+
 # ------------------------------------------------------------
 # %% Reload and save a monthly version of one of the outputs
 # ------------------------------------------------------------
@@ -627,7 +786,7 @@ for s in tqdm(range(4)):
     # Save the output
     savenamefrc = "%sflxeof_%03ipct_%s_eofcorr%i_%s.npy" % (datpath,vthres*100,mcname,eofcorr,monnames[s])
     print("Saving to %s"%savenamefrc)
-    np.save(savenamefrc,eofforce)
+    np.save(savenamefrc,eofseas)
 #%%Do some analysis/visualization
 # Plot the map of ratio  NHFLX(n-percent EOF)/NHFLX_SLAB
 plot_contours = True
