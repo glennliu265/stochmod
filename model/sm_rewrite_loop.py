@@ -7,8 +7,6 @@ Created on Tue Sep 21 10:42:25 2021
 
 @author: gliu
 """
-
-
 import numpy as np
 import matplotlib.pyplot as plt
 import sys
@@ -19,7 +17,7 @@ import time
 
 #%% Set the location
 
-stormtrack = 1
+stormtrack = 0
 
 if stormtrack == 0:
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -163,6 +161,11 @@ frcnames = (
             "flxeof_2eofs_SLAB-PIC_eofcorr0",
             "flxeof_1eofs_SLAB-PIC_eofcorr0"
             )
+
+frcnames = ('flxeof_EOF1_SLAB-PIC_eofcorr0',
+            'flxeof_EOF2_SLAB-PIC_eofcorr0')
+
+print("Running the following forcings: \n %s"%(str(frcnames)))
 #%%
 st = time.time()
 for f in range(len(frcnames)):

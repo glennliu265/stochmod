@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+Calculate Ekman Advection for the corresponding EOFs and save
+
 Created on Wed Aug  4 05:02:36 2021
 
 @author: gliu

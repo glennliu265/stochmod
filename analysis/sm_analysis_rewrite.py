@@ -16,7 +16,7 @@ import sys
 import cmocean
 from tqdm import tqdm
 #%% Set Paths, Import Custom Modules
-stormtrack = 1
+stormtrack = 0
 if stormtrack == 0:
     projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
     datpath     = projpath + '01_Data/model_output/'
@@ -39,7 +39,6 @@ elif stormtrack == 1:
 from amv import proc,viz
 import scm
 import tbx
-
 #%% User Edits
 
 # Visualization options
@@ -171,6 +170,11 @@ fnames = (
             "forcingflxeof_2eofs_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3",
             "forcingflxeof_1eofs_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3"
             )
+
+## NAO and EAP
+fnames = ("forcingflxeof_EOF1_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3",
+          "forcingflxeof_EOF2_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3")
+
 #%% Post Process Outputs (Calculate AMV, Autocorrelation)
 for frcname in tqdm(fnames):
     expid = frcname

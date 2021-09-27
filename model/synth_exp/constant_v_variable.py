@@ -36,7 +36,7 @@ projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 datpath     = projpath + '01_Data/'
 input_path  = datpath + 'model_input/'
 output_path = datpath + 'model_output/'
-outpath = projpath + '02_Figures/20210610/'
+outpath = projpath + '02_Figures/20210922/'
 proc.makedir(outpath)
 
 # Load in control data for 50N 30W
@@ -49,8 +49,6 @@ labels=["MLD Fixed","MLD Mean","MLD Seasonal","MLD Entrain"]
 #colors=["red","orange","magenta","blue"]
 expcolors = ('blue','orange','magenta','red')
 hblt = 54.61088498433431 # Meters, the mixed layer depth used in CESM Slab
-
-
 
 # UPDATED Colors and names for generals (5/25/2021)
 ecol = ["blue",'cyan','gold','red']
@@ -68,13 +66,14 @@ config['genrand']     = 0
 config['fstd']        = 1
 config['t_end']       = 120000    # Number of months in simulation
 config['runid']       = "syn001"  # White Noise ID
-config['fname']       = "FLXSTD" #['NAO','EAP,'EOF3','FLXSTD']
+config['fname']       = "flxeof_090pct_SLAB-PIC_eofcorr2.npy" #['NAO','EAP,'EOF3','FLXSTD']
 config['pointmode']   = 1
 config['query']       = [-30,50]
 config['applyfac']    = 2 # Apply Integration Factor and MLD to forcing
 config['lags']        = np.arange(0,37,1)
 config['output_path'] = projpath + '02_Figures/20210223/'
 config['smooth_forcing'] = False
+config['method'] = 3
 
 config.pop('Fpt',None)
 config.pop('damppt',None)
@@ -346,6 +345,8 @@ locstringtitle = "Lon: %.1f Lat: %.1f" % (query[0],query[1])
 #config['Fpt'] = np.roll(Fpt,1)
 ac,sst,dmp,frc,ent,Td,kmonth,params=scm.synth_stochmod(config,projpath=projpath)
 [o,a],damppt,mldpt,kprev,Fpt = params
+#if len(Fpt)>12:
+    
 
 # Read in CESM autocorrelation for all points'
 kmonth = np.argmax(mldpt)
@@ -354,7 +355,6 @@ _,_,lon,lat,lon360,cesmslabac,damping,_,_ = scm.load_data(mconfig,ftype)
 ko,ka     = proc.find_latlon(query[0]+360,query[1],lon360,lat)
 cesmauto2 = cesmslabac[kmonth,:,ka,ko]
 cesmauto  = cesmauto2[lags]
-
 
 # Plot some differences
 xtk2       = np.arange(0,37,2)
@@ -434,7 +434,9 @@ Fptdef = Fpt.copy()
 #%% Run the Experiment
 #
 
-
+if len(Fptdef.shape)>2:
+    config['fname'] = 'FLXSTD' # Dummy Move for now to prevent forcing_flag
+    
 expids   = [] # String Indicating the Variable Type
 acs      = []
 ssts     = []
@@ -449,19 +451,18 @@ for vmld in [False,True]:
         config['mldpt'] = mlddef
     else:
         config['mldpt'] = np.ones(12)*mlddef.mean()
-
+    
     for vdamp in tqdm([False,True]):
         
         if vdamp:
             config['damppt'] = dampdef
         else:
             config['damppt'] = np.ones(12)*dampdef.mean()
-            
         
         for vforce in [False,True]:
-            
+                
                 if vforce:
-                    config['Fpt'] = Fptdef
+                        config['Fpt'] = Fptdef.mean(0)
                 else:
                     config['Fpt'] = np.ones(12)*Fptdef.mean()
                 

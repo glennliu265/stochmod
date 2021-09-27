@@ -34,7 +34,7 @@ projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 datpath     = projpath + '01_Data/'
 input_path  = datpath + 'model_input/'
 output_path = datpath + 'model_output/'
-outpath     = projpath + '02_Figures/20210722/'
+outpath     = projpath + '02_Figures/20210922/'
 proc.makedir(outpath)
 
 # Load in control data for 50N 30W
@@ -57,15 +57,16 @@ config['mconfig']     = "SLAB_PIC" # Model Configuration
 config['ftype']       = "DJFM-MON" # Forcing Type
 config['genrand']     = 0          # Toggle to generate new random timeseries
 config['fstd']        = 1          # Set the standard deviation N(0,fstd)
-config['t_end']       = 12000     # Number of months in simulation
-config['runid']       = "syn002"   # White Noise ID
-config['fname']       = "FLXSTD"   #['NAO','EAP,'EOF3','FLXSTD']
+config['t_end']       = 120000     # Number of months in simulation
+config['runid']       = "syn003"   # White Noise ID
+config['fname']       = "flxeof_090pct_SLAB-PIC_eofcorr2.npy"   #['NAO','EAP,'EOF3','FLXSTD']
 config['pointmode']   = 1          # Set to 1 to generate a single point
 config['query']       = [-30,50]   # Point to run model at 
 config['applyfac']    = 2          # Apply Integration Factor and MLD to forcing
 config['lags']        = np.arange(0,37,1)
-config['output_path'] = projpath + '02_Figures/20210721/' # Note need to fix this
+config['output_path'] = projpath + '02_Figures/20210922/' # Note need to fix this
 config['smooth_forcing'] = False
+config['method'] =3 
 
 config.pop('Fpt',None)
 config.pop('damppt',None)
@@ -214,7 +215,9 @@ nlags   = len(lags)
 cfstoch = np.zeros([4,nlags,2])
 for m in range(4):
     inac = ac[m]
+    
     n = int(len(sst[m])/12)
+    print(n)
     cfs = calc_conflag(inac,conf,tails,n)
     cfstoch[m,:,:] = cfs
 cfslab = calc_conflag(cesmauto2,conf,tails,898)
