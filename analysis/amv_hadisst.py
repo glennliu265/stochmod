@@ -5,6 +5,11 @@
 Calculate AMV from HadISST Data
 Also save detrended data for stochastic model comparison
 
+Incudes
+ - Save detrended HadISST Data for regional analysis, etc
+ - Examine the Effect of Detrending, compare to Frankignoul et al. 2017 
+ - AMV plots for general exam
+
 Created on Sat Aug 22 21:05:08 2020
 
 @author: gliu
@@ -12,6 +17,7 @@ Created on Sat Aug 22 21:05:08 2020
 
 
 from scipy.io import loadmat
+from tqdm import tqdm
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -31,14 +37,14 @@ startyr = 1900 # Start year for AMV Analysis
 bbox    =[-80,0 ,0,65] # AMV bbox
 # Path to SST data from obsv
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
-outpath = projpath + '02_Figures/20210524/'
+outpath = projpath + '02_Figures/20211001/'
 proc.makedir(outpath)
 datpath = projpath + '01_Data/'
 datpath2 = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/"
 
-
 ## DETRENDING OPTIONS
 method = 2
+dropedge = 5 # Number of years to drop off when doing regression
 
 
 #%% Load in HadISST Data
@@ -84,7 +90,7 @@ dsfirst = np.reshape(dsfirst,(360,180,hsstnew.shape[2]))
 # dtdsfirst,dsymodall,_,_ = proc.detrend_dim(dsfirst,2)
 # print("Detrended in %.2fs" % (time.time()-start))
 
-
+#%%
 # Detrend
 nlon = 360
 nlat = 180
@@ -143,7 +149,6 @@ np.savez(hadname,**{
     'lat':hlatnew,
     'lon':hlon,
     'yr':hyr},allow_pickle=True)
-
 
 h_amv,h_regr = proc.calc_AMVquick(hsst,hlon,hlat,bbox)
 
@@ -406,9 +411,143 @@ fig,ax,cb = plot_AMV_generals(hlat,hlon,h_regr)
 ax.set_title("AMV Pattern (HadISST; 1900 to 2018) \n Contour Interval: 0.05 $\degree C / \sigma_{AMV}$")
 plt.savefig(outpath+"HadISST_AMV_Spatial_Pattern_%i_to_2018_detrend%i.png"%(startyr,method),bbox_inches='tight')
 
-#%% 
+#%% Try Different Detrending Methods
+# ** Make sure you have "okdata" from above
 
+#methods = [None,0,1,2,3,4]
+#mnames  = ["No Detrend","Global","Linear","Quadratic","Cubic","4th-Order"]
+methods = [0,1,2,3,4,5]
+mnames  = ["Global","Linear","Quadratic","Cubic","4th-Order","5th-Order"]
+
+amvpats = []
+amvids  = []
+for m in tqdm(range(len(methods))):
+    method = methods[m]
     
+    if method is None:
+        okdt = okdata.copy() #- okdata.mean(1)[:,None] # Just anomalize
+        
+    elif method == 0:
+        
+        # Calculate global mean SST
+        glomean = okdata.mean(0)
+        
+        # Regress back to the original data to get the global component
+        beta,b=proc.regress_2d(glomean,okdata)
+        
+        # Subtract this from the original data
+        okdt = okdata - beta[:,None]
+    
+    else: # Remove N-order polynomial
+    
+        okdt,model = proc.detrend_poly(x,okdata,method)
+        fig,ax=plt.subplots(1,1)
+        ax.scatter(x,okdata[44,:],label='raw')
+        ax.plot(x,model[44,:],label='fit')
+        ax.scatter(x,okdt[:,44],label='dt')
+        ax.set_title("Visualize Detrending Method %i"%method)
+        okdt = okdt.T
+    
+
+    # Replace back into data
+    hsstdt = np.ones((360*180,nyr)) * np.nan
+    hsstdt[okpts,:] = okdt
+    hsstdt = hsstdt.reshape(360,180,nyr)
+    
+    # Use this data to calculate amv
+    h_amv,h_regr = proc.calc_AMVquick(hsstdt,hlon,hlat,bbox,anndata=True,dropedge=5)
+    amvpats.append(h_regr)
+    amvids.append(h_amv)
+
+#%% Load limopt
+ds= xr.open_dataset("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/lim-opt/HadISST-AMO+PDO-LIMopt.nc")
+amo = ds.AMO.values
+
+
+zlat   = ds.lat.values
+ztimes = ds.time.values
+zpat = ds.SSTAMO.values
+lon360 = ds.lon.values
+lon180,zpat180 = proc.lon360to180(lon360,zpat.T)
+zpat180[np.where(np.abs(zpat180) < 1e-10)] = np.nan
+
+
+#%% Plot the AMV Patterns
+
+clim = .5 #0.025
+cstp = 0.025
+cmult = 2
+
+cint = np.arange(-clim,clim+cstp,cstp)
+cl_int = np.arange(-clim,clim+cstp*cmult,cstp*cmult)
+
+
+
+bboxplot = [-80,0 ,0,55]
+fig,axs = plt.subplots(2,3,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(12,6))
+
+for m in tqdm(range(len(methods))):
+    
+    
+    
+    blb = [0,0,0,0]
+    if m == 0:
+        blb = [1,0,0,0]
+    if m == 3:
+        blb = [1,0,0,1]
+    if m >3:
+        blb = [0,0,0,1]
+    
+    ax = axs.flatten()[m]
+    ax = viz.add_coast_grid(ax,bbox=bboxplot,blabels=blb)
+    
+    
+    if m == 0: # Plot LimOpt
+        cf = ax.contourf(lon180,zlat,zpat180.T*np.std(amo),levels=cint,cmap=cmocean.cm.balance)
+        cl = ax.contour(lon180,zlat,zpat180.T*np.std(amo),levels=cl_int,colors='k',linewidths=0.5)
+        ax.set_title("LIMopt" + "(var = %.4f)"%(np.var(amo)))
+    else:
+        cf = ax.contourf(hlon,hlat,amvpats[m].T,levels=cint,cmap=cmocean.cm.balance)
+        cl = ax.contour(hlon,hlat,amvpats[m].T,levels=cl_int,colors='k',linewidths=0.5)
+        ax.set_title(mnames[m] + "(var = %.4f)"%(np.var(amvids[m])))
+    ax.clabel(cl,fontsize=8)
+cb = fig.colorbar(cf,ax=axs.flatten(),fraction=0.05,orientation='horizontal')
+cb.set_label("AMV Pattern for SST; Contour Interval=%.3f ($\degree C \sigma_{AMV}^{-1}$)"%cstp)
+plt.suptitle("Testing Detrending Methods for AMV (HadISST %i to %i)"%(startyr,2018))
+plt.savefig("%sAMV_Detrending_Test_HadISST_%ito2018.png"%(outpath,startyr),dpi=150,bbox_inches='tight')
+
+
+
+
+#%% Plot the AMV indices
+
+plotnums2 = np.arange(5,118-7)
+
+xtks = np.arange(0,130,10)
+xtkl = np.arange(startyr,startyr+130,10)
+ytks = np.arange(-0.5,0.75,0.25)
+
+mcols = ["k","blue","red","magenta","cyan","limegreen"]
+msty  = ["solid","dashed","dotted","dashed","solid","dashdot"]
+
+fig,ax = plt.subplots(1,1,figsize=(8,3))
+
+for m in tqdm(range(len(methods))):
+    if m == 0:
+        ax.plot(plotnums2,amo,label="LIMopt",color=mcols[m],ls=msty[m])
+    ln = ax.plot(amvids[m],label=mnames[m],color=mcols[m],ls=msty[m])
+    #ax = viz.plot_AMV(amvids[m],ax=ax)
+
+ax.legend(ncol=4)
+ax.axhline(0,color="k",ls='dotted')
+
+ax.set_xticks(xtks)
+ax.set_xticklabels(xtkl)
+ax.set_ylim(-.5,.5)
+ax.set_yticks(ytks)
+ax.grid(True,ls='dotted')
+plt.savefig("%sAMV_Detrending_Test_HadISST_%ito2018.png"%(outpath,startyr),dpi=150,bbox_inches='tight')
+
 
 
     
