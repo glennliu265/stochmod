@@ -45,7 +45,6 @@ import scm
 import tbx
 #%% User Edits
 
-
 # Analysis Options
 lags = np.arange(0,37,1)
 
@@ -185,7 +184,7 @@ def calc_conflag(ac,conf,tails,n):
 
 #%% User Edits
 
-# Regional Analysis Settings
+# Regional Analysis Settings (OLD)
 bbox_SP = [-60,-15,40,65]
 bbox_ST = [-80,-10,20,40]
 bbox_TR = [-75,-15,10,20]
@@ -196,6 +195,21 @@ regionlong = ("Subpolar","Subtropical","Tropical","North Atlantic","North Atlant
 bboxes = (bbox_SP,bbox_ST,bbox_TR,bbox_NA,bbox_NNA) # Bounding Boxes
 bbcol  = ["Blue","Red","Yellow","Black","Black"]
 bbsty  = ["solid","dashed","solid","dotted","dotted"]
+
+
+# Regional Analysis Setting (NEW, STG SPLOIT)
+bbox_SP    = [-60,-15,40,65]
+bbox_ST_e  = [-80,-40,20,40]
+bbox_ST_w  = [-40,-10,20,40]
+bbox_TR    = [-75,-15,10,20]
+bbox_NA    = [-80,0 ,10,65]
+bboxes     = (bbox_SP,bbox_ST_w,bbox_ST_e,bbox_TR,bbox_NA) # Bounding Boxes
+regions    = ("SPG","STGw","STGe","TRO","NAT","NAT")#,"NNAT")        # Region Names
+regionlong = ("Subpolar","Subtropical (West)","Subtropical (East)","Tropical","North Atlantic (10N-65N)")
+bbcol      = ["Blue","Red","cornflowerblue","Yellow","Black"]
+bbsty      = ["solid","dashed","dotted","solid","dotted"]
+
+
 cint   = np.arange(-0.45,0.50,0.05) # Used this for 7/26/2021 Meeting
 cl_int = np.arange(-0.45,0.50,0.05)
 bboxplot = [-100,20,0,80]
@@ -212,6 +226,7 @@ xtk2       = np.arange(0,37,2)
 mons3=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
 conf  = 0.95
 tails = 2
+
 
 #%% load some additional data
 

@@ -25,7 +25,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20210920/"
+    figpath     = projpath + "02_Figures/20211001/"
     
     lipath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/landicemask_enssum.npy"
     
@@ -142,6 +142,18 @@ exnames = ["Basinwide Correction (Old)",
             ]
 exoutnameraw = "new_v_old_q-correction"
 
+## 
+expids = (
+    "stoch_output_forcingflxeof_EOF1_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3.npz",
+    "stoch_output_forcingflxeof_EOF2_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3.npz",
+    "stoch_output_forcingflxeof_2eofs_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3_local.npz",
+    )
+exnames = ("EOF1 (NAO)",
+            "EOF2 (EAP)",
+            "Both (NAO+EAP)",
+            )
+exoutnameraw = "NAO_EAP"
+
 #%% Settings Part 2
 
 # Experiment information
@@ -167,6 +179,7 @@ latr        = np.load(datpath+"lat.npy")
 # Model to conduct analysis on
 model       = 0
 modelnames  = ["h constant","h vary","entraining"]
+
 exoutname  = exoutnameraw +  "_model%i" % model
 # Autocorrelation parameters
 mons3       = ('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
@@ -223,6 +236,7 @@ def preprocess_CESM(sst,lon360,lat,msk,bbox):
 for i in tqdm(range(2)):
     ssts[i] = preprocess_CESM(ssts[i],lon360,lat,msk,bboxsim)
 
+# <You can now skip down below to regional analysis section if needed>
 
 #%% Examine the variance ratio between both locations
 
@@ -420,4 +434,138 @@ plt.savefig("%s%s_Theoretical_Underest_AnnAvg.png" % (figpath,exoutname),bbox_in
 #%% Load mixed layer depths to identify the base month
 
 mld    = np.load(rawpath + "FULL_HTR_HMXL_hclim.npy")
-kmonth = np.argmax(mld[klon,klat]) 
+#kmonth = np.argmax(mld[klon,klat]) 
+
+#%% <Regional Analysis> %%
+
+
+
+
+#%% Select the bounding boxes
+bbox_SP    = [-60,-15,40,65]
+bbox_ST_e  = [-80,-40,20,40]
+bbox_ST_w  = [-40,-10,20,40]
+bbox_TR    = [-75,-15,10,20]
+bbox_NA    = [-80,0 ,10,65]
+bboxes     = (bbox_SP,bbox_ST_w,bbox_ST_e,bbox_TR,bbox_NA) # Bounding Boxes
+regions    = ("SPG","STGw","STGe","TRO","NAT","NAT")#,"NNAT")        # Region Names
+regionlong = ("Subpolar","Subtropical (West)","Subtropical (East)","Tropical","North Atlantic (10N-65N)")
+bbcol      = ["Blue","Red","cornflowerblue","Yellow","Black"]
+bbsty      = ["solid","dashed","dotted","solid","dotted"]
+
+#%% Test Plot
+bboxplot = [-100,20,0,80]
+fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(5,5))
+ax = viz.add_coast_grid(ax,bboxplot)
+
+# Plot the amv pattern
+#pcm = ax.contourf(lon180g,latg,cesmpat[rid][cid].T,levels=cint,cmap=cmocean.cm.balance)
+#ax.pcolormesh(lon180g,latg,cesmpat[rid][cid].T,vmin=cint[0],vmax=cint[-1],cmap=cmocean.cm.balance,zorder=-1)
+#cl = ax.contour(lon180g,latg,cesmpat[rid][cid].T,levels=cl_int,colors="k",linewidths=0.5)
+#ax.clabel(cl,levels=cl_int,fontsize=8)
+#ax.set_title("Regional Analysis Bounding Boxes")
+#cb = fig.colorbar(pcm,ax=ax,orientation='horizontal')
+#cb.set_label("CESM-SLAB AMV ($\degree C$ per $\sigma_{AMV}$)")
+#%%
+# 
+ls = []
+for bb in [0,1,2,4]:
+    ax,ll = viz.plot_box(bboxes[bb],ax=ax,leglab=regions[bb],
+                         color=bbcol[bb],linestyle=bbsty[bb],linewidth=2,return_line=True)
+    ls.append(ll)
+    
+ax.legend(ncol=4)
+
+
+
+
+#%% 
+debug = 0
+lags  = np.arange(0,37,1)
+nsmooth = 100
+pct     = 0.10
+
+rssts    = []  # [region][model]
+racs     = []  # Autocorrelations
+raccfs   = []  # Confidence intervals (AC)
+rspecs   = []  # Spectra
+rfreqs   = []  # Frequencies
+rkmonth  = []  # Deepest MLD month
+
+
+for r in range(len(bboxes)):
+    
+    rsst  = [] # Containing regional SSTs for each model
+    rac   = []
+    rspec = []
+    rfreq = []
+    raccf = []
+    
+    for d in tqdm(range(len(ssts))):
+        # Test
+        if debug:
+            tvar,tlon,tlat = proc.sel_region(ssts[d],lonr,latr,bbox=bboxes[r])
+            plt.pcolormesh(tlon,tlat,tvar[:,:,0].T),plt.title(regionlong[r])
+            
+        # Calculate regional average
+        ravg = proc.sel_region(ssts[d],lonr,latr,bboxes[r],reg_avg=1,awgt=1)
+        rsst.append(ravg)
+        
+        # Calulate Autocorrelation, and confidence levels
+        rmld   = proc.sel_region(mld,lon180,lat,bboxes[r],reg_avg=1,awgt=1)
+        kmonth = np.argmax(rmld)
+        rkmonth.append(kmonth)
+        ac = scm.calc_autocorr([ravg],lags,kmonth+1)[0]
+        rac.append(ac)
+        
+        # Calculate spectra
+        specs,freqs,CCs,dofs,r1s = scm.quick_spectrum([ravg,],[nsmooth,],pct)
+        rspec.append(specs[0])
+        rfreq.append(freqs[0])
+        
+        # End region loop
+        
+    rssts.append(rsst)
+    racs.append(rac)
+    rspecs.append(rspec)
+    rfreqs.append(rfreq)
+
+
+#%%
+
+rid = 0
+
+
+timemax = None
+xlms = [0,0.2]
+xtks = [0,0.02,0.04,0.1,0.2]
+xtkl = 1/np.array(xtks)
+dt   = 3600*24*30
+speccolors = ["k","gray","r","b","m",]
+specnames  = np.hstack([cnames,modelnames])
+
+exnames = ("EOF1 (NAO)",
+            "EOF2 (EAP)",
+            "Both (NAO+EAP)",
+            )
+
+
+fig,axs = plt.subplots(2,3,figsize=(16,10))
+
+for rid in tqdm(range(5)):
+    ax    = axs.flatten()[rid]
+    speclabels = ["%s (%.3f $^{\circ}C^2$)" % (specnames[i],np.var(rssts[rid][i])) for i in range(len(speccolors)) ]
+    ax = viz.plot_freqxpower(rspecs[rid],rfreqs[rid],speclabels,speccolors,
+                         ax=ax,plottitle=regionlong[rid])
+    
+    if rid <2:
+        ax.set_xlabel("")
+    if rid%2 == 1:
+        ax.set_ylabel("")
+        
+plt.suptitle("Regional AMV Index Spectra")
+savename = "%sSST_Spectra_Comparison_Test.png" % (figpath)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+
+

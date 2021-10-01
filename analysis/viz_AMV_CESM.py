@@ -37,7 +37,7 @@ import yo_box as ybx
 
 # Path to data 
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
-outpath = projpath + '02_Figures/20210810/'
+outpath = projpath + '02_Figures/20211004/'
 proc.makedir(outpath)
 datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/"
 
