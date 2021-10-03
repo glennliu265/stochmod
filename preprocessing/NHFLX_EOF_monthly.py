@@ -84,7 +84,7 @@ def sel_regionxr(ds,bbox):
 #%%
 
 # Set your configuration
-mconfig = "PIC_SLAB"
+mconfig = "PIC_FULL"
 bbox    = [260,20,0,65]
 bboxeof = [280,20,0,65]
 
@@ -150,6 +150,7 @@ elif mconfig == "PIC_FULL":
 
 
 #%% Preprocess, EOF Analysis
+st = time.time()
 ntime,nlat,nlon = flxglob.shape
 nyr = int(ntime/12)
 
@@ -175,7 +176,7 @@ if debug:
     ax.plot(t,linmod[:,latf,lonf],label="Model")
     ax.scatter(t,flxa[:,latf,lonf],label="Detrended")
     ax.legend()
-
+print("Completed process in %.2fs"%(time.time()-st))
 #%% (**) Apply Area Weight (to region) ----------------------------------------------
 wgt = np.sqrt(np.cos(np.radians(lat)))
 
@@ -399,7 +400,7 @@ eof_corr = eofall.copy()
 eof_corr *= (1/vratio_alone)
 
 # Save all the files
-savename = datpath + "../NHFLX_EOF_Ratios_SLAB-PIC.npz"
+savename = datpath + "../NHFLX_EOF_Ratios_%s.npz" % mcname
 np.savez(savename,**{
     'varflx_EOF':varflx_EOF,
     'varflx_ori':varflx_ori,
@@ -422,7 +423,7 @@ np.savez(savename,**{
     'lat':lat},allow_pickle=True)
 
 #%% Load the file from above
-savename = datpath + "../NHFLX_EOF_Ratios_SLAB-PIC.npz"
+savename = datpath + "../NHFLX_EOF_Ratios_%s.npz" % mcname
 ld = np.load(savename)
 varflx_EOF = ld['varflx_EOF']
 varflx_ori = ld['varflx_ori']
@@ -516,7 +517,7 @@ plt.savefig("%s%s_NHFLX_EOFs%i_%s_ModevCumuVariance_bymon.png"%(outpath,mcname,N
 #% Save a select number of EOFs
 # -----------------------------
 eofcorr       = 0
-N_mode_choose = 2
+N_mode_choose = 50
 
 # Select the mode
 eofforce = eofall.copy()
@@ -544,7 +545,7 @@ print("Saved data to "+savenamefrc)
 # -----------------------------
 
 eofcorr       = 0
-N_mode_choose = 1
+N_mode_choose = 0
 
 # Select the mode
 eofforce = eofall.copy()
@@ -593,7 +594,7 @@ cb = fig.colorbar(pcm,ax=axs.flatten())
 cb.set_label("$Q_{net}$ ,Interval = 5 $W/m^2$ per $\sigma_{PC}$")
 plt.suptitle("SLP (Contours), Interval = 100 hPa",x=0.6, y=.955,fontsize=14)
 
-plt.savefig("%sEOF1_EOF2_uncorrected.png"%(outpath),dpi=150,bbox_inches='tight')
+plt.savefig("%sEOF1_EOF2_uncorrected_%s.png"%(outpath,mcname),dpi=150,bbox_inches='tight')
 
 #%% Plot correction ratio
 
@@ -617,7 +618,7 @@ cb = fig.colorbar(pcm,ax=axs.flatten())
 #cb.set_label("$Q_{net}$ ,Interval = 5 $W/m^2$ per $\sigma_{PC}$")
 #plt.suptitle("SLP (Contours), Interval = 100 hPa",x=0.6, y=.955,fontsize=14)
 
-plt.savefig("%sEOF1_EOF2_vratio.png"%(outpath),dpi=150,bbox_inches='tight')
+plt.savefig("%sEOF1_EOF2_vratio_%s.png"%(outpath,mcname),dpi=150,bbox_inches='tight')
 
 
 #%%
@@ -642,7 +643,7 @@ cb = fig.colorbar(pcm,ax=axs.flatten())
 cb.set_label("$Q_{net}$ ,Interval = 5 $W/m^2$ per $\sigma_{PC}$")
 plt.suptitle("SLP (Contours), Interval = 100 hPa",x=0.6, y=.955,fontsize=14)
 
-plt.savefig("%sEOF1_EOF2_corrected.png"%(outpath),dpi=150,bbox_inches='tight')
+plt.savefig("%sEOF1_EOF2_corrected_%s.png"%(outpath,mcname),dpi=150,bbox_inches='tight')
 
 # ------------------------------------
 #%% Find indices of variance threshold
@@ -728,7 +729,7 @@ fig,ax = plt.subplots(2,1)
 ax[0].pcolormesh(eofforce[:,:,stop_id,i].T),plt.colorbar()
 ax[1].pcolormesh(eofforce[:,:,stop_id+1,i].T),plt.colorbar()
 
-# Test Plot Cumulative % for indexing chec
+#%% Test Plot Cumulative % for indexing chec
 N_modeplot = 20
 modes = np.arange(1,N_mode+1)
 xtk = np.arange(1,N_mode+1,1)
@@ -747,25 +748,26 @@ ax.set_xlim([1,N_modeplot])
 #ax.set_xticks(xtk)
 #plt.savefig("%sSLAB-PIC_NHFLX_EOFs%i_%s_ModevCumuVariance_bymon.png"%(outpath,N_modeplot,bboxtext),dpi=150)
 
-#%% Plot Amp factor
+#%% Plot Amp factor (Paper Outline)
 
 # Plot for the paper
-
-
-
 bboxplot = [-100,20,0,80]
+bbox_NA  = [-80,0 ,10,65]
 clvls    = np.arange(1,1.55,.05)
 #clvls    = np.arange(1,1.55,.05)
 fig,ax   = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(8,4))
 ax       = viz.add_coast_grid(ax=ax,bbox=bboxplot)
-pcm      = ax.contourf(lon180,lat,ampfactor.mean(-1).T,levels=clvls,cmap="Oranges")
-p      = ax.pcolormesh(lon180,lat,ampfactor.mean(-1).T,vmin=clvls[0],vmax=clvls[-1],cmap="Oranges",zorder=-1)
+pcm      = ax.contourf(lon180,lat,ampfactor.mean(-1).squeeze().T,levels=clvls,cmap="Oranges")
+p        = ax.pcolormesh(lon180,lat,ampfactor.mean(-1).squeeze().T,vmin=clvls[0],vmax=clvls[-1],cmap="Oranges",zorder=-1)
 cb       = fig.colorbar(pcm,ax=ax,orientation='horizontal',fraction=0.055)
-cl       = ax.contour(lon180,lat,ampfactor.mean(-1).T,levels=clvls,colors='k',linewidths=.2)
+cl       = ax.contour(lon180,lat,ampfactor.mean(-1).squeeze().T,levels=clvls,colors='k',linewidths=.2)
+#ax.axhline(10,ls='dashed',color='k')
+ax,ll = viz.plot_box(bbox_NA,ax=ax,leglab="AMV",
+                     color="k",linestyle="dashed",linewidth=2,return_line=True)
 ax.clabel(cl,levels=np.arange(1,1.5,.1),fontsize=8)
 #cb.set_label(r"$\frac{q}{Q_{net}}$")
 ax.set_title(r"Annual Mean Variance Correction ($Q_{net}/Q_{EOF}$)"+ "\nContour Interval = 0.05")
-plt.savefig("%sRatio_varcorr_local.png"%outpath,dpi=150,bbox_inches='tight')
+plt.savefig("%sRatio_varcorr_local_%s.png"% (outpath,mcname),dpi=150,bbox_inches='tight')
 
 
 # ------------------------------------------------------------
@@ -984,9 +986,6 @@ for r in range(len(rids)):
         eofaa = proc.sel_region(ineof,lon,lat,rbbox,reg_avg=1,awgt=1)
         aavg_eof[:,m,r] = eofaa.copy()
         
-
-
-
 
 step = 1
 ylm = [-30,30]
