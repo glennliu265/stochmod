@@ -2010,11 +2010,13 @@ def load_inputs(mconfig,frcname,input_path):
         alpha     = np.ones((nlon,nlat,1,12))
     else: # [lon x lat x mon x pc]
         alpha     = np.load(input_path+frcname+".npy")
+        frcnamefull = frcname.replace("SLAB","FULL")
+        alpha_full  = np.load(input_path+frcnamefull+".npy")
     
-    return lon,lat,h,kprevall,damping,alpha
+    return lon,lat,h,kprevall,damping,alpha,alpha_full
 
 
-def make_forcing(alpha,runid,frcname,t_end,input_path,check=True):
+def make_forcing(alpha,runid,frcname,t_end,input_path,check=True,alpha_full=False):
     """
     forcing = make_forcing(alpha,runid,frcname,t_end,input_path)
     
@@ -2044,9 +2046,14 @@ def make_forcing(alpha,runid,frcname,t_end,input_path,check=True):
         Forcing for stochastic model, in units of W/m2
 
     """
+    if alpha_full is not None:
+        flag=True
+    
     
     # Get the dimensions
     nlon,nlat,N_mode,nmon = alpha.shape
+    if flag: # Get shape for FULL run
+        _,_,N_mode_full,_ = alpha_full.shape
     
     # Append extra symbols for "allrandom" forcing, make filename
     if frcname == "allrandom":
@@ -2062,7 +2069,11 @@ def make_forcing(alpha,runid,frcname,t_end,input_path,check=True):
         if frcname == "allrandom": # for each point
             randts = np.random.normal(0,1,(nlon,nlat,1,t_end)) # [lon x lat x pc x time]
         else: # Uniform thruout basin, for each PC
-            randts = np.random.normal(0,1,(1,1,N_mode,t_end)) # [1 x 1 x pc,time]
+            if flag: # Create timeseries with larger # of modes
+                N_mode_in = np.max([N_mode,N_mode_full])
+                randts = np.random.normal(0,1,(1,1,N_mode_in,t_end)) # [1 x 1 x pc,time]
+            else:
+                randts = np.random.normal(0,1,(1,1,N_mode,t_end)) # [1 x 1 x pc,time]
         
         # Save forcing
         np.save(outname,randts)
@@ -2080,8 +2091,11 @@ def make_forcing(alpha,runid,frcname,t_end,input_path,check=True):
             if frcname == "allrandom": # for each point
                 randts = np.random.normal(0,1,(nlon,nlat,1,t_end)) # [lon x lat x pc x time]
             else: # Uniform thruout basin, for each PC
-                randts = np.random.normal(0,1,(1,1,N_mode,t_end)) # [1 x 1 x pc x time]
-            
+                if flag: # Create timeseries with larger # of modes
+                    N_mode_in = np.max([N_mode,N_mode_full])
+                    randts = np.random.normal(0,1,(1,1,N_mode_in,t_end)) # [1 x 1 x pc,time]
+                else:
+                    randts = np.random.normal(0,1,(1,1,N_mode,t_end)) # [1 x 1 x pc,time]
             # Save forcing
             np.save(outname,randts)
         elif overwrite == "n": # Load old series
@@ -2091,22 +2105,86 @@ def make_forcing(alpha,runid,frcname,t_end,input_path,check=True):
             print("Invalid input, must be 'y' or 'n'")
     # Resultant randts should be 4-D [lon x lat x pc x time]
     
+    
+    
+    # Scale the forcing with the timeseries
+    forcing = tile_forcing(alpha,randts)
+    if flag:
+        forcing_full = tile_forcing(alpha_full,randts)
+        return forcing,forcing_full
+    return forcing
+    
+    # Old section with repeated code, non-funcitonized
+    # # Scale the forcing with the timeseries
+    # alpha_tile = alpha.copy()
+    # if t_end != nmon:
+    #     ntile      = int(t_end/nmon)
+    #     alpha_tile = np.tile(alpha_tile,ntile) #[lon x lat x pc x time]
+    # forcing = alpha_tile * randts[:,:,:N_mode,:]
+    
+    # # Sum the PCs for the forcing
+    # if N_mode > 1:
+    #     forcing = forcing.sum(2)
+    # forcing = forcing.squeeze()
+    
+    # # Remake into 3D [lon x lat x time]
+    # if len(forcing.shape)<3:
+    #     forcing = forcing[None,None,:]
+    
+    # # Repeat top 2 steps for CESM-FULL Forcing
+    # if flag:
+    #     alpha_tile_full = alpha_full.copy()
+    #     if t_end != nmon:
+    #         ntile      = int(t_end/nmon)
+    #         alpha_tile_full = np.tile(alpha_tile_full,ntile) #[lon x lat x pc x time]
+    #     forcing_full = alpha_tile_full * randts[:,:,:N_mode_full,:]
+        
+    #     # Sum the PCs for the forcing
+    #     if N_mode_full > 1:
+    #         forcing_full = forcing_full.sum(2)
+    #     forcing_full = forcing_full.squeeze()
+        
+    #     if len(forcing_full.shape)<3:
+    #         forcing_full = forcing_full[None,None,:]
+    #return forcing
+
+
+
+def tile_forcing(alpha,randts):
+    """
+    Parameters
+    ----------
+    alpha : [lon x lat x N_mode x month ]
+        Forcing Amplitudes
+    randts : TARRAY [1 x 1 x N_mode_max x simulation length]
+        Random Timeseries
+
+    Returns
+    -------
+    forcing : ARRAY [lon x lat x month]
+
+    """
+    # Get Dimensions
+    nlat,nlon,N_mode,nmon = alpha.shape
+    _,_,modemax,t_end = randts.shape
+    
     # Scale the forcing with the timeseries
     alpha_tile = alpha.copy()
     if t_end != nmon:
         ntile      = int(t_end/nmon)
         alpha_tile = np.tile(alpha_tile,ntile) #[lon x lat x pc x time]
-    forcing = alpha_tile * randts[:,:,:N_mode,:]
+    forcing = alpha_tile * randts[:,:,:N_mode,:] # Only take needed values
     
     # Sum the PCs for the forcing
     if N_mode > 1:
-        forcing = forcing.sum(2)
+        forcing = forcing.sum(2) # Sum along N_mode axis
     forcing = forcing.squeeze()
     
-    # Remake into 3D [lon x lat x time]
     if len(forcing.shape)<3:
-        forcing = forcing[None,None,:]
+        forcing = forcing[None,None,:] # [lon x lat x mon]
+        
     return forcing
+    
 
 
 def make_forcing_pt(alpha,runid,frcname,t_end,input_path,check=True):
@@ -2455,8 +2533,6 @@ def method2(lbd,include_b=True,original=True):
     a = 1-lbd
     b = (1-np.exp(-lbd))/lbd
     
-    
-    
     # Calculate variance of Q
     if original:
         mid_term  = (b**2 * (1-a)) / (2 * (1+a)**2)
@@ -2483,7 +2559,7 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
     
     # Load data in
     # ------------
-    lon,lat,h,kprevall,damping,alpha = load_inputs(mconfig,frcname,input_path)
+    lon,lat,h,kprevall,damping,alpha,alpha_full = load_inputs(mconfig,frcname,input_path)
     hblt = np.load(input_path + "SLAB_PIC_hblt.npy") # Slab fixed MLD
     hblt = np.ones(hblt.shape) * hblt.mean(2)[:,:,None]
 
@@ -2522,19 +2598,21 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
 
     # Generate White Noise
     # --------------------
-    forcing = make_forcing(alpha,runid,frcname,t_end,input_path,check=check)
+    forcing,forcing_full = make_forcing(alpha,runid,frcname,t_end,input_path,check=check,alpha_full=alpha_full)
 
     T_all = [] # Run 3 experiments
     for exp in range(3):
-        if exp == 0:
+        if exp == 0: # SLAB Parameters
             h_in = hblt.copy() # Used fixed slab model MLD
-        else:
+            f_in = forcing
+        else: # Full Parameters
             h_in = h.copy() # Variable MLD
+            f_in = forcing_full
         
         # Convert to w/m2
         # ---------------
         lbd_a   = convert_Wm2(damping,h_in,dt)
-        F       = convert_Wm2(forcing,h_in,dt) # [lon x lat x time]
+        F       = convert_Wm2(f_in,h_in,dt) # [lon x lat x time]
         
         #
         # If Option is set, amplitfy F to account for underestimation
