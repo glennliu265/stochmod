@@ -161,9 +161,9 @@ frcnames = (
 #frcnames = ('flxeof_EOF1_SLAB-PIC_eofcorr0',
 #            'flxeof_EOF2_SLAB-PIC_eofcorr0')
 
-frcnames = ("flxeof_2eofs_SLAB-PIC_eofcorr0",)
+#frcnames = ("flxeof_2eofs_SLAB-PIC_eofcorr0",)
 
-
+frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2',)
 
 print("Running the following forcings: \n %s"%(str(frcnames)))
 #%%
