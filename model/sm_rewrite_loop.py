@@ -17,7 +17,7 @@ import time
 
 #%% Set the location
 
-stormtrack = 0
+stormtrack = 1
 
 if stormtrack == 0:
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -96,10 +96,10 @@ mconfig    = "SLAB_PIC"
 
 
 # Running Parameters
-runid      = "test009"
+runid      = "010"
 pointmode  = 0 
 points     = [-30,50]
-bboxsim    = [-100,20,-20,90] # Simulation Box
+bboxsim    = [-80,0,0,65] # Simulation Box
 
 # Additional Constants
 t_end      = 12000 # Sim Length
@@ -167,6 +167,8 @@ frcnames = (
 
 frcnames = ("flxeof_2eofs_SLAB-PIC_eofcorr0",)
 
+frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2',)
+
 print("Running the following forcings: \n %s"%(str(frcnames)))
 #%%
 st = time.time()
@@ -188,7 +190,7 @@ for f in range(len(frcnames)):
                        runid,t_end,frcname,ampq,
                        bboxsim,pointmode,points=[lonf,latf],
                        dt=3600*24*30,
-                       debug=False,check=False)
+                       debug=False,check=False,savesep=True)
 print("Completed in %.2fs" % (time.time()-st))
     
     
