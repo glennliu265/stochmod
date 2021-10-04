@@ -1946,7 +1946,7 @@ def convert_Wm2(invar,h,dt,cp0=3996,rho=1026,verbose=True):
     
     return outvar.squeeze()
 
-def load_inputs(mconfig,frcname,input_path):
+def load_inputs(mconfig,frcname,input_path,load_both=False):
     """
     lon,lat,mld,kprevall,damping,alpha = load_inputs(mconfig,frcname,input_path)
     
@@ -1962,6 +1962,8 @@ def load_inputs(mconfig,frcname,input_path):
         Name of forcing. Supports ["allrandom","uniform"] or loads "[frcname].npy"
     input_path : STR
         Where all the data is stored
+    load_both : BOOL
+        Set to true for PIC, loading both FULL and SLAB
     
     Returns
     -------
@@ -2002,7 +2004,11 @@ def load_inputs(mconfig,frcname,input_path):
         damping   = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig020_dof082_mode4.npy")
     else:
         print("Currently supported damping mconfig are [SLAB_PIC,FULL_PIC,FULL_HTR]")
-    
+        
+    if load_both:
+        dampingslab   = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig005_dof894_mode4.npy")
+        dampingfull   = np.load(input_path+"FULL_PIC"+"_NHFLX_Damping_monwin3_sig005_dof1893_mode4.npy")
+        
     # Load Alpha (Forcing Amplitudes) [lon180 x lat x pc x mon], easier for tiling
     if frcname == "allrandom":
         alpha     = np.random.normal(0,1,(nlon,nlat,1,12)) # [lon x lat x 1 x 12]
@@ -2010,9 +2016,11 @@ def load_inputs(mconfig,frcname,input_path):
         alpha     = np.ones((nlon,nlat,1,12))
     else: # [lon x lat x mon x pc]
         alpha     = np.load(input_path+frcname+".npy")
-        frcnamefull = frcname.replace("SLAB","FULL")
-        alpha_full  = np.load(input_path+frcnamefull+".npy")
-    
+        if load_both:
+            frcnamefull = frcname.replace("SLAB","FULL")
+            alpha_full  = np.load(input_path+frcnamefull+".npy")
+            return lon,lat,h,kprevall,dampingslab,dampingfull,alpha,alpha_full
+        
     return lon,lat,h,kprevall,damping,alpha,alpha_full
 
 
@@ -2551,7 +2559,8 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
                    runid,t_end,frcname,ampq,
                    bboxsim,pointmode,points=[-30,50],
                    dt=3600*24*30,
-                   debug=False,check=True):
+                   debug=False,check=True,
+                   savesep=False):
     start = time.time()
     
     if debug:
@@ -2559,27 +2568,29 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
     
     # Load data in
     # ------------
-    lon,lat,h,kprevall,damping,alpha,alpha_full = load_inputs(mconfig,frcname,input_path)
+    lon,lat,h,kprevall,damping,dampingfull,alpha,alpha_full = load_inputs(mconfig,frcname,input_path,load_both=True)
     hblt = np.load(input_path + "SLAB_PIC_hblt.npy") # Slab fixed MLD
     hblt = np.ones(hblt.shape) * hblt.mean(2)[:,:,None]
 
     # Apply landice mask to all inputs
     # --------------------------------
     limask    = np.load(input_path+limaskname)
-    h        *= limask[:,:,None]
-    kprevall *= limask[:,:,None]
-    damping  *= limask[:,:,None]
-    alpha    *= limask[:,:,None,None]
-    hblt     *= limask[:,:,None]
+    h           *= limask[:,:,None]
+    kprevall    *= limask[:,:,None]
+    damping     *= limask[:,:,None]
+    dampingfull *= limask[:,:,None]
+    alpha       *= limask[:,:,None,None]
+    alpha_full  *= limask[:,:,None,None]
+    hblt        *= limask[:,:,None]
 
-    # Restrict to region or point
+    # Restrict to region or point (Need to fix this section)
     # ---------------------------
-    inputs = [h,kprevall,damping,alpha,hblt]
+    inputs = [h,kprevall,damping,dampingfull,alpha,alpha_full,hblt]
     if pointmode == 0:
         outputs,lonr,latr = cut_regions(inputs,lon,lat,bboxsim,pointmode,points=points)
     else:
         outputs = cut_regions(inputs,lon,lat,bboxsim,pointmode,points=points)
-    h,kprev,damping,alpha,hblt = outputs
+    h,kprev,damping,dampingfull,alpha,alpha_full,hblt = outputs
 
     # Check some params
     # -------------------
@@ -2605,13 +2616,15 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
         if exp == 0: # SLAB Parameters
             h_in = hblt.copy() # Used fixed slab model MLD
             f_in = forcing
+            d_in = damping.copy()
         else: # Full Parameters
             h_in = h.copy() # Variable MLD
             f_in = forcing_full
+            d_in = dampingfull.copy()
         
         # Convert to w/m2
         # ---------------
-        lbd_a   = convert_Wm2(damping,h_in,dt)
+        lbd_a   = convert_Wm2(d_in,h_in,dt)
         F       = convert_Wm2(f_in,h_in,dt) # [lon x lat x time]
         
         #
@@ -2645,18 +2658,45 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
         
         if exp==0:
             Q,q,lbdT = integrate_Q(lbd_a,F,T,h_in,debug=True)
+            
+            
+        # Save outputs separately, if option is set
+        # -----------------------------------------
+        if savesep:
+            
+            expstr = expname[:-4] + "_model%i"%(exp) # Get string without extension, add modelnumber
+            if exp > 0:
+                expstr = expstr.replace("SLAB","FULL") # Replace Slab  with FULL in forcing name
+                # Save the results (Not including Q)
+                np.savez(expstr+".npz",**{
+                    'sst': T,
+                    'lon' : lonr,
+                    'lat' : latr,
+                    },allow_pickle=True)
+            else:
+                # Save the results (Including integrated Q)
+                np.savez(expstr+".npz",**{
+                    'sst': T,
+                    'lon' : lonr,
+                    'lat' : latr,
+                    'Q': Q,
+                    'q':q,
+                    'lbdT':lbdT
+                    },allow_pickle=True)
+            print("Saved results separately to %s"%(expstr))
     
-    # Save the results
-    np.savez(expname,**{
-        'sst': T_all,
-        'lon' : lonr,
-        'lat' : latr,
-        'Q': Q,
-        'q':q,
-        'lbdT':lbdT
-        },allow_pickle=True)
-    
-    print("Saved output to %s in %.2fs" % (expname,time.time()-start))
+    if ~savesep:
+        # Save the results
+        np.savez(expname,**{
+            'sst': T_all,
+            'lon' : lonr,
+            'lat' : latr,
+            'Q': Q,
+            'q':q,
+            'lbdT':lbdT
+            },allow_pickle=True)
+        print("Saved output to %s in %.2fs" % (expname,time.time()-start))
+    print("Function completed in %.2fs" % (time.time()-start))
 
 
 
