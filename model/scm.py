@@ -2560,7 +2560,7 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
                    bboxsim,pointmode,points=[-30,50],
                    dt=3600*24*30,
                    debug=False,check=True,
-                   savesep=False):
+                   useslab=False,savesep=False):
     start = time.time()
     
     if debug:
@@ -2621,6 +2621,10 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
             h_in = h.copy() # Variable MLD
             f_in = forcing_full
             d_in = dampingfull.copy()
+        
+        if useslab: # In special cases, use slab for forcing and damping
+            f_in = forcing.copy()
+            d_in = damping.copy()
         
         # Convert to w/m2
         # ---------------

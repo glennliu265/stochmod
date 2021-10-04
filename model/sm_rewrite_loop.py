@@ -70,7 +70,6 @@ import scm
 # 2) Forcing includes both MLD seasonal cycle AND integration factor
 # 3) Forcing just includes integration factor
 
-
 # Types of forcing
 # "allrandom" : Completely random in space or time
 # "uniform"   : Uniform in space, random in time
@@ -93,7 +92,6 @@ mconfig    = "SLAB_PIC"
 #"flxeof_5eofs_SLAB-PIC"
 #"flxeof_080pct_SLAB-PIC"
 #flxeof_qek_50eofs_SLAB-PIC
-
 
 # Running Parameters
 runid      = "010"
@@ -133,10 +131,8 @@ frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2',
             'flxeof_090pct_SLAB-PIC_eofcorr2_JJA',
             'flxeof_090pct_SLAB-PIC_eofcorr2_SON')
 
-
 frcnames = ('flxeof_EOF1_SLAB-PIC_eofcorr1',
             'flxeof_EOF2_SLAB-PIC_eofcorr1')
-
 
 # Testing different # of EOFs, simpler correction
 frcnames = (
@@ -167,7 +163,7 @@ frcnames = (
 
 frcnames = ("flxeof_2eofs_SLAB-PIC_eofcorr0",)
 
-frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2',)
+
 
 print("Running the following forcings: \n %s"%(str(frcnames)))
 #%%
@@ -190,7 +186,6 @@ for f in range(len(frcnames)):
                        runid,t_end,frcname,ampq,
                        bboxsim,pointmode,points=[lonf,latf],
                        dt=3600*24*30,
-                       debug=False,check=False,savesep=True)
+                       debug=False,check=False,useslab=True,savesep=False)
 print("Completed in %.2fs" % (time.time()-st))
-    
-    
+
