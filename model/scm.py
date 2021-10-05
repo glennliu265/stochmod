@@ -1061,8 +1061,9 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
         if preload is None:
             sst *= mskreg[None,:,:,None]
         else:
-            sst[0] *= msk[:,:,None]
-            sst[1] *= msk[:,:,None]
+            for i in range(len(sst)):
+                sst[i] *= mskreg[:,:,None]
+            #sst[1] *= msk[:,:,None]
     
     print("Data loaded in %.2fs" % (time.time()-start))
     
@@ -1143,7 +1144,7 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
         amvpat = {}
         
         for model in range(n_models):
-            amvidx[model],amvpat[model] = proc.calc_AMVquick(sst[model],lonr,latr,amvbboxes[region])
+            amvidx[model],amvpat[model] = proc.calc_AMVquick(sst[model],lonr,latr,amvbboxes[region],dropedge=5)
         print("Calculated AMV variables for region %s in %.2f" % (regions[region],time.time()-amvtime))
         
         amvidx_region[region] = amvidx
@@ -1557,9 +1558,9 @@ def quick_spectrum(sst,nsmooth,pct,
 
 #%% Data Loading
 
-def load_hadisst(datpath,method=2,startyr=1870,grabpoint=None):
+def load_hadisst(datpath,method=2,startyr=1870,endyr=2018,grabpoint=None):
     
-    hadname  = "%sHadISST_detrend%i_startyr%i.npz" % (datpath,method,startyr)
+    hadname  = "%sHadISST_detrend%i_startyr%i_endyr%i.npz" % (datpath,method,startyr,endyr)
     ld = np.load(hadname,allow_pickle=True)
     
     hsst = ld['sst']
@@ -1574,9 +1575,9 @@ def load_hadisst(datpath,method=2,startyr=1870,grabpoint=None):
         sstpt = hsst[khlon,khlat,:]
         return sstpt
 
-def load_ersst(datpath,method=2,startyr=1854,grabpoint=None):
+def load_ersst(datpath,method=2,startyr=1854,endyr=2016,grabpoint=None):
     
-    hadname  = "%sERSST_detrend%i_startyr%i.npz" % (datpath,method,startyr)
+    hadname  = "%sERSST_detrend%i_startyr%i_endyr%i.npz" % (datpath,method,startyr,endyr)
     ld = np.load(hadname,allow_pickle=True)
     
     hsst = ld['sst']
@@ -2398,7 +2399,7 @@ def integrate_Q(lbd,F,T,mld,cp0=3996,rho=1026,dt=3600*24*30,debug=False):
     lbdT        = Q.copy()
     for t in tqdm(range(ntime)):
         q[:,:,t]    = q_ori_units[:,:,t]
-        lbdT[:,:,t] = -lbd_ori_units[:,:,t]*T[:,:,t]
+        lbdT[:,:,t] = -lbd_ori_units[:,:,t]*(T[:,:,t]+T[:,:,t-1])/2
         Q[:,:,t]    = q[:,:,t] + lbdT[:,:,t]
     if debug:
         return Q,q,lbdT
@@ -2560,7 +2561,8 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
                    bboxsim,pointmode,points=[-30,50],
                    dt=3600*24*30,
                    debug=False,check=True,
-                   useslab=False,savesep=False):
+                   useslab=False,savesep=False,
+                   intgrQ=False):
     start = time.time()
     
     if debug:
@@ -2660,33 +2662,33 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
         
         T_all.append(T)
         
-        if exp==0:
+        # Integrate Forcing, if the option is set
+        if exp==0 and intgrQ:
             Q,q,lbdT = integrate_Q(lbd_a,F,T,h_in,debug=True)
             
+            # Save output in separate file
+            expstr = expname[:-4] + "_model%i_integrQ"%(exp) # Get string without extension, add modelnumber
+            np.savez(expstr+".npz",**{
+                'lon' : lonr,
+                'lat' : latr,
+                'Q': Q,
+                'q':q,
+                'lbdT':lbdT
+                },allow_pickle=True)
             
         # Save outputs separately, if option is set
         # -----------------------------------------
         if savesep:
-            
             expstr = expname[:-4] + "_model%i"%(exp) # Get string without extension, add modelnumber
             if exp > 0:
                 expstr = expstr.replace("SLAB","FULL") # Replace Slab  with FULL in forcing name
                 # Save the results (Not including Q)
-                np.savez(expstr+".npz",**{
-                    'sst': T,
-                    'lon' : lonr,
-                    'lat' : latr,
-                    },allow_pickle=True)
-            else:
-                # Save the results (Including integrated Q)
-                np.savez(expstr+".npz",**{
-                    'sst': T,
-                    'lon' : lonr,
-                    'lat' : latr,
-                    'Q': Q,
-                    'q':q,
-                    'lbdT':lbdT
-                    },allow_pickle=True)
+            
+            np.savez(expstr+".npz",**{
+                'sst': T,
+                'lon' : lonr,
+                'lat' : latr,
+                },allow_pickle=True)
             print("Saved results separately to %s"%(expstr))
     
     if ~savesep:
@@ -2695,9 +2697,6 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
             'sst': T_all,
             'lon' : lonr,
             'lat' : latr,
-            'Q': Q,
-            'q':q,
-            'lbdT':lbdT
             },allow_pickle=True)
         print("Saved output to %s in %.2fs" % (expname,time.time()-start))
     print("Function completed in %.2fs" % (time.time()-start))
