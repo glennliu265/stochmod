@@ -20,38 +20,44 @@ import xarray as xr
 
 import sys
 sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
+sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
 from amv import proc,viz
-
+import scm
 
 #%% User Input
 
 datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/"
 ncname  = "ERSST5.nc"
-
 datpathout = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/"
 
 # Detrending Options
 method  = 2
-startyr = 1900 
-#%% Load data
-
-ds = xr.open_dataset(datpath+ncname)
-sst = ds['sst'].values
-lat = ds['lat'].values
-lon = ds['lon'].values
-times = ds['time'].values
-
-# Round off to the nearest year
-sst = sst[:-11,:,:]
+tstart = '1900-01-01'
+tend   = '2016-12-31'
 
 
+#def slice_time()
+
+#%% Load data, slice time
+
+# Open Dataset
+ds = xr.open_dataset(datpath+ncname) # [jan 1854 to nov 2018]
+dstime = ds.sel(time=slice(tstart,tend))
+
+# Load in NumPy Arrays
+sst   = dstime['sst'].values
+lat   = dstime['lat'].values
+lon   = dstime['lon'].values
+times = dstime['time'].values 
+
+# Get dimensions
 nmon,nlat,nlon = sst.shape
 nyrs = int(nmon/12)
 #%% Preprocess the data
 
 # Flip array
 sstflip = np.flip(sst,axis=1)
-latnew = np.flip(lat)
+latnew  = np.flip(lat)
 
 # def flip_lat(hlat,hsst):
 #     """
@@ -88,17 +94,63 @@ latnew = np.flip(lat)
 
 
 #%% Remove Seasonal Cycle first and plot
+debug = True
 
 # Flip to lon x lat x time
 hsstnew = sstflip.transpose(2,1,0)
 
-# Deseason
+# Deseason by computing monthly averages
 dsfirst = np.reshape(hsstnew,(nlon,nlat,nyrs,12))
 scycle  = np.mean(dsfirst,axis=2)[:,:,None,:]
 dsfirst = dsfirst -scycle
 dsfirst = np.reshape(dsfirst,(nlon,nlat,nmon))
 
+# Try to also deseason using sinusoid fit
+hcopy = hsstnew.reshape(nlon*nlat,nmon)
+okdata,knan,okpts = proc.find_nan(hcopy,1) # [Space x time]
+x,E = proc.remove_ss_sinusoid(okdata.T) # {Time x Space}
+ss  = E@x
+okdata_ds = (okdata.T - ss).T
+dssinu = np.zeros((nlon*nlat,nmon))*np.nan
+dssinu[okpts,:] = okdata_ds
+dssinu          = dssinu.reshape(nlon,nlat,nmon)
 
+if debug:
+    klon,klat = proc.find_latlon(330,55,lon,lat)
+    
+    sstpt = [dsfirst[klon,klat,:],
+             dssinu[klon,klat,:]]
+    
+    nsmooths = [1,1]
+    pct      = 0.10
+    specs,freqs,CCs,dofs,r1s = scm.quick_spectrum(sstpt,nsmooths,pct)
+    
+    
+    xlm = [1e-2,5e0]
+    xper = np.array([200,100,75,50,25,10,5,1,0.5]) # number of years
+    xtks = 1/xper
+    xlm  = [xtks[0],xtks[-1]]
+    dt   = 3600*24*365
+    
+    fig,ax = plt.subplots(1,1,figsize=(10,5))
+    
+    
+    mnames = ["Mon-Anom","Sinusoid"]
+    mcols  = ['b','r']
+    msty   = ["solid",'dashed']
+    for i in range(2):
+        ax.plot(freqs[i]*dt,specs[i]/dt,label=mnames[i],color=mcols[i],ls=msty[i])
+    ax.set_xlim(xlm)
+    ax.set_xticks(xtks)
+    ax.set_xticklabels(xper)
+    
+    #viz.plot_freqlin(specs[::-1],freqs[::-1],["Mon-Anom","Sinusoid"],["blue","r"],ax=ax,xtick=xtks,xlm=xlm)
+    #fig,ax = plt.subplots(1,1)
+    #ax.scatter(np.arange(0,nmon),hsstnew[klon,klat,:] - (hsstnew.mean(-1))[:,:,None],alpha=0.5,color='gray')
+    
+    
+
+#%%
 # Detrend
 start= time.time()
 indata = dsfirst.reshape(nlon*nlat,nmon)
@@ -152,7 +204,7 @@ hlon = lon
 hyr  = times
 
 # Save data (MONTHLY)
-hadname  = "%sERSST_detrend%i_startyr%i.npz" % (datpathout,method,startyr)
+hadname  = "%sERSST_detrend%i_startyr%s_endyr%s.npz" % (datpathout,method,tstart[:4],tend[:4])
 np.savez(hadname,**{
     'sst':dtdata,
     'lat':latnew,

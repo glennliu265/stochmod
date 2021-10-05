@@ -25,16 +25,20 @@ import time
 import cmocean
 import cartopy.crs as ccrs
 import xarray as xr
-
+import pandas as pd
 
 import sys
 sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
+sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
 from amv import proc,viz
+import scm
 
 #%% User Edits
+tstart = '1900-01-01'
+tend   = '2018-12-31'
 
-startyr = 1900 # Start year for AMV Analysis
-bbox    =[-80,0 ,0,65] # AMV bbox
+startyr = int(tstart[:4]) # Start year for AMV Analysis
+bbox    =[-80,0 ,0,65]    # AMV bbox
 # Path to SST data from obsv
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 outpath = projpath + '02_Figures/20211001/'
@@ -59,10 +63,21 @@ hsst   = obvhad['SST']
 # Change hsst to lon x lat x time
 hsst = np.transpose(hsst,(2,1,0))
 
+#%%
+
+# Make time array using pandas, then convert to npdatetime64
+t = pd.date_range('1870-01-01',periods=hsst.shape[-1],freq="MS")
+ids = (t>=tstart) * (t<=tend) # Get the starting and ending times
+#times = t[ids].to_datetime()
+
+
+
 # Take the set time period
-monstart = (startyr+1-hyr[0,0])*12
-hsst = hsst[:,:,monstart::]
+#monstart = (startyr+1-hyr[0,0])*12
+
+hsst = hsst[:,:,ids]
 nyrs = int(hsst.shape[2]/12)
+
 
 #%% Fix Latitude Dimensions for HSST
 # currently it is arranged 90:-90, need to flip to south first
@@ -81,10 +96,53 @@ hsstnew = np.concatenate((hsstsouth,hsstnorth),axis=1)
 
 #%% Remove Seasonal Cycle first and plot
 
+debug = True
+
+nlon,nlat,nmon = hsst.shape
+
 dsfirst = np.reshape(hsstnew,(360,180,nyrs,12))
 dsfirst = dsfirst - np.mean(dsfirst,axis=2)[:,:,None,:]
 dsfirst = np.reshape(dsfirst,(360,180,hsstnew.shape[2]))
 
+# Try to also deseason using sinusoid fit
+hcopy = hsstnew.reshape(nlon*nlat,nmon)
+okdata,knan,okpts = proc.find_nan(hcopy,1) # [Space x time]
+x,E = proc.remove_ss_sinusoid(okdata.T) # {Time x Space}
+ss  = E@x
+okdata_ds = (okdata.T - ss).T
+dssinu = np.zeros((nlon*nlat,nmon))*np.nan
+dssinu[okpts,:] = okdata_ds
+dssinu          = dssinu.reshape(nlon,nlat,nmon)
+
+if debug:
+    klon,klat = proc.find_latlon(330,55,hlon,hlatnew)
+    
+    sstpt = [dsfirst[klon,klat,:],
+             dssinu[klon,klat,:]]
+    
+    nsmooths = [1,1]
+    pct      = 0.10
+    specs,freqs,CCs,dofs,r1s = scm.quick_spectrum(sstpt,nsmooths,pct)
+    
+    
+    xlm = [1e-2,5e0]
+    xper = np.array([200,100,75,50,25,10,5,1,0.5]) # number of years
+    xtks = 1/xper
+    xlm  = [xtks[0],xtks[-1]]
+    dt   = 3600*24*365
+    
+    fig,ax = plt.subplots(1,1,figsize=(10,5))
+    
+    
+    mnames = ["Mon-Anom","Sinusoid"]
+    mcols  = ['b','r']
+    msty   = ["solid",'dashed']
+    for i in range(2):
+        ax.plot(freqs[i]*dt,specs[i]/dt,label=mnames[i],color=mcols[i],ls=msty[i])
+    ax.set_xlim(xlm)
+    ax.set_xticks(xtks)
+    ax.set_xticklabels(xper)
+    ax.set_ylim([0,0.5])
 # Detrend
 # start= time.time()
 # dtdsfirst,dsymodall,_,_ = proc.detrend_dim(dsfirst,2)
@@ -92,9 +150,6 @@ dsfirst = np.reshape(dsfirst,(360,180,hsstnew.shape[2]))
 
 #%%
 # Detrend
-nlon = 360
-nlat = 180
-nmon = nyrs*12
 start= time.time()
 indata = dsfirst.reshape(nlon*nlat,nmon)
 okdata,knan,okpts = proc.find_nan(indata,1)
@@ -143,7 +198,7 @@ hsst = dtdata.copy()
 #hsst = dsfirst.copy()
 
 # Save data (MONTHLY)
-hadname  = "%sHadISST_detrend%i_startyr%i.npz" % (datpath,method,startyr)
+hadname  = "%sHadISST_detrend%i_startyr%s_endyr%s.npz" % (datpath,method,tstart[:4],tend[:4])
 np.savez(hadname,**{
     'sst':dtdata,
     'lat':hlatnew,
@@ -477,7 +532,6 @@ zpat180[np.where(np.abs(zpat180) < 1e-10)] = np.nan
 clim = .5 #0.025
 cstp = 0.025
 cmult = 2
-
 cint = np.arange(-clim,clim+cstp,cstp)
 cl_int = np.arange(-clim,clim+cstp*cmult,cstp*cmult)
 
