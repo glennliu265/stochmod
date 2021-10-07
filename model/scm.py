@@ -1362,6 +1362,11 @@ def synth_stochmod(config,verbose=False,viz=False,
     if forcing_flag:# Make special forcing
         # Find the point
         fpt_in = forcing[o,a,...]
+        
+        # # Average forcing if option is set
+        # if config['favg'] is True:
+        #     fpt_in = np.ones(12)*fpt_in.mean()
+        
         #Fpt = fpt_in
         # params= list(params)
         # params[-1] = fpt_in
@@ -1393,6 +1398,8 @@ def synth_stochmod(config,verbose=False,viz=False,
     if viz:
         synth = [damppt,mldpt,Fpt]
         fig,ax = viz.summarize_params(lat,lon,params,synth=synth)
+    
+
     
     # Prepare forcing
     mldmean = hblt[o,a,:].mean()
@@ -1441,6 +1448,10 @@ def synth_stochmod(config,verbose=False,viz=False,
             underest = method2(lbd[i].mean(),original=False) # Original = uncorrected version with error
             ampmult = 1/underest
             Fh[i] *= ampmult
+    
+
+    
+    
     
     # Run the stochastic model
     multFAC = 0
@@ -1609,7 +1620,7 @@ def load_ersst(datpath,method=2,startyr=1854,endyr=2016,grabpoint=None):
         return sstpt
 
 
-def load_cesm_pt(datpath,loadname='both',grabpoint=None):
+def load_cesm_pt(datpath,loadname='both',grabpoint=None,ensorem=0):
     """
     Load CESM Data
     Inputs:
@@ -1631,13 +1642,27 @@ def load_cesm_pt(datpath,loadname='both',grabpoint=None):
     # Load SSTs
     ssts = []
     if loadname=='both' or loadname=='full': # Load full sst data from model
-        ld  = np.load(datpath+"FULL_PIC_ENSOREM_TS_lag1_pcs2_monwin3.npz" ,allow_pickle=True)
-        sstfull = ld['TS']
+        
+        
+        if ensorem == 1:# Load data with ENSO Removed
+            ld  = np.load(datpath+"FULL_PIC_ENSOREM_TS_lag1_pcs2_monwin3.npz" ,allow_pickle=True)
+            sstfull = ld['TS']
+        else:
+            ds = xr.open_dataset(datpath+"CESM_proc/TS_anom_PIC_FULL.nc")
+            sstslab = ds['TS'].values
+            
         ssts.append(sstfull)
         
     if loadname=='both' or loadname=='slab': # Load slab sst data
-        ld2 = np.load(datpath+"SLAB_PIC_ENSOREM_TS_lag1_pcs2_monwin3.npz" ,allow_pickle=True)
-        sstslab = ld2['TS']
+        
+        if ensorem == 1:# Load data with ENSO Removed
+            ld2 = np.load(datpath+"SLAB_PIC_ENSOREM_TS_lag1_pcs2_monwin3.npz" ,allow_pickle=True)
+            sstslab = ld2['TS'] # Time x lat x lon
+        else:
+            ds = xr.open_dataset(datpath+"CESM_proc/TS_anom_PIC_SLAB.nc")
+            sstslab = ds['TS'].values
+
+            
         ssts.append(sstslab)
     
     print("Loaded PiC Data in %.2fs"%(time.time()-st))
