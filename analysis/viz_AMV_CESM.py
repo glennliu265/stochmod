@@ -5,9 +5,10 @@ Calculate and Visualize AMV
 from CESM PiC Runs
 
 - Postprocesses output the same was as stochastic model output
-
+- Load in ERSST and HadISST, and compare AMV PAtterns
 
 Created on Mon May 24 22:55:19 2021
+
 
 @author: gliu
 """
@@ -18,7 +19,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time
 from tqdm import tqdm
-from scipy import linalg,stats
+from scipy import linalg,stats,signal
 from scipy.signal import butter,filtfilt
 from scipy.io import loadmat
 import sys
@@ -42,7 +43,7 @@ proc.makedir(outpath)
 datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/"
 
 
-bbox = [-80,0 ,0,60]
+bbox = [-80,0 ,0,65]
 #bboxplot = 
 runmean=True
 ensorem = False # Set to True to use ENSO-removed data
@@ -161,59 +162,91 @@ print("Lpreprocessed PiC Data in %.2fs"%(time.time()-st))
 #% ---- Inputs
 expid       = "CESM1-PIC_ensorem%i" % (ensorem)
 projpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
-datpath     = projpath + '01_Data/model_output/'
+datpath1     = projpath + '01_Data/model_output/'
 rawpath     = projpath + '01_Data/model_input/'
-outpathdat  = datpath + '/proc/'
+outpathdat  = datpath1 + '/proc/'
 
-# Set preloaded inputs, # of lags
+#%% Set preloaded inputs, # of lags
 preload = [lon180,lat,sstas]
 lags    = np.arange(0,37,1)
 
 # 
-scm.postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,preload=preload,mask_pacific=True)
+scm.postprocess_stochoutput(expid,datpath1,rawpath,outpathdat,lags,preload=preload,mask_pacific=True)
 #%% Load data preprocessed above
 
 # Load data for CESM1-PIC
 cesmacs= []
-expid      = "CESM1-PIC"
-rsst_fn    = "%s/proc/AMV_Region_%s.npz" % (datpath+"model_output/",expid)
+expid      = "CESM1-PIC_ensorem%i" % (ensorem)
+rsst_fn    = "%sAMV_Region_%s.npz" % (outpathdat,expid)
 ldc        = np.load(rsst_fn,allow_pickle=True)
-cesmpat = ldc['amvpat_region'].item()[3] # Just take North Atlantic
-cesmidx = ldc['amvidx_region'].item()[3] # Just take North Atlantic
+
+cesmpat    = ldc['amvpat_region'].item()[4] # Just take North Atlantic
+cesmidx    = ldc['amvidx_region'].item()[4] # Just take North Atlantic
 
 # Load global lat/lon
-clon,clat  = scm.load_latlon(datpath+"model_input/")
+clon,clat  = scm.load_latlon(rawpath)
 
 # ------------------------------------------
 # %% Load and postprocess HadISST and ERSST
 # ------------------------------------------
 
+load_limopt = False
 
-# Load in the Datasets **********************
-# Already detrended.
-st = time.time()
-#datpath2 = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/"
-hsst,hlat,hlon = scm.load_hadisst(datpath,method=2,startyr=1900,grabpoint=None)
-print("Completed in %.2fs" % (time.time()-st))
 
-st = time.time()
-#datpath2 = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/"
-esst,elat,elon = scm.load_ersst(datpath,method=2,startyr=1900,grabpoint=None)
-elon,esst = proc.lon360to180(elon,esst)
-print("Completed in %.2fs" % (time.time()-st))
+if load_limopt:
+    
+    # Load in LIM-opt dataset
+    ssts,lons,lats,times = scm.load_limopt_sst()
+    
+    lons.append(clon)
+    lons.append(clon)
+    lats.append(clat)
+    lats.append(clat)
+    #ssts.append()
+    for s in range(len(ssts)):
+        ssts[s] = ssts[s][:,:,4:-4]
+    
+else:
+    # Load in the Datasets **********************
+    # Already detrended.HadISST
+    st = time.time()
+    datpath2 = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/"
+    hsst,hlat,hlon = scm.load_hadisst(datpath2,method=2,startyr=1900,grabpoint=None)
+    print("Completed in %.2fs" % (time.time()-st))
+    
+    # Load the masks
+    datpath3 = datpath2 + "lim-opt/"
+    dsm = xr.open_dataset(datpath3+"HadISST.MSK.nc")
+    hmsk = dsm.MSK.values
+    hmsk[hmsk==0] = np.nan
+    hsst *= hmsk.T[:,:,None]
 
-# Load in the Datasets **********************
+    # Load ERSST
+    st = time.time()
+    esst,elat,elon = scm.load_ersst(datpath2,method=2,startyr=1900,grabpoint=None)
+    elon360 = elon.copy()
+    elon,esst = proc.lon360to180(elon,esst)
+    print("Completed in %.2fs" % (time.time()-st))
+    
+    # Load the masks
+    dsm = xr.open_dataset(datpath3+"ERSST.MSK.nc")
+    emsk = dsm.MSK.values
+    _,emsk = proc.lon360to180(elon360,emsk.T)
+    emsk[emsk==0] = np.nan
+    esst *= emsk[:,:,None]
+    
+    # Set up lists **********************
+    lons = [hlon,elon,clon,clon]
+    lats = [hlat,elat,clat,clat]
+    ssts = [hsst,esst]
+
+
+
 # Calculate AMV (North Atlantic)
-
-
-lons = [hlon,elon]
-lats = [hlat,elat]
-ssts = [hsst,esst]
-
 oidxs = []
 opats = []
-for s in range(2):
-    amvidx,amvpattern = proc.calc_AMVquick(ssts[s],lons[s],lats[s],bbox,order=5,cutofftime=10,anndata=False,runmean=runmean)
+for s in range(len(ssts)):
+    amvidx,amvpattern = proc.calc_AMVquick(ssts[s][:,:,:],lons[s],lats[s],bbox,order=5,cutofftime=10,anndata=False,runmean=False,dropedge=5)
     oidxs.append(amvidx)
     opats.append(amvpattern)
 
@@ -221,15 +254,160 @@ for s in range(2):
 
 #%% Set up arrays for plotting
 
+if load_limopt:
+    ossts = ssts
+    amvpats = opats
+    amvids  = oidxs
+    for i in range(2):
+        amvpats.append(cesmpat[i])
+        amvids.append(cesmidx[i])
+    mnames  = ["COBE","HadISST","ERSST","CESM-FULL","CESM-SLAB"]
+    
+else:
+    ossts    = [hsst,esst]
+    amvpats = [opats[0],opats[1],cesmpat[0],cesmpat[1]]
+    amvids  = [oidxs[0],oidxs[1],cesmidx[0],cesmidx[1]]
+    mnames  = ["HadISST","ERSST","CESM-FULL","CESM-SLAB"]
 
-amvids = [oid]
+
+# ---------------------------------------------
+#%% *** PLOT AMV PATTERNS (Obs. vs. CESM!!) ***
+# ---------------------------------------------
+
+# Plotting Parameters
+clim = .5 #0.025
+cstp = 0.025
+cmult = 2
+cint = np.arange(-clim,clim+cstp,cstp)
+cl_int = np.arange(-clim,clim+cstp*cmult,cstp*cmult)
+bboxplot = [-80,0 ,0,55]
+
+square=True
+
+if load_limopt:
+    fig,axs = plt.subplots(2,3,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(10,8))
+    for i in range(5):
+        ax = axs.flatten()[i]
+        ax = viz.add_coast_grid(ax,bbox=bboxplot)
+        cf = ax.contourf(lons[i],lats[i],amvpats[i].T,cmap=cmocean.cm.balance,levels=cint,extend='both')    
+        cl = ax.contour(lons[i],lats[i],amvpats[i].T,levels=cl_int,colors='k',linewidths=0.5)
+        ax.clabel(cl)
+        ax.set_title("%s ($\sigma_{AMV}^2$=%.4f$\degree \, C^{2}$)"%(mnames[i],np.var(amvids[i])))
+    
+    cb = fig.colorbar(cf,ax=axs.flatten(),orientation="horizontal",fraction=0.04,pad=0.05)
+    plt.suptitle("AMV Pattern (CESM vs. Obs)",y=0.9)   
+    cb.set_label("AMV Pattern for SST; Contour Interval=%.3f ($\degree C \sigma_{AMV}^{-1}$)"%cstp)
+    plt.savefig("%sAMV_Patterns_ObsLIMopt_v_CESM.png"% (outpath),dpi=200,bbox_inches='tight')
+else:
+    if square:
+        fig,axs = plt.subplots(2,2,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(8,8))
+    else:
+        fig,axs = plt.subplots(1,4,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(12,6))
+    for i in range(4):
+        ax = axs.flatten()[i]
+        ax = viz.add_coast_grid(ax,bbox=bboxplot)
+        cf = ax.contourf(lons[i],lats[i],amvpats[i].T,cmap=cmocean.cm.balance,levels=cint,extend='both')    
+        cl = ax.contour(lons[i],lats[i],amvpats[i].T,levels=cl_int,colors='k',linewidths=0.5)
+        ax.clabel(cl)
+        ax.set_title("%s ($\sigma_{AMV}^2$=%.4f$\degree \, C^{2}$)"%(mnames[i],np.var(amvids[i])))
+    if square:
+        cb = fig.colorbar(cf,ax=axs.flatten(),orientation="horizontal",fraction=0.04,pad=0.05)
+        plt.suptitle("AMV Pattern (CESM vs. Obs)",y=0.9)
+    else:
+        cb = fig.colorbar(cf,ax=axs.flatten(),orientation="vertical",fraction=0.010,pad=0.05)
+        plt.suptitle("AMV Pattern (CESM vs. Obs)",y=0.9)
+    cb.set_label("AMV Pattern for SST; Contour Interval=%.3f ($\degree C \sigma_{AMV}^{-1}$)"%cstp)
+    
+    
+    plt.savefig("%sAMV_Patterns_Obs_v_CESM.png"% (outpath),dpi=200,bbox_inches='tight')
+
+#amvids = [oid]
+#ax = viz.add_coast_grid(ax,bbox=bboxplot)
 
 
+#%% Calculate North Atlantic SST Spectra
 
-fig,axs = plt.subplots(1,4,subplot_kw={'projection':ccrs.PlateCarree()})
-ax = viz.add_coast_grid(ax,bbox=bboxplot)
+awgt = 1
+
+# Load regionally averaged SST
+rsst_fn    = "%sSST_RegionAvg_%s.npy" % (outpathdat,expid)
+ldc        = np.load(rsst_fn,allow_pickle=True).item()
+rssts      = ldc[4] # Get NNAT index
+
+bbox_NA_new = [-80,0,10,65]
+
+# Calculate regionall averaged SST for reanalysis
+nassti = []
+for i in range(len(ssts)):
+    aa_sst = proc.area_avg(ossts[i],bbox_NA_new,lons[i],lats[i],awgt)
+    nassti.append(aa_sst)
+
+# Calculate the spectra
+if load_limopt:
+    nasstis = [nassti[0],nassti[1],nassti[2],rssts[0],rssts[1]]
+    nsmooths = [10,10,10,50,30,]
+    mcols = ["r","b","cyan","k","gray"]
+
+else:
+    nasstis = [nassti[0],nassti[1],rssts[0],rssts[1]]
+    nsmooths = [10,10,50,30,]
+    mcols = ["r","b","k","gray"]
+    mmark = ["o","d","*","x"]
+    
+pct = 0.10
+specs,freqs,CCs,dofs,r1s = scm.quick_spectrum(nasstis,nsmooths,pct)
 
 
+#%% Plot the North Atlantic Spectra
+
+xlm = [1e-2,5e0]
+
+xper = np.array([200,100,50,25,10,5,1,0.5]) # number of years
+xtks = 1/xper
+xlm  = [xtks[0],xtks[-1]]
+
+speclabels = ["%s (%.4f$\degree \, C^{2}$)" % (mnames[i],np.var(nasstis[i])) for i in range(4)]
+fig,ax = plt.subplots(1,1,figsize=(12,4))
+
+ax = viz.plot_freqxpower(specs,freqs,speclabels,mcols,
+                     ax=ax,plottitle="North Atlantic SST Spectra",xtick=xtks,xlm=xlm)
+
+#plt.suptitle("Regional AMV Index Spectra (unsmoothed, Forcing=%s)"%(frcnamelong[f]))
+savename = "%sNASST_Spectra_Obs-v-CESM_LinearLinear.png" % (outpath)
+plt.savefig(savename,dpi=200,bbox_inches='tight')
+
+#%% Calculate and plot autocorrelation
+
+kmonth = 1
+lags   = np.arange(0,37,1)
+xtk2   = np.arange(0,38,2)
+for i in range(len(nasstis)):
+    nasstis[i] = signal.detrend(nasstis[i],type='linear')
+
+# Calculate Autocorrelation
+acs,confs    = scm.calc_autocorr(nasstis,lags,kmonth+1,calc_conf=True)
+
+# Plot the autocorrelation
+fig,ax = plt.subplots(1,1,figsize=(8,4))
+ax,ax2 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title="North Atlantic SST Autocorrelation")
+for i in range(len(acs)):
+    
+    ax.fill_between(lags,confs[i][:,0],confs[i][:,1],color=mcols[i],alpha=0.25,zorder=-1)
+    ax.plot(lags,acs[i],label=mnames[i],color=mcols[i],marker=mmark[i])
+    
+
+ax.legend(ncol=2)
+plt.savefig("%sNASST_autocorr_Obs-v-CESM.png"%outpath,dpi=150)
+
+#%% Wait... let's check the seasonal cycle
+
+fig,axs = plt.subplots(4,1)
+
+for i in range(len(nasstis)):
+    ax = axs.flatten()[i]
+    sstyrmon = proc.year2mon(nasstis[i]) # [mon x year]
+    ax.plot(sstyrmon.mean(1))
+    ax.set_title(mnames[i])
 
 #%% Old Scripts **************************************************************
 
@@ -245,12 +423,7 @@ for sst in sstas:
     amvidx,amvpattern=proc.calc_AMVquick(sst,lon180,lat,bbox,order=5,cutofftime=10,anndata=False,runmean=runmean)
     idxs.append(amvidx)
     pats.append(amvpattern)
-
-
-
-
-
-
+    
 # -----------------
 #%% Plot AMV Patterns
 # -----------------
