@@ -13,7 +13,7 @@ import numpy as np
 import xarray as xr
 from scipy.io import loadmat
 import matplotlib.pyplot as plt
-from scipy import stats
+from scipy import stats,signal
 from tqdm import tqdm
 import glob
 
@@ -1158,7 +1158,7 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
     if returnresults == True:
         return sstregion,autocorr_region,kmonths,sstavg_region,amvidx_region,amvpat_region
     
-def calc_autocorr(sst,lags,basemonth):
+def calc_autocorr(sst,lags,basemonth,calc_conf=False,conf=0.95,tails=2):
     """
     Calculate autocorrelation for output of stochastic models
     
@@ -1170,6 +1170,12 @@ def calc_autocorr(sst,lags,basemonth):
         Lags to calculate autocorrelation for
     basemonth : INT
         Month corresponding to lag 0 (ex. Jan=1)
+    calc_conf : BOOL
+        Set to true to calculate confidence intervals
+    conf : NUMERIC
+        Confidence Level (default = 0.95)
+    tails : INT
+        Number of tails (1 or 2)
        
     Returns
     -------
@@ -1178,6 +1184,7 @@ def calc_autocorr(sst,lags,basemonth):
     """
     n = len(sst)
     autocorr = {}
+    confs = {}
     for model in range(n):
         
         # Get the data
@@ -1187,8 +1194,15 @@ def calc_autocorr(sst,lags,basemonth):
         # Deseason (No Seasonal Cycle to Remove)
         tsmodel2 = tsmodel - np.mean(tsmodel,1)[:,None]
         
-        # Plot
+        # Detrend (Linear)
+        tsmodel2 = signal.detrend(tsmodel2,axis=1,type='linear')
+        
+        # Calculate the autocorrelation
         autocorr[model] = proc.calc_lagcovar(tsmodel2,tsmodel2,lags,basemonth,1)
+        
+        confs[model] = proc.calc_conflag(autocorr[model],conf,tails,tsmodel.shape[1])
+    if calc_conf:
+        return autocorr,confs
     return autocorr
 
 #%% Synthetic Stochastic Model Wrapper
@@ -2702,4 +2716,40 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
     print("Function completed in %.2fs" % (time.time()-start))
 
 
+#%%
+def load_limopt_sst(datpath=None):
+    """
+    Load SST Data that has been detrended using LIM-opt (Frankignoul et al. 2017)
+    """
+    # Set Inputs
+    if datpath is None: # Location of lim-opt data
+        datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/lim-opt/"
+    dnames = ("COBE","HadISST","ERSST")
+    
+    # Loop and load into NumPy Arrays
+    lons  = []
+    lats  = []
+    ssts  = []
+    times = []
+    for d,dname in enumerate(dnames):
 
+        # Read in indices, lat, time
+        ds = xr.open_dataset("%s%s-SST-LIM-opt.nc"%(datpath,dname))
+        lat = ds.lat.values
+        sst = ds.SST.values
+        lon360 = ds.lon.values
+        times.append(ds.time.values)
+        
+
+        # Get Mask Information (HADISST Mask is flipped, need to consider this)
+        #dsm = xr.open_dataset("%s%s.MSK.nc"%(datpath,dname))
+        #msk = dsm.MSK.values
+
+        # Flip the lon/lat, apply mask, transpose to  time x lat x lon --> lon x lat x time
+        lats.append(np.flip(lat))  # Flip lat variable
+        sst  = np.flip(sst,axis=1) # Flip latitude axis
+        #sst *= msk[None,:,:]       # Apply Mask
+        lon180,sst180 = proc.lon360to180(lon360,sst.transpose(2,1,0)) # Transpose 
+        ssts.append(sst180)
+        lons.append(lon180)
+    return ssts,lons,lats,times
