@@ -38,12 +38,12 @@ import yo_box as ybx
 
 # Path to data 
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
-outpath = projpath + '02_Figures/20211004/'
+outpath = projpath + '02_Figures/20211018/'
 proc.makedir(outpath)
 datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/"
 
 
-bbox = [-80,0 ,0,65]
+bbox = [-80,0,10,65]
 #bboxplot = 
 runmean=True
 ensorem = False # Set to True to use ENSO-removed data
@@ -172,6 +172,59 @@ lags    = np.arange(0,37,1)
 
 # 
 scm.postprocess_stochoutput(expid,datpath1,rawpath,outpathdat,lags,preload=preload,mask_pacific=True)
+
+
+#%% Additionally Calculate Seasonal AMV Patterns
+
+snames = ("Ann","DJF","MAM","JJA","SON")
+sids  = (np.arange(0,12,1),[11,0,1],[2,3,4],[5,6,7],[8,9,10])
+
+samvpats = np.zeros((5,2,288,192))*np.nan
+samvids  = []
+for i in tqdm(range(5)):
+    
+    sname = snames[i]
+    sid   = sids[i]
+    
+    #amvpats  = []
+    amvids   = []
+    dropedge=5
+    for m in range(2):
+        amvid,amvpat = proc.calc_AMVquick(sstas[m],lon180,lat,bbox,dropedge=5,monid=sid)
+        #amvpats.append(samvpats)
+        samvpats[i,m,:,:] = amvpat
+        amvids.append(amvid)
+    #samvpats.append(amvpats)
+    samvids.append(amvids)
+    
+    
+    
+#%% Quick viz
+clvl = np.arange(-.5,.525,.025)
+
+fig,axs = plt.subplots(2,2,subplot_kw={'projection' : ccrs.PlateCarree()})
+for i in range(4):
+    
+    ax = axs.flatten()[i]
+    ax = viz.add_coast_grid(ax,bbox=bbox)
+    ax.set_title(snames[i+1])
+    pcm = ax.contourf(lon180,lat,samvpats[i+1,0,:,:].T,cmap=cmocean.cm.balance,levels=clvl)
+
+#%% Save Seasonal Patterns for plotting later
+savename = "%s%s_SeasonalAMVPattern.npy" % (outpathdat,expid)
+print(savename)
+np.save(savename,samvpats)
+
+
+savename = "%s%s_SeasonalAMV.npz" % (outpathdat,expid)
+print(savename)
+np.savez(savename,**{
+    'samvpats' : samvpats,
+    'samvids'  : samvids,
+    'lon':lon180,
+    'lat':lat
+    },allow_pickle=True)
+
 #%% Load data preprocessed above
 
 # Load data for CESM1-PIC
@@ -324,6 +377,31 @@ else:
 #amvids = [oid]
 #ax = viz.add_coast_grid(ax,bbox=bboxplot)
 
+#%% Plot CESM-AMV Alone (for SM_Paper_Outline)
+i = 2
+
+
+# Prepare Tick labels
+cb_lab = ["%.2f"%(n) for n in cl_int]
+
+# Initialize Figure
+fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(6,4))
+ax = viz.add_coast_grid(ax,bbox=bboxplot)
+
+# Plot
+cf = ax.contourf(lons[i],lats[i],amvpats[i].T,cmap=cmocean.cm.balance,levels=cint,extend='both')    
+cl = ax.contour(lons[i],lats[i],amvpats[i].T,levels=cl_int,colors='k',linewidths=0.5)
+ax.clabel(cl)
+ax.set_title("%s AMV Pattern" %(mnames[i]))
+
+# Add Colorbar, Reduce tick labels
+cb = fig.colorbar(cf,ax=ax,orientation="horizontal",fraction=0.050,pad=0.1)
+cb.set_label("SST ($\degree C \sigma_{AMV}^{-1}$); Contour Interval=%.3f "%cstp)
+cb.set_ticks(cl_int[::2],cb_lab[::2])
+
+# Add a marker, save figure
+ax.scatter(-30,50,200,marker="*",facecolor='yellow',zorder=9,edgecolor='k',linewidth=.5)
+plt.savefig("%sAMV_Patterns_Indv_%s.png"% (outpath,mnames[i]),dpi=200,bbox_inches='tight')
 
 #%% Calculate North Atlantic SST Spectra
 
@@ -345,12 +423,12 @@ for i in range(len(ssts)):
 # Calculate the spectra
 if load_limopt:
     nasstis = [nassti[0],nassti[1],nassti[2],rssts[0],rssts[1]]
-    nsmooths = [10,10,10,50,30,]
+    nsmooths = [5,5,10,50,30,]
     mcols = ["r","b","cyan","k","gray"]
 
 else:
     nasstis = [nassti[0],nassti[1],rssts[0],rssts[1]]
-    nsmooths = [10,10,50,30,]
+    nsmooths = [2,2,12,12,]
     mcols = ["r","b","k","gray"]
     mmark = ["o","d","*","x"]
     
@@ -360,18 +438,30 @@ specs,freqs,CCs,dofs,r1s = scm.quick_spectrum(nasstis,nsmooths,pct)
 
 #%% Plot the North Atlantic Spectra
 
-xlm = [1e-2,5e0]
 
+# Older Params
+xlm = [1e-2,5e0]
 xper = np.array([200,100,50,25,10,5,1,0.5]) # number of years
 xtks = 1/xper
 xlm  = [xtks[0],xtks[-1]]
+xlm = [1e-2,5e0]
+
+# Newer Params
+#xper = np.array([200,100,50,25,10,5,2,1,0.5]) # number of years
+xper = np.array([100,50,20,10,5,2])
+xtks = 1/xper
+xlm  = [xtks[0],xtks[-1]]
+ylm  = [0,0.3]
+
 
 speclabels = ["%s (%.4f$\degree \, C^{2}$)" % (mnames[i],np.var(nasstis[i])) for i in range(4)]
 fig,ax = plt.subplots(1,1,figsize=(12,4))
 
-ax = viz.plot_freqxpower(specs,freqs,speclabels,mcols,
+ax = viz.plot_freqlin(specs,freqs,speclabels,mcols,
                      ax=ax,plottitle="North Atlantic SST Spectra",xtick=xtks,xlm=xlm)
 
+
+ax.set_ylim(ylm)
 #plt.suptitle("Regional AMV Index Spectra (unsmoothed, Forcing=%s)"%(frcnamelong[f]))
 savename = "%sNASST_Spectra_Obs-v-CESM_LinearLinear.png" % (outpath)
 plt.savefig(savename,dpi=200,bbox_inches='tight')
