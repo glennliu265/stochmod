@@ -1639,6 +1639,13 @@ def load_cesm_pt(datpath,loadname='both',grabpoint=None,ensorem=0):
     lon360 = loadmat("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/CESM1_LATLON.mat")['LON'].squeeze()
     
     
+    if grabpoint is not None:
+        # Query the point
+        lonf,latf = grabpoint
+        if lonf < 0:
+            lonf += 360
+        klon360,klat = proc.find_latlon(lonf,latf,lon360,lat)
+    
     # Load SSTs
     ssts = []
     if loadname=='both' or loadname=='full': # Load full sst data from model
@@ -1648,11 +1655,15 @@ def load_cesm_pt(datpath,loadname='both',grabpoint=None,ensorem=0):
             ld  = np.load(datpath+"FULL_PIC_ENSOREM_TS_lag1_pcs2_monwin3.npz" ,allow_pickle=True)
             sstfull = ld['TS']
         else:
+            
             ds = xr.open_dataset(datpath+"CESM_proc/TS_anom_PIC_FULL.nc")
-            sstslab = ds['TS'].values
+            if grabpoint is not None:
+                sstfull = ds.sel(lon=lonf,lat=latf,method='nearest').TS.vaues
+            else:
+                sstfull = ds['TS'].values
             
         ssts.append(sstfull)
-        
+          
     if loadname=='both' or loadname=='slab': # Load slab sst data
         
         if ensorem == 1:# Load data with ENSO Removed
@@ -1660,22 +1671,19 @@ def load_cesm_pt(datpath,loadname='both',grabpoint=None,ensorem=0):
             sstslab = ld2['TS'] # Time x lat x lon
         else:
             ds = xr.open_dataset(datpath+"CESM_proc/TS_anom_PIC_SLAB.nc")
-            sstslab = ds['TS'].values
-
-            
+            if grabpoint is not None:
+                sstslab = ds.sel(lon=lonf,lat=latf,method='nearest').TS.vaues
+            else:
+                sstslab = ds['TS'].values
         ssts.append(sstslab)
+        
     
     print("Loaded PiC Data in %.2fs"%(time.time()-st))
     
     # Retrieve point information
-    if grabpoint is None:
+    if grabpoint is None or ensorem==0:
         return ssts
     else:
-        # Query the point
-        lonf,latf = grabpoint
-        if lonf < 0:
-            lonf += 360
-        klon360,klat = proc.find_latlon(lonf,latf,lon360,lat)
         sstpts = []
         for sst in ssts:
             sstpt = sst[:,klat,klon360]
