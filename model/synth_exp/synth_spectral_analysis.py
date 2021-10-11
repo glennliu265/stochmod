@@ -34,7 +34,7 @@ projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 datpath     = projpath + '01_Data/'
 input_path  = datpath + 'model_input/'
 output_path = datpath + 'model_output/'
-outpath     = projpath + '02_Figures/20210922/'
+outpath     = projpath + '02_Figures/20211011/'
 proc.makedir(outpath)
 
 # Load in control data for 50N 30W
@@ -53,18 +53,18 @@ els = ["dashdot","solid","dotted","dashed"]
 
 # Set up Configuration
 config = {}
-config['mconfig']     = "SLAB_PIC" # Model Configuration
+config['mconfig']     = "FULL_PIC" # Model Configuration
 config['ftype']       = "DJFM-MON" # Forcing Type
-config['genrand']     = 0          # Toggle to generate new random timeseries
+config['genrand']     = 1          # Toggle to generate new random timeseries
 config['fstd']        = 1          # Set the standard deviation N(0,fstd)
 config['t_end']       = 120000     # Number of months in simulation
-config['runid']       = "syn003"   # White Noise ID
-config['fname']       = "flxeof_090pct_SLAB-PIC_eofcorr2.npy"   #['NAO','EAP,'EOF3','FLXSTD']
+config['runid']       = "syn008"   # White Noise ID
+config['fname']       = "flxeof_090pct_FULL-PIC_eofcorr2.npy"   #['NAO','EAP,'EOF3','FLXSTD']
 config['pointmode']   = 1          # Set to 1 to generate a single point
 config['query']       = [-30,50]   # Point to run model at 
 config['applyfac']    = 2          # Apply Integration Factor and MLD to forcing
 config['lags']        = np.arange(0,37,1)
-config['output_path'] = projpath + '02_Figures/20210922/' # Note need to fix this
+config['output_path'] = outpath # Note need to fix this
 config['smooth_forcing'] = False
 config['method'] =3 
 
@@ -75,8 +75,6 @@ config.pop('mldpt',None)
 # Confidence Level Calculations
 conf  = 0.95
 tails = 2
-
-
 #%% Functions
 
 def interp_quad(ts):
@@ -168,7 +166,6 @@ mlddef = mldpt.copy()
 Fptdef = Fpt.copy()
 
 sstall = sst
-
 #%%
 
 
@@ -176,9 +173,10 @@ sstall = sst
 
 #%% OPTIONAL: Save inputs from clean run for comparison later
 
-savenames = "%scleanrun_%s_runid%s.npz" % (output_path,config['mconfig'],config['runid'])
+savenames = "%scleanrun_%s_runid%s_%s.npz" % (output_path,config['mconfig'],config['runid'],config['fname'])
 print("Saving clean run to %s" % savenames)
 np.savez(savenames,**{
+    'ac':ac,
     'sst': sst,
     'dmp': dmp,
     'frc': frc,
@@ -188,15 +186,54 @@ np.savez(savenames,**{
     'params':params
     }, allow_pickle=True)
 
+#%% Plot the forcing
+
+
+
+
+title = "%s Monthly EOF-based Forcing " % (config['mconfig']) + "(90% Variance)" 
+
+test = Fpt.copy()
+test[test==0] = np.nan
+
+fig,ax=plt.subplots(1,1,figsize=(6,3))
+
+
+#alphas = np.flip(np.linspace(0.05,1,Fpt.shape[0]))
+
+
+for N in range(Fpt.shape[0]):
+    ax.plot(mons3,Fpt[N,:],alpha=0.25,color="k",label="")
+
+ax.plot(mons3,np.nanmean(test,0),color="r",marker="x",label=r"Mean($\alpha$)")
+ax.plot(mons3,np.nanmean(np.abs(test),0),color="b",marker="x",label=r"Mean(|$\alpha$|)")
+ax.plot(mons3,np.nanstd(test,0),color="magenta",marker="x",label=r"std($\alpha$)")
+#ax.plot(mons3,np.nanstd(np.abs(test),0),color="green",marker="x",label=r"std(|$\alpha$|)")
+
+ax.set_ylim([-70,70])
+ax.legend()
+
+ax.grid(True,ls='dotted')
+ax.set_title(title)
+plt.savefig("%sMonthlyEOFForcing_%s.png"%(outpath,config['fname']),dpi=150,bbox_inches='tight')
+#ax.plot(Fpt.mean(0))
+#ax.plot(np.nanmean(np.abs(test),0))
+#ax.plot(np.nanstd(test,0))
+
+
+
 # ---------------------------------- ---------------------------
 # %% Load HADISST data for the point, calculate Autocorrelation
 # ---------------------------------- ---------------------------
 lonf,latf = query
-hsstpt = scm.load_hadisst(datpath,method=2,startyr=1870,grabpoint=query)
+hsstpt = scm.load_hadisst(datpath,method=2,startyr=1900,endyr=2018,grabpoint=query)
+esstpt = scm.load_ersst(datpath,method=2,startyr=1900,endyr=2016,grabpoint=query)
 
 # Calculate and plot autocorrelation
 hadac = scm.calc_autocorr([hsstpt],lags,kmonth+1)[0]
 cfhad = proc.calc_conflag(hadac,conf,tails,hsstpt.shape[0])
+ersac = scm.calc_autocorr([esstpt],lags,kmonth+1)[0]
+cfers = proc.calc_conflag(ersac,conf,tails,esstpt.shape[0])
 
 # --------------------
 #%% Autocorrelation Plot with Confidence Intervals
@@ -241,6 +278,11 @@ ax.fill_between(lags,cffull[lags,0],cffull[lags,1],color='k',alpha=0.10)
 # Plot HadISST Data
 ax.plot(lags,hadac,label="HadISST",color="b",marker="x",markersize=3)
 ax.fill_between(lags,cfhad[:,0],cfhad[:,1],color='b',alpha=0.10)
+
+# Plot HadISST Data
+ax.plot(lags,ersac,label="ERSST",color="cyan",marker="x",markersize=3)
+ax.fill_between(lags,cfers[:,0],cfers[:,1],color='cyan',alpha=0.10)
+
 
 for i in range(1,4):
     ax.plot(lags,ac[i],label=labelsnew[i],color=expcolors[i],ls=els[i],marker="o",markersize=3)
