@@ -1444,20 +1444,14 @@ def synth_stochmod(config,verbose=False,viz=False,
     # Apply correction factor (if set)
     if config['method'] == 3:
         for i in range(3):
-            
             underest = method2(lbd[i].mean(),original=False) # Original = uncorrected version with error
             ampmult = 1/underest
             Fh[i] *= ampmult
-    
-
-    
-    
     
     # Run the stochastic model
     multFAC = 0
     if config['applyfac'] > 1: # Apply Integration factor
         multFAC = 1
-    
     
     sst         = {}
     dampingterm = {}
@@ -1477,7 +1471,6 @@ def synth_stochmod(config,verbose=False,viz=False,
     if forcing_flag:
         Fpt = fpt_in
     params = ([o,a],damppt,mldpt,kprev,Fpt)
-    
     
     ## Basically no effect, so commented out..
     # #Detrend again to be sure
@@ -1513,7 +1506,7 @@ def synth_stochmod(config,verbose=False,viz=False,
         return autocorr,sst,dampingterm,forcingterm,entrainterm,Td,kmonth,params,specout
 
 def quick_spectrum(sst,nsmooth,pct,
-                   opt=1,dt=3600*24*30,clvl=[.95]):
+                   opt=1,dt=None,clvl=[.95]):
     """
     Quick spectral estimate of an array of timeseries
 
@@ -1547,6 +1540,11 @@ def quick_spectrum(sst,nsmooth,pct,
 
     """
     
+    # -----------------------------------------------------------------
+    # Set interval of time series (assumes monthly by default)
+    # -----------------------------------------------------------------
+    if dt is None:
+        dt = np.ones(len(sst)) * 3600*24*30
     
     # -----------------------------------------------------------------
     # Calculate and make individual plots for stochastic model output
@@ -1559,26 +1557,25 @@ def quick_spectrum(sst,nsmooth,pct,
     r1s = []
     for i in range(len(sst)):
         sstin = sst[i]
-        
+        dt_in = dt[i]
         
         # Calculate Spectrum
         if isinstance(nsmooth,int):
             sps = ybx.yo_spec(sstin,opt,nsmooth,pct,debug=False)
         else:
             sps = ybx.yo_spec(sstin,opt,nsmooth[i],pct,debug=False)
-
-            
         
-        # Save spectrum and frequency
+        
+        # Save spectrum and frequency, convert to 1/sec
         P,freq,dof,r1=sps
-        specs.append(P*dt)
-        freqs.append(freq/dt)
+        specs.append(P*dt_in)
+        freqs.append(freq/dt_in)
         dofs.append(dof)
         r1s.append(r1)
         
         # Calculate Confidence Interval
         CC = ybx.yo_speccl(freq,P,dof,r1,clvl)
-        CCs.append(CC*dt)
+        CCs.append(CC*dt_in)
     return specs,freqs,CCs,dofs,r1s
 
 #%% Data Loading
@@ -1926,7 +1923,6 @@ def postprocess_HF(dampingmasked,limask,sellags,lon):
     
     """
     
-    
     # Inputs
     ## Dampingmasked [month x lag x lat x lon]
     ## limask [lat x lon]
@@ -2001,7 +1997,7 @@ def load_inputs(mconfig,frcname,input_path,load_both=False):
     Load stochastic model inputs from [input_path] directory. This includes
     atmospheric damping, mixed layer depth, entrainment month, and stochastic
     forcing amplitudes. 
-
+    
     Parameters
     ----------
     mconfig : STR
@@ -2053,7 +2049,8 @@ def load_inputs(mconfig,frcname,input_path,load_both=False):
     else:
         print("Currently supported damping mconfig are [SLAB_PIC,FULL_PIC,FULL_HTR]")
         
-    if load_both:
+    # Load both damping
+    if load_both: 
         dampingslab   = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig005_dof894_mode4.npy")
         dampingfull   = np.load(input_path+"FULL_PIC"+"_NHFLX_Damping_monwin3_sig005_dof1893_mode4.npy")
         
@@ -2066,6 +2063,7 @@ def load_inputs(mconfig,frcname,input_path,load_both=False):
         alpha     = np.load(input_path+frcname+".npy")
         if load_both:
             frcnamefull = frcname.replace("SLAB","FULL")
+            print(frcnamefull)
             alpha_full  = np.load(input_path+frcnamefull+".npy")
             return lon,lat,h,kprevall,dampingslab,dampingfull,alpha,alpha_full
         
@@ -2749,10 +2747,13 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
     print("Function completed in %.2fs" % (time.time()-start))
 
 
-#%%
-def load_limopt_sst(datpath=None):
+#%% Loading limopt data
+
+def load_limopt_sst(datpath=None,vname="SSTRES"):
     """
-    Load SST Data that has been detrended using LIM-opt (Frankignoul et al. 2017)
+    Load SST Data that has been detrended using LIM-opt (Frankignoul et al. 2017).
+    Loads the Residual SST (SSTRES) rather than the external trend (SST), change
+    this using the vname argument.
     """
     # Set Inputs
     if datpath is None: # Location of lim-opt data
@@ -2769,7 +2770,7 @@ def load_limopt_sst(datpath=None):
         # Read in indices, lat, time
         ds = xr.open_dataset("%s%s-SST-LIM-opt.nc"%(datpath,dname))
         lat = ds.lat.values
-        sst = ds.SST.values
+        sst = ds[vname].values
         lon360 = ds.lon.values
         times.append(ds.time.values)
         
@@ -2786,3 +2787,47 @@ def load_limopt_sst(datpath=None):
         ssts.append(sst180)
         lons.append(lon180)
     return ssts,lons,lats,times
+
+def load_limopt_amv(datpath=None):
+    """
+    Load AMO Data that has been detrended using LIM-opt (Frankignoul et al. 2017).
+
+    """
+    # Set Inputs
+    if datpath is None: # Location of lim-opt data
+        datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/lim-opt/"
+    dnames = ("COBE","HadISST","ERSST")
+    
+    # Loop and load into NumPy Arrays
+    lons  = []
+    lats  = []
+    ssts  = [] # AMV Pattern
+    idxs  = []
+    times = []
+    for d,dname in enumerate(dnames):
+
+        # Read in indices, lat, time
+        ds = xr.open_dataset("%s%s-AMO+PDO-LIMopt.nc"%(datpath,dname))
+        lat = ds.lat.values
+        sst = ds.SSTAMO.values
+        idx = ds.AMO.values
+        lon360 = ds.lon.values
+        times.append(ds.time.values)
+        idxs.append(idx)
+        
+
+        # Flip the lon/lat, apply mask, transpose to  time x lat x lon --> lon x lat x time
+        lats.append(np.flip(lat))  # Flip lat variable
+        sst  = np.flip(sst,axis=0) # Flip latitude axis
+        lon180,sst180 = proc.lon360to180(lon360,sst.T) # Transpose 
+        sst180[np.where(np.abs(sst180) < 1e-10)] = np.nan # Remove NaN points
+        ssts.append(sst180 * np.std(idx)) # Multiply to convert to degC/std_amv
+        lons.append(lon180)
+        
+    return ssts,idxs,lons,lats,times
+        
+    
+
+#%%
+
+

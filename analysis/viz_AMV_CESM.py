@@ -243,10 +243,13 @@ clon,clat  = scm.load_latlon(rawpath)
 # %% Load and postprocess HadISST and ERSST
 # ------------------------------------------
 
-load_limopt = False
+load_limopt = True
+manual_calc = False
 
 
 if load_limopt:
+    nmon = 3
+
     
     # Load in LIM-opt dataset
     ssts,lons,lats,times = scm.load_limopt_sst()
@@ -260,6 +263,8 @@ if load_limopt:
         ssts[s] = ssts[s][:,:,4:-4]
     
 else:
+    nmon = 12
+    
     # Load in the Datasets **********************
     # Already detrended.HadISST
     st = time.time()
@@ -273,7 +278,7 @@ else:
     hmsk = dsm.MSK.values
     hmsk[hmsk==0] = np.nan
     hsst *= hmsk.T[:,:,None]
-
+    
     # Load ERSST
     st = time.time()
     esst,elat,elon = scm.load_ersst(datpath2,method=2,startyr=1900,grabpoint=None)
@@ -293,15 +298,23 @@ else:
     lats = [hlat,elat,clat,clat]
     ssts = [hsst,esst]
 
-
-
 # Calculate AMV (North Atlantic)
-oidxs = []
-opats = []
-for s in range(len(ssts)):
-    amvidx,amvpattern = proc.calc_AMVquick(ssts[s][:,:,:],lons[s],lats[s],bbox,order=5,cutofftime=10,anndata=False,runmean=False,dropedge=5)
-    oidxs.append(amvidx)
-    opats.append(amvpattern)
+if load_limopt and ~manual_calc: # Load pre-computed AMV Index
+    opats,oidxs,lons,lats,_ = scm.load_limopt_amv()
+    
+    lons.append(clon)
+    lons.append(clon)
+    lats.append(clat)
+    lats.append(clat)
+
+else:
+    oidxs = []
+    opats = []
+    for s in range(len(ssts)):
+        amvidx,amvpattern = proc.calc_AMVquick(ssts[s][:,:,:],lons[s],lats[s],bbox,order=5,cutofftime=10,
+                                               anndata=False,runmean=False,dropedge=5,nmon=nmon)
+        oidxs.append(amvidx)
+        opats.append(amvpattern)
 
 
 
@@ -323,10 +336,6 @@ else:
     mnames  = ["HadISST","ERSST","CESM-FULL","CESM-SLAB"]
 
 
-# ---------------------------------------------
-#%% *** PLOT AMV PATTERNS (Obs. vs. CESM!!) ***
-# ---------------------------------------------
-
 # Plotting Parameters
 clim = .5 #0.025
 cstp = 0.025
@@ -334,6 +343,11 @@ cmult = 2
 cint = np.arange(-clim,clim+cstp,cstp)
 cl_int = np.arange(-clim,clim+cstp*cmult,cstp*cmult)
 bboxplot = [-80,0 ,0,55]
+# ---------------------------------------------
+#%% *** PLOT AMV PATTERNS (Obs. vs. CESM!!) ***
+# ---------------------------------------------
+
+
 
 square=True
 
@@ -351,6 +365,7 @@ if load_limopt:
     plt.suptitle("AMV Pattern (CESM vs. Obs)",y=0.9)   
     cb.set_label("AMV Pattern for SST; Contour Interval=%.3f ($\degree C \sigma_{AMV}^{-1}$)"%cstp)
     plt.savefig("%sAMV_Patterns_ObsLIMopt_v_CESM.png"% (outpath),dpi=200,bbox_inches='tight')
+    
 else:
     if square:
         fig,axs = plt.subplots(2,2,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(8,8))
@@ -376,6 +391,116 @@ else:
 
 #amvids = [oid]
 #ax = viz.add_coast_grid(ax,bbox=bboxplot)
+
+#%% Try centering an odd number of plots
+
+
+import matplotlib.gridspec as gridspec
+
+
+
+
+def init_2rowodd(ncol,proj,figsize=(6,6),oddtop=False,debug=False):
+    """
+    Initialize a 2-row subplot where
+    the bottom row has the smaller number of plots
+    source: https://www.tutorialguruji.com/python/matplotlib-allign-uneven-number-of-subplots/
+
+    Parameters
+    ----------
+    ncol : INT
+        Number of columns (even). Last row will contain ncol-1 subplots
+
+    proj : Cartopy Projection
+        Projection to set the subplots as
+        
+    figsize : INT (Length x Height)
+        Figure Size
+        
+    oddtop : BOOL
+        Set to True to make odd row on top
+
+    Returns
+    -------
+    axs : LIST of matplotlib axes
+        Flattened list containing subplots
+
+    """
+    
+    fig = plt.figure(figsize=figsize)
+    gs = gridspec.GridSpec(2,ncol*2)
+    
+    nodd = ncol*2-1
+    
+    axs = []
+    for i in range(ncol*2-1):
+        
+        
+        if oddtop: # Shorter row on top
+            if i < ncol-1: 
+                rowid   = 0     # Top row
+                startid = i*2+1 # Start on 1
+                stopid  = i*2+3 # Stop 2 subplots later
+                msg = "for %i <= %i --> gs[0,%i:%i]" % (i,ncol-1,startid,stopid)
+            else:
+                rowid   = 1              # Bot Row
+                startid = 2*(i-ncol)+2   # Start from 0 (+2 since i-ncol = -2)
+                stopid  = 2*(i-ncol)+4   # End 2 plots later
+                msg = "for %i > %i --> gs[1,%i:%i]" % (i,ncol,startid,stopid)
+        else: # Shorter row on bottom
+            if i < ncol:
+                rowid = 0
+                startid = 2 * i
+                stopid  = 2 * i + 2
+                msg = "for %i < %i --> gs[0,%i:%i]" % (i,ncol,startid,stopid)
+            else:
+                rowid = 1
+                startid = 2 * i - nodd
+                stopid  = 2 * i + 2 - nodd
+                msg = "for %i >= %i --> gs[1,%i:%i]" % (i,ncol,startid,stopid)
+        
+        ax = plt.subplot(gs[rowid,startid:stopid],projection=proj)
+        
+        if debug:
+            
+            print(msg)
+            
+        axs.append(ax)
+    return fig,axs
+
+ncol    = 3
+proj    = ccrs.PlateCarree()
+figsize = (12,7.5)
+fig,axs = init_2rowodd(ncol,proj,figsize=figsize,oddtop=False,debug=True)
+for i in range(len(axs)):
+    ax = axs[i]
+    
+    if i == 0:
+        blb = [1,0,0,1]
+    elif i == 3:
+        blb = [1,0,0,1]
+    else:
+        blb = [0,0,0,1]
+        
+        
+    
+    
+    ax = viz.add_coast_grid(ax,bbox=bboxplot,blabels=blb)
+    
+    cf = ax.contourf(lons[i],lats[i],amvpats[i].T,cmap=cmocean.cm.balance,levels=cint,extend='both')    
+    cl = ax.contour(lons[i],lats[i],amvpats[i].T,levels=cl_int,colors='k',linewidths=0.5)
+    
+    ax.clabel(cl)
+    ax.set_title("%s ($\sigma_{AMV}^2$=%.4f$\degree \, C^{2}$)"%(mnames[i],np.var(amvids[i])))
+
+cb = fig.colorbar(cf,ax=axs,orientation="horizontal",fraction=0.04,pad=0.05)
+plt.suptitle("AMV SST Pattern (CESM vs. Obs)",y=0.95)   
+cb.set_label("SST; Contour Interval=%.3f ($\degree C \sigma_{AMV}^{-1}$)"%cstp)
+plt.savefig("%sAMV_Patterns_ObsLIMopt_v_CESM.png"% (outpath),dpi=200,bbox_inches='tight')
+
+        
+        
+
 
 #%% Plot CESM-AMV Alone (for SM_Paper_Outline)
 i = 2
@@ -406,6 +531,12 @@ plt.savefig("%sAMV_Patterns_Indv_%s.png"% (outpath,mnames[i]),dpi=200,bbox_inche
 #%% Calculate North Atlantic SST Spectra
 
 awgt = 1
+monsec = 3600*24*30 # ~Seconds in Month
+
+fullsmth=17
+slabsmth=15
+obssmth=3
+
 
 # Load regionally averaged SST
 rsst_fn    = "%sSST_RegionAvg_%s.npy" % (outpathdat,expid)
@@ -423,21 +554,27 @@ for i in range(len(ssts)):
 # Calculate the spectra
 if load_limopt:
     nasstis = [nassti[0],nassti[1],nassti[2],rssts[0],rssts[1]]
-    nsmooths = [5,5,10,50,30,]
+    nsmooths = [obssmth,obssmth,obssmth,fullsmth,slabsmth,]
     mcols = ["r","b","cyan","k","gray"]
+    
+    dts    = [monsec*3,monsec*3,monsec*3,monsec,monsec] # LIM-OPT
+    
+    mmark = ["o","d","*","x","+"]
 
 else:
     nasstis = [nassti[0],nassti[1],rssts[0],rssts[1]]
-    nsmooths = [2,2,12,12,]
+    nsmooths = [obssmth,obssmth,fullsmth,slabsmth,]
     mcols = ["r","b","k","gray"]
     mmark = ["o","d","*","x"]
+    dts = np.ones(len(nasstis))*monsec
     
 pct = 0.10
-specs,freqs,CCs,dofs,r1s = scm.quick_spectrum(nasstis,nsmooths,pct)
+specs,freqs,CCs,dofs,r1s = scm.quick_spectrum(nasstis,nsmooths,pct,dt=dts)
 
 
+
+smoothname = "smth-obs%03i-full%02i-slab%02i" % (obssmth,fullsmth,slabsmth)
 #%% Plot the North Atlantic Spectra
-
 
 # Older Params
 xlm = [1e-2,5e0]
@@ -453,17 +590,20 @@ xtks = 1/xper
 xlm  = [xtks[0],xtks[-1]]
 ylm  = [0,0.3]
 
+title = ("North Atlantic SST Spectra \n Smoothing (# bands): Reanalysis (%i), CESM-FULL (%i), CESM-SLAB (%i)" %  (obssmth,fullsmth,slabsmth))
 
-speclabels = ["%s (%.4f$\degree \, C^{2}$)" % (mnames[i],np.var(nasstis[i])) for i in range(4)]
+speclabels = ["%s (%.4f$\degree \, C^{2}$)" % (mnames[i],np.var(nasstis[i])) for i in range(len(mnames))]
 fig,ax = plt.subplots(1,1,figsize=(12,4))
+ax,ax2 = viz.plot_freqlin(specs,freqs,speclabels,mcols,
+                     ax=ax,plottitle=title,xtick=xtks,xlm=xlm,marker="",return_ax2=True)
 
-ax = viz.plot_freqlin(specs,freqs,speclabels,mcols,
-                     ax=ax,plottitle="North Atlantic SST Spectra",xtick=xtks,xlm=xlm)
-
+ax2.set_xlabel("Period (Years)")
+plt.setp(ax2.get_xticklabels(), rotation=50,fontsize=8)
+plt.setp(ax.get_xticklabels(), rotation=50,fontsize=8)
 
 ax.set_ylim(ylm)
 #plt.suptitle("Regional AMV Index Spectra (unsmoothed, Forcing=%s)"%(frcnamelong[f]))
-savename = "%sNASST_Spectra_Obs-v-CESM_LinearLinear.png" % (outpath)
+savename = "%sNASST_Spectra_Obs-v-CESM_LinearLinear_%s_Limopt%i.png" % (outpath,smoothname,load_limopt)
 plt.savefig(savename,dpi=200,bbox_inches='tight')
 
 #%% Calculate and plot autocorrelation
@@ -482,7 +622,7 @@ fig,ax = plt.subplots(1,1,figsize=(8,4))
 ax,ax2 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title="North Atlantic SST Autocorrelation")
 for i in range(len(acs)):
     
-    ax.fill_between(lags,confs[i][:,0],confs[i][:,1],color=mcols[i],alpha=0.25,zorder=-1)
+    ax.fill_between(lags,confs[i][:,0],confs[i][:,1],color=mcols[i],alpha=0.15,zorder=-1)
     ax.plot(lags,acs[i],label=mnames[i],color=mcols[i],marker=mmark[i])
     
 
@@ -499,8 +639,10 @@ for i in range(len(nasstis)):
     ax.plot(sstyrmon.mean(1))
     ax.set_title(mnames[i])
 
-#%% Old Scripts **************************************************************
 
+#%% Old Scripts **************************************************************
+# ****************************************************************************
+# 
 # -----------------
 #%% Calculate AMV
 # -----------------
