@@ -1655,7 +1655,7 @@ def load_cesm_pt(datpath,loadname='both',grabpoint=None,ensorem=0):
             
             ds = xr.open_dataset(datpath+"CESM_proc/TS_anom_PIC_FULL.nc")
             if grabpoint is not None:
-                sstfull = ds.sel(lon=lonf,lat=latf,method='nearest').TS.vaues
+                sstfull = ds.sel(lon=lonf,lat=latf,method='nearest').TS.values
             else:
                 sstfull = ds['TS'].values
             
@@ -1669,7 +1669,7 @@ def load_cesm_pt(datpath,loadname='both',grabpoint=None,ensorem=0):
         else:
             ds = xr.open_dataset(datpath+"CESM_proc/TS_anom_PIC_SLAB.nc")
             if grabpoint is not None:
-                sstslab = ds.sel(lon=lonf,lat=latf,method='nearest').TS.vaues
+                sstslab = ds.sel(lon=lonf,lat=latf,method='nearest').TS.values
             else:
                 sstslab = ds['TS'].values
         ssts.append(sstslab)

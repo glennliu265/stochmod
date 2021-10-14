@@ -7,7 +7,6 @@ synth_stochmod_spectra
 and
 constant_v_variable
 
-
 Created on Wed Oct  6 22:17:26 2021
 
 @author: gliu
@@ -40,9 +39,6 @@ from scipy import signal
 # config['runid']   = 'syn007'
 
 # #%% Load CESM Data
-
-
-
 # #%% Load Constant_v_vary experiments
 # savenames = "%sconst_v_vary_%s_runid%s_%s.npz" % (output_path,config['mconfig'],config['runid'],config['fname'])
 # print("Loading %s" % savenames)
@@ -208,6 +204,7 @@ c_acs     = ld['acs']
 c_ssts    = ld['ssts']
 expids    = ld['expids']
 confs     = ld['confs']
+
 # print("Saving clean run to %s" % savenames)
 # np.savez(savenames,**{
 #     'expids':expids,
@@ -218,8 +215,6 @@ confs     = ld['confs']
 #     'forces':forces,
 #     'explongs':explongs
 #     },allow_pickle=True)
-
-
 # --------------------
 #%% Calculate Confidence Intervals
 # --------------------
@@ -350,9 +345,11 @@ cssts = scm.load_cesm_pt(datpath,loadname='both',grabpoint=[-30,50])
 debug = False
 
 # Smoothing Params
-nsmooth = 100
-cnsmooths = [12,12]
-pct     = 0.10
+nsmooth = 250
+cnsmooths = [45,37]
+pct        = 0.10
+
+smoothname = "smth-obs%03i-full%02i-slab%02i" % (nsmooth,cnsmooths[0],cnsmooths[1])
 
 # Spectra Plotting Params
 xlm = [1e-2,5e0]
@@ -361,7 +358,7 @@ xper = np.array([100,50,20,10,5,2])
 xtks = 1/xper
 xlm  = [xtks[0],xtks[-1]]
 
-ylm  = [0,4]
+ylm  = [0,3.1]
 
 plotids = [[0,1,2,3,8],
            [4,5,6,7]
@@ -421,7 +418,8 @@ titles = (r"Adding Varying Damping ($\lambda_a$) and Forcing ($\alpha$)",
           "Adding Varying Mixed Layer Depth ($h$) and Entrainment"
           )
 
-
+sharetitle = "SST Spectra (50$\degree$N, 30$\degree$W) \n " + 
+    "Smoothing (# bands): Stochastic Model (%i), CESM-FULL (%i), CESM-SLAB (%i)" %  (nsmooth,cnsmooths[0],cnsmooths[1]))
 
 #% Plot the spectra
 fig,axs = plt.subplots(1,2,figsize=(16,4))
@@ -449,8 +447,8 @@ for i in range(2):
     ax.set_ylim(ylm)
     
 fig.text(0.5, -0.05, 'Frequency (cycles/year)', ha='center',fontsize=12)
-plt.suptitle("SST Power Spectra at 50$\degree$N, 30$\degree$W",y=1.15,fontsize=14)
-savename = "%sNASST_Spectra_Stochmod_%s_nsmooth%i_pct%03i.png" % (outpath,plottype,nsmooth,pct*100)
+#plt.suptitle("SST Power Spectra at 50$\degree$N, 30$\degree$W",y=1.15,fontsize=14)
+savename = "%sNASST_Spectra_Stochmod_%s_%s_pct%03i.png" % (outpath,plottype,smoothname,pct*100)
 plt.savefig(savename,dpi=200,bbox_inches='tight')
 
 
