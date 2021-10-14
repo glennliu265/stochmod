@@ -51,6 +51,9 @@ lags = np.arange(0,37,1)
 mconfig   = "SLAB_PIC"
 nyrs      = 1000        # Number of years to integrate over
 runid     = "006"
+savesep   = False # Set to True if output was saved separately
+useslab   = False # Set to True if you only used slab output for all simulations
+
 
 # Analysis (7/26/2021, comparing 80% variance threshold and 5 or 3 EOFs)
 #fnames      = ["flxeof_080pct_SLAB-PIC","flxeof_5eofs_SLAB-PIC","flxeof_3eofs_SLAB-PIC"]
@@ -178,7 +181,7 @@ fnames = ("forcingflxeof_EOF1_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3",
 #%% Post Process Outputs (Calculate AMV, Autocorrelation)
 for frcname in tqdm(fnames):
     expid = frcname
-    scm.postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,mask_pacific=True)
+    scm.postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,mask_pacific=True,savesep=savesep,useslab=useslab)
     print("Completed Post-processing for Experiment: %s" % expid)
     
 #%% Visualize AMV
@@ -364,6 +367,8 @@ if viz_AMV:
     
     
     #%% Make the plot (Frequency x Power)
+    
+    
     timemax = None
     xlms = [0,0.2]
     xtks = [0,0.02,0.04,0.1,0.2]

@@ -987,7 +987,7 @@ def noentrain_2d(randts,lbd,T0,F,FAC,multFAC=1,debug=False):
 #%% Postprocessing Utilities
 def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
                             returnresults=False,preload=None,
-                            mask_pacific=False):
+                            mask_pacific=False,savesep=False,useslab=True):
     """
     Script to postprocess stochmod output
     
@@ -1002,6 +1002,9 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
              element array[lon,lat,ssts], where ssts is an array of sst for 
              each model [lon180 x lat x time]
         8) mask_pacific - Set out True to mask out the tropical pacific below 20N
+    
+        9) savesep - Set to True if data was saved separately (model0,model1,etc)
+        10) useslab - Set to True if only CESM-SLAB parameters were used
     
     Based on portions of analyze_stochoutput.py
     
@@ -1030,10 +1033,21 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
     
     # Read in Stochmod SST Data
     if preload is None: # Manually Load the data
-        if "forcing" in expid:
-            ld = np.load(datpath+"stoch_output_%s.npz"%(expid),allow_pickle=True)
-            sst = ld["sst"]
-        else:
+        if "forcing" in expid: # Newer Forcing output
+            if ~savesep: # Everything was saved in a large file
+                ld = np.load(datpath+"stoch_output_%s.npz"%(expid),allow_pickle=True)
+                sst = ld["sst"]
+            else:
+                sst = []
+                for modelnum in range(3):
+                    # Set load name with model
+                    ldname = datpath+"stoch_output_%s_model%i.npz"%(expid,modelnum)
+                    if (~useslab) and (modelnum>0): # Load different forcing for h-vary, entrain
+                        ldname = ldname.replace("SLAB","FULL")
+                    ld = np.load(ldname)
+                    sst.append(ld['sst'])
+                    
+        else: # Older Forcing Output
             sst = np.load(datpath+"stoch_output_%s.npy"%(expid),allow_pickle=True).item()
         lonr = np.load(datpath+"lon.npy")
         latr = np.load(datpath+"lat.npy")
@@ -2670,6 +2684,7 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
             d_in = dampingfull.copy()
         
         if useslab: # In special cases, use slab for forcing and damping
+            print("Warning! Using CESM-SLAB Parameters for all cases!")
             f_in = forcing.copy()
             d_in = damping.copy()
         
@@ -2720,13 +2735,14 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
                 'q':q,
                 'lbdT':lbdT
                 },allow_pickle=True)
-            
+        
         # Save outputs separately, if option is set
         # -----------------------------------------
         if savesep:
             expstr = expname[:-4] + "_model%i"%(exp) # Get string without extension, add modelnumber
             if exp > 0:
-                expstr = expstr.replace("SLAB","FULL") # Replace Slab  with FULL in forcing name
+                if ~useslab: # Only replace if we actually used the separate forcings
+                    expstr = expstr.replace("SLAB","FULL") # Replace Slab  with FULL in forcing name
                 # Save the results (Not including Q)
             
             np.savez(expstr+".npz",**{

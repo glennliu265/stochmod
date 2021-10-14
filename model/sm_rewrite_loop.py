@@ -14,7 +14,6 @@ import glob
 import tqdm
 import time
 
-
 #%% Set the location
 
 stormtrack = 1
@@ -99,6 +98,9 @@ pointmode  = 0
 points     = [-30,50]
 bboxsim    = [-80,0,0,65] # Simulation Box
 
+useslab    = False # Set to True to use SLAB_CESM parameters for all...
+savesep    = False # Set to True to save the outputs differently
+
 # Additional Constants
 t_end      = 12000 # Sim Length
 dt         = 3600*24*30 # Timestep
@@ -158,13 +160,32 @@ frcnames = (
             "flxeof_1eofs_SLAB-PIC_eofcorr0"
             )
 
-#frcnames = ('flxeof_EOF1_SLAB-PIC_eofcorr0',
-#            'flxeof_EOF2_SLAB-PIC_eofcorr0')
+
+## Testing NAO, EAP Forcing
+# frcnames = ('flxeof_EOF1_SLAB-PIC_eofcorr0',
+#             'flxeof_EOF2_SLAB-PIC_eofcorr0')
 
 #frcnames = ("flxeof_2eofs_SLAB-PIC_eofcorr0",)
 
-frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2',)
+#frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2',)
 
+# Testing seasonal EOFs
+frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2',
+            'flxeof_090pct_SLAB-PIC_eofcorr2_DJF',
+            'flxeof_090pct_SLAB-PIC_eofcorr2_MAM',
+            'flxeof_090pct_SLAB-PIC_eofcorr2_JJA',
+            'flxeof_090pct_SLAB-PIC_eofcorr2_SON')
+
+# Test the effect of increasing the number of EOFs
+frcnames = (
+            "flxeof_50eofs_SLAB-PIC_eofcorr0",
+            "flxeof_25eofs_SLAB-PIC_eofcorr0",
+            "flxeof_10eofs_SLAB-PIC_eofcorr0",
+            "flxeof_5eofs_SLAB-PIC_eofcorr0",
+            "flxeof_3eofs_SLAB-PIC_eofcorr0",
+            "flxeof_2eofs_SLAB-PIC_eofcorr0",
+            "flxeof_1eofs_SLAB-PIC_eofcorr0"
+            )
 print("Running the following forcings: \n %s"%(str(frcnames)))
 #%%
 st = time.time()
@@ -186,6 +207,7 @@ for f in range(len(frcnames)):
                        runid,t_end,frcname,ampq,
                        bboxsim,pointmode,points=[lonf,latf],
                        dt=3600*24*30,
-                       debug=False,check=False,useslab=True,savesep=False)
+                       debug=False,check=False,useslab=useslab,savesep=savesep)
+
 print("Completed in %.2fs" % (time.time()-st))
 
