@@ -44,7 +44,7 @@ elif stormtrack == 0:
     
     datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/"
     #datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/"
-    outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20210922/"
+    outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20211011/"
 
     lipath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/landicemask_enssum.npy"
     #llpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/"
@@ -71,7 +71,6 @@ def sel_regionxr(ds,bbox):
         DESCRIPTION.
 
     """
-    
     # Select lon (lon360)
     if bbox[0] > bbox[1]: # Crossing Prime Meridian
         print("Crossing Prime Meridian!")
@@ -84,7 +83,7 @@ def sel_regionxr(ds,bbox):
 #%%
 
 # Set your configuration
-mconfig = "PIC_FULL"
+mconfig = "PIC_SLAB"
 bbox    = [260,20,0,65]
 bboxeof = [280,20,0,65]
 
@@ -125,7 +124,6 @@ if mconfig == "PIC_SLAB":
     print("Loaded data in %.2fs"%(time.time()-st))
     
 elif mconfig == "PIC_FULL":
-    
     mcname = "FULL-PIC"
     
     # Load Data
@@ -461,7 +459,7 @@ for v,invar in enumerate([varflx_EOF,varflx_ori,varflx_ratio]):
          encoding={vnames[v]: {'zlib': True,'_FillValue':-2147483647,"scale_factor":0.0001,'dtype':int}})
     
     das.append(da)
-    
+
 #%% (@@) Make some plots (compatible only if it the above section has been run)
 N_mode_plot = 4
 month       = 0
@@ -517,10 +515,10 @@ plt.savefig("%s%s_NHFLX_EOFs%i_%s_ModevCumuVariance_bymon.png"%(outpath,mcname,N
 #% Save a select number of EOFs
 # -----------------------------
 eofcorr       = 0
-N_mode_choose = 50
+N_mode_choose = 3
 
 # Select the mode
-eofforce = eofall.copy()
+eofforce      = eofall.copy()
 eofforce      = eofforce.transpose(0,1,3,2) # lon x lat x pc x mon
 eofforce      = eofforce[:,:,:N_mode_choose,:]
 
@@ -545,7 +543,7 @@ print("Saved data to "+savenamefrc)
 # -----------------------------
 
 eofcorr       = 0
-N_mode_choose = 0
+N_mode_choose = 1
 
 # Select the mode
 eofforce = eofall.copy()
@@ -689,6 +687,9 @@ plt.savefig("%s%s_NHFLX_EOFs%i_%s_NumEOFs_%ipctvar_bymon.png"%(outpath,mcname,N_
 
 # Calculate correction factor
 eofcorr  = 2
+
+
+nlon,nlat,_,_ = varflx_ratio.shape
 if eofcorr == 1: # Flat variance-based correct
     ampfactor = 1/vthres#thresperc
 elif eofcorr ==2: # Point[wise variance-based correction
@@ -699,7 +700,6 @@ elif eofcorr ==2: # Point[wise variance-based correction
     ampfactor = 1/thresperc
 else:
     ampfactor = 1
-
 
 eofforce = eofall.copy() # [lon x lat x month x pc]
 cvartest = cvarall.copy()
@@ -712,7 +712,7 @@ for i in range(12):
 eofforce = eofforce.transpose(0,1,3,2) # [lon x lat x pc x mon]
 
 if eofcorr == 1:
-    eofforce *= ampfactor[None,None,None,:]
+    eofforce *= ampfactor
 elif eofcorr == 2:
     ampfactor = ampfactor[:,:,None,:] # []
     eofforce *= ampfactor # Broadcast along EOF dimension
@@ -723,7 +723,22 @@ eofforce = eofforce[:,:,:nmax+1,:]
 savenamefrc = "%sflxeof_%03ipct_%s_eofcorr%i.npy" % (datpath,vthres*100,mcname,eofcorr)
 np.save(savenamefrc,eofforce)
 
-# Test plot maps
+#%% Test Plot (Summed EOF)
+
+eofsum = np.nansum(eofforce,2)
+
+
+clvl = np.linspace(-75,75,100)
+fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()})
+ax = viz.add_coast_grid(ax,bbox=bbox)
+pcm = ax.contourf(lon,lat,np.nanmean(eofsum,2).T,levels=clvl,cmap=cmocean.cm.balance)
+
+fig.colorbar(pcm,ax=ax)
+
+#%% Test Plot ()
+
+
+#%% Test plot maps
 i = 0
 fig,ax = plt.subplots(2,1)
 ax[0].pcolormesh(eofforce[:,:,stop_id,i].T),plt.colorbar()
