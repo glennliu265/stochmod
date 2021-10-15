@@ -16,13 +16,13 @@ import sys
 import cmocean
 from tqdm import tqdm
 #%% Set Paths, Import Custom Modules
-stormtrack = 0
+stormtrack = 1
 if stormtrack == 0:
     projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20210920/"
+    figpath     = projpath + "02_Figures/20211018/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -42,7 +42,7 @@ import tbx
 #%% User Edits
 
 # Visualization options
-viz_AMV=False
+viz_AMV=True
 
 # Analysis Options
 lags = np.arange(0,37,1)
@@ -178,10 +178,35 @@ fnames = (
 fnames = ("forcingflxeof_EOF1_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3",
           "forcingflxeof_EOF2_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3")
 
+## Rewritten (with slab/full forcing/damping) (run010) ---
+
+# Seasonal Analysis
+
+#stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr2_MAM_1000yr_run010_ampq3.npz
+fnames   = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run010_ampq3',
+            'forcingflxeof_090pct_SLAB-PIC_eofcorr2_DJF_1000yr_run010_ampq3',
+            'forcingflxeof_090pct_SLAB-PIC_eofcorr2_MAM_1000yr_run010_ampq3',
+            'forcingflxeof_090pct_SLAB-PIC_eofcorr2_JJA_1000yr_run010_ampq3',
+            'forcingflxeof_090pct_SLAB-PIC_eofcorr2_SON_1000yr_run010_ampq3')
+
+fnames = ("forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run012_ampq3",)
+
+## By Number of EOFs (no correction)
+fnames = (
+            "forcingflxeof_50eofs_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3",
+            "forcingflxeof_25eofs_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3",
+            "forcingflxeof_10eofs_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3",
+            "forcingflxeof_5eofs_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3",
+            "forcingflxeof_3eofs_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3",
+            "forcingflxeof_2eofs_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3",
+            "forcingflxeof_1eofs_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3"
+            )
+
 #%% Post Process Outputs (Calculate AMV, Autocorrelation)
 for frcname in tqdm(fnames):
     expid = frcname
-    scm.postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,mask_pacific=True,savesep=savesep,useslab=useslab)
+    scm.postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,mask_pacific=True,
+                                savesep=savesep,useslab=useslab)
     print("Completed Post-processing for Experiment: %s" % expid)
     
 #%% Visualize AMV
@@ -199,26 +224,26 @@ if viz_AMV:
     bboxplot = [-100,20,0,80]
     modelnames  = ("Constant h","Vary h","Entraining")
     
-    #%% Experiment names
+    #%Experiment names
     # -- SelectExperiment -- 
-    fid   = 3
-    frcname = fnames[fid]
-    runid = "006"
-    expid = fnames[fid]#"forcing%s_%iyr_run%s" % (frcname,nyrs,runid) 
-    regid = 3
+    fid   = 0
+    expid = fnames[fid]
+    regid = 4
     
-    # Load lat/lon regional
-    lon = np.load(datpath+"lon.npy")
-    lat = np.load(datpath+"lat.npy")
+
     
     # Load post-propcssed output
-    
     ldpath = datpath + "proc/AMV_Region_%s.npz" % expid
     ld = np.load(ldpath,allow_pickle=True)
     
     # Load. Things are organized by region, then by model
     amvidx = ld['amvidx_region'].item()[regid]
     amvpat = ld['amvpat_region'].item()[regid]
+    
+    # Load lat/lon regional
+    ld = np.load(datpath+"stoch_output_"+expid+".npz",allow_pickle=True)
+    lon = ld['lon']#np.load(datpath+"lon.npy")
+    lat = ld['lat']#np.load(datpath+"lat.npy")
     
     
     fig,axs = plt.subplots(1,3,figsize=(12,3.5),subplot_kw={'projection':ccrs.PlateCarree()})
