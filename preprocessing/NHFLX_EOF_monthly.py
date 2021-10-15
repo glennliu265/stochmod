@@ -44,7 +44,7 @@ elif stormtrack == 0:
     
     datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/"
     #datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/"
-    outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20211011/"
+    outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20211018/"
 
     lipath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/landicemask_enssum.npy"
     #llpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/"
@@ -83,7 +83,7 @@ def sel_regionxr(ds,bbox):
 #%%
 
 # Set your configuration
-mconfig = "PIC_SLAB"
+mconfig = "PIC_FULL"
 bbox    = [260,20,0,65]
 bboxeof = [280,20,0,65]
 
@@ -271,9 +271,6 @@ np.savez(savename,**{
     'lon':lon180,
     'lat':lat},allow_pickle=True)
 
-
-
-
 #%% -------Analysis Section Below
 
 #%% Load the data
@@ -282,10 +279,10 @@ if mconfig == "PIC_SLAB":
 elif mconfig == "PIC_FULL":
     mcname = "FULL-PIC"
 
-bboxtext = "lon%ito%i_lat%ito%i" % (bbox[0],bbox[1],bbox[2],bbox[3])
-bboxstr  = "Lon %i to %i, Lat %i to %i" % (bbox[0],bbox[1],bbox[2],bbox[3])
-savename = "%sNHFLX_%s_%iEOFsPCs_%s.npz" % (datpath,mcname,N_mode,bboxtext)
-ld = np.load(savename,allow_pickle=True)
+bboxtext  = "lon%ito%i_lat%ito%i" % (bbox[0],bbox[1],bbox[2],bbox[3])
+bboxstr   = "Lon %i to %i, Lat %i to %i" % (bbox[0],bbox[1],bbox[2],bbox[3])
+savename  = "%sNHFLX_%s_%iEOFsPCs_%s.npz" % (datpath,mcname,N_mode,bboxtext)
+ld        = np.load(savename,allow_pickle=True)
 
 eofall    = ld['eofall']
 eofslp    = ld['eofslp']
@@ -294,8 +291,6 @@ varexpall = ld['varexpall']
 
 lon = ld['lon']
 lat = ld['lat']
-
-
 #%% Flip sign to match NAO+ (negative heat flux out of ocean/ -SLP over SPG)
 
 spgbox     = [-60,20,40,80]
@@ -314,65 +309,11 @@ for N in tqdm(range(N_modeplot)):
         if sumslp > 0:
             print("Flipping sign for SLP, mode %i month %i" % (N+1,m+1))
             eofslp[:,:,m,N]*=-1
-
-# --------------------------------------------------
-#%% (**) Check how much variance is explained by each EOF
-# --------------------------------------------------
-# !! WARNING: Long runtime, not necessary ... see section below
-
-#eofall.shape = (288, 192, 12, 200)
-#pcall.shape = (200, 12, 901)
-
-# Sum N_recon number of modes
-N_recon = 100
-
-# Get Shapes
-nlon,nlat,_,_ = eofall.shape
-_,_,nyr = pcall.shape
-
-# Preallocate and start (takes ~ 5min for 100 modes)
-#nhflx_recon = np.zeros((nlon,nlat,12,nyr,N_recon))
-nhflx_recon = np.zeros((nlon,nlat,12,nyr))
-for N in tqdm( range(N_recon)):
-    
-    # Get EOF and PC for corresponding mode
-    eofN = eofall[:,:,:,N] # lon x lat x month
-    pcN  = pcall[N,:,:] # month x time
-    
-    # Reconstruct the Net Heat Flux for that mode
-    #nhflx_recon[:,:,:,:,N] = eofN[...,None] * pcN[None,None,...]
-    nhflx_recon[:,:,:,:] += eofN[...,None] * pcN[None,None,...]
-    
 #%% Preprocess net heat flux variable from above
 flxa          *= msk[None,:,:]
 lon360        = np.load(datpath+"../CESM_lon360.npy")
 lon180,flx180 = proc.lon360to180(lon360,flxa.transpose(2,1,0))
 flx180        = flx180.reshape(nlon,nlat,nyr,12).transpose(0,1,3,2) # lon x lat x mon x year
-
-
-#%% (**) Now check the variance percentange for a specific point
-lonf = -30
-latf = 50
-klon180,klat = proc.find_latlon(lonf,latf,lon180,lat)
-
-# Calculate variance for each case at the point
-vrecon = np.var(nhflx_recon[klon180,klat,:,:,],1)
-vorig  = np.var(flx180[klon180,klat,:,:,],1)
-vratio =  vrecon/vorig
-
-# Calculate with sum of squares of the eof
-eofpt = eofall[klon180,klat,:,:]
-
-# Plot
-fig, ax= plt.subplots(1,1)
-ax.plot(np.var(flx180[klon180,klat,:,:,],1),label="var(flx)")
-ax.plot((eofpt**2).sum(1),color='r',label="$sum(ptEOF^2)$")
-ax.plot(vrecon,label="EOF*PC")
-ax.legend()
-
-# Reconstruct net heat flux by multiplying EOFs by PCs (might be a bit intensive...)
-#nhflx_reconstr = eofall[...,None] * pcall.transpose(1,0,2)[None,None,:,:,:]
-
 
 #%% (**) Now calculate the variance explained using sum of squares
 
@@ -408,7 +349,7 @@ np.savez(savename,**{
     'lat':lat
     })
 
-#%% Corrected Flux with SLP
+#%% Corrected Flux with SLP (Save it all together, EOF and variance explained)
 savename = "%sNHFLX_%s_%iEOFsPCs_%s_eofcorr2.npz" % (datpath,mcname,N_mode,bboxtext)
 
 np.savez(savename,**{
@@ -421,57 +362,57 @@ np.savez(savename,**{
     'lat':lat},allow_pickle=True)
 
 #%% Load the file from above
-savename = datpath + "../NHFLX_EOF_Ratios_%s.npz" % mcname
-ld = np.load(savename)
-varflx_EOF = ld['varflx_EOF']
-varflx_ori = ld['varflx_ori']
+savename     = datpath + "../NHFLX_EOF_Ratios_%s.npz" % mcname
+ld           = np.load(savename)
+varflx_EOF   = ld['varflx_EOF']
+varflx_ori   = ld['varflx_ori']
 varflx_ratio = ld['varflx_ratio']
 vratio_alone = ld['varflx_ratio_alone']
 eof_corr     = eofall * 1/vratio_alone
-# -----------------
-#%% (**) Save as netcdf
-# ------------------
-mode_number = np.arange(1,N_mode+1,1)
-months = np.arange(1,13,1)
+# # -----------------
+# #%% (**) Save as netcdf
+# # ------------------
+# mode_number = np.arange(1,N_mode+1,1)
+# months = np.arange(1,13,1)
 
-# [Mode x Month x Lat x Lon]
-varflx_EOF = varflx_EOF.transpose(3,2,1,0)
-varflx_ori   = varflx_ori.transpose(3,2,1,0) 
-varflx_ratio = varflx_ratio.transpose(3,2,1,0)
+# # [Mode x Month x Lat x Lon]
+# varflx_EOF = varflx_EOF.transpose(3,2,1,0)
+# varflx_ori   = varflx_ori.transpose(3,2,1,0) 
+# varflx_ratio = varflx_ratio.transpose(3,2,1,0)
 
-# Make into data array
-vnames = ["var_NHFLX_by_EOF","var_NHFLX","var_NHFLX_ratio"]
-das = []
-for v,invar in enumerate([varflx_EOF,varflx_ori,varflx_ratio]):
+# # Make into data array
+# vnames = ["var_NHFLX_by_EOF","var_NHFLX","var_NHFLX_ratio"]
+# das = []
+# for v,invar in enumerate([varflx_EOF,varflx_ori,varflx_ratio]):
     
-    if v == 1:
-        mode_in = np.array([1])
-    else:
-        mode_in = mode_number
-    da = xr.DataArray(invar,
-                dims={'mode_number':mode_in,'months':months,'lat':lat,'lon':lon},
-                coords={'mode_number':mode_in,'months':months,'lat':lat,'lon':lon},
-                name = vnames[v]
-                )
+#     if v == 1:
+#         mode_in = np.array([1])
+#     else:
+#         mode_in = mode_number
+#     da = xr.DataArray(invar,
+#                 dims={'mode_number':mode_in,'months':months,'lat':lat,'lon':lon},
+#                 coords={'mode_number':mode_in,'months':months,'lat':lat,'lon':lon},
+#                 name = vnames[v]
+#                 )
     
-    savename = datpath + "../NHFLX_200EOF_SLAB-PIC_%s.nc" % (vnames[v])
-    da.to_netcdf(savename,
-         encoding={vnames[v]: {'zlib': True,'_FillValue':-2147483647,"scale_factor":0.0001,'dtype':int}})
+#     savename = datpath + "../NHFLX_200EOF_SLAB-PIC_%s.nc" % (vnames[v])
+#     da.to_netcdf(savename,
+#          encoding={vnames[v]: {'zlib': True,'_FillValue':-2147483647,"scale_factor":0.0001,'dtype':int}})
     
-    das.append(da)
+#     das.append(da)
 
-#%% (@@) Make some plots (compatible only if it the above section has been run)
-N_mode_plot = 4
-month       = 0
-vlm         = [0.5,1]
+# #%% (@@) Make some plots (compatible only if it the above section has been run)
+# N_mode_plot = 4
+# month       = 0
+# vlm         = [0.5,1]
 
-fig,ax =plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()})
-ax = viz.add_coast_grid(ax,bbox=bbox)
-pcm = ax.pcolormesh(lon180,lat,varflx_ratio[N_mode_plot,month,...],vmin=vlm[0],vmax=vlm[1],cmap="magma")
-fig.colorbar(pcm,ax=ax)
-ax.set_title("Ratio: $var(NHFLX_{EOF})/var(NHFLX_{CESM})$, \n N=%i; Month=%i"%(N_mode_plot+1,month+1))
-savename = "%sNHFLX_Variance_Ratio_Map_Nmode%03i_month%02i.png" % (outpath,N_mode_plot+1,month+1)
-plt.savefig(savename,dpi=100)
+# fig,ax =plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()})
+# ax = viz.add_coast_grid(ax,bbox=bbox)
+# pcm = ax.pcolormesh(lon180,lat,varflx_ratio[N_mode_plot,month,...],vmin=vlm[0],vmax=vlm[1],cmap="magma")
+# fig.colorbar(pcm,ax=ax)
+# ax.set_title("Ratio: $var(NHFLX_{EOF})/var(NHFLX_{CESM})$, \n N=%i; Month=%i"%(N_mode_plot+1,month+1))
+# savename = "%sNHFLX_Variance_Ratio_Map_Nmode%03i_month%02i.png" % (outpath,N_mode_plot+1,month+1)
+# plt.savefig(savename,dpi=100)
 
 
 
@@ -543,7 +484,7 @@ print("Saved data to "+savenamefrc)
 # -----------------------------
 
 eofcorr       = 0
-N_mode_choose = 1
+N_mode_choose = 0
 
 # Select the mode
 eofforce = eofall.copy()
@@ -577,20 +518,25 @@ plvl = np.arange(-800,900,100)
 
 titles = ["EOF 1 (NAO, %.2f" % (varexpall[0,ids].mean()*100) + "% Variance)" ,
           "EOF 2 (EAP, %.2f" % (varexpall[1,ids].mean()*100) + "% Variance)" ]
-fig,axs = plt.subplots(2,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(12,7))
+#fig,axs = plt.subplots(2,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(12,7))
+fig,axs = plt.subplots(1,2,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(12,4))
 
 for k in range(2):
     ax = axs[k]
     ax  = viz.add_coast_grid(ax,bbox=bbox)
-    pcm = ax.contourf(lon180,lat,eofall[:,:,ids,k].mean(-1).T,levels=clvl,cmap=cmocean.cm.balance)
+    pcm = ax.contourf(lon180,lat,eofall[:,:,ids,k].mean(-1).T,levels=clvl,cmap='PRGn')
     cl  = ax.contour(lon180,lat,eofslp[:,:,ids,k].mean(-1).T,levels=plvl,colors='k',linewidths=.7)
     ax.clabel(cl,fontsize=10)
     ax.set_title(titles[k])
 
 
-cb = fig.colorbar(pcm,ax=axs.flatten())
+cb = fig.colorbar(pcm,ax=axs.flatten(),fraction=0.015)
 cb.set_label("$Q_{net}$ ,Interval = 5 $W/m^2$ per $\sigma_{PC}$")
-plt.suptitle("SLP (Contours), Interval = 100 hPa",x=0.6, y=.955,fontsize=14)
+#plt.suptitle("SLP (Contours), Interval = 100 hPa",x=0.6, y=.955,fontsize=14)
+plt.suptitle("$Q_{net}$ Forcing Pattern (Colors) and SLP (Contours, Interval = 100 hPa)",fontsize=12)
+
+fig.text(0.07, 0.5, mcname, va='center', rotation='vertical',fontsize=12)
+
 
 plt.savefig("%sEOF1_EOF2_uncorrected_%s.png"%(outpath,mcname),dpi=150,bbox_inches='tight')
 
@@ -620,13 +566,14 @@ plt.savefig("%sEOF1_EOF2_vratio_%s.png"%(outpath,mcname),dpi=150,bbox_inches='ti
 
 
 #%%
+
 ids = [11,0,1]
-clvl = np.arange(-600,650,5)
+clvl = np.arange(-600,650,50)
 plvl = np.arange(-800,900,100)
 
 titles = ["EOF 1 (NAO, %.2f" % (varexpall[0,ids].mean()*100) + "% Variance)" ,
           "EOF 2 (EAP, %.2f" % (varexpall[1,ids].mean()*100) + "% Variance)" ]
-fig,axs = plt.subplots(2,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(12,7))
+fig,axs = plt.subplots(1,2,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(12,7))
 
 for k in range(2):
     ax = axs[k]
@@ -735,9 +682,16 @@ pcm = ax.contourf(lon,lat,np.nanmean(eofsum,2).T,levels=clvl,cmap=cmocean.cm.bal
 
 fig.colorbar(pcm,ax=ax)
 
-#%% Test Plot ()
+#%% Test Plot (Given Mode)
 
+eofchoose=eofforce[:,:,0,:]
 
+clvl = np.linspace(-75,75,100)
+fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()})
+ax = viz.add_coast_grid(ax,bbox=bbox)
+pcm = ax.contourf(lon,lat,np.nanmean(eofchoose,2).T,levels=clvl,cmap=cmocean.cm.balance)
+
+fig.colorbar(pcm,ax=ax)
 #%% Test plot maps
 i = 0
 fig,ax = plt.subplots(2,1)
