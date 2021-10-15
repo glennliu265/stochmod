@@ -1025,6 +1025,7 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
     bbox_TR     = [-75,-15,10,20]
     bbox_NA     = [-80,0 ,0,65]
     bbox_NA_new = [-80,0,10,65]
+    #bbox_STw    = []
     regions = ("SPG","STG","TRO","NAT","NNAT")        # Region Names
     bboxes = (bbox_SP,bbox_ST,bbox_TR,bbox_NA,bbox_NA_new) # Bounding Boxes
     
@@ -2006,7 +2007,7 @@ def convert_Wm2(invar,h,dt,cp0=3996,rho=1026,verbose=True):
     
     return outvar.squeeze()
 
-def load_inputs(mconfig,frcname,input_path,load_both=False):
+def load_inputs(mconfig,frcname,input_path,load_both=False,method=4):
     """
     lon,lat,mld,kprevall,damping,alpha = load_inputs(mconfig,frcname,input_path)
     
@@ -2024,6 +2025,12 @@ def load_inputs(mconfig,frcname,input_path,load_both=False):
         Where all the data is stored
     load_both : BOOL
         Set to true for PIC, loading both FULL and SLAB
+    method : [1,2,3,4]
+        Statistic test applied to damping
+        1 - No test
+        2 - SST Autocorr
+        3 - SST-FLX Crosscorr
+        4 - Both 2 and 3 (Default)
     
     Returns
     -------
@@ -2057,11 +2064,11 @@ def load_inputs(mconfig,frcname,input_path,load_both=False):
     
     # Load Atmospheric Damping [lon180 x lat x mon]
     if mconfig == "SLAB_PIC":
-        damping   = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig005_dof894_mode4.npy")
+        damping   = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig005_dof894_mode%i.npy" % method)
     elif mconfig == "FULL_PIC":
-        damping   = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig005_dof1893_mode4.npy")
+        damping   = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig005_dof1893_mode%i.npy" % method)
     elif mconfig =="FULL_HTR":
-        damping   = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig020_dof082_mode4.npy")
+        damping   = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig020_dof082_mode%i.npy" % method)
     else:
         print("Currently supported damping mconfig are [SLAB_PIC,FULL_PIC,FULL_HTR]")
         
@@ -2634,7 +2641,9 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
                    dt=3600*24*30,
                    debug=False,check=True,
                    useslab=False,savesep=False,
-                   intgrQ=False):
+                   intgrQ=False,
+                   method=4):
+    
     start = time.time()
     
     if debug:
@@ -2642,7 +2651,8 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
     
     # Load data in
     # ------------
-    lon,lat,h,kprevall,damping,dampingfull,alpha,alpha_full = load_inputs(mconfig,frcname,input_path,load_both=True)
+    lon,lat,h,kprevall,damping,dampingfull,alpha,alpha_full = load_inputs(mconfig,frcname,input_path,
+                                                                          load_both=True,method=method)
     hblt = np.load(input_path + "SLAB_PIC_hblt.npy") # Slab fixed MLD
     hblt = np.ones(hblt.shape) * hblt.mean(2)[:,:,None]
 
