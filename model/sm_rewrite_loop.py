@@ -93,7 +93,7 @@ mconfig    = "SLAB_PIC"
 #flxeof_qek_50eofs_SLAB-PIC
 
 # Running Parameters
-runid      = "010"
+runid      = "011"
 pointmode  = 0 
 points     = [-30,50]
 bboxsim    = [-80,0,0,65] # Simulation Box
@@ -186,6 +186,20 @@ frcnames = (
             "flxeof_2eofs_SLAB-PIC_eofcorr0",
             "flxeof_1eofs_SLAB-PIC_eofcorr0"
             )
+
+frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2',)
+
+# Test the effect of increasing the number of EOFs
+frcnames = (
+            "flxeof_50eofs_SLAB-PIC_eofcorr0",
+            "flxeof_25eofs_SLAB-PIC_eofcorr0",
+            "flxeof_10eofs_SLAB-PIC_eofcorr0",
+            "flxeof_5eofs_SLAB-PIC_eofcorr0",
+            "flxeof_3eofs_SLAB-PIC_eofcorr0",
+            "flxeof_2eofs_SLAB-PIC_eofcorr0",
+            "flxeof_1eofs_SLAB-PIC_eofcorr0"
+            )
+            
 print("Running the following forcings: \n %s"%(str(frcnames)))
 #%%
 st = time.time()
