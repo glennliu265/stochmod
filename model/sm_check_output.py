@@ -131,3 +131,13 @@ lags    = np.arange(0,37,1)
 preload = [lonr,latr,ssts]
 scm.postprocess_stochoutput(expid,output_path,input_path,output_path+"proc/",lags,preload=preload,mask_pacific=True)
 
+
+#%% Check what is going on with some of the random timeseries
+# It turns out 010 only has 1 mode (1 random timeseries)
+ids = ["test009","010","011"]
+randtss = []
+for i in range(len(ids)):
+    randts = np.load(input_path+"randts_%s_12000mon.npy"%(ids[i]))
+    randtss.append(randts)
+    print(randts.shape)
+
