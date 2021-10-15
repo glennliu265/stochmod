@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 
-Visualize Input Parameters (Seasonal Cycle) at a Point
+Visualize Input Parameters (Seasonal Cycle) at a Point, and Basinwide!
 
 Plots included...
 
@@ -14,8 +14,6 @@ Updated Oct 2021 ...
 
 @author: gliu
 """
-
-
 
 import sys
 sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -38,7 +36,6 @@ import scm
 import time
 import cmocean
 
-
 #%% User Edits
 
 projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
@@ -57,8 +54,8 @@ frcname = "flxeof_090pct_SLAB-PIC_eofcorr2"
 lonf = -30
 latf = 50
 
-
-
+# Additional Plotting Parameters
+bbox = [-80,0,10,65]
 #mconfig = "FULL_PIC"
 #if mconfig == "FULL_PIC":
 #    configname = "Fully-Coupled PiC"
@@ -67,9 +64,6 @@ latf = 50
 
 
 #mconfig = "FULL_PIC"
-
-
-
 
 # # ------------
 # #%% Load Data
@@ -105,13 +99,8 @@ latf = 50
 # Load Old Forcing
 flxstd = np.load("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/SLAB_PIC_NHFLXSTD_Forcing_MON.npy")
 
-# # ---------------------------
-# #%% Retrieve data for a point
-# # ---------------------------
-# lonf = -30
-# latf = 50
 
-
+# Get mons3 from calendar function
 mons3 = [cal.month_abbr[i] for i in np.arange(1,13,1)]
 #%% Load All Inputs (Basinwide)
 
@@ -246,4 +235,53 @@ for m in range(2): # Loop for SLAB, and FULL
     ax1.set_title(title)
     plt.savefig(outpath+"Scycle_MLD_Forcing_%s_Triaxis_%s.png"% (locstring,mcf),dpi=150,bbox_inches='tight')
 
-#%%
+# ****************************************************************************
+#%% Some Basinwide Plots...
+
+# Try to visualize the Forcing
+cnames = ["SLAB","FULL"]
+# Square, sum, sqrt along EOF dimension
+alphas = [alpha,alpha_full]
+alphas2 = []
+alphasum = []
+for i in range(2):
+    a2 = np.sqrt(np.nansum(alphas[i]**2,2))
+    asum = np.nansum(alphas[i],2)
+    alphas2.append(a2)
+    alphasum.append(asum)
+    
+    
+
+
+#%% Annual Average Plot (Squared Sum)
+clvl=np.arange(0,75,2.5)
+fig,axs =  plt.subplots(1,2,subplot_kw={'projection':ccrs.PlateCarree()})
+for i in range(2):
+    ax = axs[i]
+    ax = viz.add_coast_grid(ax=ax,bbox=bbox)
+    pcm=ax.contourf(lon,lat,np.nanmean(alphas2[i],2).T,levels=clvl,cmap=cmocean.cm.balance)
+    ax.set_title(cnames[i])
+    
+fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal')
+plt.suptitle("Annual Mean Sqrt(Sum($EOF^2$))",y=1.05)
+#alpha2 = np.sqrt(np.nansum(alpha**2,2))
+#alphafull2 = 
+
+#%% Annual Average sums
+
+clvl=np.arange(-70,75,5)
+fig,axs =  plt.subplots(1,2,subplot_kw={'projection':ccrs.PlateCarree()})
+for i in range(2):
+    ax = axs[i]
+    ax = viz.add_coast_grid(ax=ax,bbox=bbox)
+    pcm=ax.contourf(lon,lat,np.nanmean(alphasum[i],2).T,levels=clvl,cmap=cmocean.cm.balance)
+    ax.set_title(cnames[i])
+    
+fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal')
+plt.suptitle("Sum(EOF^2)",y=1.05)
+
+
+
+diff = np.nanmean(alphasum[1],2) - np.nanmean(alphasum[0],2)
+
+
