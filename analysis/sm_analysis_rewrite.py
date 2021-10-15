@@ -16,7 +16,7 @@ import sys
 import cmocean
 from tqdm import tqdm
 #%% Set Paths, Import Custom Modules
-stormtrack = 1
+stormtrack = 1  
 if stormtrack == 0:
     projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
     datpath     = projpath + '01_Data/model_output/'
@@ -193,13 +193,13 @@ fnames = ("forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run012_ampq3",)
 
 ## By Number of EOFs (no correction)
 fnames = (
-            "forcingflxeof_50eofs_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3",
-            "forcingflxeof_25eofs_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3",
-            "forcingflxeof_10eofs_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3",
-            "forcingflxeof_5eofs_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3",
-            "forcingflxeof_3eofs_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3",
-            "forcingflxeof_2eofs_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3",
-            "forcingflxeof_1eofs_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3"
+            "forcingflxeof_50eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3",
+            "forcingflxeof_25eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3",
+            "forcingflxeof_10eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3",
+            "forcingflxeof_5eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3",
+            "forcingflxeof_3eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3",
+            "forcingflxeof_2eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3",
+            "forcingflxeof_1eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3"
             )
 
 #%% Post Process Outputs (Calculate AMV, Autocorrelation)
