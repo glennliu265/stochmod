@@ -1046,11 +1046,13 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
                         ldname = ldname.replace("SLAB","FULL")
                     ld = np.load(ldname)
                     sst.append(ld['sst'])
+            lonr = ld['lon']
+            latr = ld['lat']
                     
         else: # Older Forcing Output
             sst = np.load(datpath+"stoch_output_%s.npy"%(expid),allow_pickle=True).item()
-        lonr = np.load(datpath+"lon.npy")
-        latr = np.load(datpath+"lat.npy")
+            lonr = np.load(datpath+"lon.npy")
+            latr = np.load(datpath+"lat.npy")
     else:
         lonr,latr,sst = preload
     n_models = len(sst)
@@ -1158,7 +1160,7 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
         amvpat = {}
         
         for model in range(n_models):
-            amvidx[model],amvpat[model] = proc.calc_AMVquick(sst[model],lonr,latr,amvbboxes[region],dropedge=5)
+            amvidx[model],amvpat[model] = proc.calc_AMVquick(sst[model],lonr,latr,amvbboxes[region],dropedge=0)
         print("Calculated AMV variables for region %s in %.2f" % (regions[region],time.time()-amvtime))
         
         amvidx_region[region] = amvidx
@@ -2120,8 +2122,12 @@ def make_forcing(alpha,runid,frcname,t_end,input_path,check=True,alpha_full=Fals
     
     # Get the dimensions
     nlon,nlat,N_mode,nmon = alpha.shape
+    
     if flag: # Get shape for FULL run
         _,_,N_mode_full,_ = alpha_full.shape
+        N_mode_in = np.max([N_mode,N_mode_full])
+    else:
+        N_mode_in = N_mode
     
     # Append extra symbols for "allrandom" forcing, make filename
     if frcname == "allrandom":
@@ -2130,7 +2136,9 @@ def make_forcing(alpha,runid,frcname,t_end,input_path,check=True,alpha_full=Fals
     
     # Check/make random stochastic time series
     query = glob.glob(outname)
-    if len(query) < 1: # Generate NEW random timeseries if nothing is found
+    
+    # Generate NEW random timeseries if nothing is found ---------------------
+    if len(query) < 1: 
         print("Generating new forcing for runid %s..."% runid)
         
         # Generate white noise
@@ -2138,15 +2146,15 @@ def make_forcing(alpha,runid,frcname,t_end,input_path,check=True,alpha_full=Fals
             randts = np.random.normal(0,1,(nlon,nlat,1,t_end)) # [lon x lat x pc x time]
         else: # Uniform thruout basin, for each PC
             if flag: # Create timeseries with larger # of modes
-                N_mode_in = np.max([N_mode,N_mode_full])
                 randts = np.random.normal(0,1,(1,1,N_mode_in,t_end)) # [1 x 1 x pc,time]
             else:
-                randts = np.random.normal(0,1,(1,1,N_mode,t_end)) # [1 x 1 x pc,time]
+                randts = np.random.normal(0,1,(1,1,N_mode_in,t_end)) # [1 x 1 x pc,time]
         
         # Save forcing
         np.save(outname,randts)
-        
-    else: # Either overwrite or load new timeseries, based on user prompt
+    
+    # Either overwrite or load new timeseries, based on user prompt ----------
+    else: 
         if check:
             overwrite = input("Found existing file(s) \n %s. \n Overwite? (y/n)" % (str(query)))
         else:
@@ -2160,20 +2168,25 @@ def make_forcing(alpha,runid,frcname,t_end,input_path,check=True,alpha_full=Fals
                 randts = np.random.normal(0,1,(nlon,nlat,1,t_end)) # [lon x lat x pc x time]
             else: # Uniform thruout basin, for each PC
                 if flag: # Create timeseries with larger # of modes
-                    N_mode_in = np.max([N_mode,N_mode_full])
                     randts = np.random.normal(0,1,(1,1,N_mode_in,t_end)) # [1 x 1 x pc,time]
                 else:
-                    randts = np.random.normal(0,1,(1,1,N_mode,t_end)) # [1 x 1 x pc,time]
+                    randts = np.random.normal(0,1,(1,1,N_mode_in,t_end)) # [1 x 1 x pc,time]
             # Save forcing
             np.save(outname,randts)
         elif overwrite == "n": # Load old series
             print("Loading existing random timeseries")
             randts = np.load(outname)
+            # Check to make sure there is enough timeseries
+            if randts.shape[2] < N_mode_in:
+                Nmode_add = N_mode_in - randts.shape[2]
+                print("Warning... adding and saving %i random timeseries" % (Nmode_add))
+                randtsadd = np.random.normal(0,1,(1,1,Nmode_add,t_end))
+                randts = np.concatenate([randts,randtsadd],axis=2)
+                np.save(outname,randts)
+            
         else:
             print("Invalid input, must be 'y' or 'n'")
     # Resultant randts should be 4-D [lon x lat x pc x time]
-    
-    
     
     # Scale the forcing with the timeseries
     forcing = tile_forcing(alpha,randts)
@@ -2667,7 +2680,7 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
     #         else:
     #             ax.plot(outputs[i][klon,klat,0,:])
     #         ax.set_title(vnames[n])
-
+    
     # Generate White Noise
     # --------------------
     forcing,forcing_full = make_forcing(alpha,runid,frcname,t_end,input_path,check=check,alpha_full=alpha_full)
