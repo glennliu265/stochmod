@@ -595,7 +595,7 @@ def noentrain(t_end,lbd,T0,F,FAC,multFAC=1,debug=False):
     
     # Prepare the entrainment term
     explbd = np.exp(-lbd)
-    explbd[explbd==1] = 0
+    #explbd[explbd==1] = 0
     
     if (multFAC == 1) & (F.shape[0] != FAC.shape[0]):
         F *= np.tile(FAC,int(t_end/12)) # Tile FAC and scale forcing
@@ -690,7 +690,7 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
     
     # Prepare the entrainment term
     explbd = np.exp(np.copy(-lbd))
-    explbd[explbd==1] = 0
+    #explbd[explbd==1] = 0
     
     Td0 = None # Set Td=None Initially
     # Loop for integration period (indexing convention from matlab)
@@ -829,7 +829,7 @@ def entrain_parallel(inputs):
     
     # Prepare the entrainment term
     explbd = np.exp(np.copy(-lbd))
-    explbd[explbd==1] = 0
+    #explbd[explbd==1] = 0
     
     Td0 = None # Set Td=None Initially
     # Loop for integration period (indexing convention from matlab)
@@ -938,7 +938,7 @@ def noentrain_2d(randts,lbd,T0,F,FAC,multFAC=1,debug=False):
     explbd = np.exp(-lbd)
 
     # Set the term to zero where damping is insignificant
-    explbd[explbd==1] =0
+    #explbd[explbd==1] =0
     
     # Set initial condition
     #temp_ts[:,:,0] = T0
@@ -986,7 +986,8 @@ def noentrain_2d(randts,lbd,T0,F,FAC,multFAC=1,debug=False):
 #%% Postprocessing Utilities
 def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
                             returnresults=False,preload=None,
-                            mask_pacific=False,savesep=False,useslab=True):
+                            mask_pacific=False,savesep=False,
+                            useslab=True,mask_damping=False):
     """
     Script to postprocess stochmod output
     
@@ -1004,6 +1005,8 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
     
         9) savesep - Set to True if data was saved separately (model0,model1,etc)
         10) useslab - Set to True if only CESM-SLAB parameters were used
+        11) mask_damping - Set to True to exclude damping values that failed the significance test
+        
     
     Based on portions of analyze_stochoutput.py
     
@@ -1059,12 +1062,31 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
     n_models = len(sst)
     
     # Load MLD Data
+    # -------------
     mld = np.load(rawpath+"FULL_PIC_HMXL_hclim.npy") # Climatological MLD
     
     # Load Damping Data for lat/lon
+    # -----------------------------
     loaddamp = loadmat(rawpath+"ensavg_nhflxdamping_monwin3_sig020_dof082_mode4.mat")
     lon = np.squeeze(loaddamp['LON1'])
     lat = np.squeeze(loaddamp['LAT'])
+    
+    # Load damping masks from significance test 
+    # (Defaults to method 4) 0 = Failed test
+    # Output indicates whicn regions to include
+    # ------------------------------------------
+    mskslab = np.load(rawpath+"SLAB_PIC_NHFLX_Damping_monwin3_sig005_dof893_mode4_mask.npy")
+    mskfull = np.load(rawpath+"FULL_PIC_NHFLX_Damping_monwin3_sig005_dof1893_mode4_mask.npy")
+    dmskin = [mskslab,mskfull]
+    dmsks  = []
+    for i in range(2): # select region, append
+        mskin = dmskin[i]
+        mskreg,_,_ = proc.sel_region(mskin,lon,lat,[lonr[0],lonr[-1],latr[0],latr[-1]])
+        mskreg[mskreg==0] = np.nan
+        #mskreg = proc.nan_inv(mskreg) # Change so that 1 = insignificant points
+        #mskreg = np.array(mskreg,dtype=bool)
+        dmsks.append(mskreg.prod(-1))
+    dmsks.append(dmsks[-1]) # Append again for entraining
     
     # Load and apply mask if option is set
     if mask_pacific:
@@ -1120,13 +1142,10 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
             # Take regional average 
             #tsmodel = np.nanmean(tsmodel,(0,1))
             # Take area-weighted regional average
-            tsmodel   = proc.sel_region(sst[model],lonr,latr,bbox,reg_avg=1,awgt=1)
-            
-            
-            # Commented out below because now first t is Jan.
-            ## Temp FIX
-            # if model == 3:
-            #     tsmodel = np.roll(tsmodel,-1) # First t is feb.
+            if mask_damping:
+                tsmodel   = proc.sel_region(sst[model]*dmsks[model][...,None],lonr,latr,bbox,reg_avg=1,awgt=1)
+            else:
+                tsmodel   = proc.sel_region(sst[model],lonr,latr,bbox,reg_avg=1,awgt=1)
             
             sstavg[model] = np.copy(tsmodel)
             tsmodel = proc.year2mon(tsmodel) # mon x year
@@ -1161,7 +1180,7 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
         amvpat = {}
         
         for model in range(n_models):
-            amvidx[model],amvpat[model] = proc.calc_AMVquick(sst[model],lonr,latr,amvbboxes[region],dropedge=0)
+            amvidx[model],amvpat[model] = proc.calc_AMVquick(sst[model],lonr,latr,amvbboxes[region],dropedge=5,mask=dmsks[model])
         print("Calculated AMV variables for region %s in %.2f" % (regions[region],time.time()-amvtime))
         
         amvidx_region[region] = amvidx
@@ -2491,7 +2510,7 @@ def integrate_noentrain(lbd,F,T0=0,multFAC=True,debug=False):
     
     # Prepare other terms
     explbd = np.exp(-lbd)
-    explbd[explbd==1] =0 # Set the term to zero where damping is insignificant
+    #explbd[explbd==1] =0 # Set the term to zero where damping is insignificant
     
     # Preallocate
     T            = np.zeros((nlon,nlat,ntime)) * T0
