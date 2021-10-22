@@ -1736,6 +1736,21 @@ def load_latlon(datpath=None,lon360=False):
         lon = loadmat("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/CESM1_LATLON.mat")['LON'].squeeze()
     return lon,lat
 
+def load_dmasks(datpath=None,bbox=None):
+    # Load Damping Masks
+    if datpath is None:
+        datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/"
+    mskslab = np.load(datpath+"SLAB_PIC_NHFLX_Damping_monwin3_sig005_dof893_mode4_mask.npy")
+    mskfull = np.load(datpath+"FULL_PIC_NHFLX_Damping_monwin3_sig005_dof1893_mode4_mask.npy")
+    dmskin = [mskslab,mskfull]
+    dmsks  = []
+    for i in range(2): # select region, append
+        mskin = dmskin[i]
+        if bbox is not None:
+            lon,lat = load_latlon(datpath=datpath)
+            mskin,_,_ = proc.sel_region(mskin,lon,lat,bbox)
+        dmsks.append(mskin.prod(-1)) # multiply for each month
+    return dmsks
 
 
 #%% Heat Flux Feedback Calculations
