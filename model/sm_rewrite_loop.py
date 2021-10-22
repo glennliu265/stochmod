@@ -109,6 +109,9 @@ T0         = 0 # Init Temp
 # Forcing Correction Method
 ampq = 3 #0 = none 1 = old method, 2 = method 1, 3 = method 2
 
+# Damping Significance Test Method
+method = 2 # 1 = No Testing; 2 = SST autocorr; 3 = SST-FLX crosscorr, 4 = Both 
+
 lonf = -30
 latf = 50
 debug = False
@@ -166,8 +169,6 @@ frcnames = (
 
 #frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2',)
 
-
-
 # Test the effect of increasing the number of EOFs
 frcnames = (
             "flxeof_50eofs_SLAB-PIC_eofcorr0",
@@ -197,19 +198,19 @@ frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2_DJF',
             'flxeof_090pct_SLAB-PIC_eofcorr2_MAM',
             'flxeof_090pct_SLAB-PIC_eofcorr2_JJA',
             'flxeof_090pct_SLAB-PIC_eofcorr2_SON')
-            
 
 # Testing NAO, EAP Forcing
 frcnames = ('flxeof_EOF1_SLAB-PIC_eofcorr0',
             'flxeof_EOF2_SLAB-PIC_eofcorr0')
 
+frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2',)
 
 print("Running the following forcings: \n %s"%(str(frcnames)))
 #%%
 st = time.time()
 for f in range(len(frcnames)):
     frcname    = frcnames[f]
-    expname    = "%sstoch_output_forcing%s_%iyr_run%s_ampq%i.npz" % (output_path,frcname,int(t_end/12),runid,ampq) 
+    expname    = "%sstoch_output_forcing%s_%iyr_run%s_ampq%i_method%i.npz" % (output_path,frcname,int(t_end/12),runid,ampq,method) 
     
     # Check if results exist
     query = glob.glob(expname)
@@ -225,7 +226,7 @@ for f in range(len(frcnames)):
                        runid,t_end,frcname,ampq,
                        bboxsim,pointmode,points=[lonf,latf],
                        dt=3600*24*30,
-                       debug=False,check=False,useslab=useslab,savesep=savesep)
+                       debug=False,check=False,useslab=useslab,savesep=savesep,method=method)
 
 print("Completed in %.2fs" % (time.time()-st))
 
