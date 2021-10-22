@@ -39,7 +39,7 @@ import cmocean
 projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath = projpath + '03_Scripts/stochmod/'
 datpath    = projpath + '01_Data/'
-outpath    = projpath + '02_Figures/20211018/'
+outpath    = projpath + '02_Figures/20211021/'
 input_path  = datpath + 'model_input/'
 proc.makedir(outpath)
 
@@ -84,6 +84,8 @@ bbox_NA  = [-80,0 ,10,65]
 ampfactors = []
 qcorrs     = []
 thresids = []
+eofalls = []
+eofslps = []
 for model in tqdm(range(2)):
     
     mcname = mcfs[model]
@@ -102,10 +104,12 @@ for model in tqdm(range(2)):
     # ----------------
     savename  = "%sNHFLX_%s_%iEOFsPCs_%s.npz" % (input_path,mcname,N_mode,bboxtext)
     ld        = np.load(savename,allow_pickle=True)
-    #eofall    = ld['eofall']
-    #eofslp    = ld['eofslp']
+    eofall    = ld['eofall']
+    eofslp    = ld['eofslp']
     #pcall     = ld['pcall']
     varexpall = ld['varexpall']
+    eofalls.append(eofall)
+    eofslps.append(eofslp)
 
     # Load Data (Variance Corrections)
     # --------------------------------
@@ -247,10 +251,71 @@ fig.text(0.07, 0.70, 'SLAB', va='center', rotation='vertical',fontsize=16)
 fig.text(0.07, 0.30, 'FULL', va='center', rotation='vertical',fontsize=16)
 plt.savefig("%sFig04_Forcing_Corrections.png"% (outpath),dpi=150,bbox_inches='tight')
 
+#%% -- -- -- -- -- -- -- -- How does NAO/EOF look like after each correction?
+
+
+# indicate selections
+im    = 0 # Month Index
+model = 1 # Model Index 
+N     = 0 # MODE Index
+
+# plotting params
+clvl = np.arange(-60,65,5)
+
+# Set some strings
+vizstring    = "%s_Month%02i_Mode%03i" % (mcfs[model],im+1,N+1)
+
+
+titlestrings  = ("EOF %02i (no correction)" % (N+1),
+                "With Local Variance Correction (to 100%)",
+                "With Local Variance Correction and Q-correction")
+                #Note, add variance explained later
+
+
+# Select model
+eofin   = eofalls[model][:,:,im,N]
+ampin   = ampfactors[model][:,:,im]
+qcorrin = qcorrs[0][:,:,im]
+
+
+
+#init plot
+def plot_NAOpat(lon,lat,eofpat,clvl,title,bbox,ax=None,cmap='PRGn'):
+    if ax is None:
+        ax = plt.gca()
+    ax  = viz.add_coast_grid(ax,bbox=bbox)
+    pcm = ax.contourf(lon,lat,eofpat,levels=clvl,cmap=cmap,extend='both')
+    cl  = ax.contour(lon,lat,eofpat,levels=clvl,colors="k",linewidths=0.5)
+    ax.clabel(cl,fontsize=10)
+    ax.set_title(title)
+    return pcm,ax
+
+
+
+fig,axs = plt.subplots(1,3,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(18,4))
+
+for ip in range(3):
+    
+    ax = axs.flatten()[ip]
     
     
+    if ip == 0:
+        plotvar = eofin.T
+    elif ip == 1:
+        plotvar = (eofin*ampin).T
+    else:
+        plotvar = (eofin*ampin*qcorrin).T
+        
+    pcm,ax = plot_NAOpat(lon,lat,plotvar,clvl,titlestrings[ip],bbox,ax=ax)
+
+cb = fig.colorbar(pcm,ax=axs.flatten(),fraction=0.015)
+cb.set_label("$Q_{net}$ ,Interval = 5 $W/m^2$ per $\sigma_{PC}$")
 
 
-
+plt.savefig("%sEOF_Variance_Correction_effects_%s.png" % (outpath,vizstring),bbox_inches='tight',dpi=200)
+#%%
+    
+    
+    
 
 
