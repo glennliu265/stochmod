@@ -112,7 +112,6 @@ def calc_Td(t,index,values,prevmon=False,debug=False):
     else: # Just return Td1
         return Td[0]
 
-
 def cut_NAOregion(ds,bbox=[0,360,-90,90],mons=None,lonname='lon',latname='lat'):
     """
     Prepares input DataArray for NAO Calculation by cutting region and taking
@@ -1025,9 +1024,10 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
     bbox_TR     = [-75,-15,10,20]
     bbox_NA     = [-80,0 ,0,65]
     bbox_NA_new = [-80,0,10,65]
-    #bbox_STw    = []
-    regions = ("SPG","STG","TRO","NAT","NNAT")        # Region Names
-    bboxes = (bbox_SP,bbox_ST,bbox_TR,bbox_NA,bbox_NA_new) # Bounding Boxes
+    bbox_ST_w  = [-80,-40,20,40]
+    bbox_ST_e  = [-40,-10,20,40]
+    regions = ("SPG","STG","TRO","NAT","NNAT","STGe","STGw")        # Region Names
+    bboxes = (bbox_SP,bbox_ST,bbox_TR,bbox_NA,bbox_NA_new,bbox_ST_e,bbox_ST_w) # Bounding Boxes
     
     #% ---- Read in Data ----
     start = time.time()
@@ -1856,7 +1856,8 @@ def calc_HF(sst,flx,lags,monwin,verbose=True,posatm=True):
             
     return damping,autocorr,crosscorr
 
-def prep_HF(damping,rsst,rflx,p,tails,dof,mode,returnall=False,posatm=True):
+def prep_HF(damping,rsst,rflx,p,tails,dof,mode,
+            returnall=False,posatm=True,maskval=np.nan):
     """
     
     Mask the damping values using Students T-Test on based on the 
@@ -1885,8 +1886,10 @@ def prep_HF(damping,rsst,rflx,p,tails,dof,mode,returnall=False,posatm=True):
         --- OPTIONAL ---
         8) returnall BOOL
             Set to True to return masks and frequency
-        6) posatm : BOOL
+        9) posatm : BOOL
             Set to True to ensure positive upwards into the atmosphere
+        10) maskval : NUMERIC
+            Fill value for failed points
     
     Outputs
     -------
@@ -1905,8 +1908,8 @@ def prep_HF(damping,rsst,rflx,p,tails,dof,mode,returnall=False,posatm=True):
             rflx*=-1
     
     # Create Mask
-    msst = np.zeros(damping.shape) * np.nan
-    mflx = np.zeros(damping.shape) * np.nan
+    msst = np.zeros(damping.shape) * maskval#np.nan
+    mflx = np.zeros(damping.shape) * maskval#np.nan
     msst[rsst > corrthres] = 1
     mflx[rflx > corrthres] = 1
     if mode == 1:
@@ -1930,10 +1933,10 @@ def prep_HF(damping,rsst,rflx,p,tails,dof,mode,returnall=False,posatm=True):
     dampingmasked = damping * mall
     
     if returnall:
-        return dampingmasked,mtot,mult
+        return dampingmasked,mtot,mall
     return dampingmasked
 
-def postprocess_HF(dampingmasked,limask,sellags,lon):
+def postprocess_HF(dampingmasked,limask,sellags,lon,pos_upward=True):
     
     """
     Apply a land/ice mask and average across the selected lags
@@ -1951,7 +1954,8 @@ def postprocess_HF(dampingmasked,limask,sellags,lon):
     lon1,dampingw = proc.lon360to180(lon,mchoose.transpose(2,1,0))
 
     # Multiple by 1 to make positive upwards
-    dampingw *= -1
+    if pos_upward:
+        dampingw *= -1
     return dampingw
 
 
@@ -2074,8 +2078,8 @@ def load_inputs(mconfig,frcname,input_path,load_both=False,method=4):
         
     # Load both damping
     if load_both: 
-        dampingslab   = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig005_dof894_mode4.npy")
-        dampingfull   = np.load(input_path+"FULL_PIC"+"_NHFLX_Damping_monwin3_sig005_dof1893_mode4.npy")
+        dampingslab   = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig005_dof894_mode%i.npy"%method)
+        dampingfull   = np.load(input_path+"FULL_PIC"+"_NHFLX_Damping_monwin3_sig005_dof1893_mode%i.npy"%method)
         
     # Load Alpha (Forcing Amplitudes) [lon180 x lat x pc x mon], easier for tiling
     if frcname == "allrandom":
@@ -2201,42 +2205,6 @@ def make_forcing(alpha,runid,frcname,t_end,input_path,check=True,alpha_full=Fals
         forcing_full = tile_forcing(alpha_full,randts)
         return forcing,forcing_full
     return forcing
-    
-    # Old section with repeated code, non-funcitonized
-    # # Scale the forcing with the timeseries
-    # alpha_tile = alpha.copy()
-    # if t_end != nmon:
-    #     ntile      = int(t_end/nmon)
-    #     alpha_tile = np.tile(alpha_tile,ntile) #[lon x lat x pc x time]
-    # forcing = alpha_tile * randts[:,:,:N_mode,:]
-    
-    # # Sum the PCs for the forcing
-    # if N_mode > 1:
-    #     forcing = forcing.sum(2)
-    # forcing = forcing.squeeze()
-    
-    # # Remake into 3D [lon x lat x time]
-    # if len(forcing.shape)<3:
-    #     forcing = forcing[None,None,:]
-    
-    # # Repeat top 2 steps for CESM-FULL Forcing
-    # if flag:
-    #     alpha_tile_full = alpha_full.copy()
-    #     if t_end != nmon:
-    #         ntile      = int(t_end/nmon)
-    #         alpha_tile_full = np.tile(alpha_tile_full,ntile) #[lon x lat x pc x time]
-    #     forcing_full = alpha_tile_full * randts[:,:,:N_mode_full,:]
-        
-    #     # Sum the PCs for the forcing
-    #     if N_mode_full > 1:
-    #         forcing_full = forcing_full.sum(2)
-    #     forcing_full = forcing_full.squeeze()
-        
-    #     if len(forcing_full.shape)<3:
-    #         forcing_full = forcing_full[None,None,:]
-    #return forcing
-
-
 
 def tile_forcing(alpha,randts):
     """
@@ -2642,7 +2610,20 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
                    debug=False,check=True,
                    useslab=False,savesep=False,
                    intgrQ=False,
-                   method=4):
+                   method=4,chk_damping=False):
+    
+    """
+    Inputs
+    ------
+    
+    1. expname [STR]: Name of experiment output
+    2. mconfig [STR]: Model Configuration
+    
+    
+    
+    chk_damping [BOOL] : set True to set negative damping values to 0
+
+    """
     
     start = time.time()
     
@@ -2675,6 +2656,15 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
     else:
         outputs = cut_regions(inputs,lon,lat,bboxsim,pointmode,points=points)
     h,kprev,damping,dampingfull,alpha,alpha_full,hblt = outputs
+    
+    
+    # Remove negative damping values, if option is set
+    # ------------------------------------------------
+    if chk_damping:
+        dmask = (damping<0)
+        dmaskfull = (dampingfull<0)
+        
+    
 
     # Check some params
     # -------------------
