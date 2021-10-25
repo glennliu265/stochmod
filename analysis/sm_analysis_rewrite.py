@@ -16,7 +16,7 @@ import sys
 import cmocean
 from tqdm import tqdm
 #%% Set Paths, Import Custom Modules
-stormtrack = 1  
+stormtrack = 1
 if stormtrack == 0:
     projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
     datpath     = projpath + '01_Data/model_output/'
@@ -42,7 +42,7 @@ import tbx
 #%% User Edits
 
 # Visualization options
-viz_AMV=True
+viz_AMV=False
 
 # Analysis Options
 lags = np.arange(0,37,1)
@@ -54,6 +54,8 @@ runid     = "006"
 savesep   = False # Set to True if output was saved separately
 useslab   = False # Set to True if you only used slab output for all simulations
 
+# Additional Analysis Options
+mask_damping = True # Set to True to mask out damping points that failed the T-Test
 
 # Analysis (7/26/2021, comparing 80% variance threshold and 5 or 3 EOFs)
 #fnames      = ["flxeof_080pct_SLAB-PIC","flxeof_5eofs_SLAB-PIC","flxeof_3eofs_SLAB-PIC"]
@@ -180,35 +182,53 @@ fnames = ("forcingflxeof_EOF1_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3",
 
 ## Rewritten (with slab/full forcing/damping) (run010) ---
 
+
+
+
 # Seasonal Analysis
-
 #stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr2_MAM_1000yr_run010_ampq3.npz
-fnames   = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run010_ampq3',
-            'forcingflxeof_090pct_SLAB-PIC_eofcorr2_DJF_1000yr_run010_ampq3',
-            'forcingflxeof_090pct_SLAB-PIC_eofcorr2_MAM_1000yr_run010_ampq3',
-            'forcingflxeof_090pct_SLAB-PIC_eofcorr2_JJA_1000yr_run010_ampq3',
-            'forcingflxeof_090pct_SLAB-PIC_eofcorr2_SON_1000yr_run010_ampq3')
+fnames   = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3',
+            'forcingflxeof_090pct_SLAB-PIC_eofcorr2_DJF_1000yr_run011_ampq3',
+            'forcingflxeof_090pct_SLAB-PIC_eofcorr2_MAM_1000yr_run011_ampq3',
+            'forcingflxeof_090pct_SLAB-PIC_eofcorr2_JJA_1000yr_run011_ampq3',
+            'forcingflxeof_090pct_SLAB-PIC_eofcorr2_SON_1000yr_run011_ampq3')
 
-fnames = ("forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run012_ampq3",)
+## NAO and EAP
+fnames = ("forcingflxeof_EOF1_SLAB-PIC_eofcorr0_1000yr_run011_ampq3",
+          "forcingflxeof_EOF2_SLAB-PIC_eofcorr0_1000yr_run011_ampq3")
+
+# Test witha single output
+fnames = ("forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method4_dmp0",)
+
+# Seasonal Analysis
+#stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr2_MAM_1000yr_run010_ampq3.npz
+fnames   = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3',
+            'forcingflxeof_090pct_SLAB-PIC_eofcorr2_DJF_1000yr_run011_ampq3',
+            'forcingflxeof_090pct_SLAB-PIC_eofcorr2_MAM_1000yr_run011_ampq3',
+            'forcingflxeof_090pct_SLAB-PIC_eofcorr2_JJA_1000yr_run011_ampq3',
+            'forcingflxeof_090pct_SLAB-PIC_eofcorr2_SON_1000yr_run011_ampq3')
+
+## NAO and EAP
+fnames = ("forcingflxeof_EOF1_SLAB-PIC_eofcorr0_1000yr_run011_ampq3_method4_dmp0",
+          "forcingflxeof_EOF2_SLAB-PIC_eofcorr0_1000yr_run011_ampq3_method4_dmp0")
+
 
 ## By Number of EOFs (no correction)
 fnames = (
-            "forcingflxeof_50eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3",
-            "forcingflxeof_25eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3",
-            "forcingflxeof_10eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3",
-            "forcingflxeof_5eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3",
-            "forcingflxeof_3eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3",
-            "forcingflxeof_2eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3",
-            "forcingflxeof_1eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3"
+            "forcingflxeof_50eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3_method4_dmp0",
+            "forcingflxeof_25eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3_method4_dmp0",
+            "forcingflxeof_10eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3_method4_dmp0",
+            "forcingflxeof_5eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3_method4_dmp0",
+            "forcingflxeof_3eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3_method4_dmp0",
+            "forcingflxeof_2eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3_method4_dmp0",
+            "forcingflxeof_1eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3_method4_dmp0"
             )
-
 #%% Post Process Outputs (Calculate AMV, Autocorrelation)
 for frcname in tqdm(fnames):
     expid = frcname
     scm.postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,mask_pacific=True,
-                                savesep=savesep,useslab=useslab)
+                                savesep=savesep,useslab=useslab,mask_damping=mask_damping)
     print("Completed Post-processing for Experiment: %s" % expid)
-    
 #%% Visualize AMV
 if viz_AMV:
     # Regional Analysis Settings
