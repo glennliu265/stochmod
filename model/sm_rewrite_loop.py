@@ -16,7 +16,7 @@ import time
 
 #%% Set the location
 
-stormtrack =0
+stormtrack =1
 
 if stormtrack == 0:
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -106,17 +106,18 @@ t_end      = 12000 # Sim Length
 dt         = 3600*24*30 # Timestep
 T0         = 0 # Init Temp
 
-# Forcing Correction Method
-ampq = 3 #0 = none 1 = old method, 2 = method 1, 3 = method 2
+# Forcing Correction Method (q-corr)
+ampq   = 3 #0 = none 1 = old method, 2 = method 1, 3 = method 2
 
 # Damping Significance Test Method
-method = 2 # 1 = No Testing; 2 = SST autocorr; 3 = SST-FLX crosscorr, 4 = Both 
+method = 4 # 1 = No Testing; 2 = SST autocorr; 3 = SST-FLX crosscorr, 4 = Both 
 
+# Point information
 lonf = -30
 latf = 50
 debug = False
 
-# Loop by forcing
+# Indicate Forcing Files to Loop Thru
 
 # Testing different # of EOFs
 frcnames = (
@@ -182,6 +183,21 @@ frcnames = (
 
 frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2',)
 
+
+
+# Testing seasonal EOFs
+frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2_DJF',
+            'flxeof_090pct_SLAB-PIC_eofcorr2_MAM',
+            'flxeof_090pct_SLAB-PIC_eofcorr2_JJA',
+            'flxeof_090pct_SLAB-PIC_eofcorr2_SON')
+
+# Single run test (90% variance forcing)
+frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2',)
+
+# Testing NAO, EAP Forcing
+frcnames = ('flxeof_EOF1_SLAB-PIC_eofcorr0',
+            'flxeof_EOF2_SLAB-PIC_eofcorr0')
+
 # Test the effect of increasing the number of EOFs
 frcnames = (
             "flxeof_50eofs_SLAB-PIC_eofcorr0",
@@ -193,24 +209,14 @@ frcnames = (
             "flxeof_1eofs_SLAB-PIC_eofcorr0"
             )
 
-# Testing seasonal EOFs
-frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2_DJF',
-            'flxeof_090pct_SLAB-PIC_eofcorr2_MAM',
-            'flxeof_090pct_SLAB-PIC_eofcorr2_JJA',
-            'flxeof_090pct_SLAB-PIC_eofcorr2_SON')
-
-# Testing NAO, EAP Forcing
-frcnames = ('flxeof_EOF1_SLAB-PIC_eofcorr0',
-            'flxeof_EOF2_SLAB-PIC_eofcorr0')
-
-frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2',)
-
 print("Running the following forcings: \n %s"%(str(frcnames)))
 #%%
 st = time.time()
 for f in range(len(frcnames)):
     frcname    = frcnames[f]
-    expname    = "%sstoch_output_forcing%s_%iyr_run%s_ampq%i_method%i.npz" % (output_path,frcname,int(t_end/12),runid,ampq,method) 
+    expname    = "%sstoch_output_forcing%s_%iyr_run%s_ampq%i_method%i_dmp0.npz" % (output_path,frcname,int(t_end/12),runid,ampq,method) 
+    # dmp0 indicates that points with insignificant lbd_a were set to zero.
+    # previously, they were set to np.nan, or the whole damping term was set to zero
     
     # Check if results exist
     query = glob.glob(expname)
