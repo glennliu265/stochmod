@@ -1087,6 +1087,10 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
         #mskreg = np.array(mskreg,dtype=bool)
         dmsks.append(mskreg.prod(-1))
     dmsks.append(dmsks[-1]) # Append again for entraining
+    # if len(sst) != 3: # For cases where preloaded SSTs are provided...
+    #     mskall = dmsks[0] * dmsks[1]
+    #     for i in range(len(sst)):
+    #         dmsk
     
     # Load and apply mask if option is set
     if mask_pacific:
@@ -1180,7 +1184,10 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
         amvpat = {}
         
         for model in range(n_models):
-            amvidx[model],amvpat[model] = proc.calc_AMVquick(sst[model],lonr,latr,amvbboxes[region],dropedge=5,mask=dmsks[model])
+            if mask_damping:
+                amvidx[model],amvpat[model] = proc.calc_AMVquick(sst[model],lonr,latr,amvbboxes[region],dropedge=5,mask=dmsks[model])
+            else:
+                amvidx[model],amvpat[model] = proc.calc_AMVquick(sst[model],lonr,latr,amvbboxes[region],dropedge=5)
         print("Calculated AMV variables for region %s in %.2f" % (regions[region],time.time()-amvtime))
         
         amvidx_region[region] = amvidx
@@ -1682,13 +1689,12 @@ def load_cesm_pt(datpath,loadname='both',grabpoint=None,ensorem=0):
     # Load SSTs
     ssts = []
     if loadname=='both' or loadname=='full': # Load full sst data from model
-        
+        print("Loading from CESM-FULL...")
         
         if ensorem == 1:# Load data with ENSO Removed
             ld  = np.load(datpath+"FULL_PIC_ENSOREM_TS_lag1_pcs2_monwin3.npz" ,allow_pickle=True)
             sstfull = ld['TS']
         else:
-            
             ds = xr.open_dataset(datpath+"CESM_proc/TS_anom_PIC_FULL.nc")
             if grabpoint is not None:
                 sstfull = ds.sel(lon=lonf,lat=latf,method='nearest').TS.values
@@ -1698,7 +1704,7 @@ def load_cesm_pt(datpath,loadname='both',grabpoint=None,ensorem=0):
         ssts.append(sstfull)
           
     if loadname=='both' or loadname=='slab': # Load slab sst data
-        
+        print("Loading from CESM-SLAB")
         if ensorem == 1:# Load data with ENSO Removed
             ld2 = np.load(datpath+"SLAB_PIC_ENSOREM_TS_lag1_pcs2_monwin3.npz" ,allow_pickle=True)
             sstslab = ld2['TS'] # Time x lat x lon
@@ -1752,6 +1758,35 @@ def load_dmasks(datpath=None,bbox=None):
         dmsks.append(mskin.prod(-1)) # multiply for each month
     return dmsks
 
+def load_cesm_le(datpath=None,preprocess=False,return_ds=False):
+    """
+    Load CESM1.1-LE Historical Data that has been preprocessed for the
+    Machine Learning Project (predict_AMV)
+    """
+    if datpath is None: # Defaults to location on local Mac
+        datpath = "/Users/gliu/Downloads/2020_Fall/6.862/Project/CESM_data/"
+    
+    ncname  = "CESM1LE_sst_NAtl_19200101_20051201.nc"
+    ds      = xr.open_dataset(datpath+ncname)
+    
+    if preprocess: # Do some preprocessing
+        st = time.time()
+        ds = ds.sst - ds.sst.mean('ensemble') # Remove Ensemble mean
+        ds = proc.xrdeseason(ds)
+        print("Loaded in %.2fs" % (time.time()-st))
+    
+    if return_ds: # Just return the dataset
+        return ds
+    
+    st = time.time()
+    if preprocess:
+        sst = ds.values
+    else:
+        sst = ds.sst.values # [lat x lon x time x ensemble]
+    lon = ds.lon.values
+    lat = ds.lat.values
+    print("Loaded in %.2fs" % (time.time()-st))
+    return sst,lon,lat
 
 #%% Heat Flux Feedback Calculations
 
@@ -2888,7 +2923,7 @@ def load_limopt_amv(datpath=None):
         lons.append(lon180)
         
     return ssts,idxs,lons,lats,times
-        
+
     
 
 #%%
