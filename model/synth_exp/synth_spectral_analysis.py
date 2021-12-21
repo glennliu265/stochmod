@@ -75,6 +75,8 @@ config.pop('mldpt',None)
 # Confidence Level Calculations
 conf  = 0.95
 tails = 2
+
+darkmode=True
 #%% Functions
 
 def interp_quad(ts):
@@ -166,10 +168,49 @@ mlddef = mldpt.copy()
 Fptdef = Fpt.copy()
 
 sstall = sst
-#%%
+#%% 
+
+#%% Make a plot for your thesis proposal (reemergence detection)
 
 
+if darkmode:
+    plt.style.use('dark_background')
+    savename = outpath+"Default_Autocorrelation_ThesisP_dark.png"
+    dfcol = 'w'
+else:
+    plt.style.use('default')
+    savename = outpath+"Default_Autocorrelation_ThesisP.png"
+    dfcol = 'k'
+    
 
+# Compute the significance level
+sstpt = scm.load_cesm_pt(datpath,loadname='full',grabpoint=[-30,50])
+acpt  = scm.calc_autocorr(sstpt,np.arange(0,37,1),2)
+acpt  = acpt[0]
+sstpt = sstpt[0]
+r1    = np.corrcoef(sstpt[:-1],sstpt[1:])[0,1]
+neff  = len(sstpt)/12* (1-r1**2)/(1+r1**2)
+rhocrit = proc.ttest_rho(0.05,1,neff)
+
+# Plot some differences
+xtk2       = np.arange(0,37,2)
+fig,ax     = plt.subplots(1,1,figsize=(8,4))
+title      = "SST Autocorrelation at %s (Lag 0 = %s)" % (locstringtitle,mons3[mldpt.argmax()])
+ax,ax2 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,loopvar=None,title=title)
+#ax.plot(lags,cesmauto2[lags],label="CESM SLAB",color='k')
+#ax.plot(lags,cesmautofull,color=dfcol,label='CESM Full',lw=2)
+ax.plot(lags,acpt,color=dfcol,label="CESM1-PiC SST Autocorrelation")
+ax.axhline(rhocrit,color='white',ls='dashed',lw=0.75,label="5% Significance Level (1-sided T-Test)")
+ax.legend()
+
+ax.axvspan(6, 13, facecolor='skyblue', alpha=0.5)
+ax.axvspan(18, 25, facecolor='skyblue', alpha=0.5)
+ax.axvspan(30, 37, facecolor='skyblue', alpha=0.5)
+
+ax.axvspan(1, 7, facecolor='yellow', alpha=0.5)
+ax.axvspan(13, 19, facecolor='yellow', alpha=0.5)
+ax.axvspan(25, 31, facecolor='yellow', alpha=0.5)
+plt.savefig(savename,dpi=200)
 
 #%% OPTIONAL: Save inputs from clean run for comparison later
 
