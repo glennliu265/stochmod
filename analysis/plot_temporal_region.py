@@ -191,7 +191,7 @@ cfcesm  [Region x Model x Lag x Upper/Lower]
 
 
     
-#%% Plot Bounding Boxes over CESM Slab Pattern
+#%% Plot Bounding Boxes (STG)Locator
 
 cid = 0
 rid = 4
@@ -201,14 +201,7 @@ bboxtemp = [-85,-5,15,45]
 fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(4.5,3))
 ax = viz.add_coast_grid(ax,bboxtemp,fill_color='k')
 fig.patch.set_alpha(1)  # solution
-# # Plot the amv pattern
-# pcm = ax.contourf(lon180g,latg,cesmpat[rid][cid].T,levels=cint,cmap=cmocean.cm.balance)
-# ax.pcolormesh(lon180g,latg,cesmpat[rid][cid].T,vmin=cint[0],vmax=cint[-1],cmap=cmocean.cm.balance,zorder=-1)
-# cl = ax.contour(lon180g,latg,cesmpat[rid][cid].T,levels=cl_int,colors="k",linewidths=0.5)
-# ax.clabel(cl,levels=cl_int,fontsize=8)
-# ax.set_title("Regional Analysis Bounding Boxes")
-# cb = fig.colorbar(pcm,ax=ax,orientation='horizontal')
-# cb.set_label("CESM-SLAB AMV ($\degree C$ per $\sigma_{AMV}$)")
+
 props = dict(boxstyle='square', facecolor='white', alpha=0.8)
 ax.text(-63.5,48,"STG Bounding Boxes",ha='center',bbox=props,fontsize=12)
 #ax.set_title("STG Bounding Boxes",fontsize=10)
@@ -222,6 +215,39 @@ for bb in [5,6]:
 ax.legend(ncol=2,fontsize=8)
 
 plt.savefig("%sSTG_Locator.png"%figpath,dpi=100,bbox_inches='tight',transparent=True)
+
+
+#%% Plot Bounding Boxes (SPG) over Locator
+
+cid = 0
+rid = 0
+
+bboxtemp = [-90,5,0,65]
+
+fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(4.5,3))
+ax = viz.add_coast_grid(ax,bboxtemp,fill_color='gray')
+fig.patch.set_alpha(1)  # solution
+# # Plot the amv pattern
+props = dict(boxstyle='square', facecolor='white', alpha=0.8)
+
+
+ax.text(-67,70,"Bounding Boxes",ha='center',bbox=props,fontsize=12) # (works for SPG Only)
+
+
+# # 
+ls = []
+for bb in [0,4]:
+    ax,ll = viz.plot_box(bboxes[bb],ax=ax,leglab=regions[bb],
+                          color=bbcol[bb],linestyle=bbsty[bb],linewidth=3,return_line=True)
+    ls.append(ll)
+    
+ax.legend(ncol=2,fontsize=8)
+
+plt.savefig("%sSPG-NAT_Locator.png"%figpath,dpi=100,bbox_inches='tight',transparent=True)
+
+
+
+
 
 #%% Load Stochastic Model Output (Regional SSTs)
 
@@ -285,13 +311,13 @@ dofs    = [1000,1000,898,1798] # In number of years
 #     insstvars.append(np.var(s))
 #     #print(np.var(s))
 
-# Calculate Spectra and confidence Intervals
-specs,freqs,CCs,dofs,r1s = scm.quick_spectrum(insst,nsmooth,pct)
-alpha = 0.05
-bnds = []
-for nu in dofs:
-    lower,upper = tbx.confid(alpha,nu*2)
-    bnds.append([lower,upper])
+# # Calculate Spectra and confidence Intervals
+# specs,freqs,CCs,dofs,r1s = scm.quick_spectrum(insst,nsmooth,pct)
+# alpha = 0.05
+# bnds = []
+# for nu in dofs:
+#     lower,upper = tbx.confid(alpha,nu*2)
+#     bnds.append([lower,upper])
     
 
 # Loop for each region
@@ -415,6 +441,100 @@ plt.tight_layout()
 plt.savefig("%sSTG_Autocorrelation_Spectra%s.png"%(figpath,smoothname),
             dpi=200,transparent=False)
 
+
+#%% Same, but for North Atlantic
+# Autocorr on top row
+# Power Spectra on the bottom
+
+alw = 3
+
+rid_L = 0 #  SPG
+rid_R = 4 #  NAT
+order = [rid_L,rid_R]
+
+
+fig,axs =plt.subplots(2,2,figsize=(12,8))
+
+
+# Plot the autocorrelation (top row)
+for i in range(2):
+    
+    ax = axs[0,i]
+    
+    rid    = order[i] 
+    kmonth = kmonths[rid]
+    #title  = "%s Autocorrelation (Lag 0 = %s)" % (regionlong[rid],mons3[kmonth])
+    title  = "%s Autocorrelation" % (regionlong[rid]) # No Month
+    ax,ax2 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title="")
+    ax.set_title(title,color=bbcol[rid],fontsize=12)
+    
+    # Plot Each Stochastic Model
+    for mid in range(3):
+        ax.plot(lags,sstac[rid][mid],color=mcolors[mid],label=modelnames[mid],lw=alw)
+        ax.fill_between(lags,cfstoch[rid,mid,lags,0],cfstoch[rid,mid,lags,1],
+                        color=mcolors[mid],alpha=0.10)
+    
+    # Plot CESM
+    for cid in range(2):
+        ax.plot(lags,cesmacs[rid][cid],color=cesmcolor[cid],label=cesmname[cid],ls=cesmline[cid],lw=alw)
+        ax.fill_between(lags,cfcesm[rid,cid,lags,0],cfcesm[rid,cid,lags,1],
+                        color=cesmcolor[cid],alpha=0.10)
+        
+    if i == 1:
+        ax.set_ylabel("")
+        ax.legend(ncol=2,fontsize=12)
+
+
+# Plot the power spectra (bottom row)
+for i in range(2):
+    
+    
+    
+    
+    ax  = axs[1,i]
+    rid = order[i]
+    
+    if rid == 4:
+        specylim = [0,0.30]
+    elif rid == 0:
+        specylim = [0,1] 
+        
+    
+    speclabels = ["%s (%.3f $^{\circ}C^2$)" % (specnames[i],sstvarall[rid][i]) for i in range(len(insst)) ]
+    
+    
+    ax,ax2 = viz.plot_freqlin(specsall[rid],freqsall[rid],speclabels,speccolors,lw=alw,
+                         ax=ax,plottitle=regionlong[rid],
+                         xlm=xlm,xtick=xtks,return_ax2=True)
+    
+    # Turn off title and second axis labels
+    ax.set_title("")
+    ax2.set_xlabel("")
+    sxtk2 = ax2.get_xticklabels()
+    sxtk2new = np.repeat("",len(sxtk2))
+    ax2.set_xticklabels(sxtk2new)
+    
+    # Move period labels to ax1
+    ax.set_xticklabels(1/xtks)
+    ax.set_xlabel("Period (Years)")
+    plt.setp(ax.get_xticklabels(), rotation=50,fontsize=8)
+    if i == 1:
+        ax.set_ylabel("")
+    else:
+        ax.set_ylabel("Power ($\degree C^2 /cpy$)")
+    ax.set_ylim(specylim)
+    
+    
+    
+    title = "%s Power Spectra" % (regions[rid])
+    ax.set_title(title,color=bbcol[rid],fontsize=12)
+
+plt.tight_layout()
+plt.savefig("%sSPG-NAT_Autocorrelation_Spectra%s.png"%(figpath,smoothname),
+            dpi=200,transparent=False)
+
+
+
 #%%
 # #%% Remake using subplot grids (Note Working)
 
@@ -426,7 +546,6 @@ plt.savefig("%sSTG_Autocorrelation_Spectra%s.png"%(figpath,smoothname),
 
 # subfigs = fig.subfigures(nrows=2,ncols=1)
 # for row,subfig in enumerate(subfigs):
-    
 #     # Create 1x4 subplots per subfig
 #     axs = subfig.subplots(nrows=1, ncols=2)
 #     subfig.suptitle(rowtitles[row],fontsize=12)
