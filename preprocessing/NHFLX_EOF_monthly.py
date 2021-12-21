@@ -294,13 +294,22 @@ lat = ld['lat']
 #%% Flip sign to match NAO+ (negative heat flux out of ocean/ -SLP over SPG)
 
 spgbox     = [-60,20,40,80]
+eapbox     = [-60,20,40,60] # Shift Box west for EAP
+
 N_modeplot = 5
 
 for N in tqdm(range(N_modeplot)):
+    if N == 1:
+        chkbox = eapbox # Shift coordinates west
+    else:
+        chkbox = spgbox
     for m in range(12):
         
-        sumflx = proc.sel_region(eofall[:,:,[m],N],lon,lat,spgbox,reg_avg=True)
-        sumslp = proc.sel_region(eofslp[:,:,[m],N],lon,lat,spgbox,reg_avg=True)
+        
+        
+        
+        sumflx = proc.sel_region(eofall[:,:,[m],N],lon,lat,chkbox,reg_avg=True)
+        sumslp = proc.sel_region(eofslp[:,:,[m],N],lon,lat,chkbox,reg_avg=True)
         
         if sumflx > 0:
             print("Flipping sign for NHFLX, mode %i month %i" % (N+1,m+1))
@@ -368,7 +377,9 @@ varflx_EOF   = ld['varflx_EOF']
 varflx_ori   = ld['varflx_ori']
 varflx_ratio = ld['varflx_ratio']
 vratio_alone = ld['varflx_ratio_alone']
+
 eof_corr     = eofall * 1/vratio_alone
+
 # # -----------------
 # #%% (**) Save as netcdf
 # # ------------------
@@ -533,12 +544,29 @@ for k in range(2):
 cb = fig.colorbar(pcm,ax=axs.flatten(),fraction=0.015)
 cb.set_label("$Q_{net}$ ,Interval = 5 $W/m^2$ per $\sigma_{PC}$")
 #plt.suptitle("SLP (Contours), Interval = 100 hPa",x=0.6, y=.955,fontsize=14)
-plt.suptitle("$Q_{net}$ Forcing Pattern (Colors) and SLP (Contours, Interval = 100 hPa)",fontsize=12)
+plt.suptitle("$Q_{net}$ Forcing Pattern (Colors) and SLP (Contours, Interval = 100 hPa), DJF Mean",fontsize=12)
 
-fig.text(0.07, 0.5, mcname, va='center', rotation='vertical',fontsize=12)
+#fig.text(0.07, 0.5, mcname, va='center', rotation='vertical',fontsize=12)
 
 
 plt.savefig("%sEOF1_EOF2_uncorrected_%s.png"%(outpath,mcname),dpi=150,bbox_inches='tight')
+
+#%% Quickly check what is going on with EOF SLP
+
+N = 0
+fig,axs = plt.subplots(1,3,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(12,4))
+
+for k in range(3):
+    
+    im = ids[k]
+    ax = axs[k]
+    ax  = viz.add_coast_grid(ax,bbox=bbox)
+    pcm = ax.contourf(lon180,lat,eofall[:,:,im,N].T,levels=clvl,cmap='PRGn')
+    cl  = ax.contour(lon180,lat,eofslp[:,:,im,N].T,levels=plvl,colors='k',linewidths=.7)
+    ax.clabel(cl,fontsize=10)
+    ax.set_title("Mode " + str(N+1)+"; Month"+str(im))
+
+
 
 #%% Plot correction ratio
 
