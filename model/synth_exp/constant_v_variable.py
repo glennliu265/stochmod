@@ -32,11 +32,11 @@ from scipy.ndimage.filters import uniform_filter1d
 #%% Settings
 
 # Set Paths
-projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
+projpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 datpath     = projpath + '01_Data/'
 input_path  = datpath + 'model_input/'
 output_path = datpath + 'model_output/'
-outpath = projpath + '02_Figures/20210922/'
+outpath     = projpath + '02_Figures/20211011/'
 proc.makedir(outpath)
 
 # Load in control data for 50N 30W
@@ -65,15 +65,16 @@ config['ftype']       = "DJFM-MON" # Forcing Type
 config['genrand']     = 0
 config['fstd']        = 1
 config['t_end']       = 120000    # Number of months in simulation
-config['runid']       = "syn001"  # White Noise ID
+config['runid']       = "syn007"  # White Noise ID
 config['fname']       = "flxeof_090pct_SLAB-PIC_eofcorr2.npy" #['NAO','EAP,'EOF3','FLXSTD']
 config['pointmode']   = 1
 config['query']       = [-30,50]
 config['applyfac']    = 2 # Apply Integration Factor and MLD to forcing
 config['lags']        = np.arange(0,37,1)
-config['output_path'] = projpath + '02_Figures/20210223/'
+config['output_path'] = outpath
 config['smooth_forcing'] = False
 config['method'] = 3
+config['favg'] = False
 
 config.pop('Fpt',None)
 config.pop('damppt',None)
@@ -379,6 +380,13 @@ dampdef = damppt.copy()
 mlddef = mldpt.copy()
 Fptdef = Fpt.copy()
 
+# Calculate constant forcing value (Using CESM-SLAB values)
+cp0=3996
+rho=1026
+dt = 3600*24*30
+frcstd_slab = np.std(frc[1]) * (rho*cp0*hblt) / dt 
+
+#[(np.std(frc[i])) for i in range(len(frc))]*rho*cp0*mldpt.
 
 #
 # %% Advance plot with confidence levels
@@ -434,7 +442,10 @@ Fptdef = Fpt.copy()
 #%% Run the Experiment
 #
 
+foriginal = np.copy(config['fname'])
+
 if len(Fptdef.shape)>2:
+    #original = config['fname']
     config['fname'] = 'FLXSTD' # Dummy Move for now to prevent forcing_flag
     
 expids   = [] # String Indicating the Variable Type
@@ -462,9 +473,26 @@ for vmld in [False,True]:
         for vforce in [False,True]:
                 
                 if vforce:
-                        config['Fpt'] = Fptdef.mean(0)
-                else:
-                    config['Fpt'] = np.ones(12)*Fptdef.mean()
+                    
+                    print(foriginal)
+                    config['fname'] = np.copy(foriginal).item()
+                    config.pop('Fpt',None)
+                    config['favg'] = False
+                    
+                        #config['Fpt'] = Fptdef.mean(0)
+                else: # Constant Forcing
+                    
+                    config['fname'] = 'FLXSTD'
+                    config['favg'] = True
+                    # Take stdev over EOFs, then take the mean
+                    
+                    Fptin = Fptdef.copy()
+                    Fptin[Fptin==0] = np.nan                    
+                    
+                    config['Fpt'] = frcstd_slab * np.ones(12)
+                    # This yields a value that is greater than Fptin
+                    #config['Fpt'] = np.ones(12)*np.nanmean(np.nansum(Fptin,0))
+                    #np.std(Fptdef,0).mean()
                 
                 # Set experiment name
                 expid = "vdamp%i_vforce%i_vmld%i" % (vdamp,vforce,vmld)
@@ -484,15 +512,15 @@ for vmld in [False,True]:
                 forces.append(Fpt)
                 explongs.append(explong)
                 print("Completed %s"%expid)
-                print(mldpt)
+                #print(mldpt)
                 
                 # Clean Config, End Forcing Loop
                 config.pop('Fpt',None)
-                print(Fpt)
+                #print(Fpt)
                 
         # Clean Config, End Damping Loop
         config.pop('damppt',None)
-        print(damppt)
+        #print(damppt)
     # Clean Config, End MLD Loop
     config.pop('mldpt',None)
     
@@ -526,7 +554,30 @@ cfslab = calc_conflag(cesmauto2,conf,tails,898)
 cffull = calc_conflag(fullauto,conf,tails,1798)
 #for l,lag in enumerate(lags)
     
-        
+#%% OPTIONAL: Save above results
+
+savenames = "%sconst_v_vary_%s_runid%s_%s.npz" % (output_path,config['mconfig'],config['runid'],config['fname'])
+print("Saving clean run to %s" % savenames)
+np.savez(savenames,**{
+    'expids':expids,
+    'acs':acs,
+    'ssts':ssts,
+    'damps':damps,
+    'mlds':mlds,
+    'forces':forces,
+    'explongs':explongs,
+    'confs':confs
+    },allow_pickle=True)
+    
+    
+    # 'sst': sst,
+    # 'dmp': dmp,
+    # 'frc': frc,
+    # 'entr' : ent,
+    # 'Td': Td,
+    # 'kmonth':kmonth,
+    # 'params':params
+    # }, allow_pickle=True)
         
 
 
@@ -585,11 +636,6 @@ plt.suptitle("Stochastic Model (No Entrainment), Constant MLD",fontsize=14)
 plt.tight_layout()
 plt.savefig("%sAutocorrelation_ConstvVary_MLDConst.png"%outpath,dpi=150)
 
-
-
-
-
-
 #%% Plot on the same plot
 
 plotacs = acs
@@ -604,9 +650,6 @@ ylab    = "Forcing ($W/m^{2}$)"
 #plotvar = Fpt - np.roll(Fpt,1)
 plotvar = damppt
 ylab =  "Atmopsheric Damping ($W/m^{2}$)"
-
-
-
 
 figs,ax = plt.subplots(1,1,figsize=(6,4))
 
@@ -1003,7 +1046,7 @@ clfull,clslab = CLs
 #
 
 pct     = 0.10
-nsmooth = 1000
+nsmooth = 500
 opt     = 1
 dt      = 3600*24*30
 tunit   = "Months"
@@ -1064,12 +1107,33 @@ ax.set_ylabel(r"Frequency x Power $(^{\circ}C)^{2}$",fontsize=13)
 ax.set_title("SST Spectral Estimates, Non-Entraining Stochastic Model")
 plt.tight_layout()
 plt.savefig("%sSpectra_ConstvVary_MLDConst_SamePlot.png"%outpath,dpi=150)
+#%%
+
+
+xlm = [1e-2,5e0]
+
+xper = np.array([200,100,50,25,10,5,1,0.5]) # number of years
+xtks = 1/xper
+xlm  = [xtks[0],xtks[-1]]
+
+
+
+speclabels = ["%s (%.4f$\degree \, C^{2}$)" % (ename[i],np.var(sstin[i])) for i in range(len(sstin))]
+fig,ax = plt.subplots(1,1,figsize=(12,4))
+
+ax = viz.plot_freqlin(specs,freqs,speclabels,ecol,
+                     ax=ax,plottitle="North Atlantic SST Spectra",xtick=xtks,xlm=xlm)
+
+#plt.suptitle("Regional AMV Index Spectra (unsmoothed, Forcing=%s)"%(frcnamelong[f]))
+savename = "%sNASST_Spectra_Obs-v-CESM_LinearLinear.png" % (outpath)
+plt.savefig(savename,dpi=200,bbox_inches='tight')
+
 
 
 
 
 #%% Save the results to visualize in another script (plot_spectra_Generals)
-outdatname = datpath + "/Generals_Report/lower_hierarchy_data_nsmooth%i.npz" % (nsmooth)
+outdatname = datpath + "/Generals_Report/lower_hierarchy_data_nsmooth%i_updated.npz" % (nsmooth)
 np.savez(outdatname,**{
     'freqs':freqs,
     'CCs':CCs,
@@ -1099,7 +1163,6 @@ for i in range(4):
     ax.semilogx(freqs[i]*plotdt,CCs[i][:,0]*freqs[i],color=ecolors[i],alpha=0.5,ls='dotted')
 
 ax.semilogx(freqcesmslab*plotdt,freqcesmslab*Pcesmslab,color='gray',label="CESM1 SLAB" + "$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(slabpt)))
-
 
 # Set x limits
 xtick = [float(10)**(x) for x in np.arange(-4,2)]
