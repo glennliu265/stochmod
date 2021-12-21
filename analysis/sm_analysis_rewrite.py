@@ -16,7 +16,7 @@ import sys
 import cmocean
 from tqdm import tqdm
 #%% Set Paths, Import Custom Modules
-stormtrack = 1
+stormtrack = 0
 if stormtrack == 0:
     projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
     datpath     = projpath + '01_Data/model_output/'
@@ -223,6 +223,17 @@ fnames = (
             "forcingflxeof_2eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3_method4_dmp0",
             "forcingflxeof_1eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3_method4_dmp0"
             )
+
+# Seasonal Analysis
+#stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr2_MAM_1000yr_run010_ampq3.npz
+fnames   = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method4_dmp0',
+            'forcingflxeof_090pct_SLAB-PIC_eofcorr2_DJF_1000yr_run011_ampq3_method4_dmp0',
+            'forcingflxeof_090pct_SLAB-PIC_eofcorr2_MAM_1000yr_run011_ampq3_method4_dmp0',
+            'forcingflxeof_090pct_SLAB-PIC_eofcorr2_JJA_1000yr_run011_ampq3_method4_dmp0',
+            'forcingflxeof_090pct_SLAB-PIC_eofcorr2_SON_1000yr_run011_ampq3_method4_dmp0')
+
+print("Now processing the following files: \n ")
+print(*fnames, sep='\n')
 #%% Post Process Outputs (Calculate AMV, Autocorrelation)
 for frcname in tqdm(fnames):
     expid = frcname
@@ -249,7 +260,6 @@ if viz_AMV:
     fid   = 0
     expid = fnames[fid]
     regid = 4
-    
 
     
     # Load post-propcssed output

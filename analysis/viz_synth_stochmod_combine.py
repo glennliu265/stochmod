@@ -241,7 +241,7 @@ cffull = calc_conflag(cesmautofull,conf,tails,1798)
 
 #%%
 
-fig,axs     = plt.subplots(1,2,figsize=(12,4),sharex=True,sharey=True)
+fig,axs     = plt.subplots(1,2,figsize=(12,4),sharex=True,sharey=True,constrained_layout=False)
 
 # UPDATED Colors and names for generals (5/25/2021)
 #ecol = ["blue",'cyan','gold','red']
@@ -251,6 +251,8 @@ ename = ["All Constant",
          r"Vary $\alpha$",
          r"Vary $\lambda_a$",
          "All Varying"]
+
+lw = 3
 
 # Plot Lower Hierarchy
 ax = axs[0]
@@ -277,7 +279,7 @@ if addvar:
     ax3.yaxis.label.set_color('gray')
 else:
     ax,ax2 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title)
-ax.plot(lags,cesmauto2[lags],label="CESM1 SLAB",color='gray',marker="o",markersize=4)
+ax.plot(lags,cesmauto2[lags],label="CESM1 SLAB",color='gray',marker="o",markersize=4,lw=lw)
 #ax.scatter(lags,cesmauto2[lags],10,label="",color='k')
 ax.fill_between(lags,cfslab[lags,0],cfslab[lags,1],color='gray',alpha=0.4)
 #ax.grid(minor=True)
@@ -288,7 +290,7 @@ for i,e in enumerate([0,1,2,3]):
     ax.set_ylabel("")
     
     cfs = confs[e,model,:,:]
-    ax.plot(lags,plotacs[e][model],label=ename[i],color=ecol[i],ls=els[i],marker="o",markersize=4)
+    ax.plot(lags,plotacs[e][model],label=ename[i],color=ecol[i],ls=els[i],marker="o",markersize=4,lw=lw)
     #ax.scatter(lags,plotacs[e][model],10,label="",color=ecol[i])
     ax.fill_between(lags,cfs[:,0],cfs[:,1],color=ecol[i],alpha=0.2)
     
@@ -310,11 +312,11 @@ ax,ax2= viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title)
 #ax.plot(lags,cesmauto2[lags],label="CESM1 SLAB",color='gray',marker="o",markersize=3)
 #ax.fill_between(lags,cfslab[lags,0],cfslab[lags,1],color='k',alpha=0.10)
 
-ax.plot(lags,cesmautofull,color='k',label='CESM1 Full',ls='dashdot',marker="o",markersize=3)
+ax.plot(lags,cesmautofull,color='k',label='CESM1 Full',ls='dashdot',marker="o",markersize=3,lw=lw)
 ax.fill_between(lags,cffull[lags,0],cffull[lags,1],color='k',alpha=0.10)
 
 for i in range(1,4):
-    ax.plot(lags,ac[i],label=labelsnew[i],color=expcolors[i],ls=els[i],marker="o",markersize=3)
+    ax.plot(lags,ac[i],label=labelsnew[i],color=expcolors[i],ls=els[i],marker="o",markersize=3,lw=lw)
     ax.fill_between(lags,cfstoch[i,:,0],cfstoch[i,:,1],color=expcolors[i],alpha=0.25)
 
 ax.legend()
