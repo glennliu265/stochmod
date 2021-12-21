@@ -9,6 +9,9 @@ Plots included...
 [1] Comparing EOF-based forcing (SLAB and FULL) vs. Old Forcing (FLXSTD)
 [2] Seasonal cycle of inputs (Damping, Forcing, MLD) from Generals
 
+[3] Stochastic Model Inputs (seasonal averages, FULL)
+
+
 Created on Tue Apr 27 01:20:49 2021
 Updated Oct 2021 ...
 
@@ -41,14 +44,14 @@ import cmocean
 projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath = projpath + '03_Scripts/stochmod/'
 datpath    = projpath + '01_Data/'
-outpath    = projpath + '02_Figures/20211018/'
+outpath    = projpath + '02_Figures/20211214/'
 input_path  = datpath + 'model_input/'
 proc.makedir(outpath)
 
 
 # Put slab version first, then the load_load func. searches in the same
 # directory replace "SLAB_PIC" with "FULL_PIC"
-frcname = "flxeof_090pct_SLAB-PIC_eofcorr2"
+frcname = "flxeof_090pct_FULL-PIC_eofcorr2"
 
 # Which point do you want to visualize conditions for?
 lonf = -30
@@ -84,7 +87,7 @@ bbox = [-80,0,10,65]
 #     kprevall    = np.load(input_path+"HMXL_kprev.npy") # Entraining Month
 
 # # Load Slab MLD
-# hblt  = np.load(datpath+"SLAB_PIC_hblt.npy")
+hblt  = np.load(datpath+"SLAB_PIC_hblt.npy")
     
 
 # # Load full MLD field
@@ -133,6 +136,21 @@ for i in range(len(inputs)):
         inputs_pt.append(invar[klon,klat,...])
 
 hpt,kprev,lbd_a,lbd_af,Fpt,Fpt_f = inputs_pt
+
+
+# -------------------
+#%% Fancy Kprev Plot
+# -------------------
+
+monstr_kprv = np.append(mons3,'Jan')
+fig,ax = plt.subplots(1,1,figsize=(6,4),constrained_layout=True)
+viz.viz_kprev(hpt,kprev,locstring="50$\degree$N, 30$\degree$W",
+              ax=ax,msize=50,mstyle="x",lw=2.5)
+ax.grid(True,ls='dotted')
+ax.set_xticklabels(monstr_kprv)
+plt.savefig(outpath+"MLD_Detrainment_month_SPGPoint.png",dpi=200)
+
+
 
 #%% manuallly load forcing for debugging
 load_forcing_manual=False
@@ -283,5 +301,313 @@ plt.suptitle("Sum(EOF^2)",y=1.05)
 
 
 diff = np.nanmean(alphasum[1],2) - np.nanmean(alphasum[0],2)
+
+# --------------------- --------------------- --------------------- ---------------------
+#%% Compute seasonal averages
+
+# calculate seasonal averages for the forcing (CESM-FULL) dataset 
+alphaavg,snames = proc.calc_savg(alphas2[-1],debug=True,return_str=True)
+dampingavg,snames = proc.calc_savg(dampingfull,debug=True,return_str=True)
+havg,snames = proc.calc_savg(h,debug=True,return_str=True)
+
+# Calculate seasonal averages for CESm-SLAB
+alphaavgslab,snames = proc.calc_savg(alphas2[0],debug=True,return_str=True)
+dampingavgslab,snames = proc.calc_savg(dampingslab,debug=True,return_str=True)
+havgslab,snames = proc.calc_savg(hblt,debug=True,return_str=True)
+
+#%% Plot the Forcing Patterns
+
+clvl=np.arange(0,105,5)
+fig,axs =  plt.subplots(1,4,figsize=(12,4),subplot_kw={'projection':ccrs.PlateCarree()})
+
+for i in range(4):
+    ax = axs[i]
+    pcm=ax.contourf(lon,lat,alphaavg[i].T,levels=clvl,cmap='hot',extend='both')
+    ax = viz.add_coast_grid(ax=ax,bbox=bbox,blabels=[0,0,0,0],fill_color='gray')
+    #fig.colorbar(pcm,ax=ax)
+    ax.set_title(snames[i])
+
+cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='vertical',fraction=0.009)
+cb.set_label("Total Forcing Amplitude ($W/m^2$)")
+
+#%% Plot the Damping Patterns
+
+
+clvl=np.arange(-60,65,5)
+fig,axs =  plt.subplots(1,4,figsize=(12,4),subplot_kw={'projection':ccrs.PlateCarree()})
+
+for i in range(4):
+    ax = axs[i]
+    pcm=ax.contourf(lon,lat,dampingavg[i].T,levels=clvl,cmap=cmocean.cm.balance,extend='both')
+    ax = viz.add_coast_grid(ax=ax,bbox=bbox,blabels=[0,0,0,0],fill_color='gray')
+    #fig.colorbar(pcm,ax=ax)
+    ax.set_title(snames[i])
+
+cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='vertical',fraction=0.009)
+cb.set_label("Atmospheric Damping ($W/m^2$)")
+
+
+#%% Plot the Mixed Layer Depth
+
+
+vlms = [0,500]
+#clvl=np.arange(-,65,5)
+
+fig,axs =  plt.subplots(1,4,figsize=(12,4),subplot_kw={'projection':ccrs.PlateCarree()})
+
+for i in range(4):
+    ax = axs[i]
+    pcm=ax.pcolormesh(lon,lat,havg[i].T,vmin=vlms[0],vmax=vlms[1],cmap='cmo.deep')
+    ax = viz.add_coast_grid(ax=ax,bbox=bbox,blabels=[0,0,0,0],fill_color='gray')
+    #fig.colorbar(pcm,ax=ax)
+    ax.set_title(snames[i])
+
+cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='vertical',fraction=0.009)
+cb.set_label("Mixed-Layer Depth ($m$)")
+
+
+
+#%% Now Plot all 3 Together
+
+# Set Inputs
+invars = (alphaavg,dampingavg,havg)
+cblabs = ("Total Forcing Amplitude \n Contour = 5 $W/m^2$",
+          "Atmospheric Damping \n Contour = 5 $W/m^2 / \degree C$",
+          "Mixed-Layer Depth \n Contour = 50 $m$"
+          )
+vnames = (r"Total Forcing Amplitude ($\alpha$)",
+          r"Atmospheric Damping ($\lambda_a$)",
+          r"Mixed-Layer Depth ($h$)")
+cblabs2 = (u"Contour = 5 $Wm^{-2}$",u"Contour = 5 $Wm^{-2} \degree C^{-1}$",u"Contour = 50 $m$")
+
+cints  = (np.arange(0,105,5),np.arange(0,65,5),np.arange(0,1050,50)
+          )
+
+cmaps  = ('hot','cmo.thermal','cmo.dense') 
+
+snamesl = ('Winter (DJF)','Spring (MAM)','Summer (JJA)','Fall (SON)')
+
+fig,axs = plt.subplots(3,4,figsize=(12,8),subplot_kw={'projection':ccrs.PlateCarree()})
+for v in range(3):
+    
+    invar = invars[v]
+    cblab = cblabs[v]
+    cint  = cints[v]
+    cmap  = cmaps[v]
+    
+    for s in range(4):
+        ax = axs[v,s]
+        
+        # Set Lat/Lon Labels
+        blabel = [0,0,0,0]
+        if v == 2:
+            blabel[-1] = 1 # Add Bottom Label
+        if s == 0:
+            blabel[0]  = 1 # Add Left Label
+        
+        # Set Title (First Row Only)
+        if v == 0:
+            ax.set_title(snamesl[s],fontsize=14)
+        
+        pcm=ax.contourf(lon,lat,invar[s].T,levels=cint,extend='both',cmap=cmap)
+        ax = viz.add_coast_grid(ax=ax,bbox=bbox,blabels=blabel,fill_color='gray')
+        
+    cb = fig.colorbar(pcm,ax=axs[v,:].flatten(),orientation='vertical',fraction=0.009)
+    cb.set_label(cblab,fontsize=12)
+        
+    
+#%% Try Subfigures Method
+import matplotlib as mpl
+
+#mpl.rcParams['font.sans-serif'] = "Avenir"#"stix"
+#mpl.rcParams['font.family'] = "sans-serif"#"STIXGeneral"
+#mpl.rcParams["text.usetex"] = True
+
+
+mpl.rcParams['font.sans-serif'] = "stix"
+mpl.rcParams['font.family'] = "STIXGeneral"
+
+
+mpl.rcParams.update(mpl.rcParamsDefault)
+
+
+cblabs2 = (u"Contours: 5 $Wm^{-2}$",
+           u"Contours: 5 $Wm^{-2} \degree C^{-1}$",
+           u"Contours: 50 $m$")
+
+
+fig = plt.figure(constrained_layout=True,figsize=(12,8))
+fig.suptitle("Stochastic Model Inputs (CESM1-FULL, Seasonal Average)",fontsize=20)
+
+# Create 3x1 subfigs
+subfigs = fig.subfigures(nrows=3,ncols=1)
+for row,subfig in enumerate(subfigs):
+    subfig.suptitle(vnames[row])
+    
+    v = row
+    
+    invar = invars[v]
+    cblab = cblabs[v]
+    cint  = cints[v]
+    cmap  = cmaps[v]
+    
+    # Create 1x4 subplots per subfig
+    axs = subfig.subplots(nrows=1, ncols=4,subplot_kw={'projection':ccrs.PlateCarree()})
+    
+    for s, ax in enumerate(axs):
+        
+        # Set Lat/Lon Labels
+        blabel = [0,0,0,0]
+        if v == 2:
+            blabel[-1] = 1 # Add Bottom Label
+        if s == 0:
+            blabel[0]  = 1 # Add Left Label
+        
+        # Set Title (First Row Only)
+        if v == 0:
+            ax.set_title(snamesl[s],fontsize=14)
+        
+        pcm=ax.contourf(lon,lat,invar[s].T,levels=cint,extend='both',cmap=cmap)
+        ax = viz.add_coast_grid(ax=ax,bbox=bbox,blabels=blabel,fill_color='gray')
+        
+    cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='vertical',fraction=0.009,pad=.010)
+    cb.set_label(cblabs2[v],fontsize=12)
+    
+#plt.show()
+plt.savefig(outpath+"Seasonal_Inputs_CESM-FULL.png",dpi=200,bbox_inches='tight')
+
+#%% Plot CESM1-SLAB Forcing and Damping
+
+
+invars = (alphaavgslab,dampingavgslab,havgslab)
+cblabs = ("Total Forcing Amplitude \n Contour = 5 $W/m^2$",
+          "Atmospheric Damping \n Contour = 5 $W/m^2 / \degree C$",
+          "Mixed-Layer Depth \n Contour = 50 $m$"
+          )
+vnames = (r"Total Forcing Amplitude ($\alpha$)",
+          r"Atmospheric Damping ($\lambda_a$)",
+          r"Mixed-Layer Depth ($h$)")
+cblabs2 = (u"Contour = 5 $Wm^{-2}$",u"Contour = 5 $Wm^{-2} \degree C^{-1}$",u"Contour = 50 $m$")
+cints  = (np.arange(0,105,5),np.arange(0,65,5),np.arange(0,1050,50)
+          )
+cmaps  = ('hot','cmo.thermal','cmo.dense') 
+snamesl = ('Winter (DJF)','Spring (MAM)','Summer (JJA)','Fall (SON)')
+
+
+fig = plt.figure(constrained_layout=True,figsize=(12,8))
+fig.suptitle("Stochastic Model Inputs (CESM1-SLAB, Seasonal Average)",fontsize=20)
+
+# Create 3x1 subfigs
+subfigs = fig.subfigures(nrows=3,ncols=1)
+for row,subfig in enumerate(subfigs):
+    subfig.suptitle(vnames[row])
+    
+    v = row
+    
+    invar = invars[v]
+    cblab = cblabs[v]
+    cint  = cints[v]
+    cmap  = cmaps[v]
+    
+    # Create 1x4 subplots per subfig
+    axs = subfig.subplots(nrows=1, ncols=4,subplot_kw={'projection':ccrs.PlateCarree()})
+    
+    for s, ax in enumerate(axs):
+        
+        # Set Lat/Lon Labels
+        blabel = [0,0,0,0]
+        if v == 2:
+            blabel[-1] = 1 # Add Bottom Label
+        if s == 0:
+            blabel[0]  = 1 # Add Left Label
+        
+        # Set Title (First Row Only)
+        if v == 0:
+            ax.set_title(snamesl[s],fontsize=14)
+        
+        pcm=ax.contourf(lon,lat,invar[s].T,levels=cint,extend='both',cmap=cmap)
+        ax = viz.add_coast_grid(ax=ax,bbox=bbox,blabels=blabel,fill_color='gray')
+        
+    cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='vertical',fraction=0.009,pad=.010)
+    cb.set_label(cblabs2[v],fontsize=12)
+    
+#plt.show()
+plt.savefig(outpath+"Seasonal_Inputs_CESM-SLAB.png",dpi=200,bbox_inches='tight')
+
+
+# --------------------------------------
+#%% Compare CESM1 FULL MLD with Levitus
+# --------------------------------------
+# Load WOA
+levpath = "/Users/gliu/Downloads/06_School/01_Fall2019/12860/12860/TermProject/tp_p1/Data/mld/"
+levname = "mldpd.mnltm.nc"
+ds      = xr.open_dataset(levpath+levname)
+h_woa   = ds.mldpd.values
+lat_woa = ds.lat.values
+lon_woa = ds.lon.values
+
+# Transpose [mon x lat x lon] --> [lon x lat x mon]
+print(h_woa.shape)
+h_woa = h_woa.transpose(2,1,0)
+print(h_woa.shape)
+
+# Convert lon to -180
+lon1_woa,h_woa = proc.lon360to180(lon_woa,h_woa)
+
+# Flip latitude
+h_woa = np.flip(h_woa,1)
+lat_woa = np.flip(lat_woa)
+
+# Do interpolation, Compute Differences (Assume lat/lon are midpoints
+x_tol = (lon[1] - lon[0])
+y_tol = (lat[1] - lat[0])
+
+nlon,nlat,_ = h.shape
+mld_diff = np.zeros(h.shape)*np.nan
+woa_avg  = mld_diff.copy()
+for o in range(nlon):
+    lonc = lon[o]
+    
+    for a in range(nlat):
+        latc = lat[a]
+        
+        klat = np.where((lat_woa >= latc - y_tol) & (lat_woa <=  latc + y_tol))[0]
+        klon = np.where((lon1_woa >= lonc - x_tol) & (lon1_woa <=  lonc + x_tol))[0]
+        
+        if np.any(np.array(klat[0].shape)==0) or np.any(np.array(klon[0].shape)==0):
+            print("Nothing found for lon %f lat %f" % (lonc,latc))
+            continue
+        h_values = h_woa[klon[:,None,None],klat[None,:,None],:]
+        if len(h_values.shape)<3:
+            print("Warning size is under 3!")
+            break
+        if np.any(np.array(h_values.shape)==0): # Points where nothing is found
+            print("Nothing found for lon %f lat %f" % (lonc,latc))
+            continue
+        woa_avg[o,a,:]  = np.nanmean(h_values,(0,1))
+
+# Compute Differences, Then seasonal Average
+mld_diff = h-woa_avg
+hdiff_savg,monstrs=proc.calc_savg(mld_diff,return_str=True,debug=True)
+
+#%% Make the Plot
+fig,axs = plt.subplots(2,2,figsize=(7,7),
+                      subplot_kw={'projection':ccrs.PlateCarree()})
+
+for s,ax in enumerate(axs.flatten()):
+    print(s)
+    pcm = ax.pcolormesh(lon,lat,hdiff_savg[s].T,vmin=-250,vmax=250,cmap='cmo.balance')
+    
+    ax = viz.add_coast_grid(ax=ax,bbox=bbox,fill_color='gray')
+    ax.set_title(monstrs[s])
+    #fig.colorbar(pcm,ax=ax)
+fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction=0.035,pad=0.05)
+plt.suptitle("Seasonal Mean Mixed Layer Depth Differences in meters \n (CESM1 - WOA 1994)",fontsize=14,y=.94)
+
+plt.savefig("%sMLD_Differences-CESM1_WOA1994_Savg.png" %(outpath),dpi=200,bbox_inches='tight')
+
+
+
+
 
 
