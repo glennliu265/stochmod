@@ -13,7 +13,6 @@ Created on Mon May 24 22:55:19 2021
 @author: gliu
 """
 
-
 import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
@@ -38,7 +37,7 @@ import yo_box as ybx
 
 # Path to data 
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
-outpath = projpath + '02_Figures/20211018/'
+outpath = projpath + '02_Figures/20211026/'
 proc.makedir(outpath)
 datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/"
 
@@ -121,7 +120,7 @@ for sst in [sstfull,sstslab]:
 sstfulla,sstslaba = sstas
 nlon,nlat,ntimef  = sstfulla.shape
 _,_,ntimes        = sstslaba.shape
-print("Lpreprocessed PiC Data in %.2fs"%(time.time()-st))
+print("preprocessed PiC Data in %.2fs"%(time.time()-st))
 
 # # # Apply Land/Ice Mask
 # # mask = np.load(datpath+"landicemask_enssum.npy")
@@ -166,6 +165,7 @@ datpath1     = projpath + '01_Data/model_output/'
 rawpath     = projpath + '01_Data/model_input/'
 outpathdat  = datpath1 + '/proc/'
 
+
 #%% Set preloaded inputs, # of lags
 preload = [lon180,lat,sstas]
 lags    = np.arange(0,37,1)
@@ -173,6 +173,30 @@ lags    = np.arange(0,37,1)
 # 
 scm.postprocess_stochoutput(expid,datpath1,rawpath,outpathdat,lags,preload=preload,mask_pacific=True)
 
+
+
+#%% Do the same thing for CESM1-LE
+
+
+# Load in the CESM1-LE Data
+sstle,lonh,lath = scm.load_cesm_le(preprocess=True) # [lat x llon x time x ensemble]
+
+# Set up preload for sm style postprocessing
+sstle_all = []
+for e in range(sstle.shape[-1]):
+    sstin = sstle[...,e].transpose(1,0,2) # Flip lon and lat
+    sstle_all.append(sstin)
+
+# Postprocess it
+preload = [lonh,lath,sstle_all]
+lags    = np.arange(0,37,1)
+ensorem     = 0
+expid       = "CESM1-LE_ensorem%i" % (ensorem)
+projpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
+datpath1     = projpath + '01_Data/model_output/'
+rawpath     = projpath + '01_Data/model_input/'
+outpathdat  = datpath1 + '/proc/'
+scm.postprocess_stochoutput(expid,datpath1,rawpath,outpathdat,lags,preload=preload,mask_pacific=True)
 
 #%% Additionally Calculate Seasonal AMV Patterns
 
@@ -222,7 +246,9 @@ np.savez(savename,**{
     'samvpats' : samvpats,
     'samvids'  : samvids,
     'lon':lon180,
-    'lat':lat
+    'lat':lat,
+    'snames':snames,
+    'mnames':["CESM-FULL","CESM-SLAB"]
     },allow_pickle=True)
 
 #%% Load data preprocessed above
@@ -239,6 +265,19 @@ cesmidx    = ldc['amvidx_region'].item()[4] # Just take North Atlantic
 # Load global lat/lon
 clon,clat  = scm.load_latlon(rawpath)
 
+#%% Load CESM-Historical data as well
+cesmacs_le = []
+expid      = "CESM1-LE_ensorem%i" % (ensorem)
+rsst_fn    = "%sAMV_Region_%s.npz" % (outpathdat,expid)
+ldc_le     = np.load(rsst_fn,allow_pickle=True)
+
+# Load the CESM Patterns
+cesmpat_le    = ldc_le['amvpat_region'].item()[4] # Just take North Atlantic
+cesmidx_le    = ldc_le['amvidx_region'].item()[4] # Just take North Atlantic
+
+# Load global lat/lon
+clonh,clath  = scm.load_latlon(rawpath)
+
 # ------------------------------------------
 # %% Load and postprocess HadISST and ERSST
 # ------------------------------------------
@@ -249,7 +288,6 @@ manual_calc = False
 
 if load_limopt:
     nmon = 3
-
     
     # Load in LIM-opt dataset
     ssts,lons,lats,times = scm.load_limopt_sst()
