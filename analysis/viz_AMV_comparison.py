@@ -26,7 +26,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20211021/"
+    figpath     = projpath + "02_Figures/2021221/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -43,6 +43,8 @@ elif stormtrack == 1:
 from amv import proc,viz
 import scm
 import tbx
+
+proc.makedir(figpath)
 #%% User Edits
 
 # Analysis Options
@@ -52,6 +54,8 @@ lags = np.arange(0,37,1)
 mconfig   = "SLAB_PIC"
 nyrs      = 1000        # Number of years to integrate over
 runid     = "011"
+
+darkmode   = False
 
 # Analysis (7/26/2021, comparing 80% variance threshold and 5 or 3 EOFs)
 #fnames      = ["flxeof_080pct_SLAB-PIC","flxeof_5eofs_SLAB-PIC","flxeof_3eofs_SLAB-PIC"]
@@ -175,41 +179,43 @@ exoutnameraw = "new_v_old_q-correction"
 
 # --> Updated Run 011 ***************
 
-# Just compare 90% Variance Run with CESM
-fnames = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3',)#'forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run009_ampq3',)
-frcnamelong = ["EOF Forcing (90% Variance)",]
-exname ="run_comparison"
-
-
-fnames    = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3',
-            'forcingflxeof_090pct_SLAB-PIC_eofcorr2_DJF_1000yr_run011_ampq3',
-            'forcingflxeof_090pct_SLAB-PIC_eofcorr2_MAM_1000yr_run011_ampq3',
-            'forcingflxeof_090pct_SLAB-PIC_eofcorr2_JJA_1000yr_run011_ampq3',
-            'forcingflxeof_090pct_SLAB-PIC_eofcorr2_SON_1000yr_run011_ampq3')
-frcnamelong = ("Annual","Winter","Spring","Summer","Fall")
-exname = "seasonal"
-
-
-# # Number of EOFs (eof1)
-fnames =  ("forcingflxeof_50eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3",
-            "forcingflxeof_25eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3",
-            "forcingflxeof_10eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3",
-            "forcingflxeof_5eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3",
-            )
-
-frcnamelong = ["%02i EOFs" % i for i in [50,25,10,5,]]
-exname = "numEOFs"
+# Just compare 90% Variance Run with CESM (w/NaN)
+# fnames = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3',)#'forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run009_ampq3',)
+# frcnamelong = ["EOF Forcing (90% Variance)",]
+# exname ="run_comparison"
 
 
 
-#NAO and EAP
-fnames = (
-    "forcingflxeof_EOF1_SLAB-PIC_eofcorr0_1000yr_run011_ampq3",
-    "forcingflxeof_EOF2_SLAB-PIC_eofcorr0_1000yr_run011_ampq3",
-    "forcingflxeof_2eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3",
-    )
-frcnamelong = ("NAO (EOF1)","EAP (EOF2)","NAO+EAP")
-exname = "NAO_EAP"
+# Seasonal w/o NaN
+# fnames    = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method4_dmp0',
+#             'forcingflxeof_090pct_SLAB-PIC_eofcorr2_DJF_1000yr_run011_ampq3_method4_dmp0',
+#             'forcingflxeof_090pct_SLAB-PIC_eofcorr2_MAM_1000yr_run011_ampq3_method4_dmp0',
+#             'forcingflxeof_090pct_SLAB-PIC_eofcorr2_JJA_1000yr_run011_ampq3_method4_dmp0',
+#             'forcingflxeof_090pct_SLAB-PIC_eofcorr2_SON_1000yr_run011_ampq3_method4_dmp0')
+# frcnamelong = ("Annual","Winter","Spring","Summer","Fall")
+# exname = "seasonal"
+
+
+# # # Number of EOFs (eof1)
+# fnames =  ("forcingflxeof_50eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3",
+#             "forcingflxeof_25eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3",
+#             "forcingflxeof_10eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3",
+#             "forcingflxeof_5eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3",
+#             )
+
+# frcnamelong = ["%02i EOFs" % i for i in [50,25,10,5,]]
+# exname = "numEOFs"
+
+
+
+# #NAO and EAP
+# fnames = (
+#     "forcingflxeof_EOF1_SLAB-PIC_eofcorr0_1000yr_run011_ampq3",
+#     "forcingflxeof_EOF2_SLAB-PIC_eofcorr0_1000yr_run011_ampq3",
+#     "forcingflxeof_2eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3",
+#     )
+# frcnamelong = ("NAO (EOF1)","EAP (EOF2)","NAO+EAP")
+# exname = "NAO_EAP"
 
 # Just compare 90% Variance Run with CESM
 fnames = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method4_dmp0',)#'forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run009_ampq3',)
@@ -446,9 +452,11 @@ for f in range(len(frcnamelong)):
 amvpats  = []
 amvids   = []
 for f in range(len(fnames)):
+    
     # Load the dictionary [h-const, h-vary, entrain]
     expid = fnames[f]
     rsst_fn = "%sproc/AMV_Region_%s.npz" % (datpath,expid)
+    print("Loading %s" % rsst_fn)
     ld = np.load(rsst_fn,allow_pickle=True)#.item()
     
     amvidx = ld['amvidx_region'].item()
@@ -504,10 +512,22 @@ cstep = 0.025
 lstep = 0.05
 cint,cl_int=viz.return_clevels(cmax,cstep,lstep)
 clb = ["%.2f"%i for i in cint[::4]]
+
+
 for f in tqdm(range(len(fnames))):
     for rid in range(5):
         if rid != sel_rid:
             continue
+        
+        
+        if darkmode:
+            plt.style.use('dark_background')
+            savename = "%sSST_AMVPattern_Comparison_region%s_%s_dark.png" % (figpath,regions[rid],fnames[f])
+            dfcol = 'k'
+        else:
+            plt.style.use('default')
+            savename = "%sSST_AMVPattern_Comparison_region%s_%s.png" % (figpath,regions[rid],fnames[f])
+            dfcol = 'k'
         
         proj = ccrs.PlateCarree()
         fig,axs = plt.subplots(2,3,subplot_kw={'projection':proj},figsize=(12,6))
@@ -529,17 +549,18 @@ for f in tqdm(range(len(fnames))):
                 blabel = [0,0,0,0]
             
             # Make the Plot
-            ax = viz.add_coast_grid(ax,bboxplot,blabels=blabel)
+            ax = viz.add_coast_grid(ax,bboxplot,blabels=blabel,line_color=dfcol,
+                                    fill_color='gray')
             pcm = ax.contourf(lon,lat,amvpats[f][rid][mid].T,levels=cint,cmap=cmocean.cm.balance)
             ax.pcolormesh(lon,lat,amvpats[f][rid][mid].T,vmin=cint[0],vmax=cint[-1],cmap=cmocean.cm.balance,zorder=-1)
             cl = ax.contour(lon,lat,amvpats[f][rid][mid].T,levels=cl_int,colors="k",linewidths=0.5)
             ax.clabel(cl,levels=cl_int,fontsize=8)
-            ax.set_title("%s [var(AMV) = %f]"%(modelnames[mid],np.var(amvids[f][rid][mid])))
+            ax.set_title("%s ($\sigma^2_{AMV}$ = %f)"%(modelnames[mid],np.var(amvids[f][rid][mid])))
             if plotbbox:
                 ax,ll = viz.plot_box(bbox_NNA,ax=ax,leglab="AMV",
-                                     color="k",linestyle="dashed",linewidth=2,return_line=True)
+                                     color=dfcol,linestyle="dashed",linewidth=2,return_line=True)
                 
-            viz.plot_mask(lon,lat,dmsks[mid],ax=ax)
+            viz.plot_mask(lon,lat,dmsks[mid],ax=ax,markersize=0.1)
             
         # Plot CESM1
         axs[1,1].axis('off')
@@ -553,15 +574,16 @@ for f in tqdm(range(len(fnames))):
                 blabel = [1,0,0,1]
                 
             # Make the Plot
-            ax = viz.add_coast_grid(ax,bboxplot,blabels=blabel)
+            ax = viz.add_coast_grid(ax,bboxplot,blabels=blabel,line_color=dfcol,
+                                    fill_color='gray')
             pcm = ax.contourf(lon180g,latg,cesmpat[rid][cid].T,levels=cint,cmap=cmocean.cm.balance)
             ax.pcolormesh(lon180g,latg,cesmpat[rid][cid].T,vmin=cint[0],vmax=cint[-1],cmap=cmocean.cm.balance,zorder=-1)
             cl = ax.contour(lon180g,latg,cesmpat[rid][cid].T,levels=cl_int,colors="k",linewidths=0.5)
             ax.clabel(cl,levels=cl_int,fontsize=8)
-            ax.set_title("%s [var(AMV) = %f]"%(cesmname[cid],np.var(cesmidx[rid][cid])))
+            ax.set_title("%s ($\sigma^2_{AMV}$ = %f]"%(cesmname[cid],np.var(cesmidx[rid][cid])))
             if plotbbox:
                 ax,ll = viz.plot_box(bbox_NNA,ax=ax,leglab="AMV",
-                                     color="k",linestyle="dashed",linewidth=2,return_line=True)
+                                     color=dfcol,linestyle="dashed",linewidth=2,return_line=True)
         
         cb = fig.colorbar(pcm,ax=axs[1,1],orientation='horizontal')
         cb.set_ticks(cint[::4])
@@ -569,10 +591,153 @@ for f in tqdm(range(len(fnames))):
         #cb.ax.set_xticklabels(cint[::2],rotation=90)
         #tick_start = np.argmin(abs(cint-cint[0]))
         #cb.ax.set_xticklabels(cint[tick_start::2],rotation=90)
+        
         plt.suptitle("%s AMV Pattern and Index Variance [Forcing = %s]" % (regionlong[rid],frcnamelong[f]),fontsize=14)
-        savename = "%sSST_AMVPattern_Comparison_region%s_%s.png" % (figpath,regions[rid],fnames[f])
+        
         plt.savefig(savename,dpi=150,bbox_inches='tight')
+#%% AGU Comparison Plot (90% Variance)
 
+rid = 4
+    
+    
+if darkmode:
+    plt.style.use('dark_background')
+    savename = "%sSST_AMVPattern_Comparison_AGU_%s_dark.png" % (figpath,fnames[f])
+    dfcol = 'k'
+else:
+    plt.style.use('default')
+    savename = "%sSST_AMVPattern_Comparison_AGU_%s.png" % (figpath,fnames[f])
+    dfcol = 'k'
+
+proj = ccrs.PlateCarree()
+fig,axs = plt.subplots(2,3,subplot_kw={'projection':proj},figsize=(12,6))
+# 
+# figsize=(12,6)
+# ncol = 3
+# fig,axs = viz.init_2rowodd(ncol,proj,figsize=figsize,oddtop=False,debug=True)
+
+# Plot Stochastic Model Output
+for mid in range(3):
+    ax = axs.flatten()[mid]
+    
+    # Set Labels, Axis, Coastline
+    if mid == 0:
+        blabel = [1,0,0,0]
+    elif mid == 1:
+        blabel = [0,0,0,1]
+    else:
+        blabel = [0,0,0,0]
+    
+    # Make the Plot
+    ax = viz.add_coast_grid(ax,bboxplot,blabels=blabel,line_color=dfcol,
+                            fill_color='gray')
+    pcm = ax.contourf(lon,lat,amvpats[f][rid][mid].T,levels=cint,cmap=cmocean.cm.balance)
+    ax.pcolormesh(lon,lat,amvpats[f][rid][mid].T,vmin=cint[0],vmax=cint[-1],cmap=cmocean.cm.balance,zorder=-1)
+    cl = ax.contour(lon,lat,amvpats[f][rid][mid].T,levels=cl_int,colors="k",linewidths=0.5)
+    ax.clabel(cl,levels=cl_int,fontsize=8)
+    ax.set_title("%s ($\sigma^2_{AMV}$ = %.4f$\degree C^2$)"%(modelnames[mid],np.var(amvids[f][rid][mid])))
+    if plotbbox:
+        ax,ll = viz.plot_box(bbox_NNA,ax=ax,leglab="AMV",
+                             color=dfcol,linestyle="dashed",linewidth=2,return_line=True)
+        
+    #viz.plot_mask(lon,lat,dmsks[mid],ax=ax,markersize=0.1)
+    
+# Plot CESM1
+axs[1,1].axis('off')
+
+for cid in range(2):
+    if cid == 0:
+        ax = axs[1,2]
+        blabel = [0,0,0,1]
+    else:
+        ax = axs[1,0]
+        blabel = [1,0,0,1]
+        
+    # Make the Plot
+    ax = viz.add_coast_grid(ax,bboxplot,blabels=blabel,line_color=dfcol,
+                            fill_color='gray')
+    pcm = ax.contourf(lon180g,latg,cesmpat[rid][cid].T,levels=cint,cmap=cmocean.cm.balance)
+    ax.pcolormesh(lon180g,latg,cesmpat[rid][cid].T,vmin=cint[0],vmax=cint[-1],cmap=cmocean.cm.balance,zorder=-1)
+    cl = ax.contour(lon180g,latg,cesmpat[rid][cid].T,levels=cl_int,colors="k",linewidths=0.5)
+    ax.clabel(cl,levels=cl_int,fontsize=8)
+    ax.set_title("%s ($\sigma^2_{AMV}$ = %.4f$\degree C^2$)"%(cesmname[cid],np.var(cesmidx[rid][cid])))
+    if plotbbox:
+        ax,ll = viz.plot_box(bbox_NNA,ax=ax,leglab="AMV",
+                             color=dfcol,linestyle="dashed",linewidth=2,return_line=True)
+
+cb = fig.colorbar(pcm,ax=axs[1,1],orientation='horizontal')
+cb.set_ticks(cint[::4])
+cb.ax.set_xticklabels(clb,rotation=45)
+#cb.ax.set_xticklabels(cint[::2],rotation=90)
+#tick_start = np.argmin(abs(cint-cint[0]))
+#cb.ax.set_xticklabels(cint[tick_start::2],rotation=90)
+
+plt.suptitle("AMV Pattern for Stochastic Model (Top Row) and CESM1 (Bottom)",fontsize=14)
+
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+#%% AGU Logo (Plot Entraining vs. CESM-SLAB vs CESM-FULL vs. HadISST)
+
+ra_id = 1
+# Load in LIM-opt datasets (from viz_AMV_CESM.py)
+reanalysis_names  = ["COBE","HadISST","ERSST"]
+rassts,ra_ids,ralons,ralats,ratimes = scm.load_limopt_amv()
+
+
+
+if darkmode:
+    plt.style.use('dark_background')
+    savename = "%sAGU-Logo_region%s_%s_dark.png" % (figpath,regions[rid],fnames[f])
+    dfcol = 'k'
+else:
+    plt.style.use('dark_background')
+    savename = "%sAGU-Logo_region%s_%s_light.png" % (figpath,regions[rid],fnames[f])
+    dfcol = 'k'
+
+
+# Plot for first forcing (f=0), region NAT (r=4)
+lons   = [ralons[ra_id],lon,lon180g,lon180g]
+lats   = [ralats[ra_id],lat,latg,latg]
+pats   = [rassts[ra_id].T,amvpats[0][4][mid].T,cesmpat[4][0].T,cesmpat[4][1].T]
+pnames = (reanalysis_names[ra_id] + " (1900 to 2014)",
+          "Stochastic Model (Entraining)",
+          "CESM1 (Preindustrial Control)",
+          "CESM1 (SLAB Ocean)")
+
+fig,axs = plt.subplots(2,2,subplot_kw={'projection':proj},figsize=(8,8))
+
+for i in range(4):
+    
+    plon = lons[i]
+    plat = lats[i]
+    ppat = pats[i]
+    pname = pnames[i]
+    
+    
+    blabel=viz.init_blabels()
+    if i%2 == 0:
+        blabel['left'] = 1
+    if i > 1:
+        blabel['lower']=1
+        
+    ax = axs.flatten()[i]
+    ax = viz.add_coast_grid(ax,bboxplot,blabels=blabel,line_color=dfcol,
+                            fill_color='gray')
+    
+    
+    
+    pcm = ax.contourf(plon,plat,ppat,levels=cint,cmap=cmocean.cm.balance)
+    ax.pcolormesh(plon,plat,ppat,vmin=cint[0],vmax=cint[-1],cmap=cmocean.cm.balance,zorder=-1)
+    cl = ax.contour(plon,plat,ppat,levels=cl_int,colors="k",linewidths=0.5)
+    ax.clabel(cl,levels=cl_int,fontsize=8)
+    ax.set_title("%s" % (pname)) #$\sigma^2_{AMV}$ = %f]"%(pname,pvar))
+
+cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction=0.036,pad=0.075)
+cb.set_ticks(cint[::4])
+cb.ax.set_xticklabels(clb,rotation=45)
+plt.suptitle("AMV Pattern Comparison ($\degree C$ per $\sigma_{AMV}$)",y=.92,fontsize=14)
+
+plt.savefig(savename,dpi=150,bbox_inches='tight')
 #%% Plot AMV Patterns (Comparing N_EOFs)
 
 rid = 4 # Let's just do NAT
@@ -790,6 +955,57 @@ if exname == "seasonal":
     fig.text(0.07, 0.30, '%s' % cesmname[cid], va='center', rotation='vertical',fontsize=14)
     
     plt.savefig("%sSeasonal_comparison_wCESM%s_model%i_region%i.png" % (figpath,cesmname[cid],mid,rid),dpi=150,bbox_inches='tight')
+
+#%% AGU Poster Seasonal Plot
+
+if exname == "seasonal":
+    mid   = 2 # Model id  (hconst, hvary, entrain)
+    rid   = 4 # Region id (See regions variable)
+    cid   = 0 # CESM ID (0=FULL, 1=SLAB)
+    
+    # Colorbar limits
+    cmax  = .50
+    cstep = 0.05
+    lstep = 0.05
+    cint,cl_int = viz.return_clevels(cmax,cstep,lstep)
+    
+    fig,axs = plt.subplots(1,4,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(13,3))
+    
+
+    plotamvs = amvpats#amvpats[0][rid][mid]
+
+        
+    for sid in range(4): # Loop for each season
+    
+        blabel = [0,0,0,0]
+        if sid == 0:
+            blabel[0]=1 # Add Left Label
+        if row == 1:
+            blabel[-1]=1 # Ad bottom labels
+        
+        ax = axs[sid]
+        ax = viz.add_coast_grid(ax,bboxplot,blabels=blabel,fill_color='gray')
+        
+        # Plot and set the title
+        plotamv = plotamvs[sid+1][rid][mid]
+        pcm,ax = plot_amvpat(lon,lat,plotamv.T,ax,blabel=blabel)
+        ax.set_title(frcnamelong[sid+1])
+    
+    # Set Colorbar
+    cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='vertical',fraction=0.020,pad=0.015)
+    #cb.set_label("SST, Contour = %.2f $\degree C \sigma_{AMV}^{-1}$" % cstep)
+    
+    plt.suptitle("AMV Pattern, Forcing with Fixed Seasonal Patterns (Contours = 0.05$\degree C$ per 1$\sigma_{AMV}$)",y=.90)
+    
+    # Set Axis Labels for CESM-SLAB and CESM-FULL
+    #fig.text(0.07, 0.70, 'Stochastic Model', va='center', rotation='vertical',fontsize=14)
+    #fig.text(0.07, 0.30, '%s' % cesmname[cid], va='center', rotation='vertical',fontsize=14)
+    
+    plt.savefig("%sSeasonal_comparison_AGU_model%i_region%i.png" % (figpath,mid,rid),dpi=150,bbox_inches='tight')
+
+
+
+
 
 #%% Plot NAO-EAP Plots
 
