@@ -3,7 +3,7 @@
 """
 Calculate Ekman Advection for the corresponding EOFs and save
 
-Created on Wed Aug  4 05:02:36 2021
+Created on Wed Aug 4 05:02:36 2021
 
 @author: gliu
 """
@@ -18,7 +18,9 @@ import time
 from tqdm import tqdm
 
 #%%
+
 stormtrack = 0
+
 if stormtrack == 0:
     projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
     datpath     = projpath + '01_Data/model_output/'
@@ -46,9 +48,13 @@ import tbx
 
 #%% Functions
 
-def calc_dx_dy(longitude,latitude):
-    ''' This definition calculates the distance between grid points that are in
+def calc_dx_dy(longitude,latitude,centered=False):
+    ''' 
+        This definition calculates the distance between grid points that are in
         a latitude/longitude format.
+        
+        Function from: https://github.com/Unidata/MetPy/issues/288
+        added "centered" option to double the distance for centered-difference
         
         Equations from:
         http://andrew.hedges.name/experiments/haversine/
@@ -63,17 +69,25 @@ def calc_dx_dy(longitude,latitude):
                                     in the x and y direction in meters 
     '''
     dlat = np.abs(lat[1]-lat[0])*np.pi/180
+    if centered:
+        dlat *= 2
     dy   = 2*(np.arctan2(np.sqrt((np.sin(dlat/2))**2),np.sqrt(1-(np.sin(dlat/2))**2)))*6371000
     dy   = np.ones((latitude.shape[0],longitude.shape[0]))*dy
 
     dx = np.empty((latitude.shape))
     dlon = np.abs(longitude[1] - longitude[0])*np.pi/180
+    if centered:
+        dlon *= 2
     for i in range(latitude.shape[0]):
+        # Apply cos^2 latitude weight
         a = (np.cos(latitude[i]*np.pi/180)*np.cos(latitude[i]*np.pi/180)*np.sin(dlon/2))**2
         c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1-a) )
         dx[i] = c * 6371000
     dx = np.repeat(dx[:,np.newaxis],longitude.shape,axis=1)
     return dx, dy
+
+
+
 
 
 #%% Set constants
@@ -124,27 +138,36 @@ ts = ds1.TS.values
 print("Completed in %.2fs"%(time.time()-st))
 
 # Calculate the mean gradient for each month
-ts_monmean = ts.mean(0)
-
-# Roll longitude along axis for forward difference (gradT_x0 = T_x1 - xT0)
+ts_monmean = ts.mean(0) # [month x lat x lon]
+ 
+# Roll longitude along axis for <FORWARD> difference (gradT_x0 = T_x1 - xT0)
 dTdx = (np.roll(ts_monmean,-1,axis=2)- ts_monmean) / dx[None,:,:]
 dTdy = (np.roll(ts_monmean,-1,axis=1)- ts_monmean) / dy[None,:,:]
 dTdy[:,-1,:] = 0 # Set top latitude to zero (since latitude is not periodic)
 
-#dTdy = (ts_monmean[:,1:,:] - ts_monmean[:,:-1,:])  / dy[None,:-1,:] # Drop the last grid?
-#dTdx = (ts_monmean[:,:,1:] - ts_monmean[:,:,0:-1]) / dx[None,:,:]
-#dTdy = ts_monmean / dy[None,:,:]
+# Try Centered Difference (compare with Numpy's Gradient Function ------------
+dTdx2   = (np.roll(ts_monmean,-1,axis=2) - np.roll(ts_monmean,1,axis=2))/2
+dx2test = np.gradient(ts_monmean,axis=2) # Using gradient function
+# Try visualizing
+plt.pcolormesh(dx2test[0,...],vmin=-10,vmax=10),plt.colorbar()
+plt.pcolormesh(dTdx2[0,...],vmin=-10,vmax=10),plt.colorbar()
+plt.pcolormesh(dTdx2[0,...]-dx2test[0,...]),plt.colorbar()
 
 
+# Centered Difference Final
+dx2,dy2 = calc_dx_dy(lon360,lat,centered=True)
+dTx2    = np.roll(ts_monmean,-1,axis=2) - np.roll(ts_monmean,1,axis=2)
+dTy2    = np.roll(ts_monmean,-1,axis=1) - np.roll(ts_monmean,1,axis=1)
+dTdx2 = dTx2 / dx2[None,...]
+dTdy2 = dTy2 / dy2[None,...]
 
+plt.pcolormesh(dTdx2[0,:,:],vmin=-0.6e-5,vmax=0.6e-5),plt.colorbar()
+plt.pcolormesh(dTdx[0,:,:],vmin=-0.6e-5,vmax=0.6e-5),plt.colorbar()
 
 # Save output...
 savename = "%sFULL-PIC_Monthly_gradT_lon360.npz" % (rawpath)
 
-
-
 # Save [mon x lat x lon360]
-
 np.savez(savename,**{
     'ts_monmean':ts_monmean,
     'dTdx':dTdx,
@@ -154,6 +177,30 @@ np.savez(savename,**{
     'lon':lon360,
     'lat':lat})
 
+# Save 2nd order [mon x lat x lon360]
+savename = "%sFULL-PIC_Monthly_gradT2_lon360.npz" % (rawpath)
+np.savez(savename,**{
+    'ts_monmean':ts_monmean,
+    'dTdx':dTdx2,
+    'dTdy':dTdy2,
+    'dx':dx2,
+    'dy':dy2,
+    'lon':lon360,
+    'lat':lat})
+
+#%% This Part Doesn't seem to be working...
+
+# https://gradsaddict.blogspot.com/2019/11/python-tutorial-temperature-advection.html?m=0
+
+proj      =  ccrs.Miller()#UTM(zone=1)#ccrs.PlateCarree(central_longitude=360)
+mlon,mlat = np.meshgrid(lon360,lat)
+output    = proj.transform_points(ccrs.PlateCarree(),mlon,mlat)
+
+x,y=output[:,:,0],output[:,:,1]
+gradx=np.gradient(x,axis=1)
+grady=np.gradient(y,axis=0)
+
+plt.pcolormesh(gradx),plt.colorbar()
 
 #%% Load temperature gradient and plot
 
@@ -197,12 +244,11 @@ ax.set_title(r"Meridional gradient ($\frac{\partial T}{\partial x}$)" + " for %s
 #%% Load the wind stress and the PCs to prepare for regression
 N_mode = 200
 
-
 # Load the PCs
-ld     = np.load("%sNHFLX_FULL-PIC_%sEOFsPCs_lon260to20_lat0to65.npz" % (rawpath,N_mode),allow_pickle=True)
-pcall  = ld['pcall'] # [PC x MON x TIME]
-eofall = ld['eofall']
-eofslp = ld['eofslp']
+ld        = np.load("%sNHFLX_FULL-PIC_%sEOFsPCs_lon260to20_lat0to65.npz" % (rawpath,N_mode),allow_pickle=True)
+pcall     = ld['pcall'] # [PC x MON x TIME]
+eofall    = ld['eofall']
+eofslp    = ld['eofslp']
 varexpall = ld['varexpall']
 
 # Load each wind stress component [yr mon lat lon]
@@ -212,7 +258,6 @@ taux = dsx.TAUX.values
 dsx  = xr.open_dataset(rawpath+"../CESM_proc/TAUY_PIC_FULL.nc")
 tauy = dsx.TAUY.values
 print("Loaded wind stress data in %.2fs"%(time.time()-st))
-
 
 # Convert stress from stress on OCN on ATM --> ATM on OCN
 taux*= -1
