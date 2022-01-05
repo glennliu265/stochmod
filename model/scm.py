@@ -2166,7 +2166,7 @@ def load_inputs(mconfig,frcname,input_path,load_both=False,method=4):
     return lon,lat,h,kprevall,damping,alpha,alpha_full
 
 
-def make_forcing(alpha,runid,frcname,t_end,input_path,check=True,alpha_full=False):
+def make_forcing(alpha,runid,frcname,t_end,input_path,check=True,alpha_full=None):
     """
     forcing = make_forcing(alpha,runid,frcname,t_end,input_path)
     
@@ -2198,7 +2198,8 @@ def make_forcing(alpha,runid,frcname,t_end,input_path,check=True,alpha_full=Fals
     """
     if alpha_full is not None:
         flag=True
-    
+    else:
+        flag=False
     
     # Get the dimensions
     nlon,nlat,N_mode,nmon = alpha.shape
@@ -2299,7 +2300,7 @@ def tile_forcing(alpha,randts):
         ntile      = int(t_end/nmon)
         alpha_tile = np.tile(alpha_tile,ntile) #[lon x lat x pc x time]
     forcing = alpha_tile * randts[:,:,:N_mode,:] # Only take needed values
-    
+
     # Sum the PCs for the forcing
     if N_mode > 1:
         forcing = forcing.sum(2) # Sum along N_mode axis
@@ -2732,9 +2733,7 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
     if chk_damping:
         dmask = (damping<0)
         dmaskfull = (dampingfull<0)
-        
     
-
     # Check some params
     # -------------------
     # if debug:

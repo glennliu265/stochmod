@@ -52,7 +52,6 @@ elif stormtrack == 0:
 from amv import proc,viz
 import scm
 
-
 def sel_regionxr(ds,bbox):
     """
     Select region from xr.dataset with 'lon' (degrees East), 'lat'.
