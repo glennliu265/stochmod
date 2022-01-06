@@ -987,7 +987,8 @@ def noentrain_2d(randts,lbd,T0,F,FAC,multFAC=1,debug=False):
 def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
                             returnresults=False,preload=None,
                             mask_pacific=False,savesep=False,
-                            useslab=True,mask_damping=False):
+                            useslab=True,mask_damping=False,
+                            n_models=None):
     """
     Script to postprocess stochmod output
     
@@ -1003,9 +1004,10 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
              each model [lon180 x lat x time]
         8) mask_pacific - Set out True to mask out the tropical pacific below 20N
     
-        9) savesep - Set to True if data was saved separately (model0,model1,etc)
+        9)  savesep - Set to True if data was saved separately (model0,model1,etc)
         10) useslab - Set to True if only CESM-SLAB parameters were used
         11) mask_damping - Set to True to exclude damping values that failed the significance test
+        12) n_models - Number of models to loop through. assumes len(sst) that was loaded is the # of models.
         
     
     Based on portions of analyze_stochoutput.py
@@ -1059,8 +1061,9 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
             latr = np.load(datpath+"lat.npy")
     else:
         lonr,latr,sst = preload
-    n_models = len(sst)
-    
+    if n_models is None:
+        n_models = len(sst) # Checks number of SSTs is list by default
+       
     # Load MLD Data
     # -------------
     mld = np.load(rawpath+"FULL_PIC_HMXL_hclim.npy") # Climatological MLD
@@ -1102,7 +1105,11 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
         
         # Apply the mask to SST
         if preload is None:
+            if len(sst.shape) < 4: # Include model dimension (?)
+                print("Adding model dimension because sst size is %i" % len(sst.shape))
+                sst = sst[None,...]
             sst *= mskreg[None,:,:,None]
+            
         else:
             for i in range(len(sst)):
                 sst[i] *= mskreg[:,:,None]
