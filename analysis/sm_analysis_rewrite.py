@@ -232,13 +232,27 @@ fnames   = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method4_
             'forcingflxeof_090pct_SLAB-PIC_eofcorr2_JJA_1000yr_run011_ampq3_method4_dmp0',
             'forcingflxeof_090pct_SLAB-PIC_eofcorr2_SON_1000yr_run011_ampq3_method4_dmp0')
 
+# 90% Variance forcing with Ekman Forcing, needs n_models=1 as an additional argument
+fnames   = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_Qek',)
+
 print("Now processing the following files: \n ")
 print(*fnames, sep='\n')
+
+
+n_models=1 # SET TO 1 for EKMAN FORCING< None for all others!!!!
 #%% Post Process Outputs (Calculate AMV, Autocorrelation)
 for frcname in tqdm(fnames):
     expid = frcname
+    
+    if "Qek" in expid:
+        print("Processing just entrain model for Qek")
+        n_models = 1
+    else:
+        n_models = None
+        
+        
     scm.postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,mask_pacific=True,
-                                savesep=savesep,useslab=useslab,mask_damping=mask_damping)
+                                savesep=savesep,useslab=useslab,mask_damping=mask_damping,n_models=n_models)
     print("Completed Post-processing for Experiment: %s" % expid)
 #%% Visualize AMV
 if viz_AMV:
