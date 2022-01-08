@@ -44,7 +44,7 @@ import cmocean
 projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath = projpath + '03_Scripts/stochmod/'
 datpath    = projpath + '01_Data/'
-outpath    = projpath + '02_Figures/20211214/'
+outpath    = projpath + '02_Figures/20210113/'
 input_path  = datpath + 'model_input/'
 proc.makedir(outpath)
 
@@ -347,17 +347,44 @@ cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='vertical',fraction=0.009)
 cb.set_label("Atmospheric Damping ($W/m^2$)")
 
 
+#%% Experiment with nonlinear colormap
+
+#https://stackoverflow.com/questions/8461605/making-small-values-visible-on-matplotlib-colorbar-in-python
+from matplotlib import colors
+
+# cdict = {'red':   [(0.0,  0.0, 0.0),
+#                    (0.5,  1.0, 1.0),
+#                    (1.0,  1.0, 1.0)],
+
+#          'green': [(0.0,  0.0, 0.0),
+#                    (0.25, 0.0, 0.0),
+#                    (0.75, 1.0, 1.0),
+#                    (1.0,  1.0, 1.0)],
+
+#          'blue':  [(0.0,  0.0, 0.0),
+#                    (0.5,  0.0, 0.0),
+#                    (1.0,  1.0, 1.0)]}
+
+
+# Try out different gammas > 1.0. Gamma >1 increases sensitivity in the lower part of scale
+cmapmld = colors.LinearSegmentedColormap.from_list('mldmap',['fuchsia','w','darkblue'],gamma=0.30)
+#cmap = 'jet'
+cintmld = [0,5,10,15,20,25,30,35,40,45,50,60,70,75,100,150,200,300,400,500,750,1000,1250]
+
+
+
 #%% Plot the Mixed Layer Depth
 
 
-vlms = [0,500]
+vlms = [0,1000]
 #clvl=np.arange(-,65,5)
 
 fig,axs =  plt.subplots(1,4,figsize=(12,4),subplot_kw={'projection':ccrs.PlateCarree()})
 
 for i in range(4):
     ax = axs[i]
-    pcm=ax.pcolormesh(lon,lat,havg[i].T,vmin=vlms[0],vmax=vlms[1],cmap='cmo.deep')
+    pcm=ax.pcolormesh(lon,lat,havg[i].T,vmin=vlms[0],vmax=vlms[1],cmap=cmap)
+    #pcm = ax.contourf(lon,lat,havg[i].T,levels=cints2,cmap=cmap)
     ax = viz.add_coast_grid(ax=ax,bbox=bbox,blabels=[0,0,0,0],fill_color='gray')
     #fig.colorbar(pcm,ax=ax)
     ax.set_title(snames[i])
@@ -370,22 +397,31 @@ cb.set_label("Mixed-Layer Depth ($m$)")
 #%% Now Plot all 3 Together
 
 # Set Inputs
+
+cintmld = [0,10,20,30,40,50,60,70,80,90,100,150,200,300,400,500,750,1000,1250]
+cmapmld = colors.LinearSegmentedColormap.from_list('mldmap',['fuchsia','w','darkblue'],gamma=0.30)
+cmapdamp = colors.LinearSegmentedColormap.from_list('mldmap',['darkgreen','mintcream'],gamma=1)
+
 invars = (alphaavg,dampingavg,havg)
 cblabs = ("Total Forcing Amplitude \n Contour = 5 $W/m^2$",
           "Atmospheric Damping \n Contour = 5 $W/m^2 / \degree C$",
-          "Mixed-Layer Depth \n Contour = 50 $m$"
+          "Mixed-Layer Depth \n Contours = 10-250 $m$"
           )
 vnames = (r"Total Forcing Amplitude ($\alpha$)",
           r"Atmospheric Damping ($\lambda_a$)",
           r"Mixed-Layer Depth ($h$)")
-cblabs2 = (u"Contour = 5 $Wm^{-2}$",u"Contour = 5 $Wm^{-2} \degree C^{-1}$",u"Contour = 50 $m$")
+cblabs2 = (u"Contour = 5 $Wm^{-2}$",u"Contour = 5 $Wm^{-2} \degree C^{-1}$",u"Contours = 10 to 250 $m$")
 
-cints  = (np.arange(0,105,5),np.arange(0,65,5),np.arange(0,1050,50)
+cints  = (np.arange(0,105,5),np.arange(0,45,5),cintmld
           )
 
-cmaps  = ('hot','cmo.thermal','cmo.dense') 
+
+cmaps  = ('hot',cmapdamp,cmapmld) 
 
 snamesl = ('Winter (DJF)','Spring (MAM)','Summer (JJA)','Fall (SON)')
+
+
+sp_id = 0
 
 fig,axs = plt.subplots(3,4,figsize=(12,8),subplot_kw={'projection':ccrs.PlateCarree()})
 for v in range(3):
@@ -412,6 +448,9 @@ for v in range(3):
         pcm=ax.contourf(lon,lat,invar[s].T,levels=cint,extend='both',cmap=cmap)
         ax = viz.add_coast_grid(ax=ax,bbox=bbox,blabels=blabel,fill_color='gray')
         
+        ax = viz.label_sp(sp_id,ax=ax,fontsize=14,fig=fig,labelstyle="(%s)",case='lower',alpha=.75)
+        sp_id += 1
+        
     cb = fig.colorbar(pcm,ax=axs[v,:].flatten(),orientation='vertical',fraction=0.009)
     cb.set_label(cblab,fontsize=12)
         
@@ -427,19 +466,19 @@ import matplotlib as mpl
 mpl.rcParams['font.sans-serif'] = "stix"
 mpl.rcParams['font.family'] = "STIXGeneral"
 
-
 mpl.rcParams.update(mpl.rcParamsDefault)
 
 
 cblabs2 = (u"Contours: 5 $Wm^{-2}$",
            u"Contours: 5 $Wm^{-2} \degree C^{-1}$",
-           u"Contours: 50 $m$")
+           u"Contours = 10-250 $m$")
 
 
 fig = plt.figure(constrained_layout=True,figsize=(12,8))
 fig.suptitle("Stochastic Model Inputs (CESM1-FULL, Seasonal Average)",fontsize=20)
 
 # Create 3x1 subfigs
+sp_id = 0
 subfigs = fig.subfigures(nrows=3,ncols=1)
 for row,subfig in enumerate(subfigs):
     subfig.suptitle(vnames[row])
@@ -470,6 +509,9 @@ for row,subfig in enumerate(subfigs):
         pcm=ax.contourf(lon,lat,invar[s].T,levels=cint,extend='both',cmap=cmap)
         ax = viz.add_coast_grid(ax=ax,bbox=bbox,blabels=blabel,fill_color='gray')
         
+        ax = viz.label_sp(sp_id,ax=ax,fontsize=18,fig=fig,labelstyle="(%s)",case='lower',alpha=.75)
+        sp_id += 1
+        
     cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='vertical',fraction=0.009,pad=.010)
     cb.set_label(cblabs2[v],fontsize=12)
     
@@ -482,15 +524,21 @@ plt.savefig(outpath+"Seasonal_Inputs_CESM-FULL.png",dpi=200,bbox_inches='tight')
 invars = (alphaavgslab,dampingavgslab,havgslab)
 cblabs = ("Total Forcing Amplitude \n Contour = 5 $W/m^2$",
           "Atmospheric Damping \n Contour = 5 $W/m^2 / \degree C$",
-          "Mixed-Layer Depth \n Contour = 50 $m$"
+          "Mixed-Layer Depth \n Contours = 10-250 $m$"
           )
 vnames = (r"Total Forcing Amplitude ($\alpha$)",
           r"Atmospheric Damping ($\lambda_a$)",
           r"Mixed-Layer Depth ($h$)")
-cblabs2 = (u"Contour = 5 $Wm^{-2}$",u"Contour = 5 $Wm^{-2} \degree C^{-1}$",u"Contour = 50 $m$")
-cints  = (np.arange(0,105,5),np.arange(0,65,5),np.arange(0,1050,50)
+cblabs2 = (u"Contour = 5 $Wm^{-2}$",u"Contour = 5 $Wm^{-2} \degree C^{-1}$",u"Contours = 10-250 $m$")
+
+# Draft 1
+# cints  = (np.arange(0,105,5),np.arange(0,65,5),np.arange(0,1050,50)
+#           )
+# cmaps  = ('hot','cmo.thermal','cmo.dense') 
+cints  = (np.arange(0,105,5),np.arange(0,65,5),cintmld
           )
-cmaps  = ('hot','cmo.thermal','cmo.dense') 
+cmaps  = ('hot',cmapdamp,cmapmld) 
+
 snamesl = ('Winter (DJF)','Spring (MAM)','Summer (JJA)','Fall (SON)')
 
 
@@ -530,6 +578,9 @@ for row,subfig in enumerate(subfigs):
         
     cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='vertical',fraction=0.009,pad=.010)
     cb.set_label(cblabs2[v],fontsize=12)
+    
+    ax = viz.label_sp(sp_id,ax=ax,fontsize=18,fig=fig,labelstyle="(%s)",case='lower',alpha=.75)
+    sp_id += 1
     
 #plt.show()
 plt.savefig(outpath+"Seasonal_Inputs_CESM-SLAB.png",dpi=200,bbox_inches='tight')

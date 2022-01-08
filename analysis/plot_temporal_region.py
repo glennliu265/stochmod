@@ -26,7 +26,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/2021221/"
+    figpath     = projpath + "02_Figures/20210113/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -361,6 +361,19 @@ Cfsall    = cc
 bndsall   = bb
 sstvarall = vv
 
+#%% Function to add subplot labels
+
+
+
+
+
+    
+    
+    
+    
+    
+
+
 #%% Now let's plot two regions side by side, with 
 # Autocorr on top row
 # Power Spectra on the bottom
@@ -374,6 +387,7 @@ specylim = [0,0.40]
 
 fig,axs =plt.subplots(2,2,figsize=(12,8))
 
+sp_id = 0
 
 # Plot the autocorrelation (top row)
 for i in range(2):
@@ -402,6 +416,9 @@ for i in range(2):
     if i == 1:
         ax.set_ylabel("")
         ax.legend(ncol=2,fontsize=12)
+    
+    ax = viz.label_sp(sp_id,fontsize=20,fig=fig,labelstyle="(%s)",case='lower')
+    sp_id += 1
 
 
 # Plot the power spectra (bottom row)
@@ -436,6 +453,9 @@ for i in range(2):
     
     title = "%s Power Spectra" % (regions[rid])
     ax.set_title(title,color=bbcol[rid],fontsize=12)
+    
+    ax = viz.label_sp(sp_id,fontsize=20,fig=fig,labelstyle="(%s)",case='lower')
+    sp_id += 1
 
 plt.tight_layout()
 plt.savefig("%sSTG_Autocorrelation_Spectra%s.png"%(figpath,smoothname),
@@ -455,6 +475,7 @@ order = [rid_L,rid_R]
 
 fig,axs =plt.subplots(2,2,figsize=(12,8))
 
+sp_id = 0
 
 # Plot the autocorrelation (top row)
 for i in range(2):
@@ -483,6 +504,9 @@ for i in range(2):
     if i == 1:
         ax.set_ylabel("")
         ax.legend(ncol=2,fontsize=12)
+        
+    ax = viz.label_sp(sp_id,fontsize=20,fig=fig,labelstyle="(%s)",case='lower')
+    sp_id += 1
 
 
 # Plot the power spectra (bottom row)
@@ -528,6 +552,9 @@ for i in range(2):
     
     title = "%s Power Spectra" % (regions[rid])
     ax.set_title(title,color=bbcol[rid],fontsize=12)
+    
+    ax = viz.label_sp(sp_id,fontsize=20,fig=fig,labelstyle="(%s)",case='lower')
+    sp_id += 1
 
 plt.tight_layout()
 plt.savefig("%sSPG-NAT_Autocorrelation_Spectra%s.png"%(figpath,smoothname),
