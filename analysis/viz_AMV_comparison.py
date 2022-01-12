@@ -26,7 +26,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/2021221/"
+    figpath     = projpath + "02_Figures/20220113/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -208,20 +208,23 @@ exoutnameraw = "new_v_old_q-correction"
 
 
 
-# #NAO and EAP
-# fnames = (
-#     "forcingflxeof_EOF1_SLAB-PIC_eofcorr0_1000yr_run011_ampq3",
-#     "forcingflxeof_EOF2_SLAB-PIC_eofcorr0_1000yr_run011_ampq3",
-#     "forcingflxeof_2eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3",
-#     )
-# frcnamelong = ("NAO (EOF1)","EAP (EOF2)","NAO+EAP")
-# exname = "NAO_EAP"
+#NAO and EAP
+fnames = (
+    "forcingflxeof_EOF1_SLAB-PIC_eofcorr0_1000yr_run011_ampq3_method4_dmp0",
+    "forcingflxeof_EOF2_SLAB-PIC_eofcorr0_1000yr_run011_ampq3_method4_dmp0",
+    "forcingflxeof_2eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3_method4_dmp0",
+    )
+frcnamelong = ("NAO (EOF1)","EAP (EOF2)","NAO+EAP")
+exname = "NAO_EAP"
 
 # Just compare 90% Variance Run with CESM
-fnames = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method4_dmp0',)#'forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run009_ampq3',)
-frcnamelong = ["EOF Forcing (90% Variance)",]
-exname ="run_comparison"
+# fnames = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method4_dmp0',)#'forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run009_ampq3',)
+# frcnamelong = ["EOF Forcing (90% Variance)",]
+# exname ="run_comparison"
 
+# Examine impact of Ekman Forcing
+# fnames = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_Qek',)
+# frcnamelong = ["EOF Forcing (90% Variance) with Ekman",]
 #%% Functions
 def calc_conflag(ac,conf,tails,n):
     cflags = np.zeros((len(ac),2))
@@ -244,7 +247,6 @@ regionlong = ("Subpolar","Subtropical","Tropical","North Atlantic","North Atlant
 bboxes = (bbox_SP,bbox_ST,bbox_TR,bbox_NA,bbox_NNA) # Bounding Boxes
 bbcol  = ["Blue","Red","Yellow","Black","Black"]
 bbsty  = ["solid","dashed","solid","dotted","dotted"]
-
 
 # # Regional Analysis Setting (NEW, STG SPLOIT)
 # Regional Analysis Settings
@@ -402,13 +404,13 @@ mid_sel = [0,2]
 plt.style.use("default")
 
 for f in range(len(frcnamelong)):
+    
     fig,axs = viz.init_2rowodd(3, proj=None,figsize=(14,6))
     for r in range(len(rid_sel)):
-                      
+        
         rid = rid_sel[r]
         ax = axs[r]
         kmonth = kmonths[f][rid]
-        
         
         # Plot some differences
         title      = "%s (Lag 0 = %s)" % (regionlong[rid],mons3[kmonth])
@@ -416,7 +418,6 @@ for f in range(len(frcnamelong)):
         #ax.plot(lags,cesmauto2[lags],label="CESM SLAB",color='k')
         #ax.plot(lags,fullauto,color='k',label='CESM Full',ls='dashdot')
         
-    
         # Plot Each Model
         for mid in mid_sel:
             ax.plot(lags,sstacs[f][rid][mid],color=mcolors[mid],label=modelnames[mid])
@@ -507,12 +508,16 @@ dmsks = scm.load_dmasks(bbox=[lon[0],lon[-1],lat[0],lat[-1]])
 dmsks.append(dmsks[-1])
 
 #%% Plot AMV Patterns (Model vs CESM) for each forcing
+# SM Paper Draft 2 
+
+notitle = True
+
+
 cmax  = 0.5
 cstep = 0.025
 lstep = 0.05
 cint,cl_int=viz.return_clevels(cmax,cstep,lstep)
 clb = ["%.2f"%i for i in cint[::4]]
-
 
 for f in tqdm(range(len(fnames))):
     for rid in range(5):
@@ -529,6 +534,7 @@ for f in tqdm(range(len(fnames))):
             savename = "%sSST_AMVPattern_Comparison_region%s_%s.png" % (figpath,regions[rid],fnames[f])
             dfcol = 'k'
         
+        spid = 0
         proj = ccrs.PlateCarree()
         fig,axs = plt.subplots(2,3,subplot_kw={'projection':proj},figsize=(12,6))
         # 
@@ -555,12 +561,16 @@ for f in tqdm(range(len(fnames))):
             ax.pcolormesh(lon,lat,amvpats[f][rid][mid].T,vmin=cint[0],vmax=cint[-1],cmap=cmocean.cm.balance,zorder=-1)
             cl = ax.contour(lon,lat,amvpats[f][rid][mid].T,levels=cl_int,colors="k",linewidths=0.5)
             ax.clabel(cl,levels=cl_int,fontsize=8)
-            ax.set_title("%s ($\sigma^2_{AMV}$ = %f)"%(modelnames[mid],np.var(amvids[f][rid][mid])))
+            
+            ax.set_title("%s ($\sigma^2_{AMV}$ = %.4f $K^2$)"%(modelnames[mid],np.var(amvids[f][rid][mid])))
             if plotbbox:
                 ax,ll = viz.plot_box(bbox_NNA,ax=ax,leglab="AMV",
                                      color=dfcol,linestyle="dashed",linewidth=2,return_line=True)
                 
             viz.plot_mask(lon,lat,dmsks[mid],ax=ax,markersize=0.1)
+            
+            ax = viz.label_sp(spid,case='lower',ax=ax,labelstyle="(%s)",fontsize=16,alpha=0.7)
+            spid += 1
             
         # Plot CESM1
         axs[1,1].axis('off')
@@ -580,10 +590,12 @@ for f in tqdm(range(len(fnames))):
             ax.pcolormesh(lon180g,latg,cesmpat[rid][cid].T,vmin=cint[0],vmax=cint[-1],cmap=cmocean.cm.balance,zorder=-1)
             cl = ax.contour(lon180g,latg,cesmpat[rid][cid].T,levels=cl_int,colors="k",linewidths=0.5)
             ax.clabel(cl,levels=cl_int,fontsize=8)
-            ax.set_title("%s ($\sigma^2_{AMV}$ = %f]"%(cesmname[cid],np.var(cesmidx[rid][cid])))
+            ax.set_title("%s ($\sigma^2_{AMV}$ = %.3f $K^2$)"%(cesmname[cid],np.var(cesmidx[rid][cid])))
             if plotbbox:
                 ax,ll = viz.plot_box(bbox_NNA,ax=ax,leglab="AMV",
                                      color=dfcol,linestyle="dashed",linewidth=2,return_line=True)
+            ax = viz.label_sp(spid,case='lower',ax=ax,labelstyle="(%s)",fontsize=16,alpha=0.7)
+            spid += 1
         
         cb = fig.colorbar(pcm,ax=axs[1,1],orientation='horizontal')
         cb.set_ticks(cint[::4])
@@ -591,8 +603,8 @@ for f in tqdm(range(len(fnames))):
         #cb.ax.set_xticklabels(cint[::2],rotation=90)
         #tick_start = np.argmin(abs(cint-cint[0]))
         #cb.ax.set_xticklabels(cint[tick_start::2],rotation=90)
-        
-        plt.suptitle("%s AMV Pattern and Index Variance [Forcing = %s]" % (regionlong[rid],frcnamelong[f]),fontsize=14)
+        if notitle is False:
+            plt.suptitle("%s AMV Pattern and Index Variance [Forcing = %s]" % (regionlong[rid],frcnamelong[f]),fontsize=14)
         
         plt.savefig(savename,dpi=150,bbox_inches='tight')
 #%% AGU Comparison Plot (90% Variance)
@@ -781,7 +793,7 @@ if exname == "numEOFs":
     #     ax.clabel(cl,levels=cl_int,fontsize=8)
     #     ax.set_title("%s %s [var(AMV) = %f]"%(fnames[f],modelnames[mid],np.var(amvids[f][rid][mid])))
 
-#%% Updated numEOFS plot (Figure 14)
+#%% Updated numEOFS plot (SM Paper Draft Figure 14)
 
 mid = 0 # Select stochastic mode
 
@@ -870,7 +882,7 @@ fig.text(0.07, 0.30, 'Forcing (1$\sigma$)', va='center', rotation='vertical',fon
 plt.savefig("%snumEOFs_comparison_amvpat_updated_withforcing_model%i.png" % (figpath,mid),dpi=150,bbox_inches='tight')
 #%% Plot AMV Patterns (Seasonality Comparison, Old)
 
-rid = 4
+rid   = 4
 
 cmax  = 1.0
 cstep = 0.1
@@ -915,6 +927,8 @@ if exname == "seasonal":
     lstep = 0.05
     cint,cl_int = viz.return_clevels(cmax,cstep,lstep)
     
+    
+    
     fig,axs = plt.subplots(2,4,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(12,4))
     
     for row in range(2):
@@ -946,7 +960,7 @@ if exname == "seasonal":
     
     # Set Colorbar
     cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='vertical',fraction=0.020)
-    cb.set_label("SST, Contour = %.2f $\degree C \sigma_{AMV}^{-1}$" % cstep)
+    cb.set_label("SST, Contour = %.2f $K \, \sigma_{AMV}^{-1}$" % cstep)
     
     plt.suptitle("AMV Pattern, Obtained from Forcing with Fixed Seasonal Patterns")
     
@@ -956,7 +970,9 @@ if exname == "seasonal":
     
     plt.savefig("%sSeasonal_comparison_wCESM%s_model%i_region%i.png" % (figpath,cesmname[cid],mid,rid),dpi=150,bbox_inches='tight')
 
-#%% AGU Poster Seasonal Plot
+#%% AGU Poster Seasonal Plot (and SM Outline Draft 2)
+
+notitle = True
 
 if exname == "seasonal":
     mid   = 2 # Model id  (hconst, hvary, entrain)
@@ -974,7 +990,7 @@ if exname == "seasonal":
 
     plotamvs = amvpats#amvpats[0][rid][mid]
 
-        
+    spid = 0
     for sid in range(4): # Loop for each season
     
         blabel = [0,0,0,0]
@@ -990,12 +1006,15 @@ if exname == "seasonal":
         plotamv = plotamvs[sid+1][rid][mid]
         pcm,ax = plot_amvpat(lon,lat,plotamv.T,ax,blabel=blabel)
         ax.set_title(frcnamelong[sid+1])
+        ax = viz.label_sp(spid,case='lower',ax=ax,labelstyle="(%s)",fontsize=16,alpha=0.7)
+        spid += 1
     
     # Set Colorbar
-    cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='vertical',fraction=0.020,pad=0.015)
-    #cb.set_label("SST, Contour = %.2f $\degree C \sigma_{AMV}^{-1}$" % cstep)
+    cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='vertical',fraction=0.010,pad=0.015)
+    cb.set_label("Contour = %.2f $K \sigma_{AMV}^{-1}$" % cstep)
+    if notitle is False:
+        plt.suptitle("AMV Pattern, Forcing with Fixed Seasonal Patterns (Contours = 0.05$\degree C$ per 1$\sigma_{AMV}$)",y=.90)
     
-    plt.suptitle("AMV Pattern, Forcing with Fixed Seasonal Patterns (Contours = 0.05$\degree C$ per 1$\sigma_{AMV}$)",y=.90)
     
     # Set Axis Labels for CESM-SLAB and CESM-FULL
     #fig.text(0.07, 0.70, 'Stochastic Model', va='center', rotation='vertical',fontsize=14)
@@ -1010,8 +1029,7 @@ if exname == "seasonal":
 #%% Plot NAO-EAP Plots
 
 rid = 4
-mid = 1
-
+mid = 2
 
 clmax = 0.5
 cstep = .05
@@ -1019,18 +1037,20 @@ cint   = np.arange(-clmax,clmax+cstep,cstep) # Used this for 7/26/2021 Meeting
 cl_int = np.arange(-clmax,clmax+cstep,cstep)
 
 if exname == "NAO_EAP":
+    spid = 0
     
     fig,axs = plt.subplots(1,3,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(13,7))
     for f in range(3):
         ax = axs[f]
         ax  = viz.add_coast_grid(ax,bbox=bboxplot)
         pcm,ax = plot_amvpat(lon,lat,amvpats[f][rid][mid].T,ax)
-        ax.set_title("AMV Pattern [%s]"%(frcnamelong[f]))
+        ax.set_title("%s"%(frcnamelong[f]))
+        ax = viz.label_sp(spid,case='lower',ax=ax,labelstyle="(%s)",fontsize=16,alpha=0.7)
+        spid += 1
     cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='vertical',fraction= 0.012,pad=0.05)
-    cb.set_label("SST ($\degree C$ per $\sigma_{AMV}$)")
+    cb.set_label("Contour = %.2f $K \sigma_{AMV}^{-1}$" % cstep)
 plt.savefig("%sAMV_Patterns_NAO_EAP_model%i.png" % (figpath,mid),dpi=150,bbox_inches='tight')
 
-    
 #%% Plot Bounding Boxes over CESM Slab Pattern
 
 cid = 0
@@ -1239,6 +1259,8 @@ for f in tqdm(range(len(frcnamelong))):
     plt.suptitle("Regional AMV Index Spectra (unsmoothed, Forcing=%s)"%(frcnamelong[f]))
     savename = "%sSST_Spectra_Comparison_%s_Linear-Decadal.png" % (figpath,fnames[f])
     plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+
 
 #%% Make plot (Log-Log)
 

@@ -26,7 +26,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20210113/"
+    figpath     = projpath + "02_Figures/20220113/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -170,7 +170,11 @@ if ~calc_inplace:
 
     
 else:
+    
     print("PLACEHOLDER: NEED TO WRITE CODE")
+    
+    
+    
 
 """
 Key Outputs ----
@@ -244,10 +248,6 @@ for bb in [0,4]:
 ax.legend(ncol=2,fontsize=8)
 
 plt.savefig("%sSPG-NAT_Locator.png"%figpath,dpi=100,bbox_inches='tight',transparent=True)
-
-
-
-
 
 #%% Load Stochastic Model Output (Regional SSTs)
 
@@ -364,21 +364,21 @@ sstvarall = vv
 #%% Function to add subplot labels
 
 
-
-
-
-    
-    
-    
-    
-    
-
-
 #%% Now let's plot two regions side by side, with 
 # Autocorr on top row
 # Power Spectra on the bottom
 
 alw = 3
+exclude_consth = True # Set to true to NOT plot constant h model
+notitle = True
+
+
+if exclude_consth:
+    plotid = [1,2]
+    plotidspec = [1,2,3,4] # Exclude constant h
+else:
+    plotid = [0,1,2]
+    plotidspec = [0,1,2,3,4]
 
 rid_L = 6 #  STGw
 rid_R = 5 #  STGe
@@ -397,12 +397,13 @@ for i in range(2):
     rid    = order[i] 
     kmonth = kmonths[rid]
     #title  = "%s Autocorrelation (Lag 0 = %s)" % (regionlong[rid],mons3[kmonth])
+
     title  = "%s Autocorrelation" % (regionlong[rid]) # No Month
     ax,ax2 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title="")
     ax.set_title(title,color=bbcol[rid],fontsize=12)
     
     # Plot Each Stochastic Model
-    for mid in range(3):
+    for mid in plotid:
         ax.plot(lags,sstac[rid][mid],color=mcolors[mid],label=modelnames[mid],lw=alw)
         ax.fill_between(lags,cfstoch[rid,mid,lags,0],cfstoch[rid,mid,lags,1],
                         color=mcolors[mid],alpha=0.10)
@@ -429,10 +430,9 @@ for i in range(2):
     
     speclabels = ["%s (%.3f $^{\circ}C^2$)" % (specnames[i],sstvarall[rid][i]) for i in range(len(insst)) ]
     
-    
     ax,ax2 = viz.plot_freqlin(specsall[rid],freqsall[rid],speclabels,speccolors,lw=alw,
                          ax=ax,plottitle=regionlong[rid],
-                         xlm=xlm,xtick=xtks,return_ax2=True)
+                         xlm=xlm,xtick=xtks,return_ax2=True,plotids=plotidspec)
     
     # Turn off title and second axis labels
     ax.set_title("")

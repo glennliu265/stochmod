@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 
-Visualize Input Parameters (Seasonal Cycle) at a Point, and Basinwide!
+Visualize Input Parameters (Seasonal Cycle) at a Point, and Basinwide
 
 Plots included...
 
@@ -393,7 +393,15 @@ cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='vertical',fraction=0.009)
 cb.set_label("Mixed-Layer Depth ($m$)")
 
 
+#%% Check maximum MLD depth in the summer
+bboxs = [-80,0,0,65]
+havgr,lonr,latr = proc.sel_region(havg[2][...,None],lon,lat,bboxs)
 
+fig,ax =  plt.subplots(1,1,figsize=(6,6),subplot_kw={'projection':ccrs.PlateCarree()})
+
+pcm = ax.pcolormesh(lon,lat,havg[2].T,vmin=0,vmax=100,cmap="cmo.dense")
+ax  = viz.add_coast_grid(ax=ax,bbox=bbox,blabels=[0,0,0,0],fill_color='gray')
+fig.colorbar(pcm,ax=ax)
 #%% Now Plot all 3 Together
 
 # Set Inputs
@@ -544,7 +552,7 @@ snamesl = ('Winter (DJF)','Spring (MAM)','Summer (JJA)','Fall (SON)')
 
 fig = plt.figure(constrained_layout=True,figsize=(12,8))
 fig.suptitle("Stochastic Model Inputs (CESM1-SLAB, Seasonal Average)",fontsize=20)
-
+sp_id = 0
 # Create 3x1 subfigs
 subfigs = fig.subfigures(nrows=3,ncols=1)
 for row,subfig in enumerate(subfigs):
@@ -576,11 +584,13 @@ for row,subfig in enumerate(subfigs):
         pcm=ax.contourf(lon,lat,invar[s].T,levels=cint,extend='both',cmap=cmap)
         ax = viz.add_coast_grid(ax=ax,bbox=bbox,blabels=blabel,fill_color='gray')
         
+        ax = viz.label_sp(sp_id,ax=ax,fontsize=18,fig=fig,labelstyle="(%s)",case='lower',alpha=.75)
+        sp_id += 1
+        
     cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='vertical',fraction=0.009,pad=.010)
     cb.set_label(cblabs2[v],fontsize=12)
     
-    ax = viz.label_sp(sp_id,ax=ax,fontsize=18,fig=fig,labelstyle="(%s)",case='lower',alpha=.75)
-    sp_id += 1
+
     
 #plt.show()
 plt.savefig(outpath+"Seasonal_Inputs_CESM-SLAB.png",dpi=200,bbox_inches='tight')

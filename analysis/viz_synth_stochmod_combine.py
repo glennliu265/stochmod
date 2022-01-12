@@ -101,7 +101,7 @@ projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 datpath     = projpath + '01_Data/'
 input_path  = datpath + 'model_input/'
 output_path = datpath + 'model_output/'
-outpath     = projpath + '02_Figures/20211018/'
+outpath     = projpath + '02_Figures/20220113/'
 proc.makedir(outpath)
 
 # Load in control data for 50N 30W
@@ -241,6 +241,9 @@ cffull = calc_conflag(cesmautofull,conf,tails,1798)
 
 #%%
 
+
+notitle = True
+
 fig,axs     = plt.subplots(1,2,figsize=(12,4),sharex=True,sharey=True,constrained_layout=False)
 
 # UPDATED Colors and names for generals (5/25/2021)
@@ -257,7 +260,10 @@ lw = 3
 # Plot Lower Hierarchy
 ax = axs[0]
 
-title = r"Adding Varying Damping ($\lambda_a$) and Forcing ($\alpha$)"
+if notitle:
+    title = ""
+else:
+    title = r"Adding Varying Damping ($\lambda_a$) and Forcing ($\alpha$)"
 
 plotacs = c_acs
 model   = 1
@@ -298,12 +304,17 @@ for i,e in enumerate([0,1,2,3]):
     
 ax.set_ylabel("Correlation")
 
+ax = viz.label_sp(0,case='lower', ax=ax, fontsize=16, labelstyle="(%s)")
+
 
 # --------------------------------------------
 
 # Plot Upper Hierarchy
 ax = axs[1]
-title = "Adding Varying Mixed Layer Depth ($h$) and Entrainment"
+if notitle:
+    title = ""
+else:
+    title = "Adding Varying Mixed Layer Depth ($h$) and Entrainment"
 #title      = "SST Autocorrelation (%s) \n Lag 0 = %s" % (locstringtitle,mons3[mldpt.argmax()])
 #ax,ax2,ax3 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title,loopvar=damppt)
 
@@ -315,7 +326,7 @@ ax,ax2= viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title)
 ax.plot(lags,cesmautofull,color='k',label='CESM1 Full',ls='dashdot',marker="o",markersize=3,lw=lw)
 ax.fill_between(lags,cffull[lags,0],cffull[lags,1],color='k',alpha=0.10)
 
-for i in range(1,4):
+for i in range(2,4):
     ax.plot(lags,ac[i],label=labelsnew[i],color=expcolors[i],ls=els[i],marker="o",markersize=3,lw=lw)
     ax.fill_between(lags,cfstoch[i,:,0],cfstoch[i,:,1],color=expcolors[i],alpha=0.25)
 
@@ -326,7 +337,10 @@ ax.legend(fontsize=10,ncol=3)
 plt.tight_layout()
 ax.set_ylabel("")
 
-plt.suptitle("Monthly SST Autocorrelation at 50N, 30W (Lag 0 = February)",fontsize=12,y=1.01)
+ax = viz.label_sp(1,case='lower', ax=ax, fontsize=16, labelstyle="(%s)")
+
+if notitle is False:
+    plt.suptitle("Monthly SST Autocorrelation at 50N, 30W (Lag 0 = February)",fontsize=12,y=1.01)
 
 # Save Default Values
 dampdef = damppt.copy()
@@ -444,6 +458,7 @@ cssts = scm.load_cesm_pt(datpath,loadname='both',grabpoint=[-30,50])
 #%% Calculate Spectra
 
 debug = False
+notitle = True
 
 # Smoothing Params
 nsmooth = 300
@@ -462,7 +477,7 @@ xlm  = [xtks[0],xtks[-1]]
 ylm  = [0,3.0]
 
 plotids = [[0,1,2,3,8],
-           [4,5,6,7]
+           [5,6,7]
            ]
 
 plottype = "freqlin"
@@ -471,7 +486,7 @@ plottype = "freqlin"
 inssts   = [c_ssts[0][1],c_ssts[1][1],c_ssts[2][1],c_ssts[3][1],sst[1],sst[2],sst[3],cssts[0],cssts[1]]
 nsmooths = np.concatenate([np.ones(len(inssts)-2)*nsmooth,cnsmooths])
 labels   = np.concatenate([ename,labelsnew[1:],['CESM-FULL','CESM-SLAB']])
-speclabels = ["%s (%.2f$\degree \, C^{2}$)" % (labels[i],np.var(inssts[i])) for i in range(len(inssts))]
+speclabels = ["%s (%.2f$ \, K^{2}$)" % (labels[i],np.var(inssts[i])) for i in range(len(inssts))]
 allcols  = np.concatenate([ecol,expcolors[1:],["k","gray"]])
 
 # Calculate Autocorrelation
@@ -514,10 +529,13 @@ for i in range(len(convert)):
 specs,freqs,speclabels,allcols = convert
 
 
+if notitle:
+    titles = ["",""]
+else:
+    titles = (r"Adding Varying Damping ($\lambda_a$) and Forcing ($\alpha$)",
+              "Adding Varying Mixed Layer Depth ($h$) and Entrainment"
+              )
 
-titles = (r"Adding Varying Damping ($\lambda_a$) and Forcing ($\alpha$)",
-          "Adding Varying Mixed Layer Depth ($h$) and Entrainment"
-          )
 
 sharetitle = "SST Spectra (50$\degree$N, 30$\degree$W) \n" + \
 "Smoothing (# bands): Stochastic Model (%i), CESM-FULL (%i), CESM-SLAB (%i)" %  (nsmooth,cnsmooths[0],cnsmooths[1])
@@ -528,12 +546,14 @@ for i in range(2):
     ax = axs[i]
     plotid = plotids[i]
     
+    
+    
     if plottype == "freqxpower":
         ax,ax2 = viz.plot_freqxpower(specs[plotid],freqs[plotid],speclabels[plotid],allcols[plotid],
                              ax=ax,plottitle=titles[i],xtick=xtks,xlm=xlm,return_ax2=True)
     elif plottype == "freqlin":
         ax,ax2 = viz.plot_freqlin(specs[plotid],freqs[plotid],speclabels[plotid],allcols[plotid],
-                             ax=ax,plottitle=titles[i],xtick=xtks,xlm=xlm,return_ax2=True)
+                             ax=ax,plottitle=titles[i],xtick=xtks,xlm=xlm,return_ax2=True,lw=lw)
     elif plottype == "freqlog":
         ax,ax2 = viz.plot_freqlog(specs[plotid],freqs[plotid],speclabels[plotid],allcols[plotid],
                              ax=ax,plottitle=titles[i],xtick=xtks,xlm=xlm,return_ax2=True)
@@ -547,9 +567,26 @@ for i in range(2):
     
     ax.set_ylim(ylm)
     
-fig.text(0.5, -0.05, 'Frequency (cycles/year)', ha='center',fontsize=12)
+    
+    ax2.set_xlabel("")
+    xtk2 = ax2.get_xticklabels()
+    xtk2new = np.repeat("",len(xtk2))
+    ax2.set_xticklabels(xtk2new)
+    
+    ax.set_xticklabels(1/xtks)
+    
+    if i == 0:
+         ax.set_xlabel("")
+         ax.set_ylabel("Power ($K^2/cpy$)")
+    #if i == 1:
+       # ax.set_xlabel("Period (Years)")
+    ax = viz.label_sp(i,case='lower', ax=ax, fontsize=16, labelstyle="(%s)")
+        
+#fig.text(0.5, -0.05, 'Frequency (cycles/year)', ha='center',fontsize=12)
+fig.text(0.5, -0.05, 'Period (Years)', ha='center',fontsize=12)
 #plt.suptitle("SST Power Spectra at 50$\degree$N, 30$\degree$W",y=1.15,fontsize=14)
-plt.suptitle(sharetitle,y=1.22,fontsize=14)
+if notitle is False:
+    plt.suptitle(sharetitle,y=1.05,fontsize=14)
 savename = "%sNASST_Spectra_Stochmod_%s_%s_pct%03i.png" % (outpath,plottype,smoothname,pct*100)
 plt.savefig(savename,dpi=200,bbox_inches='tight')
 
