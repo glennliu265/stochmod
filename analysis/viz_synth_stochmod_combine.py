@@ -101,7 +101,7 @@ projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 datpath     = projpath + '01_Data/'
 input_path  = datpath + 'model_input/'
 output_path = datpath + 'model_output/'
-outpath     = projpath + '02_Figures/20220113/'
+outpath     = projpath + '02_Figures/20220114/'
 proc.makedir(outpath)
 
 # Load in control data for 50N 30W
@@ -160,6 +160,7 @@ locstringtitle = "Lon: %.1f Lat: %.1f" % (query[0],query[1])
 #config['Fpt'] = np.roll(Fpt,1)
 ac,sst,dmp,frc,ent,Td,kmonth,params=scm.synth_stochmod(config,projpath=projpath)
 [o,a],damppt,mldpt,kprev,Fpt       =params
+darkmode = True
 
 # Read in CESM autocorrelation for all points'
 kmonth = np.argmax(mldpt)
@@ -240,11 +241,21 @@ cfslab = calc_conflag(cesmauto2,conf,tails,898)
 cffull = calc_conflag(cesmautofull,conf,tails,1798)
 
 #%%
+# Includes separate plots for the CSU Presentation
 
 
 notitle = True
+sepfig  = True
 
-fig,axs     = plt.subplots(1,2,figsize=(12,4),sharex=True,sharey=True,constrained_layout=False)
+
+# Figure Separation <1> Figure Creation
+if sepfig:
+    fig,ax = plt.subplots(1,1,figsize=(6,4))
+else:
+    fig,axs     = plt.subplots(1,2,figsize=(12,4),sharex=True,sharey=True,constrained_layout=False)
+    
+    # Plot Lower Hierarchy
+    ax = axs[0]
 
 # UPDATED Colors and names for generals (5/25/2021)
 #ecol = ["blue",'cyan','gold','red']
@@ -256,9 +267,6 @@ ename = ["All Constant",
          "All Varying"]
 
 lw = 3
-
-# Plot Lower Hierarchy
-ax = axs[0]
 
 if notitle:
     title = ""
@@ -304,17 +312,23 @@ for i,e in enumerate([0,1,2,3]):
     
 ax.set_ylabel("Correlation")
 
-ax = viz.label_sp(0,case='lower', ax=ax, fontsize=16, labelstyle="(%s)")
 
 
 # --------------------------------------------
-
 # Plot Upper Hierarchy
-ax = axs[1]
+
+# Figure Separation <2> Figure Save, Fig 2 Creation
+if sepfig:
+    plt.savefig(outpath+"Autocorrelation_lower-hierarchy_%s.png"%locstring,dpi=200,bbox_inches='tight')
+    fig,ax = plt.subplots(1,1,figsize=(6,4))
+else:
+    ax = viz.label_sp(0,case='lower', ax=ax, fontsize=16, labelstyle="(%s)")
+    ax = axs[1]
 if notitle:
     title = ""
 else:
     title = "Adding Varying Mixed Layer Depth ($h$) and Entrainment"
+
 #title      = "SST Autocorrelation (%s) \n Lag 0 = %s" % (locstringtitle,mons3[mldpt.argmax()])
 #ax,ax2,ax3 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title,loopvar=damppt)
 
@@ -337,7 +351,7 @@ ax.legend(fontsize=10,ncol=3)
 plt.tight_layout()
 ax.set_ylabel("")
 
-ax = viz.label_sp(1,case='lower', ax=ax, fontsize=16, labelstyle="(%s)")
+
 
 if notitle is False:
     plt.suptitle("Monthly SST Autocorrelation at 50N, 30W (Lag 0 = February)",fontsize=12,y=1.01)
@@ -347,8 +361,15 @@ dampdef = damppt.copy()
 mlddef = mldpt.copy()
 Fptdef = Fpt.copy()
 
-plt.savefig(outpath+"Autocorrelation_2-PANEL_%s.png"%locstring,dpi=200,bbox_inches='tight')
+# Figure Separation <3> Figure 2 Save
+if sepfig:
+    ax.set_ylabel("Correlation")
+    plt.savefig(outpath+"Autocorrelation_upper-hierarchy_%s.png"%locstring,dpi=200,bbox_inches='tight')
+else:
+    ax = viz.label_sp(1,case='lower', ax=ax, fontsize=16, labelstyle="(%s)")
+    plt.savefig(outpath+"Autocorrelation_2-PANEL_%s.png"%locstring,dpi=200,bbox_inches='tight')
 
+#%% 
 
 
 #%% AGU Style Plot (Vertically Stacked)
@@ -528,6 +549,9 @@ for i in range(len(convert)):
     convert[i] = np.array(convert[i])
 specs,freqs,speclabels,allcols = convert
 
+#%% # Plot the spectra
+
+sepfig = True
 
 if notitle:
     titles = ["",""]
@@ -541,9 +565,17 @@ sharetitle = "SST Spectra (50$\degree$N, 30$\degree$W) \n" + \
 "Smoothing (# bands): Stochastic Model (%i), CESM-FULL (%i), CESM-SLAB (%i)" %  (nsmooth,cnsmooths[0],cnsmooths[1])
 
 #% Plot the spectra
-fig,axs = plt.subplots(1,2,figsize=(16,4))
+
+if sepfig is False:
+    fig,axs = plt.subplots(1,2,figsize=(16,4))
+
+
 for i in range(2):
-    ax = axs[i]
+    
+    if sepfig is True:
+        fig,ax = plt.subplots(1,1,figsize=(8,4))
+    else:
+        ax = axs[i]
     plotid = plotids[i]
     
     
@@ -575,20 +607,31 @@ for i in range(2):
     
     ax.set_xticklabels(1/xtks)
     
-    if i == 0:
-         ax.set_xlabel("")
-         ax.set_ylabel("Power ($K^2/cpy$)")
-    #if i == 1:
-       # ax.set_xlabel("Period (Years)")
-    ax = viz.label_sp(i,case='lower', ax=ax, fontsize=16, labelstyle="(%s)")
+
+    
+    if sepfig is True: # Save separate figures
+        ax.set_xlabel('Period (Years)',fontsize=12)
+        ax.set_ylabel("Power ($K^2/cpy$)")
         
-#fig.text(0.5, -0.05, 'Frequency (cycles/year)', ha='center',fontsize=12)
-fig.text(0.5, -0.05, 'Period (Years)', ha='center',fontsize=12)
-#plt.suptitle("SST Power Spectra at 50$\degree$N, 30$\degree$W",y=1.15,fontsize=14)
-if notitle is False:
-    plt.suptitle(sharetitle,y=1.05,fontsize=14)
-savename = "%sNASST_Spectra_Stochmod_%s_%s_pct%03i.png" % (outpath,plottype,smoothname,pct*100)
-plt.savefig(savename,dpi=200,bbox_inches='tight')
+        savename = "%sNASST_Spectra_Stochmod_%s_%s_pct%03i_part%i.png" % (outpath,plottype,smoothname,pct*100,i)
+        plt.savefig(savename,dpi=200,bbox_inches='tight')
+    else:
+        if i == 0:
+             ax.set_xlabel("")
+             ax.set_ylabel("Power ($K^2/cpy$)")
+        #if i == 1:
+           # ax.set_xlabel("Period (Years)")
+        ax = viz.label_sp(i,case='lower', ax=ax, fontsize=16, labelstyle="(%s)")
+        
+
+if sepfig is False:
+    #fig.text(0.5, -0.05, 'Frequency (cycles/year)', ha='center',fontsize=12)
+    fig.text(0.5, -0.05, 'Period (Years)', ha='center',fontsize=12)
+    #plt.suptitle("SST Power Spectra at 50$\degree$N, 30$\degree$W",y=1.15,fontsize=14)
+    if notitle is False:
+        plt.suptitle(sharetitle,y=1.05,fontsize=14)
+    savename = "%sNASST_Spectra_Stochmod_%s_%s_pct%03i.png" % (outpath,plottype,smoothname,pct*100)
+    plt.savefig(savename,dpi=200,bbox_inches='tight')
 
 
 # plotid = 
