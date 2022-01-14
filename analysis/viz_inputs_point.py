@@ -51,7 +51,7 @@ proc.makedir(outpath)
 
 # Put slab version first, then the load_load func. searches in the same
 # directory replace "SLAB_PIC" with "FULL_PIC"
-frcname = "flxeof_090pct_FULL-PIC_eofcorr2"
+frcname = "Qek_eof_090pct_FULL_PIC_eofcorr0"
 
 # Which point do you want to visualize conditions for?
 lonf = -30
@@ -329,7 +329,7 @@ for i in range(4):
 
 cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='vertical',fraction=0.009)
 cb.set_label("Total Forcing Amplitude ($W/m^2$)")
-
+plt.savefig("%sForcing_SeasonaAvg_%s.png"%(outpath,frcname),dpi=200)
 #%% Plot the Damping Patterns
 
 
@@ -466,6 +466,8 @@ for v in range(3):
 #%% Try Subfigures Method
 import matplotlib as mpl
 
+notitle = True
+
 #mpl.rcParams['font.sans-serif'] = "Avenir"#"stix"
 #mpl.rcParams['font.family'] = "sans-serif"#"STIXGeneral"
 #mpl.rcParams["text.usetex"] = True
@@ -476,20 +478,26 @@ mpl.rcParams['font.family'] = "STIXGeneral"
 
 mpl.rcParams.update(mpl.rcParamsDefault)
 
+cblabs2 = ("Total Forcing Amplitude \n Contour = 5 $W/m^2$",
+          "Atmospheric Damping \n Contour = 5 $W/m^2 / \degree C$",
+          "Mixed-Layer Depth \n Contours = 10-250 $m$"
+          )
 
-cblabs2 = (u"Contours: 5 $Wm^{-2}$",
-           u"Contours: 5 $Wm^{-2} \degree C^{-1}$",
-           u"Contours = 10-250 $m$")
+# cblabs2 = (u"Contours: 5 $Wm^{-2}$",
+#            u"Contours: 5 $Wm^{-2} \degree C^{-1}$",
+#            u"Contours = 10-250 $m$")
 
 
 fig = plt.figure(constrained_layout=True,figsize=(12,8))
-fig.suptitle("Stochastic Model Inputs (CESM1-FULL, Seasonal Average)",fontsize=20)
+if notitle is False:
+    fig.suptitle("Stochastic Model Inputs (CESM1-FULL, Seasonal Average)",fontsize=20)
 
 # Create 3x1 subfigs
 sp_id = 0
 subfigs = fig.subfigures(nrows=3,ncols=1)
 for row,subfig in enumerate(subfigs):
-    subfig.suptitle(vnames[row])
+    if notitle is False:
+        subfig.suptitle(vnames[row])
     
     v = row
     
@@ -530,14 +538,17 @@ plt.savefig(outpath+"Seasonal_Inputs_CESM-FULL.png",dpi=200,bbox_inches='tight')
 
 
 invars = (alphaavgslab,dampingavgslab,havgslab)
-cblabs = ("Total Forcing Amplitude \n Contour = 5 $W/m^2$",
-          "Atmospheric Damping \n Contour = 5 $W/m^2 / \degree C$",
-          "Mixed-Layer Depth \n Contours = 10-250 $m$"
-          )
+
 vnames = (r"Total Forcing Amplitude ($\alpha$)",
           r"Atmospheric Damping ($\lambda_a$)",
           r"Mixed-Layer Depth ($h$)")
-cblabs2 = (u"Contour = 5 $Wm^{-2}$",u"Contour = 5 $Wm^{-2} \degree C^{-1}$",u"Contours = 10-250 $m$")
+
+cblabs2 = ("Total Forcing Amplitude \n Contour = 5 $W/m^2$",
+          "Atmospheric Damping \n Contour = 5 $W/m^2 / \degree C$",
+          "Mixed-Layer Depth \n Contours = 10-250 $m$"
+          )
+
+
 
 # Draft 1
 # cints  = (np.arange(0,105,5),np.arange(0,65,5),np.arange(0,1050,50)
@@ -594,6 +605,81 @@ for row,subfig in enumerate(subfigs):
     
 #plt.show()
 plt.savefig(outpath+"Seasonal_Inputs_CESM-SLAB.png",dpi=200,bbox_inches='tight')
+
+
+# ----------------------------------------------------------
+# %% Plot the differences between CESM1-FULL and CESM1-SLAB
+# ----------------------------------------------------------
+
+# Declare the lists
+invarsslab = (alphaavgslab,dampingavgslab,havgslab)
+invarsfull = (alphaavg,dampingavg,havg)
+    
+# Set the Labels
+notitle = True
+cblabs2 = ("Total Forcing Amplitude \n Contour = 1 $W/m^2$",
+          "Atmospheric Damping \n Contour = 2 $W/m^2 / \degree C$",
+          "Mixed-Layer Depth \n Contours = 20 $m$"
+          )
+vnames = (r"Total Forcing Amplitude ($\alpha$)",
+          r"Atmospheric Damping ($\lambda_a$)",
+          r"Mixed-Layer Depth ($h$)")
+cblabs2 = (u"Contour = 5 $Wm^{-2}$",u"Contour = 5 $Wm^{-2} \degree C^{-1}$",u"Contours = 10-250 $m$")
+
+# Draft 2
+cints  = (np.arange(-10,11,1),np.arange(-24,26,2),np.arange(-500,520,20))
+          
+cmaps  = ('PiYG','RdBu_r','PuOr') 
+snamesl = ('Winter (DJF)','Spring (MAM)','Summer (JJA)','Fall (SON)')
+
+
+fig = plt.figure(constrained_layout=True,figsize=(12,8))
+#fig.suptitle("Stochastic Model Inputs (CESM1-SLAB, Seasonal Average)",fontsize=20)
+sp_id = 0
+# Create 3x1 subfigs
+subfigs = fig.subfigures(nrows=3,ncols=1)
+for row,subfig in enumerate(subfigs):
+    if notitle is False:
+        subfig.suptitle(vnames[row])
+    
+    v = row
+    
+    #invar = invars[v]
+    cblab = cblabs[v]
+    cint  = cints[v]
+    cmap  = cmaps[v]
+    
+    # Create 1x4 subplots per subfig
+    axs = subfig.subplots(nrows=1, ncols=4,subplot_kw={'projection':ccrs.PlateCarree()})
+    
+    for s, ax in enumerate(axs):
+        
+        # Set Lat/Lon Labels
+        blabel = [0,0,0,0]
+        if v == 2:
+            blabel[-1] = 1 # Add Bottom Label
+        if s == 0:
+            blabel[0]  = 1 # Add Left Label
+        
+        # Set Title (First Row Only)
+        if v == 0:
+            ax.set_title(snamesl[s],fontsize=14)
+            
+        plotvar = (invarsslab[v][s] - invarsfull[v][s]).T
+        
+        pcm=ax.contourf(lon,lat,plotvar,levels=cint,extend='both',cmap=cmap)
+        ax = viz.add_coast_grid(ax=ax,bbox=bbox,blabels=blabel,fill_color='gray')
+        
+        ax = viz.label_sp(sp_id,ax=ax,fontsize=18,fig=fig,labelstyle="(%s)",case='lower',alpha=.75)
+        sp_id += 1
+        
+    cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='vertical',fraction=0.009,pad=.010)
+    cb.set_label(cblabs2[v],fontsize=12)
+    
+
+    
+#plt.show()
+plt.savefig(outpath+"Seasonal_Inputs_SLAB-Minus-FULL.png",dpi=200,bbox_inches='tight')
 
 
 # --------------------------------------
@@ -666,6 +752,23 @@ fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction=0.035,pad=0.
 plt.suptitle("Seasonal Mean Mixed Layer Depth Differences in meters \n (CESM1 - WOA 1994)",fontsize=14,y=.94)
 
 plt.savefig("%sMLD_Differences-CESM1_WOA1994_Savg.png" %(outpath),dpi=200,bbox_inches='tight')
+
+
+
+#%% Scrap Section
+
+plotvar = h.mean(2)
+
+
+
+levels = 10
+levels = [0,100,150,200,250,300]
+levels = np.arange(0,1000,1)
+
+fig,ax = plt.subplots(1,1)
+cf = ax.contourf(lon,lat,plotvar.T,levels=levels)
+cb = fig.colorbar(cf,ax=ax)
+
 
 
 
