@@ -10,6 +10,7 @@ constant_v_variable
 Created on Wed Oct  6 22:17:26 2021
 
 @author: gliu
+
 """
 
 import numpy as np
@@ -241,7 +242,6 @@ cfslab = calc_conflag(cesmauto2,conf,tails,898)
 cffull = calc_conflag(cesmautofull,conf,tails,1798)
 
 #%%
-# Includes separate plots for the CSU Presentation
 
 
 notitle = True
@@ -312,8 +312,6 @@ for i,e in enumerate([0,1,2,3]):
     
 ax.set_ylabel("Correlation")
 
-
-
 # --------------------------------------------
 # Plot Upper Hierarchy
 
@@ -369,7 +367,125 @@ else:
     ax = viz.label_sp(1,case='lower', ax=ax, fontsize=16, labelstyle="(%s)")
     plt.savefig(outpath+"Autocorrelation_2-PANEL_%s.png"%locstring,dpi=200,bbox_inches='tight')
 
-#%% 
+#%%  Sucessively Add Each Line 
+# This is for the LOWER hierarchy
+
+"""
+Note this is the section used to generate figures for the following
+presentations
+    - Generals Exam Presentation
+    - Presentation to ECCO/CSU Group
+    - OSM 2022 Presentation
+"""
+
+lw         = 3
+markersize = 6
+addvar     = False
+darkmode   = True
+
+if darkmode:
+    plt.style.use('dark_background')
+    dfcol      = 'w'
+    dfalph     = 0.30
+    dfalph_col = 0.40
+else:
+    plt.style.use('default')
+    dfcol      = 'k'
+    dfalph     = 0.1
+    dfalph_col = 0.25 
+    
+
+#plotlags = np.arange(0,24)
+lags    = np.arange(0,25,1)
+xtk2    = np.arange(0,25,2)
+for es in range(4):
+    loopis = np.arange(0,es+1)
+    print(loopis)
+    
+    
+    figs,ax = plt.subplots(1,1,figsize=(6,4))
+    if addvar:
+        ax,ax2,ax3 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title,loopvar=plotvar)
+        ax3.set_ylabel(ylab)
+        ax3.yaxis.label.set_color('gray')
+    else:
+        ax,ax2 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title)
+    
+    # Plot CESm1-SLAB
+    ax.plot(lags,cesmauto2[lags],label="CESM1 SLAB",color='gray',marker="o",markersize=markersize,lw=lw)
+    ax.fill_between(lags,cfslab[lags,0],cfslab[lags,1],color='gray',alpha=dfalph)
+    
+    # Plot stochastic models
+    for i,e in enumerate(loopis):
+        title=""
+        ax.set_ylabel("")
+        cfs = confs[e,model,:,:]
+        ax.plot(lags,plotacs[e][model][lags],
+                label=ename[i],color=ecol[i],
+                ls=els[i],marker="o",markersize=markersize,
+                lw=lw)
+        ax.fill_between(lags,cfs[lags,0],cfs[lags,1],color=ecol[i],alpha=dfalph_col)
+        ax.legend(fontsize=8,ncol=3)
+        
+    ax.set_ylabel("Correlation")
+    plt.suptitle("SST Autocorrelation: Non-Entraining Stochastic Model \n Adding Varying Damping and Forcing",fontsize=12)
+    plt.tight_layout()
+    plt.savefig("%sAutocorrelation_LowerHierarchy_%i.png"% (outpath,es),dpi=150)
+    print("Done With %i"% es)
+
+#%% Upper Hierarchy
+
+lw         = 3
+markersize = 3#4
+addvar     = False
+
+#plotlags = np.arange(0,24)
+
+lags    = np.arange(0,37,1)
+xtk2    = np.arange(0,37,2)
+
+loopis = [2,3] # Which is to look through
+
+for es in range(2):
+    print(loopis)
+    
+    figs,ax = plt.subplots(1,1,figsize=(6,4))
+    ax,ax2 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title)
+    
+    # Plot CESM1-FULL
+    ax.plot(lags,cesmautofull[lags],color=dfcol,label='CESM1 Full',ls='dashdot',marker="o",markersize=markersize,lw=lw)
+    ax.fill_between(lags,cffull[lags,0],cffull[lags,1],color=dfcol,alpha=dfalph)
+    
+    # plot for the stochastic model
+    
+    for count in range(es+1):
+        i = loopis[count]
+        
+        ax.plot(lags,ac[i],label=labelsnew[i],color=expcolors[i],ls=els[i],marker="o",markersize=markersize,lw=lw)
+        ax.fill_between(lags,cfstoch[i,:,0],cfstoch[i,:,1],color=expcolors[i],alpha=0.25)
+    
+    
+    
+    # for i,e in enumerate(loopis):
+        
+    #     title=""
+    #     ax.set_ylabel("")
+        
+    #     cfs = confs[e,model,:,:]
+    #     ax.plot(lags,plotacs[e][model][lags],
+    #             label=ename[i],color=ecol[i],
+    #             ls=els[i],marker="o",markersize=markersize,
+    #             lw=lw)
+    #     ax.fill_between(lags,cfs[lags,0],cfs[lags,1],color=ecol[i],alpha=dfalph_col)
+        
+        ax.legend(fontsize=8,ncol=3)
+        
+    ax.set_ylabel("Correlation")
+    plt.suptitle("SST Autocorrelation: Non-Entraining Stochastic Model \n Adding Varying Damping and Forcing",fontsize=12)
+    plt.tight_layout()
+    plt.savefig("%sAutocorrelation_UpperHierarchy_%i.png"% (outpath,es),dpi=150)
+    print("Done With %i"% es)
+
 
 
 #%% AGU Style Plot (Vertically Stacked)
@@ -480,6 +596,13 @@ cssts = scm.load_cesm_pt(datpath,loadname='both',grabpoint=[-30,50])
 
 debug = False
 notitle = True
+darkmode = True 
+
+
+if darkmode:
+    plt.style.use("dark_background")
+else:
+    plt.style.use("default")
 
 # Smoothing Params
 nsmooth = 300
@@ -508,7 +631,7 @@ inssts   = [c_ssts[0][1],c_ssts[1][1],c_ssts[2][1],c_ssts[3][1],sst[1],sst[2],ss
 nsmooths = np.concatenate([np.ones(len(inssts)-2)*nsmooth,cnsmooths])
 labels   = np.concatenate([ename,labelsnew[1:],['CESM-FULL','CESM-SLAB']])
 speclabels = ["%s (%.2f$ \, K^{2}$)" % (labels[i],np.var(inssts[i])) for i in range(len(inssts))]
-allcols  = np.concatenate([ecol,expcolors[1:],["k","gray"]])
+allcols  = np.concatenate([ecol,expcolors[1:],[dfcol,"gray"]])
 
 # Calculate Autocorrelation
 allacs,allconfs = scm.calc_autocorr(inssts,lags,kmonth+1,calc_conf=True)
@@ -551,7 +674,8 @@ specs,freqs,speclabels,allcols = convert
 
 #%% # Plot the spectra
 
-sepfig = True
+sepfig   = True
+
 
 if notitle:
     titles = ["",""]
@@ -559,7 +683,6 @@ else:
     titles = (r"Adding Varying Damping ($\lambda_a$) and Forcing ($\alpha$)",
               "Adding Varying Mixed Layer Depth ($h$) and Entrainment"
               )
-
 
 sharetitle = "SST Spectra (50$\degree$N, 30$\degree$W) \n" + \
 "Smoothing (# bands): Stochastic Model (%i), CESM-FULL (%i), CESM-SLAB (%i)" %  (nsmooth,cnsmooths[0],cnsmooths[1])
@@ -577,8 +700,6 @@ for i in range(2):
     else:
         ax = axs[i]
     plotid = plotids[i]
-    
-    
     
     if plottype == "freqxpower":
         ax,ax2 = viz.plot_freqxpower(specs[plotid],freqs[plotid],speclabels[plotid],allcols[plotid],
@@ -673,7 +794,6 @@ if sepfig is False:
 
 # Get the spectra
 #specs,freqs,CCs,dofs,r1s = scm.quick_spectrum(sstin,nsmooth,pct)
-
 #%% AGU Version (Vertically Stacked)
 
 debug = False
@@ -781,9 +901,6 @@ fig.text(0.04,0.5,'Power ($\degree C^2/cpy$)',va='center', rotation='vertical')
 plt.suptitle(sharetitle,fontsize=14,y=.925)
 savename = "%sNASST_Spectra_Stochmod_%s_%s_pct%03i_vertical.png" % (outpath,plottype,smoothname,pct*100)
 plt.savefig(savename,dpi=200,bbox_inches='tight')
-
-
-
 
 #%% Make a plot with an inset
 from mpl_toolkits.axes_grid.inset_locator import (inset_axes, InsetPosition,
