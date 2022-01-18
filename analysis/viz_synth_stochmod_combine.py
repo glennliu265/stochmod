@@ -29,72 +29,6 @@ import cartopy.crs as ccrs
 
 from scipy import signal
 
-# #%%
-# output_path = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_output/'
-
-# # Experimental Configurations
-# config = {}
-# config['mconfig'] = 'SLAB_PIC'
-# config['fname']   = 'flxeof_090pct_SLAB-PIC_eofcorr2.npy'
-# config['runid']   = 'syn007'
-
-# #%% Load CESM Data
-# #%% Load Constant_v_vary experiments
-# savenames = "%sconst_v_vary_%s_runid%s_%s.npz" % (output_path,config['mconfig'],config['runid'],config['fname'])
-# print("Loading %s" % savenames)
-# ld = np.load(savenames,allow_pickle=True)
-
-# c_acs  = ld['acs'].item
-# c_ssts = ld['ssts'].item
-# # print("Saving clean run to %s" % savenames)
-# # np.savez(savenames,**{
-# #     'expids':expids,
-# #     'acs':acs,
-# #     'ssts':ssts,
-# #     'damps':damps,
-# #     'mlds':mlds,
-# #     'forces':forces,
-# #     'explongs':explongs
-# #     },allow_pickle=True)
-
-# #%% Load Synthetic Experiments
-# savenames = "%scleanrun_%s_runid%s_%s.npz" % (output_path,config['mconfig'],config['runid'],config['fname'])
-# print("Loading clean run %s" % savenames)
-# ld = np.load(savenames,allow_pickle=True)
-
-# s_acs = ld['ac'].item
-# s_ssts = ld['sst'].item
-# # np.savez(savenames,**{
-# #     'ac':ac,
-# #     'sst': sst,
-# #     'dmp': dmp,
-# #     'frc': frc,
-# #     'entr' : ent,
-# #     'Td': Td,
-# #     'kmonth':kmonth,
-# #     'params':params
-# #     }, allow_pickle=True)
-
-# #%%
-
-
-
-import numpy as np
-from scipy.io import loadmat,savemat
-import matplotlib.pyplot as plt
-import sys
-sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
-sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
-from amv import proc,viz
-import yo_box as ybx
-from scipy.interpolate import interp1d
-from tqdm import tqdm
-import scm
-import time
-import cartopy.crs as ccrs
-
-from scipy import signal
-
 #%% Settings
 
 # Set Paths
@@ -145,6 +79,15 @@ config.pop('mldpt',None)
 # Confidence Level Calculations
 conf  = 0.95
 tails = 2
+
+# Plotting Mode
+darkmode = True
+if darkmode:
+    plt.style.use("dark_background")
+    dfcol = "w"
+else:
+    plt.style.use("default")
+    dfcol = "k"
 #% ------------
 #%% Clean Run
 #% ------------
@@ -177,8 +120,8 @@ xtk2       = np.arange(0,37,2)
 fig,ax     = plt.subplots(1,1)
 title      = "SST Autocorrelation at %s (Lag 0 = %s)" % (locstringtitle,mons3[mldpt.argmax()])
 ax,ax2,ax3 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,loopvar=params[2],title=title)
-ax.plot(lags,cesmauto2[lags],label="CESM SLAB",color='k')
-ax.plot(lags,cesmautofull,color='k',label='CESM Full',ls='dashdot')
+ax.plot(lags,cesmauto2[lags],label="CESM SLAB",color='gray')
+ax.plot(lags,cesmautofull,color=dfcol,label='CESM Full',ls='dashdot')
 
 for i in range(1,4):
     ax.plot(lags,ac[i],label=labels[i],color=expcolors[i])
@@ -241,12 +184,11 @@ for m in range(4):
 cfslab = calc_conflag(cesmauto2,conf,tails,898)
 cffull = calc_conflag(cesmautofull,conf,tails,1798)
 
-#%%
+#%% Plot SSTT Autocorrelation at the test point
 
 
-notitle = True
-sepfig  = True
-
+notitle = True  # Remove Title for publications
+sepfig  = True  # Plot figures separately, for presentaiton, or together)
 
 # Figure Separation <1> Figure Creation
 if sepfig:
@@ -433,7 +375,7 @@ for es in range(4):
     plt.savefig("%sAutocorrelation_LowerHierarchy_%i.png"% (outpath,es),dpi=150)
     print("Done With %i"% es)
 
-#%% Upper Hierarchy
+#%% Upper Hierarchy (succesively Add each line)
 
 lw         = 3
 markersize = 3#4
@@ -485,8 +427,6 @@ for es in range(2):
     plt.tight_layout()
     plt.savefig("%sAutocorrelation_UpperHierarchy_%i.png"% (outpath,es),dpi=150)
     print("Done With %i"% es)
-
-
 
 #%% AGU Style Plot (Vertically Stacked)
 
@@ -674,21 +614,19 @@ specs,freqs,speclabels,allcols = convert
 
 #%% # Plot the spectra
 
+plottype = 'freqlog'#'freqlin'
+
 sepfig   = True
-
-
 if notitle:
     titles = ["",""]
 else:
     titles = (r"Adding Varying Damping ($\lambda_a$) and Forcing ($\alpha$)",
               "Adding Varying Mixed Layer Depth ($h$) and Entrainment"
               )
-
 sharetitle = "SST Spectra (50$\degree$N, 30$\degree$W) \n" + \
 "Smoothing (# bands): Stochastic Model (%i), CESM-FULL (%i), CESM-SLAB (%i)" %  (nsmooth,cnsmooths[0],cnsmooths[1])
 
 #% Plot the spectra
-
 if sepfig is False:
     fig,axs = plt.subplots(1,2,figsize=(16,4))
 
@@ -707,9 +645,12 @@ for i in range(2):
     elif plottype == "freqlin":
         ax,ax2 = viz.plot_freqlin(specs[plotid],freqs[plotid],speclabels[plotid],allcols[plotid],
                              ax=ax,plottitle=titles[i],xtick=xtks,xlm=xlm,return_ax2=True,lw=lw)
+        ylabel = "Power ($K^2/cpy$)"
     elif plottype == "freqlog":
         ax,ax2 = viz.plot_freqlog(specs[plotid],freqs[plotid],speclabels[plotid],allcols[plotid],
-                             ax=ax,plottitle=titles[i],xtick=xtks,xlm=xlm,return_ax2=True)
+                             ax=ax,plottitle=titles[i],xtick=xtks,xlm=xlm,return_ax2=True,lw=lw)
+        ax.set_ylim([1e-1,1e1])
+        ylabel = "Variance ($K^2$)"
     ax2.set_xlabel("Period (Years)")
     if i == 1:
         ax.set_ylabel("")
@@ -938,4 +879,97 @@ plt.suptitle("SST Power Spectra at 50N, 30W",y=1.05)
 savename = "%sNASST_Spectra_Stochmod_%s_nsmooth%i_pct%03i.png" % (outpath,plottype,nsmooth,pct*100)
 plt.savefig(savename,dpi=200,bbox_inches='tight')
 
+#%% Plot Specific ranges similar to Patrizio et al. 2021
 
+
+plottype = 'freqlog'#'freqlin'
+# Shorter Timescales
+# xper = np.array([25,10,5,2.5,1,0.5,0.2])
+# xtks = 1/xper
+# xlm  = [xtks[0],xtks[-1]]
+# Clement et al. 2015 range
+xper = np.array([50,25,10,5,2.5,1.0])
+xtks = 1/xper
+xlm  = [xtks[0],xtks[-1]]
+ylm  = [0.5e-1,5e1]
+
+sepfig   = True
+if notitle:
+    titles = ["",""]
+else:
+    titles = (r"Adding Varying Damping ($\lambda_a$) and Forcing ($\alpha$)",
+              "Adding Varying Mixed Layer Depth ($h$) and Entrainment"
+              )
+sharetitle = "SST Spectra (50$\degree$N, 30$\degree$W) \n" + \
+"Smoothing (# bands): Stochastic Model (%i), CESM-FULL (%i), CESM-SLAB (%i)" %  (nsmooth,cnsmooths[0],cnsmooths[1])
+
+#% Plot the spectra
+if sepfig is False:
+    fig,axs = plt.subplots(1,2,figsize=(16,4))
+
+
+for i in range(2):
+    
+    if sepfig is True:
+        fig,ax = plt.subplots(1,1,figsize=(8,4))
+    else:
+        ax = axs[i]
+    plotid = plotids[i]
+    
+    if plottype == "freqxpower":
+        ax,ax2 = viz.plot_freqxpower(specs[plotid],freqs[plotid],speclabels[plotid],allcols[plotid],
+                             ax=ax,plottitle=titles[i],xtick=xtks,xlm=xlm,return_ax2=True)
+        
+    elif plottype == "freqlin":
+        ax,ax2 = viz.plot_freqlin(specs[plotid],freqs[plotid],speclabels[plotid],allcols[plotid],
+                             ax=ax,plottitle=titles[i],xtick=xtks,xlm=xlm,return_ax2=True,lw=lw)
+        ylabel = "Power ($K^2/cpy$)"
+    elif plottype == "freqlog":
+        ax,ax2 = viz.plot_freqlog(specs[plotid],freqs[plotid],speclabels[plotid],allcols[plotid],
+                             ax=ax,plottitle=titles[i],xtick=xtks,xlm=xlm,return_ax2=True,lw=lw)
+        #ax.set_ylim([1e-1,1e1])
+        #ax.set_ylim([1e-2,1e2])
+        ylabel = "Variance ($K^2$)"
+    ax2.set_xlabel("Period (Years)")
+    if i == 1:
+        ax.set_ylabel("")
+    ax.set_xlabel("")
+        
+    plt.setp(ax2.get_xticklabels(), rotation=50,fontsize=8)
+    plt.setp(ax.get_xticklabels(), rotation=50,fontsize=8)
+    
+    ax.set_ylim(ylm)
+    
+    
+    ax2.set_xlabel("")
+    xtk2 = ax2.get_xticklabels()
+    xtk2new = np.repeat("",len(xtk2))
+    ax2.set_xticklabels(xtk2new)
+    
+    ax.set_xticklabels(1/xtks)
+    
+
+    
+    if sepfig is True: # Save separate figures
+        ax.set_xlabel('Period (Years)',fontsize=12)
+        ax.set_ylabel("Power ($K^2/cpy$)")
+        
+        savename = "%sNASST_Spectra_Stochmod_%s_%s_pct%03i_part%i.png" % (outpath,plottype,smoothname,pct*100,i)
+        plt.savefig(savename,dpi=200,bbox_inches='tight')
+    else:
+        if i == 0:
+             ax.set_xlabel("")
+             ax.set_ylabel("Power ($K^2/cpy$)")
+        #if i == 1:
+           # ax.set_xlabel("Period (Years)")
+        ax = viz.label_sp(i,case='lower', ax=ax, fontsize=16, labelstyle="(%s)")
+        
+
+if sepfig is False:
+    #fig.text(0.5, -0.05, 'Frequency (cycles/year)', ha='center',fontsize=12)
+    fig.text(0.5, -0.05, 'Period (Years)', ha='center',fontsize=12)
+    #plt.suptitle("SST Power Spectra at 50$\degree$N, 30$\degree$W",y=1.15,fontsize=14)
+    if notitle is False:
+        plt.suptitle(sharetitle,y=1.05,fontsize=14)
+    savename = "%sNASST_Spectra_Stochmod_%s_%s_pct%03i.png" % (outpath,plottype,smoothname,pct*100)
+    plt.savefig(savename,dpi=200,bbox_inches='tight')
