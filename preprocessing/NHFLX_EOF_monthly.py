@@ -44,7 +44,7 @@ elif stormtrack == 0:
     
     datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/"
     #datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/"
-    outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20211018/"
+    outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220113/"
 
     lipath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/landicemask_enssum.npy"
     #llpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/"
@@ -83,6 +83,10 @@ def sel_regionxr(ds,bbox):
 
 # Set your configuration
 mconfig = "PIC_FULL"
+if mconfig == "PIC_SLAB":
+    mcname = "SLAB-PIC"
+elif mconfig == "PIC_FULL":
+    mcname = "FULL-PIC"
 bbox    = [260,20,0,65]
 bboxeof = [280,20,0,65]
 
@@ -290,13 +294,15 @@ varexpall = ld['varexpall']
 
 lon = ld['lon']
 lat = ld['lat']
+
+lon360        = np.load(datpath+"../CESM_lon360.npy")
+lon180,_        = scm.load_latlon()
 #%% Flip sign to match NAO+ (negative heat flux out of ocean/ -SLP over SPG)
 
 spgbox     = [-60,20,40,80]
 eapbox     = [-60,20,40,60] # Shift Box west for EAP
 
 N_modeplot = 5
-
 for N in tqdm(range(N_modeplot)):
     if N == 1:
         chkbox = eapbox # Shift coordinates west
@@ -521,6 +527,17 @@ print("Saved data to "+savenamefrc)
 
 
 #%% (@@) Plot the above EOFs
+# Note this is also the bottom of figure from SM Paper Outline
+
+darkmode = False
+if darkmode:
+    plt.style.use('dark_background')
+    dfcol = "w"
+else:
+    plt.style.use('default')
+    dfcol = 'k'
+
+notitle = True
 
 ids = [11,0,1]
 clvl = np.arange(-60,65,5)
@@ -531,24 +548,76 @@ titles = ["EOF 1 (NAO, %.2f" % (varexpall[0,ids].mean()*100) + "% Variance)" ,
 #fig,axs = plt.subplots(2,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(12,7))
 fig,axs = plt.subplots(1,2,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(12,4))
 
+spid = 3
 for k in range(2):
     ax = axs[k]
-    ax  = viz.add_coast_grid(ax,bbox=bbox)
+    ax  = viz.add_coast_grid(ax,bbox=bbox,line_color=dfcol)
     pcm = ax.contourf(lon180,lat,eofall[:,:,ids,k].mean(-1).T,levels=clvl,cmap='PRGn')
-    cl  = ax.contour(lon180,lat,eofslp[:,:,ids,k].mean(-1).T,levels=plvl,colors='k',linewidths=.7)
+    cl  = ax.contour(lon180,lat,eofslp[:,:,ids,k].mean(-1).T,levels=plvl,colors=dfcol,linewidths=.7)
     ax.clabel(cl,fontsize=10)
     ax.set_title(titles[k])
+    
+    ax = viz.label_sp(spid,case='lower',ax=ax,labelstyle="(%s)",fontsize=16,alpha=0.7)
+    spid += 1
 
 
 cb = fig.colorbar(pcm,ax=axs.flatten(),fraction=0.015)
-cb.set_label("$Q_{net}$ ,Interval = 5 $W/m^2$ per $\sigma_{PC}$")
+cb.set_label("$Q_{net}$ ,Contour = 5 $Wm^{-2} \,\sigma_{PC}^{-1}$")
 #plt.suptitle("SLP (Contours), Interval = 100 hPa",x=0.6, y=.955,fontsize=14)
-plt.suptitle("$Q_{net}$ Forcing Pattern (Colors) and SLP (Contours, Interval = 100 hPa), DJF Mean",fontsize=12)
+if notitle is False:
+    plt.suptitle("$Q_{net}$ Forcing Pattern (Colors) and SLP (Contours, Interval = 100 hPa), DJF Mean",fontsize=12)
 
 #fig.text(0.07, 0.5, mcname, va='center', rotation='vertical',fontsize=12)
 
-
 plt.savefig("%sEOF1_EOF2_uncorrected_%s.png"%(outpath,mcname),dpi=150,bbox_inches='tight')
+
+#%% Plot Select EOF and PC
+k   = 0
+ids = [0,]
+
+replace_wn = True
+
+fig = plt.figure(constrained_layout=False, facecolor='w',figsize=(12,4))
+
+gs = fig.add_gridspec(nrows=1, ncols=3, left=.02, right=1,
+                      hspace=.075, wspace=0.25)
+
+# Plot the Map
+ax0 = fig.add_subplot(gs[0, 0],projection=ccrs.PlateCarree())
+ax  = ax0
+ax  = viz.add_coast_grid(ax,bbox=bbox,line_color=dfcol)
+pcm = ax.contourf(lon180,lat,eofall[:,:,ids,k].mean(-1).T,levels=clvl,cmap='RdBu_r',extend='both')
+cl  = ax.contour(lon180,lat,eofslp[:,:,ids,k].mean(-1).T,levels=plvl,colors=dfcol,linewidths=.7)
+ax.clabel(cl,fontsize=10)
+ax.set_title("EOF %i Pattern (SLP, Contour = 100 hPa)" % (k+1))
+cb = fig.colorbar(pcm,ax=ax,orientation='horizontal')
+cb.set_label("$Q_{net}$ ,Contour = 5 $Wm^{-2}$")
+
+#annotate_axes(ax0, 'ax0')
+ax1 = fig.add_subplot(gs[0,1:3])
+if replace_wn:
+    ax1.plot(np.random.normal(0,1,pcall.shape[-1]),color='gray')
+else:
+    ax1.plot(pcall[k,ids,:].mean(0))
+ystd = np.std(pcall[k,ids,:]*3)
+ax1.set_ylim([-ystd,ystd])
+ax1.set_title("%s PC %i (Percent Variance Explained: %.2f" % (mons3[ids[0]],k+1,varexpall[1,ids].mean()*100) + "%)" )
+ax1.set_xlim([0,pcall.shape[-1]])
+ax1.grid(True,ls='dotted')
+ax1.set_xlabel("Time (Months)")
+ax1.set_ylabel("PC %i"%(k+1))
+ax1.axhline([0],ls='dashed',color='k')
+
+#annotate_axes(ax1, 'ax1')
+#annotate_axes(ax2, 'ax2')
+#fig.suptitle('Manual gridspec with right=0.75')
+#plt.show()
+if replace_wn:
+    savename = "%s%s_EOF%i_Pattern_WhiteNoise.png" % (outpath,mcname,k+1)
+else:
+    "%s%s_EOF%i_Pattern_PC.png" % (outpath,mcname,k+1)
+
+plt.savefig(savename,dpi=200,bbox_inches='tight')
 
 #%% Quickly check what is going on with EOF SLP
 
