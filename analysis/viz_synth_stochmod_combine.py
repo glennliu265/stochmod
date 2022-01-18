@@ -36,7 +36,7 @@ projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 datpath     = projpath + '01_Data/'
 input_path  = datpath + 'model_input/'
 output_path = datpath + 'model_output/'
-outpath     = projpath + '02_Figures/20220114/'
+outpath     = projpath + '02_Figures/20220119/'
 proc.makedir(outpath)
 
 # Load in control data for 50N 30W
@@ -44,14 +44,33 @@ proc.makedir(outpath)
 #fullauto = np.load(datpath+"FULL_PIC_autocorr_lon330_lat50_lags0to36_month2.npy")
 fullauto = np.load(datpath+"CESM_clim/TS_FULL_Autocorrelation.npy")
 
-mons3=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
-labels=["MLD Fixed","MLD Mean","MLD Seasonal","MLD Entrain"]
-labelsnew = ["h=50m","Constant $h$","Vary $h$","Entraining"]
-#labels=["MLD (MAX)","MLD Seasonal","MLD Entrain"]
-#colors=["red","orange","magenta","blue"]
-#expcolors = ('blue','red','magenta','orange')
-expcolors = ('mediumorchid','red','magenta','orange')
-els = ["dashdot","solid","dotted","dashed"]
+# Set some Labels
+mons3    = ('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
+
+# From SM Stylesheet -------------------------------------------------
+# SM Lower Hierarchy (05/25/2021)
+ecol_lower       = ["blue",'cyan','gold','red']
+els_lower        = ["dotted","dashdot","dashed","solid"]
+labels_lower     = ["All Constant",
+                     r"Vary $F'$",
+                     r"Vary $\lambda_a$",
+                     "Vary $F'$ and $\lambda_a$"] 
+
+# SM Upper Hierarchy (05/25/2021)
+labels_upper = ["h=50m",
+                 "Vary $F'$ and $\lambda_a$",
+                 "Vary $F'$, $h$, and $\lambda_a$",
+                 "Entraining"]
+ecol_upper = ('mediumorchid','red','magenta','orange')
+els_upper = ["dashdot","solid","dotted","dashed"]
+
+
+# Confidence Level Calculations
+conf  = 0.95
+tails = 2
+
+# End SM Stylesheet --------------------------------------------------
+
 #hblt = 54.61088498433431 # Meters, the mixed layer depth used in CESM Slab
 
 # Set up Configuration
@@ -76,9 +95,7 @@ config.pop('Fpt',None)
 config.pop('damppt',None)
 config.pop('mldpt',None)
 
-# Confidence Level Calculations
-conf  = 0.95
-tails = 2
+
 
 # Plotting Mode
 darkmode = True
@@ -124,7 +141,7 @@ ax.plot(lags,cesmauto2[lags],label="CESM SLAB",color='gray')
 ax.plot(lags,cesmautofull,color=dfcol,label='CESM Full',ls='dashdot')
 
 for i in range(1,4):
-    ax.plot(lags,ac[i],label=labels[i],color=expcolors[i])
+    ax.plot(lags,ac[i],label=labels_upper[i],color=ecol_upper[i])
 
 ax.legend()
 ax3.set_ylabel("Mixed Layer Depth (m)")
@@ -184,7 +201,7 @@ for m in range(4):
 cfslab = calc_conflag(cesmauto2,conf,tails,898)
 cffull = calc_conflag(cesmautofull,conf,tails,1798)
 
-#%% Plot SSTT Autocorrelation at the test point
+#%% Plot SST Autocorrelation at the test point
 
 
 notitle = True  # Remove Title for publications
@@ -198,15 +215,6 @@ else:
     
     # Plot Lower Hierarchy
     ax = axs[0]
-
-# UPDATED Colors and names for generals (5/25/2021)
-#ecol = ["blue",'cyan','gold','red']
-ecol = ["blue",'cyan','gold','red']
-els  = ["dotted","dashdot","dashed","solid"]
-ename = ["All Constant",
-         r"Vary $\alpha$",
-         r"Vary $\lambda_a$",
-         "All Varying"]
 
 lw = 3
 
@@ -246,9 +254,9 @@ for i,e in enumerate([0,1,2,3]):
     ax.set_ylabel("")
     
     cfs = confs[e,model,:,:]
-    ax.plot(lags,plotacs[e][model],label=ename[i],color=ecol[i],ls=els[i],marker="o",markersize=4,lw=lw)
+    ax.plot(lags,plotacs[e][model],label=labels_lower[i],color=ecol_lower[i],ls=els_lower[i],marker="o",markersize=4,lw=lw)
     #ax.scatter(lags,plotacs[e][model],10,label="",color=ecol[i])
-    ax.fill_between(lags,cfs[:,0],cfs[:,1],color=ecol[i],alpha=0.2)
+    ax.fill_between(lags,cfs[:,0],cfs[:,1],color=ecol_lower[i],alpha=0.2)
     
     ax.legend(fontsize=10,ncol=3)
     
@@ -281,8 +289,8 @@ ax.plot(lags,cesmautofull,color='k',label='CESM1 Full',ls='dashdot',marker="o",m
 ax.fill_between(lags,cffull[lags,0],cffull[lags,1],color='k',alpha=0.10)
 
 for i in range(2,4):
-    ax.plot(lags,ac[i],label=labelsnew[i],color=expcolors[i],ls=els[i],marker="o",markersize=3,lw=lw)
-    ax.fill_between(lags,cfstoch[i,:,0],cfstoch[i,:,1],color=expcolors[i],alpha=0.25)
+    ax.plot(lags,ac[i],label=labels_upper[i],color=ecol_upper[i],ls=els_upper[i],marker="o",markersize=3,lw=lw)
+    ax.fill_between(lags,cfstoch[i,:,0],cfstoch[i,:,1],color=ecol_upper[i],alpha=0.25)
 
 ax.legend()
 #ax3.set_ylabel("Heat Flux Feedback ($W/m^{2}$)")
@@ -363,10 +371,10 @@ for es in range(4):
         ax.set_ylabel("")
         cfs = confs[e,model,:,:]
         ax.plot(lags,plotacs[e][model][lags],
-                label=ename[i],color=ecol[i],
-                ls=els[i],marker="o",markersize=markersize,
+                label=labels_lower[i],color=ecol_lower[i],
+                ls=els_lower[i],marker="o",markersize=markersize,
                 lw=lw)
-        ax.fill_between(lags,cfs[lags,0],cfs[lags,1],color=ecol[i],alpha=dfalph_col)
+        ax.fill_between(lags,cfs[lags,0],cfs[lags,1],color=ecol_lower[i],alpha=dfalph_col)
         ax.legend(fontsize=8,ncol=3)
         
     ax.set_ylabel("Correlation")
@@ -403,22 +411,8 @@ for es in range(2):
     for count in range(es+1):
         i = loopis[count]
         
-        ax.plot(lags,ac[i],label=labelsnew[i],color=expcolors[i],ls=els[i],marker="o",markersize=markersize,lw=lw)
-        ax.fill_between(lags,cfstoch[i,:,0],cfstoch[i,:,1],color=expcolors[i],alpha=0.25)
-    
-    
-    
-    # for i,e in enumerate(loopis):
-        
-    #     title=""
-    #     ax.set_ylabel("")
-        
-    #     cfs = confs[e,model,:,:]
-    #     ax.plot(lags,plotacs[e][model][lags],
-    #             label=ename[i],color=ecol[i],
-    #             ls=els[i],marker="o",markersize=markersize,
-    #             lw=lw)
-    #     ax.fill_between(lags,cfs[lags,0],cfs[lags,1],color=ecol[i],alpha=dfalph_col)
+        ax.plot(lags,ac[i],label=labels_upper[i],color=ecol_upper[i],ls=els_upper[i],marker="o",markersize=markersize,lw=lw)
+        ax.fill_between(lags,cfstoch[i,:,0],cfstoch[i,:,1],color=ecol_upper[i],alpha=0.25)
         
         ax.legend(fontsize=8,ncol=3)
         
@@ -432,14 +426,6 @@ for es in range(2):
 
 fig,axs     = plt.subplots(2,1,figsize=(6,8),sharex=True,sharey=True)
 
-# UPDATED Colors and names for generals (5/25/2021)
-#ecol = ["blue",'cyan','gold','red']
-ecol = ["blue",'cyan','gold','red']
-els  = ["dotted","dashdot","dashed","solid"]
-ename = ["All Constant",
-         r"Vary $\alpha$",
-         r"Vary $\lambda_a$",
-         "All Varying"]
 
 # Plot Lower Hierarchy
 ax = axs[0]
@@ -477,9 +463,9 @@ for i,e in enumerate([0,1,2,3]):
     ax.set_ylabel("")
     
     cfs = confs[e,model,:,:]
-    ax.plot(lags,plotacs[e][model],label=ename[i],color=ecol[i],ls=els[i],marker="o",markersize=4)
+    ax.plot(lags,plotacs[e][model],label=labels_lower[i],color=ecol_lower[i],ls=els_lower[i],marker="o",markersize=4)
     #ax.scatter(lags,plotacs[e][model],10,label="",color=ecol[i])
-    ax.fill_between(lags,cfs[:,0],cfs[:,1],color=ecol[i],alpha=0.2)
+    ax.fill_between(lags,cfs[:,0],cfs[:,1],color=ecol_lower[i],alpha=0.2)
     
     ax.legend(fontsize=10,ncol=3)
 ax.set_ylabel("")
@@ -504,8 +490,8 @@ ax.plot(lags,cesmautofull,color='k',label='CESM1 Full',ls='dashdot',marker="o",m
 ax.fill_between(lags,cffull[lags,0],cffull[lags,1],color='k',alpha=0.10)
 
 for i in range(2,4):
-    ax.plot(lags,ac[i],label=labelsnew[i],color=expcolors[i],ls=els[i],marker="o",markersize=3)
-    ax.fill_between(lags,cfstoch[i,:,0],cfstoch[i,:,1],color=expcolors[i],alpha=0.25)
+    ax.plot(lags,ac[i],label=labels_upper[i],color=ecol_upper[i],ls=els_upper[i],marker="o",markersize=3)
+    ax.fill_between(lags,cfstoch[i,:,0],cfstoch[i,:,1],color=ecol_upper[i],alpha=0.25)
 
 ax.legend()
 #ax3.set_ylabel("Heat Flux Feedback ($W/m^{2}$)")
@@ -522,10 +508,6 @@ mlddef = mldpt.copy()
 Fptdef = Fpt.copy()
 
 plt.savefig(outpath+"Autocorrelation_2-PANEL_%s_vertical.png"%locstring,dpi=200,bbox_inches='tight')
-
-
-
-
 #%% Load and calculate CESM Spectra
 
 cssts = scm.load_cesm_pt(datpath,loadname='both',grabpoint=[-30,50])
@@ -534,10 +516,9 @@ cssts = scm.load_cesm_pt(datpath,loadname='both',grabpoint=[-30,50])
 
 #%% Calculate Spectra
 
-debug = False
-notitle = True
+debug    = False
+notitle  = True
 darkmode = True 
-
 
 if darkmode:
     plt.style.use("dark_background")
@@ -552,28 +533,26 @@ pct        = 0.10
 smoothname = "smth-obs%03i-full%02i-slab%02i" % (nsmooth,cnsmooths[0],cnsmooths[1])
 
 # Spectra Plotting Params
-xlm = [1e-2,5e0]
+plottype = "freqlin"
+xlm  = [1e-2,5e0]
 #xper = np.array([200,100,50,25,10,5,2,1,0.5]) # number of years
 xper = np.array([100,50,20,10,5,2])
 xtks = 1/xper
 xlm  = [xtks[0],xtks[-1]]
-
 ylm  = [0,3.0]
-
 plotids = [[0,1,2,3,8],
            [5,6,7]
            ]
 
-plottype = "freqlin"
 
-# First, pull out the needed SSTs
+# Combine lower and upper hierarchy
 inssts   = [c_ssts[0][1],c_ssts[1][1],c_ssts[2][1],c_ssts[3][1],sst[1],sst[2],sst[3],cssts[0],cssts[1]]
 nsmooths = np.concatenate([np.ones(len(inssts)-2)*nsmooth,cnsmooths])
-labels   = np.concatenate([ename,labelsnew[1:],['CESM-FULL','CESM-SLAB']])
+labels   = np.concatenate([labels_lower,labels_upper[1:],['CESM-FULL','CESM-SLAB']])
 speclabels = ["%s (%.2f$ \, K^{2}$)" % (labels[i],np.var(inssts[i])) for i in range(len(inssts))]
-allcols  = np.concatenate([ecol,expcolors[1:],[dfcol,"gray"]])
+allcols  = np.concatenate([ecol_lower,ecol_upper[1:],[dfcol,"gray"]])
 
-# Calculate Autocorrelation
+# Calculate Autocorrelation (?)
 allacs,allconfs = scm.calc_autocorr(inssts,lags,kmonth+1,calc_conf=True)
 
 # Convert Dict --> Array
@@ -584,24 +563,20 @@ for i in range(len(allacs)):
     ocf.append(allconfs[i])
 allacs=oac
 allconfs=ocf
-    
 
-
-if debug: # Check its alright
+if debug: # Check if variables were properly concatenated using ACs
     fig,axs = plt.subplots(1,2,figsize=(16,4))
     ax = axs[0]
     plotac = allacs[:4]
     for i in range(4):
-        ax.plot(lags,plotac[i],label=ename[i],color=ecol[i],)
+        ax.plot(lags,plotac[i],label=labels_lower[i],color=ecol_lower[i],)
     ax.legend()
     ax = axs[1]
     plotac = allacs[4:]
     for i in range(3):
-        ax.plot(lags,plotac[i],label=labelsnew[i+1],color=expcolors[i+1],)
+        ax.plot(lags,plotac[i],label=labels_upper[i+1],color=ecol_upper[i+1],)
     ax.legend()
-    #
-    
-    
+
 # Do spectral Analysis
 specs,freqs,CCs,dofs,r1s = scm.quick_spectrum(inssts,nsmooths,pct)
 #cspecs,cfreqs,cCCs,cdofs,cr1s = scm.quick_spectrum(cssts,cnsmooths,pct)
@@ -758,15 +733,8 @@ ylm  = [0,3.0]
 plotids = [[0,1,2,3,8],
            [4,5,6,7]
            ]
-
 plottype = "freqlin"
 
-# First, pull out the needed SSTs
-inssts   = [c_ssts[0][1],c_ssts[1][1],c_ssts[2][1],c_ssts[3][1],sst[1],sst[2],sst[3],cssts[0],cssts[1]]
-nsmooths = np.concatenate([np.ones(len(inssts)-2)*nsmooth,cnsmooths])
-labels   = np.concatenate([ename,labelsnew[1:],['CESM-FULL','CESM-SLAB']])
-speclabels = ["%s (%.2f$\degree \, C^{2}$)" % (labels[i],np.var(inssts[i])) for i in range(len(inssts))]
-allcols  = np.concatenate([ecol,expcolors[1:],["k","gray"]])
 
 # Convert Dict --> Array
 oac=[]

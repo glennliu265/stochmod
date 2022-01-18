@@ -32,13 +32,33 @@ bbcol       = ["Blue","Red","Yellow","Black","Black"]
 bbcol       = ["Blue","Red","Yellow","Black","Black","magenta","red"]
 bbsty       = ["solid","dashed","solid","dotted","dotted","dashed","dotted"]
 
-# AMV Contours
+# AMV Pattern Contours
 cint        = np.arange(-0.45,0.50,0.05) # Used this for 7/26/2021 Meeting
 cl_int      = np.arange(-0.45,0.50,0.05)
+bboxplot    = [-80,0,5,60]
 
 # SM Names and colors
 modelnames  = ("Constant h","Vary h","Entraining")
 mcolors     = ["red","magenta","orange"] 
+
+
+# SM Lower Hierarchy (05/25/2021)
+ecol_lower       = ["blue",'cyan','gold','red']
+els_lower        = ["dotted","dashdot","dashed","solid"]
+labels_lower     = ["All Constant",
+                     r"Vary $F'$",
+                     r"Vary $\lambda_a$",
+                     "Vary $F'$ and $\lambda_a$"] 
+
+# SM Upper Hierarchy (05/25/2021)
+labels_upper = ["h=50m",
+                 "Vary $F'$ and $\lambda_a$",
+                 "Vary $F'$, $h$, and $\lambda_a$",
+                 "Entraining"]
+ecol_upper = ('mediumorchid','red','magenta','orange')
+els_upper = ["dashdot","solid","dotted","dashed"]
+
+
 
 # CESM Names
 cesmname    =  ["CESM-FULL","CESM-SLAB"]
@@ -52,13 +72,37 @@ conf        = 0.95
 tails       = 2 # Tails for Significance Calculation
 alw         = 3 # Autocorrelation Line Width
 
-# Power Spectra Options
+
+
+#%% Power Spectra Options
 speccolors = ["r","magenta","Orange","k","gray"]
 specnames  = np.hstack([modelnames,cesmname])
 
-# Linear-Power Spectra, < 2-yr
+# Linear-Power Spectra, < 2-yr (Current SM Draft Choice)
 xlm = [1e-2,5e0]
 #xper = np.array([200,100,50,25,10,5,2,1,0.5]) # number of years
 xper = np.array([100,50,20,10,5,2])
 xtks = 1/xper
 xlm  = [xtks[0],xtks[-1]]
+ylm  = [0,3.0]
+
+# Shorter Timescales (Patrizio et al)
+xper = np.array([25,10,5,2.5,1,0.5,0.2])
+xtks = 1/xper
+xlm  = [xtks[0],xtks[-1]]
+
+# Clement et al. 2015 range
+xper = np.array([50,25,10,5,2.5,1.0])
+xtks = 1/xper
+xlm  = [xtks[0],xtks[-1]]
+#%% Darkmode, Lightmode
+
+darkmode = True
+if darkmode:
+    plt.style.use("dark_background")
+    dfcol = "w"
+else:
+    plt.style.use("default")
+    dfcol = "k"
+
+
