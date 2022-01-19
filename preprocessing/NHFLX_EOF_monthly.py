@@ -572,10 +572,10 @@ if notitle is False:
 plt.savefig("%sEOF1_EOF2_uncorrected_%s.png"%(outpath,mcname),dpi=150,bbox_inches='tight')
 
 #%% Plot Select EOF and PC
-k   = 0
+k   = 1
 ids = [0,]
 
-replace_wn = True
+replace_wn = False
 
 fig = plt.figure(constrained_layout=False, facecolor='w',figsize=(12,4))
 
@@ -615,7 +615,7 @@ ax1.axhline([0],ls='dashed',color='k')
 if replace_wn:
     savename = "%s%s_EOF%i_Pattern_WhiteNoise.png" % (outpath,mcname,k+1)
 else:
-    "%s%s_EOF%i_Pattern_PC.png" % (outpath,mcname,k+1)
+    savename="%s%s_EOF%i_Pattern_PC.png" % (outpath,mcname,k+1)
 
 plt.savefig(savename,dpi=200,bbox_inches='tight')
 
