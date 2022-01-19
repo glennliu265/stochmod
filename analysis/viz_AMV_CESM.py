@@ -151,6 +151,37 @@ print("preprocessed PiC Data in %.2fs"%(time.time()-st))
 # #
 # #proc.sel_region(sstfull,lon360,
 
+
+#%% Save the data above as netcdf files
+
+
+tfull = xr.cftime_range(start="0400-01-01",periods=sstfull.shape[0],freq="MS")
+tslab = xr.cftime_range(start="0200-01-01",periods=sstslab.shape[0],freq="MS")
+
+ts = [tfull,tslab]
+for s in tqdm(range(2)):
+    
+    # Create dimensions and attribute dict
+    dims = {'lon':lon180,
+            'lat':lat,
+            'time':ts[s],
+            }
+    attr_dict = {'ocean_model_config':mconfigs[s]}
+    
+    # Make DataArray
+    da = xr.DataArray(sstas[s],
+                dims=dims,
+                coords=dims,
+                name = 'SST',
+                attrs=attr_dict
+                )
+    
+    # Make encoding dict and export
+    encoding_dict = {"SST" : {'zlib': True}} 
+    savename = "%sCESM1_%s_postprocessed_NAtl.nc" % (datpath,mconfigs[s])
+    print("Saving to %s" % savename)
+    da.to_netcdf(savename,
+             encoding=encoding_dict)
 # --------------------------------------------------------------
 #%% Postprocess in manner similar to the stochastic model output
 # --------------------------------------------------------------
