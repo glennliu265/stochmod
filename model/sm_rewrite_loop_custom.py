@@ -2,7 +2,11 @@
 # -*- coding: utf-8 -*-
 """
 
-Loopable version of sm_rewrite
+sm_rewrite Custom
+
+copied from sm_rewrite (1/20/2022)
+but customized to support input of custom parameters (h,F', or lambda')
+
 Created on Tue Sep 21 10:42:25 2021
 
 @author: gliu
@@ -78,19 +82,24 @@ import scm
 
 # Directories
 
+# Custom Parameters
+
+"""
+Fixed MLD Experiment
+"""
+cexpname = "hfix50_slab"
+h_cust = np.ones((288,192,12)) * 50 # 50 m slab
+custom_params = {}
+custom_params['h'] = h_cust
+#'forcing' and 'lambda' are two other options
+hconfigs      = [0] # Just run the slab simulation
+
 # Landice Mask Name
 limaskname = "limask180_FULL-HTR.npy" 
 
 # Model Params
 ampq       = True # Set to true to multiply stochastic forcing by a set value
 mconfig    = "SLAB_PIC"
-#"flxeof_090pct_SLAB-PIC_eofcorr1"
-#"flxeof_q-ek_090pct_SLAB-PIC_eofcorr1" #"flxeof_090pct_SLAB-PIC_eofcorr1"
-#"flxeof_qek_50eofs_SLAB-PIC" #"uniform" "flxeof_5eofs_SLAB-PIC"
-#"flxeof_090pct_SLAB-PIC_eofcorr1"
-#"flxeof_5eofs_SLAB-PIC"
-#"flxeof_080pct_SLAB-PIC"
-#flxeof_qek_50eofs_SLAB-PIC
 
 # Running Parameters
 runid      = "011"
@@ -118,94 +127,8 @@ latf = 50
 debug = False
 
 # Indicate Forcing Files to Loop Thru
-
-# Testing different # of EOFs
-frcnames = (
-            "flxeof_50eofs_SLAB-PIC_eofcorr2",
-            "flxeof_25eofs_SLAB-PIC_eofcorr2",
-            "flxeof_10eofs_SLAB-PIC_eofcorr2",
-            "flxeof_5eofs_SLAB-PIC_eofcorr2",
-            "flxeof_3eofs_SLAB-PIC_eofcorr2",
-            "flxeof_2eofs_SLAB-PIC_eofcorr2",
-            "flxeof_1eofs_SLAB-PIC_eofcorr2"
-            )
-
-# Testing seasonal EOFs
-frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2',
-            'flxeof_090pct_SLAB-PIC_eofcorr2_DJF',
-            'flxeof_090pct_SLAB-PIC_eofcorr2_MAM',
-            'flxeof_090pct_SLAB-PIC_eofcorr2_JJA',
-            'flxeof_090pct_SLAB-PIC_eofcorr2_SON')
-
-frcnames = ('flxeof_EOF1_SLAB-PIC_eofcorr1',
-            'flxeof_EOF2_SLAB-PIC_eofcorr1')
-
-# Testing different # of EOFs, simpler correction
-frcnames = (
-            "flxeof_50eofs_SLAB-PIC_eofcorr1",
-            "flxeof_25eofs_SLAB-PIC_eofcorr1",
-            "flxeof_10eofs_SLAB-PIC_eofcorr1",
-            "flxeof_5eofs_SLAB-PIC_eofcorr1",
-            "flxeof_3eofs_SLAB-PIC_eofcorr1",
-            "flxeof_2eofs_SLAB-PIC_eofcorr1",
-            "flxeof_1eofs_SLAB-PIC_eofcorr1"
-            )
-
-frcnames = ('flxeof_EOF1_SLAB-PIC_eofcorr1',
-            'flxeof_EOF2_SLAB-PIC_eofcorr1')
-
-frcnames = (
-            "flxeof_50eofs_SLAB-PIC_eofcorr0",
-            "flxeof_25eofs_SLAB-PIC_eofcorr0",
-            "flxeof_10eofs_SLAB-PIC_eofcorr0",
-            "flxeof_5eofs_SLAB-PIC_eofcorr0",
-            "flxeof_3eofs_SLAB-PIC_eofcorr0",
-            "flxeof_2eofs_SLAB-PIC_eofcorr0",
-            "flxeof_1eofs_SLAB-PIC_eofcorr0"
-            )
-
-
-
-#frcnames = ("flxeof_2eofs_SLAB-PIC_eofcorr0",)
-
-#frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2',)
-
-# Test the effect of increasing the number of EOFs
-frcnames = (
-            "flxeof_50eofs_SLAB-PIC_eofcorr0",
-            "flxeof_25eofs_SLAB-PIC_eofcorr0",
-            "flxeof_10eofs_SLAB-PIC_eofcorr0",
-            "flxeof_5eofs_SLAB-PIC_eofcorr0",
-            "flxeof_3eofs_SLAB-PIC_eofcorr0",
-            "flxeof_2eofs_SLAB-PIC_eofcorr0",
-            "flxeof_1eofs_SLAB-PIC_eofcorr0"
-            )
-
-frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2',)
-
 # Single run test (90% variance forcing)
 frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2',)
-
-# Testing NAO, EAP Forcing
-frcnames = ('flxeof_EOF1_SLAB-PIC_eofcorr0',
-            'flxeof_EOF2_SLAB-PIC_eofcorr0')
-
-# Test the effect of increasing the number of EOFs
-frcnames = (
-            "flxeof_50eofs_SLAB-PIC_eofcorr0",
-            "flxeof_25eofs_SLAB-PIC_eofcorr0",
-            "flxeof_10eofs_SLAB-PIC_eofcorr0",
-            "flxeof_5eofs_SLAB-PIC_eofcorr0",
-            "flxeof_3eofs_SLAB-PIC_eofcorr0",
-            "flxeof_2eofs_SLAB-PIC_eofcorr0",
-            "flxeof_1eofs_SLAB-PIC_eofcorr0"
-            )
-
-# Testing seasonal EOFs
-frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2_DJF',
-            'flxeof_090pct_SLAB-PIC_eofcorr2_MAM',
-            'flxeof_090pct_SLAB-PIC_eofcorr2_JJA',
-            'flxeof_090pct_SLAB-PIC_eofcorr2_SON')
 
 print("Running the following forcings: \n")
 print(*frcnames, sep='\n')
@@ -214,7 +137,10 @@ print(*frcnames, sep='\n')
 st = time.time()
 for f in range(len(frcnames)):
     frcname    = frcnames[f]
-    expname    = "%sstoch_output_forcing%s_%iyr_run%s_ampq%i_method%i_dmp0.npz" % (output_path,frcname,int(t_end/12),runid,ampq,method) 
+    expname    = "%sstoch_output_forcing%s_%iyr_run%s_ampq%i_method%i_dmp0_%s.npz" % (output_path,
+                                                                                      frcname,int(t_end/12),runid,
+                                                                                      ampq,method,
+                                                                                      cexpname) 
     # dmp0 indicates that points with insignificant lbd_a were set to zero.
     # previously, they were set to np.nan, or the whole damping term was set to zero
     
@@ -232,6 +158,10 @@ for f in range(len(frcnames)):
                        runid,t_end,frcname,ampq,
                        bboxsim,pointmode,points=[lonf,latf],
                        dt=3600*24*30,
-                       debug=False,check=False,useslab=useslab,savesep=savesep,method=method)
+                       debug=False,check=False,useslab=useslab,
+                       savesep=savesep,method=method,
+                       custom_params=custom_params,
+                       hconfigs=hconfigs)
 print("Completed in %.2fs" % (time.time()-st))
+
 

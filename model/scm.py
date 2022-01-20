@@ -2687,7 +2687,10 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
                    debug=False,check=True,
                    useslab=False,savesep=False,
                    intgrQ=False,
-                   method=4,chk_damping=False):
+                   method=4,chk_damping=False,
+                   custom_params = {},
+                   hconfigs=[0,1,2]
+                   ):
     
     """
     Inputs
@@ -2695,14 +2698,42 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
     
     1. expname [STR]: Name of experiment output
     2. mconfig [STR]: Model Configuration
+    3. input_path [STR]: Where input parameters are contained
+    4. limaskname [STR]: Name of file containing land-ice mask
+    5. runid [STR]: Name of the white noise timeseries
+    6. t_end [INT]: Number of months to integrate over
+    7. frcname [INT]: Name of forcing file
+    8. ampq [INT]: Type of forcing correction to use
+    9. bboxsim [ARRAY]: Simulation bounding box [lonW,lonE,latS,latN]    
     
+    ...
+    need to finish adding documentation
+    10. pointmode [INT]:
+    11. points [ARRAY] : Point to run simulation at [lon,lat]
+    12. dt [INT]       : Simulation step (default is monthly)
+    13. debug [BOOL   ]: Set to true to just run 10-year simulation
+    14. check [BOOL]   :
+    15. useslab [BOOL] :
+    16. savesep [BOOL] :
+    17. intgrQ [BOOL]  :
+    18. method [INT]
+    ...
     
-    
-    chk_damping [BOOL] : set True to set negative damping values to 0
-
+    19. chk_damping [BOOL]: set True to set negative damping values to 0
+    20. custom_params [DICT]: set custom arrays for forcing, damping, mld
+                Dict Key | Expected Input (Arrays)
+                -------- | -----------------------
+                "h"       - Mixed Layer Depth :: [LON x LAT x 12]
+                "forcing" - Stochastic Forcing Amplitude :: [LON x LAT x EOF_MODE x 12]
+                "lambda"  - Atmospheric Heat Flux Feedback :: [LON x LAT x 12]
+    21. hconfigs [ARRAY]: Mixed Layer Experiments to run. Options: [0,1,2]
+            0 : non-entrain, constant mld, slab parameters
+            1 : non-entrain, seasonal mld, full parameters
+            2 : entraining , seasonal mld, full parameters
     """
     
     start = time.time()
+    print("Running the following MLD configurations: %s" % (hconfigs))
     
     if debug:
         t_end = 120 # Just run 10 yr
@@ -2713,7 +2744,24 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
                                                                           load_both=True,method=method)
     hblt = np.load(input_path + "SLAB_PIC_hblt.npy") # Slab fixed MLD
     hblt = np.ones(hblt.shape) * hblt.mean(2)[:,:,None]
-
+    
+    # Check if there are custom values
+    # Replaces both full and slab values with custom values
+    # -----------------------------------------------------
+    if "h" in custom_params.keys(): # Replace Mixed Layer
+        print("Found custom Mixed Layer Depth!")
+        h    = custom_params['h']
+        hblt = h.copy()
+    if "forcing" in custom_params.keys(): # Replace forcing amplitude
+        print("Found custom Forcing!")
+        alpha = custom_params['forcing']
+        alpha_full = alpha.copy()
+    if "lambda" in custom_params.keys():
+        print("Found custom Damping!")
+        damping = custom_params['lambda']
+        dampingfull = damping.copy()
+    
+    
     # Apply landice mask to all inputs
     # --------------------------------
     limask    = np.load(input_path+limaskname)
@@ -2724,7 +2772,7 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
     alpha       *= limask[:,:,None,None]
     alpha_full  *= limask[:,:,None,None]
     hblt        *= limask[:,:,None]
-
+    
     # Restrict to region or point (Need to fix this section)
     # ---------------------------
     inputs = [h,kprevall,damping,dampingfull,alpha,alpha_full,hblt]
@@ -2761,7 +2809,7 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
     forcing,forcing_full = make_forcing(alpha,runid,frcname,t_end,input_path,check=check,alpha_full=alpha_full)
 
     T_all = [] # Run 3 experiments
-    for exp in range(3):
+    for exp in hconfigs:
         if exp == 0: # SLAB Parameters
             h_in = hblt.copy() # Used fixed slab model MLD
             f_in = forcing
