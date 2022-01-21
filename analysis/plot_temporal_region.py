@@ -26,7 +26,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20220113/"
+    figpath     = projpath + "02_Figures/20220128/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -55,6 +55,13 @@ mconfig   = "SLAB_PIC"
 nyrs      = 1000        # Number of years to integrate over
 runid     = "011"
 darkmode   = False
+if darkmode:
+    plt.style.use("dark_background")
+    dfcol = "w"
+else:
+    plt.style.use("default")
+    dfcol = "k"
+
 
 # Indicate the experiment file name, display name (for plotting), and output save name
 fname = 'forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method4_dmp0'
@@ -87,12 +94,16 @@ cint        = np.arange(-0.45,0.50,0.05) # Used this for 7/26/2021 Meeting
 cl_int      = np.arange(-0.45,0.50,0.05)
 
 # SM Names and colors
-modelnames  = ("Constant h","Vary h","Entraining")
+modelnames  = ("Vary $F'$ and $\lambda_a$",
+                    "Vary $F'$, $h$, and $\lambda_a$",
+                    "Entraining")
 mcolors     = ["red","magenta","orange"]
+mlines      = ["solid","dotted","dashed"]
+
 
 # CESM Names
 cesmname    =  ["CESM-FULL","CESM-SLAB"]
-cesmcolor   =  ["k","gray"]
+cesmcolor   =  [dfcol,"gray"]
 cesmline    =  ["dashed","dotted"]
 
 # Autocorrelation Plot parameters
@@ -512,9 +523,6 @@ for i in range(2):
 # Plot the power spectra (bottom row)
 for i in range(2):
     
-    
-    
-    
     ax  = axs[1,i]
     rid = order[i]
     
@@ -560,6 +568,154 @@ plt.tight_layout()
 plt.savefig("%sSPG-NAT_Autocorrelation_Spectra%s.png"%(figpath,smoothname),
             dpi=200,transparent=False)
 
+
+#%% SM Draft 2, Plot all Regionals in 1 Plot
+
+
+# Plotting Params
+# ---------------
+alw            = 3
+exclude_consth = True # Set to true to NOT plot constant h model
+notitle        = True
+
+if exclude_consth:
+    plotid = [1,2]
+    plotidspec = [1,2,3,4] # Exclude constant h
+else:
+    plotid = [0,1,2]
+    plotidspec = [0,1,2,3,4]
+
+rids = [0,6,5,]
+order = rids
+
+specylim_spg = [0,0.8]
+specylim_stg = [0,0.3]
+
+
+# Do Plotting
+# ---------------
+fig,axs =plt.subplots(2,3,figsize=(16,8))
+sp_id = 0
+# Plot the autocorrelation (top row)
+for i in range(len(rids)):
+    
+    ax = axs[0,i]
+    
+    rid    = order[i] 
+    kmonth = kmonths[rid]
+    #title  = "%s Autocorrelation (Lag 0 = %s)" % (regionlong[rid],mons3[kmonth])
+
+    title  = "%s" % (regionlong[rid]) # No Month
+    ax,ax2 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title="")
+    ax.set_title(title,color=bbcol[rid],fontsize=12)
+    
+    # Plot Each Stochastic Model
+    for mid in plotid:
+        ax.plot(lags,sstac[rid][mid],color=mcolors[mid],label=modelnames[mid],lw=alw)
+        ax.fill_between(lags,cfstoch[rid,mid,lags,0],cfstoch[rid,mid,lags,1],
+                        color=mcolors[mid],alpha=0.10)
+    
+    # Plot CESM
+    for cid in range(2):
+        ax.plot(lags,cesmacs[rid][cid],color=cesmcolor[cid],label=cesmname[cid],lw=alw)
+        ax.fill_between(lags,cfcesm[rid,cid,lags,0],cfcesm[rid,cid,lags,1],
+                        color=cesmcolor[cid],alpha=0.10)
+        
+    if i >0: # Set ylabel to false for all plots except leftmost
+        ax.set_ylabel("")
+        ax.yaxis.set_ticklabels([])
+    else:
+        ax.set_ylabel("Autocorrelation")
+        
+    if i == 1: # Add legend and x-label to middle plot
+        ax.legend(ncol=2,fontsize=12)
+    else:
+        ax.set_xlabel("")
+        
+    ax = viz.label_sp(sp_id,fontsize=20,fig=fig,labelstyle="(%s)",case='lower')
+    sp_id += 1
+
+
+# Plot the power spectra (bottom row)
+for i in range(len(rids)):
+    
+    ax  = axs[1,i]
+    rid = order[i]
+    
+    #speclabels = ["%s (%.3f $^{\circ}C^2$)" % (specnames[i],sstvarall[rid][i]) for i in range(len(insst)) ]
+    speclabels=["" for i in range(len(insst))]
+    
+    ax,ax2 = viz.plot_freqlin(specsall[rid],freqsall[rid],speclabels,speccolors,lw=alw,
+                         ax=ax,plottitle=regionlong[rid],
+                         xlm=xlm,xtick=xtks,return_ax2=True,plotids=plotidspec)
+    
+    # Turn off title and second axis labels
+    ax.set_title("")
+    ax2.set_xlabel("")
+    sxtk2 = ax2.get_xticklabels()
+    sxtk2new = np.repeat("",len(sxtk2))
+    ax2.set_xticklabels(sxtk2new)
+    
+    # Move period labels to ax1
+    ax.set_xticklabels(xper)
+    ax.set_xlabel("Period (Years)")
+    plt.setp(ax.get_xticklabels(), rotation=50,fontsize=8)
+    
+    if i == 0:# Turn off y label except for leftmost plot
+        ax.set_ylabel("Power Spectrum ($\degree C^2 /cpy$)")
+        ax.set_ylim(specylim_spg)
+    else:
+        ax.set_ylabel("")
+        
+        ax.set_ylim(specylim_stg)
+        
+    if i != 1:
+        ax.set_xlabel("")
+        
+    if i == 2: # Just turn off for last STG plot
+        ax.yaxis.set_ticklabels([])
+    
+    #title = "%s Power Spectra" % (regions[rid])
+    title = ""
+    ax.set_title(title,color=bbcol[rid],fontsize=12)
+    
+    ax = viz.label_sp(sp_id,fontsize=20,fig=fig,labelstyle="(%s)",case='lower')
+    sp_id += 1
+
+plt.tight_layout()
+plt.savefig("%sRegional_Autocorrelation_Spectra%s.png"%(figpath,smoothname),
+            dpi=200,transparent=False)
+
+#%% Make the Corresponding Bounding Box
+
+
+cid = 0
+
+bboxtemp = [-90,5,15,68]
+
+fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(4.5,3))
+ax = viz.add_coast_grid(ax,bboxtemp,fill_color='gray')
+fig.patch.set_alpha(1)  # solution
+# # Plot the amv pattern
+props = dict(boxstyle='square', facecolor='white', alpha=0.8)
+
+
+ax.text(-69,69,"Bounding Boxes",ha='center',bbox=props,fontsize=12) # (works for SPG Only)
+
+
+# # 
+ls = []
+for bb in rids:
+    ax,ll = viz.plot_box(bboxes[bb],ax=ax,leglab=regions[bb],
+                          color=bbcol[bb],linestyle=bbsty[bb],linewidth=3,return_line=True)
+    ls.append(ll)
+
+#BBox right below ttiel
+ax.legend(ncol=1,fontsize=8,loc=6,bbox_to_anchor=(0, .75))
+
+#ax.text(-41,50,"SPG",ha='center',bbox=props,fontsize=25)
+
+plt.savefig("%sRegional_BBOX_Locator.png"%figpath,dpi=100,bbox_inches='tight',transparent=True)
 
 
 #%%
