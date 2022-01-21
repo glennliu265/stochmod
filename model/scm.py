@@ -2689,7 +2689,7 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
                    intgrQ=False,
                    method=4,chk_damping=False,
                    custom_params = {},
-                   hconfigs=[0,1,2]
+                   hconfigs=[0,1,2],
                    ):
     
     """
@@ -2720,12 +2720,13 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
     ...
     
     19. chk_damping [BOOL]: set True to set negative damping values to 0
-    20. custom_params [DICT]: set custom arrays for forcing, damping, mld
+    20. custom_params [DICT]: set custom arrays for forcing, damping, mld,q_ek
                 Dict Key | Expected Input (Arrays)
                 -------- | -----------------------
                 "h"       - Mixed Layer Depth :: [LON x LAT x 12]
                 "forcing" - Stochastic Forcing Amplitude :: [LON x LAT x EOF_MODE x 12]
                 "lambda"  - Atmospheric Heat Flux Feedback :: [LON x LAT x 12]
+                "q_ek"    - Name of Ekman Forcing
     21. hconfigs [ARRAY]: Mixed Layer Experiments to run. Options: [0,1,2]
             0 : non-entrain, constant mld, slab parameters
             1 : non-entrain, seasonal mld, full parameters
@@ -2807,7 +2808,28 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
     # Generate White Noise
     # --------------------
     forcing,forcing_full = make_forcing(alpha,runid,frcname,t_end,input_path,check=check,alpha_full=alpha_full)
+    
+    
+    # If option is set, repeat procedure to load in ekman forcing
+    # ------------------------------------------------------------
+    if "q_ek" in custom_params.keys():
+        print("Now Including Qek!")
+        qek_name = custom_params["q_ek"]
+        # Load Qek [lon x lat x mode x month], apply mask -------------
+        qek_raw = np.load(input_path+qek_name)
+        qek_raw *= limask[:,:,None,None]
+        # Restrict to Region ------------------------------------------
+        outputs1,_,_ = cut_regions([qek_raw],lon,lat,bboxsim,pointmode,points=points)
+        qekr = outputs1[0]
+        forcing_qekr = make_forcing(qekr,runid,frcname,t_end,input_path,check=check)
+        qek_flag = True
+    else:
+        qek_flag = False
+        
 
+        
+    
+    
     T_all = [] # Run 3 experiments
     for exp in hconfigs:
         if exp == 0: # SLAB Parameters
@@ -2829,6 +2851,8 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
         lbd_a   = convert_Wm2(d_in,h_in,dt)
         F       = convert_Wm2(f_in,h_in,dt) # [lon x lat x time]
         
+
+        
         #
         # If Option is set, amplitfy F to account for underestimation
         # -----------------------------------------------------------
@@ -2848,6 +2872,13 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
             ntile = int(t_end/a.shape[2])
             ampmult = np.tile(1/np.sqrt(underest),ntile)
             F *= ampmult
+        
+        # Add Ekman if needed after forcing correction
+        # ---------------------------------------------
+        if qek_flag:
+            Fek  = convert_Wm2(forcing_qekr,h_in,dt)
+            F = F + Fek
+            
         
         # Integrate Stochastic Model
         # --------------------------

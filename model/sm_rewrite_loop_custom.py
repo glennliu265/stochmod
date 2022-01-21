@@ -94,6 +94,30 @@ custom_params['h'] = h_cust
 #'forcing' and 'lambda' are two other options
 hconfigs      = [0] # Just run the slab simulation
 
+
+"""
+Fixed MLD with Q_ek
+"""
+cexpname = "hfix50_slab_qek"
+h_cust = np.ones((288,192,12)) * 50 # 50 m slab
+custom_params = {}
+custom_params['h'] = h_cust
+custom_params['q_ek'] = "Qek_eof_090pct_FULL_PIC_eofcorr0.npy"
+#'forcing' and 'lambda' are two other options
+hconfigs      = [0] # Just run the slab simulation
+
+
+# """
+# Spatial Vary MLD with Q_ek
+# """
+# cexpname = "hslab_slab_qek"
+# h_cust = np.ones((288,192,12)) * 50 # 50 m slab
+# custom_params = {}
+# #custom_params['h'] = h_cust
+# custom_params['q_ek'] = "Qek_eof_090pct_FULL_PIC_eofcorr0.npy"
+# #'forcing' and 'lambda' are two other options
+# hconfigs      = [0] # Just run the slab simulation
+#%%
 # Landice Mask Name
 limaskname = "limask180_FULL-HTR.npy" 
 
