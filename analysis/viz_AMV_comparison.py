@@ -26,7 +26,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20220113/"
+    figpath     = projpath + "02_Figures/20220128/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -186,7 +186,7 @@ exoutnameraw = "new_v_old_q-correction"
 
 
 
-# Seasonal w/o NaN
+# # Seasonal w/o NaN
 # fnames    = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method4_dmp0',
 #             'forcingflxeof_090pct_SLAB-PIC_eofcorr2_DJF_1000yr_run011_ampq3_method4_dmp0',
 #             'forcingflxeof_090pct_SLAB-PIC_eofcorr2_MAM_1000yr_run011_ampq3_method4_dmp0',
@@ -217,7 +217,7 @@ fnames = (
 frcnamelong = ("NAO (EOF1)","EAP (EOF2)","NAO+EAP")
 exname = "NAO_EAP"
 
-# Just compare 90% Variance Run with CESM
+# # Just compare 90% Variance Run with CESM
 # fnames = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method4_dmp0',)#'forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run009_ampq3',)
 # frcnamelong = ["EOF Forcing (90% Variance)",]
 # exname ="run_comparison"
@@ -225,6 +225,11 @@ exname = "NAO_EAP"
 # Examine impact of Ekman Forcing
 # fnames = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_Qek',)
 # frcnamelong = ["EOF Forcing (90% Variance) with Ekman",]
+
+# # Examine impact of including spatial MLD variations
+# fnames = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method4_dmp0_hfix50_slab',
+#           'forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method4_dmp0')
+
 #%% Functions
 def calc_conflag(ac,conf,tails,n):
     cflags = np.zeros((len(ac),2))
@@ -492,7 +497,7 @@ bboxplot = [-80,0,5,60]
 plotbbox = False
 def plot_amvpat(lon,lat,amvpat,ax,add_bbox=False,bbox_NNA=[-80, 0, 10, 65],blabel=[1,0,0,1]):
     
-    ax = viz.add_coast_grid(ax,bboxplot,blabels=blabel)
+    ax = viz.add_coast_grid(ax,bboxplot,blabels=blabel,ignore_error=True)
     pcm = ax.contourf(lon,lat,amvpat,levels=cint,cmap=cmocean.cm.balance)
     ax.pcolormesh(lon,lat,amvpat,vmin=cint[0],vmax=cint[-1],cmap=cmocean.cm.balance,zorder=-1)
     cl = ax.contour(lon,lat,amvpat,levels=cl_int,colors="k",linewidths=0.5)
@@ -511,8 +516,6 @@ dmsks.append(dmsks[-1])
 # SM Paper Draft 2 
 
 notitle = True
-
-
 cmax  = 0.5
 cstep = 0.025
 lstep = 0.05
@@ -528,7 +531,7 @@ for f in tqdm(range(len(fnames))):
         if darkmode:
             plt.style.use('dark_background')
             savename = "%sSST_AMVPattern_Comparison_region%s_%s_dark.png" % (figpath,regions[rid],fnames[f])
-            dfcol = 'k'
+            dfcol = 'w'
         else:
             plt.style.use('default')
             savename = "%sSST_AMVPattern_Comparison_region%s_%s.png" % (figpath,regions[rid],fnames[f])
@@ -543,7 +546,8 @@ for f in tqdm(range(len(fnames))):
         # fig,axs = viz.init_2rowodd(ncol,proj,figsize=figsize,oddtop=False,debug=True)
         
         # Plot Stochastic Model Output
-        for mid in range(3):
+        nmods = len(amvpats[f][rid])
+        for mid in range(nmods):
             ax = axs.flatten()[mid]
             
             # Set Labels, Axis, Coastline
@@ -562,7 +566,7 @@ for f in tqdm(range(len(fnames))):
             cl = ax.contour(lon,lat,amvpats[f][rid][mid].T,levels=cl_int,colors="k",linewidths=0.5)
             ax.clabel(cl,levels=cl_int,fontsize=8)
             
-            ax.set_title("%s ($\sigma^2_{AMV}$ = %.4f $K^2$)"%(modelnames[mid],np.var(amvids[f][rid][mid])))
+            ax.set_title("%s ($\sigma^2_{AMV}$ = %.04f $K^2$)"%(modelnames[mid],np.var(amvids[f][rid][mid])))
             if plotbbox:
                 ax,ll = viz.plot_box(bbox_NNA,ax=ax,leglab="AMV",
                                      color=dfcol,linestyle="dashed",linewidth=2,return_line=True)
@@ -579,9 +583,11 @@ for f in tqdm(range(len(fnames))):
             if cid == 0:
                 ax = axs[1,2]
                 blabel = [0,0,0,1]
+                spid = 4 # Flipped order
             else:
                 ax = axs[1,0]
                 blabel = [1,0,0,1]
+                spid = 3
                 
             # Make the Plot
             ax = viz.add_coast_grid(ax,bboxplot,blabels=blabel,line_color=dfcol,
@@ -590,12 +596,11 @@ for f in tqdm(range(len(fnames))):
             ax.pcolormesh(lon180g,latg,cesmpat[rid][cid].T,vmin=cint[0],vmax=cint[-1],cmap=cmocean.cm.balance,zorder=-1)
             cl = ax.contour(lon180g,latg,cesmpat[rid][cid].T,levels=cl_int,colors="k",linewidths=0.5)
             ax.clabel(cl,levels=cl_int,fontsize=8)
-            ax.set_title("%s ($\sigma^2_{AMV}$ = %.3f $K^2$)"%(cesmname[cid],np.var(cesmidx[rid][cid])))
+            ax.set_title("%s ($\sigma^2_{AMV}$ = %.04f $K^2$)"%(cesmname[cid],np.var(cesmidx[rid][cid])))
             if plotbbox:
                 ax,ll = viz.plot_box(bbox_NNA,ax=ax,leglab="AMV",
                                      color=dfcol,linestyle="dashed",linewidth=2,return_line=True)
             ax = viz.label_sp(spid,case='lower',ax=ax,labelstyle="(%s)",fontsize=16,alpha=0.7)
-            spid += 1
         
         cb = fig.colorbar(pcm,ax=axs[1,1],orientation='horizontal')
         cb.set_ticks(cint[::4])
@@ -748,8 +753,113 @@ cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction=0.036,p
 cb.set_ticks(cint[::4])
 cb.ax.set_xticklabels(clb,rotation=45)
 plt.suptitle("AMV Pattern Comparison ($\degree C$ per $\sigma_{AMV}$)",y=.92,fontsize=14)
-
 plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+
+#%% Updated Plot With just the SLAB FULL AND SM COMPARISONS, SM DRAFT 2
+
+notitle = True
+
+cmax  = 0.5
+cstep = 0.025
+lstep = 0.05
+cint,cl_int=viz.return_clevels(cmax,cstep,lstep)
+clb = ["%.2f"%i for i in cint[::4]]
+
+f = 0
+
+for rid in range(5):
+    if rid != sel_rid:
+        continue
+    
+    
+    if darkmode:
+        plt.style.use('dark_background')
+        savename = "%sSST_AMVPattern_Comparison_region%s_%s_dark.png" % (figpath,regions[rid],fnames[f])
+        fig.patch.set_facecolor('black')
+        dfcol = 'k'
+    else:
+        plt.style.use('default')
+        savename = "%sSST_AMVPattern_Comparison_region%s_%s.png" % (figpath,regions[rid],fnames[f])
+        fig.patch.set_facecolor('white')
+        dfcol = 'k'
+    
+    spid = 0
+    proj = ccrs.PlateCarree()
+    fig,axs = plt.subplots(2,2,subplot_kw={'projection':proj},figsize=(10,8))
+    
+    
+    # figsize=(12,6)
+    # ncol = 3
+    # fig,axs = viz.init_2rowodd(ncol,proj,figsize=figsize,oddtop=False,debug=True)
+    
+    # Plot Stochastic Model Output
+    for aid,mid in enumerate([0,2]):
+        ax = axs.flatten()[aid]
+        
+        # Set Labels, Axis, Coastline
+        if mid == 0:
+            blabel = [1,0,0,0]
+        elif mid == 1:
+            blabel = [0,0,0,1]
+        else:
+            blabel = [0,0,0,0]
+        
+        # Make the Plot
+        ax = viz.add_coast_grid(ax,bboxplot,blabels=blabel,line_color=dfcol,
+                                fill_color='gray')
+        pcm = ax.contourf(lon,lat,amvpats[f][rid][mid].T,levels=cint,cmap='cmo.balance')
+        ax.pcolormesh(lon,lat,amvpats[f][rid][mid].T,vmin=cint[0],vmax=cint[-1],cmap='cmo.balance',zorder=-1)
+        cl = ax.contour(lon,lat,amvpats[f][rid][mid].T,levels=cl_int,colors="k",linewidths=0.5)
+        ax.clabel(cl,levels=cl_int,fontsize=8)
+        
+        ax.set_title("%s ($\sigma^2_{AMV}$ = %.04f $K^2$)"%(modelnames[mid],np.var(amvids[f][rid][mid])))
+        if plotbbox:
+            ax,ll = viz.plot_box(bbox_NNA,ax=ax,leglab="AMV",
+                                 color=dfcol,linestyle="dashed",linewidth=2,return_line=True)
+            
+        viz.plot_mask(lon,lat,dmsks[mid],ax=ax,markersize=0.1)
+        ax.set_facecolor=dfcol
+        ax = viz.label_sp(spid,case='lower',ax=ax,labelstyle="(%s)",fontsize=16,alpha=0.7,fontcolor=dfcol)
+        spid += 1
+        
+    # Plot CESM1
+    #axs[1,1].axis('off')
+    
+    for cid in range(2):
+        if cid == 0:
+            ax = axs[1,1]
+            blabel = [0,0,0,1]
+            spid = 3 # Flipped order
+        else:
+            ax = axs[1,0]
+            blabel = [1,0,0,1]
+            spid = 2
+            
+        # Make the Plot
+        ax = viz.add_coast_grid(ax,bboxplot,blabels=blabel,line_color=dfcol,
+                                fill_color='gray')
+        pcm = ax.contourf(lon180g,latg,cesmpat[rid][cid].T,levels=cint,cmap='cmo.balance')
+        ax.pcolormesh(lon180g,latg,cesmpat[rid][cid].T,vmin=cint[0],vmax=cint[-1],cmap='cmo.balance',zorder=-1)
+        cl = ax.contour(lon180g,latg,cesmpat[rid][cid].T,levels=cl_int,colors="k",linewidths=0.5)
+        ax.clabel(cl,levels=cl_int,fontsize=8)
+        ax.set_title("%s ($\sigma^2_{AMV}$ = %.04f $K^2$)"%(cesmname[cid],np.var(cesmidx[rid][cid])))
+        if plotbbox:
+            ax,ll = viz.plot_box(bbox_NNA,ax=ax,leglab="AMV",
+                                 color=dfcol,linestyle="dashed",linewidth=2,return_line=True)
+        ax = viz.label_sp(spid,case='lower',ax=ax,labelstyle="(%s)",fontsize=16,alpha=0.7,fontcolor=dfcol)
+    
+    cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction=0.045,pad=0.075)
+    cb.set_ticks(cint[::4])
+    cb.ax.set_xticklabels(clb,rotation=45)
+    #cb.ax.set_xticklabels(cint[::2],rotation=90)
+    #tick_start = np.argmin(abs(cint-cint[0]))
+    #cb.ax.set_xticklabels(cint[tick_start::2],rotation=90)
+    if notitle is False:
+        plt.suptitle("%s AMV Pattern and Index Variance [Forcing = %s]" % (regionlong[rid],frcnamelong[f]),fontsize=14)
+    
+    plt.savefig(savename,dpi=150,bbox_inches='tight')
+
 #%% Plot AMV Patterns (Comparing N_EOFs)
 
 rid = 4 # Let's just do NAT
@@ -973,6 +1083,7 @@ if exname == "seasonal":
 #%% AGU Poster Seasonal Plot (and SM Outline Draft 2)
 
 notitle = True
+tworow  = True
 
 if exname == "seasonal":
     mid   = 2 # Model id  (hconst, hvary, entrain)
@@ -985,7 +1096,12 @@ if exname == "seasonal":
     lstep = 0.05
     cint,cl_int = viz.return_clevels(cmax,cstep,lstep)
     
-    fig,axs = plt.subplots(1,4,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(13,3))
+    if tworow:
+        fig,axs = plt.subplots(2,2,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(8,6))
+        fontsize=20
+    else:
+        fig,axs = plt.subplots(1,4,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(13,3))
+        fontsize=16
     
 
     plotamvs = amvpats#amvpats[0][rid][mid]
@@ -994,23 +1110,41 @@ if exname == "seasonal":
     for sid in range(4): # Loop for each season
     
         blabel = [0,0,0,0]
-        if sid == 0:
-            blabel[0]=1 # Add Left Label
-        if row == 1:
-            blabel[-1]=1 # Ad bottom labels
         
-        ax = axs[sid]
+        
+        if tworow:
+            ax = axs.flatten()[sid]
+            
+            if sid%2 == 0:
+                blabel[0] = 1 # Add Left Label
+            if sid > 1:
+                blabel[-1] = 1 # Add bottom labels
+            
+        else:
+            ax = axs[sid]
+            
+            if sid == 0:
+                blabel[0]=1 # Add Left Label
+            if row == 1:
+                blabel[-1]=1 # Add bottom labels
+            
         ax = viz.add_coast_grid(ax,bboxplot,blabels=blabel,fill_color='gray')
         
         # Plot and set the title
         plotamv = plotamvs[sid+1][rid][mid]
         pcm,ax = plot_amvpat(lon,lat,plotamv.T,ax,blabel=blabel)
         ax.set_title(frcnamelong[sid+1])
-        ax = viz.label_sp(spid,case='lower',ax=ax,labelstyle="(%s)",fontsize=16,alpha=0.7)
+        
+        viz.plot_mask(lon,lat,dmsks[mid],ax=ax,markersize=0.1)
+        
+        ax = viz.label_sp(spid,case='lower',ax=ax,labelstyle="(%s)",fontsize=fontsize,alpha=0.7)
         spid += 1
     
     # Set Colorbar
-    cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='vertical',fraction=0.010,pad=0.015)
+    if tworow:
+        cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='vertical',fraction=0.035,pad=0.02)
+    else:
+        cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='vertical',fraction=0.010,pad=0.015)
     cb.set_label("Contour = %.2f $K \sigma_{AMV}^{-1}$" % cstep)
     if notitle is False:
         plt.suptitle("AMV Pattern, Forcing with Fixed Seasonal Patterns (Contours = 0.05$\degree C$ per 1$\sigma_{AMV}$)",y=.90)
@@ -1026,8 +1160,9 @@ if exname == "seasonal":
 
 
 
-#%% Plot NAO-EAP Plots
-
+#%% Plot NAO-EAP Plots (Updated for Stochastic Model Draft 2)
+notitle = True
+cbvert  = False
 rid = 4
 mid = 2
 
@@ -1039,16 +1174,33 @@ cl_int = np.arange(-clmax,clmax+cstep,cstep)
 if exname == "NAO_EAP":
     spid = 0
     
-    fig,axs = plt.subplots(1,3,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(13,7))
+    fig,axs = plt.subplots(1,3,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(14,6))
     for f in range(3):
+        
+        
+        blabel = [0,0,0,1]
+        if f == 0:
+            blabel[0] = 1
+        
+        
         ax = axs[f]
-        ax  = viz.add_coast_grid(ax,bbox=bboxplot)
-        pcm,ax = plot_amvpat(lon,lat,amvpats[f][rid][mid].T,ax)
-        ax.set_title("%s"%(frcnamelong[f]))
+        ax  = viz.add_coast_grid(ax,bbox=bboxplot,blabels=[0,0,0,0],fill_color='gray')
+        
+        pcm,ax = plot_amvpat(lon,lat,amvpats[f][rid][mid].T,ax,blabel=blabel)
+        
+        
+        if notitle is False:
+            ax.set_title("%s"%(frcnamelong[f]))
+        
+        viz.plot_mask(lon,lat,dmsks[mid],ax=ax,markersize=0.1)
+        
         ax = viz.label_sp(spid,case='lower',ax=ax,labelstyle="(%s)",fontsize=16,alpha=0.7)
         spid += 1
-    cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='vertical',fraction= 0.012,pad=0.05)
-    cb.set_label("Contour = %.2f $K \sigma_{AMV}^{-1}$" % cstep)
+    if cbvert:
+        cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='vertical',fraction= 0.012,pad=0.05)
+    else:
+        cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction= 0.04,pad=0.09)
+    #cb.set_label("Contour = %.2f $K \sigma_{AMV}^{-1}$" % cstep)
 plt.savefig("%sAMV_Patterns_NAO_EAP_model%i.png" % (figpath,mid),dpi=150,bbox_inches='tight')
 
 #%% Plot Bounding Boxes over CESM Slab Pattern
@@ -1099,7 +1251,8 @@ sstvars = np.zeros((len(fnames),len(regions),len(modelnames))) # Forcing x Regio
 # An unfortunate nested loop... 
 for fid in range(len(fnames)):
     for rid in range(len(regions)):
-        for model in range(len(modelnames)):
+        nmod = len(sstdicts[fid][rid])
+        for model in range(nmod):
             sstin  = sstdicts[fid][rid][model]
             sstvar = np.var(sstin)
             print("Variance for forcing %s, region %s, model %s is %f" % (fnames[fid],regions[rid],modelnames[model],sstvar))
@@ -1211,7 +1364,7 @@ for f in range(len(fnames)):
 #%% Plot Params
 
 rid_sel  = [0,5,6,2,4,]
-speccolors = ["r","magenta","Orange","k","gray"]
+speccolors = ["r","magenta","Orange",dfcol,"gray"]
 specnames  = np.hstack([modelnames,cesmname])
     
 #%% Make the plot (Frequency x Power)
