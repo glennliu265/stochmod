@@ -690,7 +690,7 @@ plt.savefig("%sRegional_Autocorrelation_Spectra%s.png"%(figpath,smoothname),
 
 
 cid = 0
-
+rids = [0,6,5,]
 bboxtemp = [-90,5,15,68]
 
 fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(4.5,3))
