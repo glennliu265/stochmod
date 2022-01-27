@@ -577,6 +577,7 @@ plt.savefig("%sSPG-NAT_Autocorrelation_Spectra%s.png"%(figpath,smoothname),
 alw            = 3
 exclude_consth = True # Set to true to NOT plot constant h model
 notitle        = True
+plotslab       = False # Set to True to plot the slab model simulation
 
 if exclude_consth:
     plotid = [1,2]
@@ -585,11 +586,18 @@ else:
     plotid = [0,1,2]
     plotidspec = [0,1,2,3,4]
 
+if plotslab is False: # Remove slab simulation
+    plotidspec.remove(4)
+    specylim_spg = [0,0.42]
+    specylim_stg = [0,0.15]
+else:
+    specylim_spg = [0,0.8]
+    specylim_stg = [0,0.3]
+
 rids = [0,6,5,]
 order = rids
 
-specylim_spg = [0,0.8]
-specylim_stg = [0,0.3]
+
 
 
 # Do Plotting
@@ -616,7 +624,11 @@ for i in range(len(rids)):
                         color=mcolors[mid],alpha=0.10)
     
     # Plot CESM
-    for cid in range(2):
+    if plotslab:
+        crange = 2
+    else:
+        crange = 1
+    for cid in range(crange):
         ax.plot(lags,cesmacs[rid][cid],color=cesmcolor[cid],label=cesmname[cid],lw=alw)
         ax.fill_between(lags,cfcesm[rid,cid,lags,0],cfcesm[rid,cid,lags,1],
                         color=cesmcolor[cid],alpha=0.10)
@@ -647,7 +659,8 @@ for i in range(len(rids)):
     
     ax,ax2 = viz.plot_freqlin(specsall[rid],freqsall[rid],speclabels,speccolors,lw=alw,
                          ax=ax,plottitle=regionlong[rid],
-                         xlm=xlm,xtick=xtks,return_ax2=True,plotids=plotidspec)
+                         xlm=xlm,xtick=xtks,return_ax2=True,
+                         plotids=plotidspec,legend=False)
     
     # Turn off title and second axis labels
     ax.set_title("")
@@ -689,29 +702,55 @@ plt.savefig("%sRegional_Autocorrelation_Spectra%s.png"%(figpath,smoothname),
 #%% Make the Corresponding Bounding Box
 
 
+"""
+Old Param Combinations that worked...
+
+Having the bounding box and legend box right below it
+bboxtemp = [-90,5,15,68]
+fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(4.5,3))
+ax.text(-69,69,"Bounding Boxes",ha='center',bbox=props,fontsize=12) # (works for SPG Only)
+ax.legend(ncol=1,fontsize=8,loc=6,bbox_to_anchor=(0, .75))
+
+"""
+
 cid = 0
 rids = [0,6,5,]
-bboxtemp = [-90,5,15,68]
+bboxtemp = [-85,-5,15,65]
 
-fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(4.5,3))
-ax = viz.add_coast_grid(ax,bboxtemp,fill_color='gray')
+fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(3,2))
+ax = viz.add_coast_grid(ax,bboxtemp,fill_color='gray',ignore_error=True)
 fig.patch.set_alpha(1)  # solution
 # # Plot the amv pattern
 props = dict(boxstyle='square', facecolor='white', alpha=0.8)
 
 
-ax.text(-69,69,"Bounding Boxes",ha='center',bbox=props,fontsize=12) # (works for SPG Only)
+#ax.text()
+
+#ax.text(-69,69,"Bounding Boxes",ha='center',bbox=props,fontsize=12) # (works for SPG Only)
 
 
-# # 
-ls = []
+# Add text
+ax.text(-38,50,"SPG",ha='center',fontsize=15,weight='bold') 
+ax.text(-60,27,"STGw",ha='center',fontsize=15,weight='bold') 
+ax.text(-25,27,"STGe",ha='center',fontsize=15,weight='bold') 
+#ax.text()
+
+
+# First PLot Solid lines below
 for bb in rids:
     ax,ll = viz.plot_box(bboxes[bb],ax=ax,leglab=regions[bb],
-                          color=bbcol[bb],linestyle=bbsty[bb],linewidth=3,return_line=True)
+                          color=bbcol[bb],linestyle="solid",linewidth=3,return_line=True)
+
+# Then plot dashed lines above
+ls = []
+for bb in rids:
+    
+    ax,ll = viz.plot_box(bboxes[bb],ax=ax,leglab=regions[bb],
+                          color=bbcol[bb],linestyle="dashed",linewidth=3,return_line=True)
     ls.append(ll)
 
 #BBox right below ttiel
-ax.legend(ncol=1,fontsize=8,loc=6,bbox_to_anchor=(0, .75))
+#ax.legend(ncol=1,fontsize=8,loc=6,bbox_to_anchor=(0, .75))
 
 #ax.text(-41,50,"SPG",ha='center',bbox=props,fontsize=25)
 
