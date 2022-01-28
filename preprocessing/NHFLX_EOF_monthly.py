@@ -541,28 +541,34 @@ notitle = True
 
 ids = [11,0,1]
 clvl = np.arange(-60,65,5)
-plvl = np.arange(-800,900,100)
+plvl = np.arange(-800,900,100)/100
 
 titles = ["EOF 1 (NAO, %.2f" % (varexpall[0,ids].mean()*100) + "% Variance)" ,
           "EOF 2 (EAP, %.2f" % (varexpall[1,ids].mean()*100) + "% Variance)" ]
 #fig,axs = plt.subplots(2,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(12,7))
-fig,axs = plt.subplots(1,2,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(12,4))
+fig,axs = plt.subplots(1,2,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(12,4),
+                       constrained_layout=True)
 
-spid = 3
+spid = 0
 for k in range(2):
+    blabel = [1,0,0,1]
+    
+    if k == 1:
+        blabel = [0,0,0,1]
     ax = axs[k]
-    ax  = viz.add_coast_grid(ax,bbox=bbox,line_color=dfcol)
-    pcm = ax.contourf(lon180,lat,eofall[:,:,ids,k].mean(-1).T,levels=clvl,cmap='PRGn')
-    cl  = ax.contour(lon180,lat,eofslp[:,:,ids,k].mean(-1).T,levels=plvl,colors=dfcol,linewidths=.7)
+    ax  = viz.add_coast_grid(ax,bbox=bbox,line_color="gray",fill_color='gray',blabels=blabel)
+    pcm = ax.contourf(lon180,lat,eofall[:,:,ids,k].mean(-1).T,levels=clvl,cmap='RdBu_r')
+    cl  = ax.contour(lon180,lat,eofslp[:,:,ids,k].mean(-1).T/100,levels=plvl,colors=dfcol,linewidths=.7)
     ax.clabel(cl,fontsize=10)
-    ax.set_title(titles[k])
+    #ax.set_title(titles[k])
     
     ax = viz.label_sp(spid,case='lower',ax=ax,labelstyle="(%s)",fontsize=16,alpha=0.7)
     spid += 1
 
 
-cb = fig.colorbar(pcm,ax=axs.flatten(),fraction=0.015)
-cb.set_label("$Q_{net}$ ,Contour = 5 $Wm^{-2} \,\sigma_{PC}^{-1}$")
+cb = fig.colorbar(pcm,ax=axs.flatten(),fraction=0.015,pad=0.01)
+#cb.set_label("$Q_{net}$ ,Contour = 5 $Wm^{-2} \,\sigma_{PC}^{-1}$")
+cb.set_label("$Q_{net}$ ($Wm^{-2}$ $\sigma_{PC}^{-1}$)")
 #plt.suptitle("SLP (Contours), Interval = 100 hPa",x=0.6, y=.955,fontsize=14)
 if notitle is False:
     plt.suptitle("$Q_{net}$ Forcing Pattern (Colors) and SLP (Contours, Interval = 100 hPa), DJF Mean",fontsize=12)
@@ -655,7 +661,7 @@ for k in range(2):
 
 
 cb = fig.colorbar(pcm,ax=axs.flatten())
-#cb.set_label("$Q_{net}$ ,Interval = 5 $W/m^2$ per $\sigma_{PC}$")
+cb.set_label("$Q_{net}$ ,Interval = 5 $W/m^2$ per $\sigma_{PC}$")
 #plt.suptitle("SLP (Contours), Interval = 100 hPa",x=0.6, y=.955,fontsize=14)
 
 plt.savefig("%sEOF1_EOF2_vratio_%s.png"%(outpath,mcname),dpi=150,bbox_inches='tight')
@@ -681,7 +687,8 @@ for k in range(2):
 
 
 cb = fig.colorbar(pcm,ax=axs.flatten())
-cb.set_label("$Q_{net}$ ,Interval = 5 $W/m^2$ per $\sigma_{PC}$")
+#cb.set_label("$Q_{net}$ ,Interval = 5 $W/m^2$ per $\sigma_{PC}$")
+cb.set_label("$Q_{net}$ ($W/m^2$ per $\sigma_{PC}$)")
 plt.suptitle("SLP (Contours), Interval = 100 hPa",x=0.6, y=.955,fontsize=14)
 
 plt.savefig("%sEOF1_EOF2_corrected_%s.png"%(outpath,mcname),dpi=150,bbox_inches='tight')
