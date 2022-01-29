@@ -37,7 +37,7 @@ import yo_box as ybx
 
 # Path to data 
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
-outpath = projpath + '02_Figures/20211026/'
+outpath = projpath + '02_Figures/20220128/'
 proc.makedir(outpath)
 datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/"
 
@@ -283,6 +283,11 @@ np.savez(savename,**{
     },allow_pickle=True)
 
 #%% Load data preprocessed above
+
+projpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
+datpath1     = projpath + '01_Data/model_output/'
+rawpath     = projpath + '01_Data/model_input/'
+outpathdat  = datpath1 + '/proc/'
 
 # Load data for CESM1-PIC
 cesmacs= []
@@ -602,9 +607,9 @@ plt.savefig("%sAMV_Patterns_Indv_%s.png"% (outpath,mnames[i]),dpi=200,bbox_inche
 awgt = 1
 monsec = 3600*24*30 # ~Seconds in Month
 
-fullsmth=17
-slabsmth=15
-obssmth=3
+fullsmth=75
+slabsmth=65
+obssmth=12
 
 
 # Load regionally averaged SST
@@ -664,7 +669,7 @@ title = ("North Atlantic SST Spectra \n Smoothing (# bands): Reanalysis (%i), CE
 speclabels = ["%s (%.4f$\degree \, C^{2}$)" % (mnames[i],np.var(nasstis[i])) for i in range(len(mnames))]
 fig,ax = plt.subplots(1,1,figsize=(12,4))
 ax,ax2 = viz.plot_freqlin(specs,freqs,speclabels,mcols,
-                     ax=ax,plottitle=title,xtick=xtks,xlm=xlm,marker="",return_ax2=True)
+                     ax=ax,plottitle=title,xtick=xtks,xlm=xlm,marker="",return_ax2=True,lw=4)
 
 ax2.set_xlabel("Period (Years)")
 plt.setp(ax2.get_xticklabels(), rotation=50,fontsize=8)
@@ -707,6 +712,76 @@ for i in range(len(nasstis)):
     sstyrmon = proc.year2mon(nasstis[i]) # [mon x year]
     ax.plot(sstyrmon.mean(1))
     ax.set_title(mnames[i])
+
+
+#%% Comparison Plot for SM Draft 2
+
+
+fig = plt.figure(constrained_layout=True, facecolor='w',figsize=(12,8))
+
+gs = fig.add_gridspec(nrows=3, ncols=3, left=.02, right=1,
+                      hspace=.075, wspace=0.25)
+
+
+# Create Top Row with AMV plots
+axs = []
+for i in range(3):
+    
+    blabel = [0,0,0,1]
+    if i == 0:
+        blabel[0] = 1
+    
+    
+    ax  = fig.add_subplot(gs[0:2, i],projection=ccrs.PlateCarree())
+    ax  = viz.add_coast_grid(ax,bbox=bbox,line_color='k',
+                             ignore_error=True,fill_color='gray',
+                             blabels=blabel)
+    
+    cf = ax.contourf(lons[i],lats[i],amvpats[i].T,cmap=cmocean.cm.balance,levels=cint,extend='both')    
+    cl = ax.contour(lons[i],lats[i],amvpats[i].T,levels=cl_int,colors='k',linewidths=0.5)
+    
+    ax.clabel(cl)
+    ax.set_title("%s ($\sigma_{AMV}^2$=%.4f$\degree \, C^{2}$)"%(mnames[i],np.var(amvids[i])))
+
+    axs.append(ax)
+
+ax3 = fig.add_subplot(gs[2, :])
+
+ax3,ax2 = viz.plot_freqlin(specs,freqs,speclabels,mcols,
+                     ax=ax3,plottitle=title,xtick=xtks,xlm=xlm,return_ax2=True,lw=4)
+plt.tight_layout()
+
+#%%  Just Plot the AMV Patterns (SM Draft 2)
+
+
+fig,axs = plt.subplots(1,3,constrained_layout=True,figsize=(10,4),
+                       subplot_kw={'projection':ccrs.PlateCarree()})
+
+spid = 0
+for i in range(3):
+    
+    blb = [0,0,0,1]
+    if i == 0:
+        blb[0] = 1
+        
+    ax = axs.flatten()[i]
+    ax = viz.add_coast_grid(ax,bbox=bboxplot,blabels=blb,ignore_error=True,
+                            fill_color='gray')
+    
+    cf = ax.contourf(lons[i],lats[i],amvpats[i].T,cmap=cmocean.cm.balance,levels=cint,extend='both')    
+    cl = ax.contour(lons[i],lats[i],amvpats[i].T,levels=cl_int,colors='k',linewidths=0.5)
+    
+    ax.clabel(cl)
+    ax.set_title("%s ($\sigma_{AMV}^2$=%.4f$\degree \, C^{2}$)"%(mnames[i],np.var(amvids[i])))
+    
+    ax = viz.label_sp(spid,case='lower',ax=ax,labelstyle="(%s)",fontsize=16,alpha=0.7)
+    spid += 1
+    
+cb = fig.colorbar(cf,ax=axs,orientation="horizontal",fraction=0.08,pad=0.05)
+#plt.suptitle("AMV SST Pattern (CESM vs. Obs)",y=0.95)   
+cb.set_label("SST ($K \sigma_{AMV}^{-1}$)")
+plt.savefig("%sAMV_Patterns_Obs.png"% (outpath),dpi=200,bbox_inches='tight')
+
 
 
 #%% Old Scripts **************************************************************
