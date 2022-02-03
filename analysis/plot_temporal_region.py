@@ -19,6 +19,8 @@ import matplotlib.pyplot as plt
 import sys
 import cmocean
 from tqdm import tqdm
+
+from time import time
 #%% Set Paths, Import Custom Modules
 stormtrack = 0
 if stormtrack == 0:
@@ -381,7 +383,7 @@ sstvarall = vv
 
 alw = 3
 exclude_consth = True # Set to true to NOT plot constant h model
-notitle = True
+notitle        = True
 
 
 if exclude_consth:
@@ -579,6 +581,8 @@ exclude_consth = True # Set to true to NOT plot constant h model
 notitle        = True
 plotslab       = False # Set to True to plot the slab model simulation
 
+plotlog        = True # Set to True to Plot in Log Scale
+
 if exclude_consth:
     plotid = [1,2]
     plotidspec = [1,2,3,4] # Exclude constant h
@@ -657,10 +661,17 @@ for i in range(len(rids)):
     #speclabels = ["%s (%.3f $^{\circ}C^2$)" % (specnames[i],sstvarall[rid][i]) for i in range(len(insst)) ]
     speclabels=["" for i in range(len(insst))]
     
-    ax,ax2 = viz.plot_freqlin(specsall[rid],freqsall[rid],speclabels,speccolors,lw=alw,
-                         ax=ax,plottitle=regionlong[rid],
-                         xlm=xlm,xtick=xtks,return_ax2=True,
-                         plotids=plotidspec,legend=False)
+    
+    if plotlog:
+        ax,ax2 = viz.plot_freqlog(specsall[rid],freqsall[rid],speclabels,speccolors,lw=alw,
+                             ax=ax,plottitle=regionlong[rid],
+                             xlm=xlm,xtick=xtks,return_ax2=True,
+                             plotids=plotidspec,legend=False)
+    else:
+        ax,ax2 = viz.plot_freqlin(specsall[rid],freqsall[rid],speclabels,speccolors,lw=alw,
+                             ax=ax,plottitle=regionlong[rid],
+                             xlm=xlm,xtick=xtks,return_ax2=True,
+                             plotids=plotidspec,legend=False)
     
     # Turn off title and second axis labels
     ax.set_title("")
@@ -672,21 +683,36 @@ for i in range(len(rids)):
     # Move period labels to ax1
     ax.set_xticklabels(xper)
     ax.set_xlabel("Period (Years)")
-    plt.setp(ax.get_xticklabels(), rotation=50,fontsize=8)
+    
+    if plotlog is False:
+        rotation  =55
+        xfontsize =8
+    else:
+        rotation  =0
+        xfontsize =8
+    
+    plt.setp(ax.get_xticklabels(), rotation=rotation,fontsize=xfontsize)
     
     if i == 0:# Turn off y label except for leftmost plot
-        ax.set_ylabel("Power Spectrum ($\degree C^2 /cpy$)")
+        ax.set_ylabel("Power Spectrum ($K^2 /cpy$)")
         ax.set_ylim(specylim_spg)
     else:
         ax.set_ylabel("")
-        
         ax.set_ylim(specylim_stg)
+        
+        
+    if plotlog:
+        ax.set_ylim([1e-2,1e0])
+        
+        if i == 1: # Turn off ylabels for middle plot
+            ax.yaxis.set_ticklabels([])
         
     if i != 1:
         ax.set_xlabel("")
         
     if i == 2: # Just turn off for last STG plot
         ax.yaxis.set_ticklabels([])
+    
     
     #title = "%s Power Spectra" % (regions[rid])
     title = ""
@@ -756,6 +782,221 @@ for bb in rids:
 
 plt.savefig("%sRegional_BBOX_Locator.png"%figpath,dpi=100,bbox_inches='tight',transparent=True)
 
+#%% Plot ratios of SLAB and FULL
+
+recip   = True  # True for SLAB/FULL, False for FULL/SLAB
+rid_sel = [0,5,6]
+dtplot  = 3600*24*365
+debug  = False
+plotlog  = True
+
+# Interpolate the data
+freqslab   = freqsall[0][-1]
+freqfull   = freqsall[0][-2]
+
+
+if debug:
+    interpfull = np.interp(freqslab,freqfull,specsall[0][-2])
+    fig,ax = plt.subplots(1,1)
+    ax.loglog(freqslab*dtplot,interpfull/dtplot,label="Interp")
+    ax.loglog(freqfull*dtplot,specsall[0][-2]/dtplot,ls='dashed',label="Original")
+    ax.set_xlim([1e-2,1e0])
+
+
+fig,ax = plt.subplots(1,1)
+for r in rid_sel:
+    
+    # Interpolate FULL to SLAB frequencies
+    specfull        = specsall[r][-2]
+    specslab        = specsall[r][-1]
+    specfull_interp = np.interp(freqslab,freqfull,specfull)
+    
+    # Compute the ratio
+    if recip:
+        specratio = specslab/specfull_interp
+        ylab = "SLAB/FULL"
+    else:
+        specratio = specfull_interp/specslab
+        ylab = "FULL/SLAB"
+    
+    if plotlog:
+        specratio = np.log(specratio)
+        ax.set_ylabel("$log$(%s)" % ylab)
+    
+    ln = ax.semilogx(freqslab*dtplot,specratio,label=regions[r],lw=4,color=bbcol[r])
+ax.legend()
+ax.set_xlim([xtks[0],xtks[-1]])
+ax.set_xticks(xtks)
+ax.set_xticklabels(xper)
+ax.set_xlabel("Period (Years)")
+ax.axhline(0,ls='dashed',color="k")
+ax.grid(True,ls='dotted')
+ax.set_ylim([-2.25,2.25])
+#ax.set_title("Ratio of Regional SST Spectra")
+    #ratio = specs[]
+    
+    
+#%%
+    
+spec_num = -1
+ref       = 'FULL' # [SLAB or FULL or ref_num]
+ref_num   = 0
+plotlog  = True
+recip    = False
+
+# Interpolate the data
+freqslab   = freqsall[0][-1]
+freqfull   = freqsall[0][-2]
+freqsm     = freqsall[0][0]
+
+if debug:
+    interpfull = np.interp(freqslab,freqfull,specsall[0][-2])
+    fig,ax = plt.subplots(1,1)
+    ax.loglog(freqslab*dtplot,interpfull/dtplot,label="Interp")
+    ax.loglog(freqfull*dtplot,specsall[0][-2]/dtplot,ls='dashed',label="Original")
+    ax.set_xlim([1e-2,1e0])
+
+
+fig,ax = plt.subplots(1,1,figsize=(6,4),constrained_layout=True)
+for r in rid_sel:
+    
+    # Interpolate to Reference Frequency
+    if ref == 'FULL':
+        reffreq = freqfull
+        refspec = specsall[r][-2]
+    elif ref == 'SLAB':
+        reffreq = freqslab
+        refspec = specsall[r][-1]
+    else:
+        reffreq = freqsm
+        refspec = specsall[r][ref_num]
+        ref     = specnames[ref_num]
+        
+    
+    # Interpolate selected spectra to reference frequencies
+    spec_interp = np.interp(reffreq,freqs[spec_num],specsall[r][spec_num])
+    
+    # Compute the ratio
+    if recip:
+        specratio = refspec/spec_interp
+        ylab = "%s/%s" % (ref,specnames[spec_num])
+        flab = "%s-%s" % (ref,specnames[spec_num])
+    else:
+        specratio = spec_interp/refspec
+        ylab = "%s/%s" % (specnames[spec_num],ref)
+        flab = "%s-%s" % (ref,specnames[spec_num])
+        
+    if plotlog:
+        specratio = np.log(specratio)
+        ax.set_ylabel("$log$(%s)" % ylab)
+    
+    ln = ax.semilogx(reffreq*dtplot,specratio,label=regions[r],lw=4,color=bbcol[r])
+ax.legend()
+ax.set_xlim([xtks[0],xtks[-1]])
+ax.set_xticks(xtks)
+ax.set_xticklabels(xper)
+ax.set_xlabel("Period (Years)")
+ax.axhline(0,ls='dashed',color="k")
+ax.grid(True,ls='dotted')
+ax.set_ylim([-2.25,2.25])
+
+
+plt.savefig("%sRegional_Spectra_Ratio_%s.png"%(figpath,flab),dpi=150,bbox_inche='tight')
+
+#%% Make Multiple Panels
+
+spec_num = -1
+ref       = 'FULL' # [SLAB or FULL or ref_num]
+ref_num   = 0
+plotlog  = True
+recip    = False
+
+# Interpolate the data
+freqslab   = freqsall[0][-1]
+freqfull   = freqsall[0][-2]
+freqsm     = freqsall[0][0]
+
+if debug:
+    interpfull = np.interp(freqslab,freqfull,specsall[0][-2])
+    fig,ax = plt.subplots(1,1)
+    ax.loglog(freqslab*dtplot,interpfull/dtplot,label="Interp")
+    ax.loglog(freqfull*dtplot,specsall[0][-2]/dtplot,ls='dashed',label="Original")
+    ax.set_xlim([1e-2,1e0])
+
+
+
+
+
+spec_nums = [-1,2]
+refs      = ['FULL','FULL']
+ref_nums  = [0,1]
+refnames  = ("CESM-FULL","CESM-FULL")
+#specnames = ("CESM-SLAB","Entraining")
+fig,axs = plt.subplots(2,1,figsize=(6,6),constrained_layout=True,sharex=True)
+spid = 0
+for a in range(2):
+    
+    ax = axs[a]
+    
+    spec_num = spec_nums[a]
+    ref      = refs[a]
+    ref_num  = ref_nums[a]
+    
+    
+    
+    for r in rid_sel:
+        
+        # Interpolate to Reference Frequency
+        if ref == 'FULL':
+            reffreq = freqfull
+            refspec = specsall[r][-2]
+        elif ref == 'SLAB':
+            reffreq = freqslab
+            refspec = specsall[r][-1]
+        else:
+            reffreq = freqsm
+            refspec = specsall[r][ref_num]
+            ref     = refnames[a] #specnames[ref_num]
+            
+        
+        # Interpolate selected spectra to reference frequencies
+        spec_interp = np.interp(reffreq,freqs[spec_num],specsall[r][spec_num])
+        
+        
+        # Compute the ratio
+        if recip:
+            specratio = refspec/spec_interp
+            ylab = "%s/%s" % (ref,specnames[spec_num])
+            flab = "%s-%s" % (ref,specnames[spec_num])
+        else:
+            specratio = spec_interp/refspec
+            ylab = "%s/%s" % (specnames[spec_num],refnames[a])
+            flab = "%s-%s" % (refnames[a],specnames[spec_num])
+            
+        if plotlog:
+            specratio = np.log(specratio)
+            ax.set_ylabel("log(%s)" % ylab)
+        
+        ln = ax.semilogx(reffreq*dtplot,specratio,label=regions[r],lw=4,color=bbcol[r])
+    if a == 0:
+        ax.legend(ncol=2)
+        ax.set_xlabel("")
+    else:
+        ax.set_xlabel("Period (Years)")
+    ax.set_xlim([xtks[0],xtks[-1]])
+    ax.set_xticks(xtks)
+    ax.set_xticklabels(xper)
+    
+    ax.axhline(0,ls='dashed',color="k")
+    ax.grid(True,ls='dotted')
+    ax.set_ylim([-2.25,2.25])
+    
+    ax = viz.label_sp(spid,case='lower',ax=ax,labelstyle="(%s)",fontsize=16,alpha=0.7)
+    spid += 1
+    
+
+
+plt.savefig("%sRegional_Spectra_Ratio_2-panel_%s.png"%(figpath,flab),dpi=150,bbox_inche='tight')
 
 #%%
 # #%% Remake using subplot grids (Note Working)
