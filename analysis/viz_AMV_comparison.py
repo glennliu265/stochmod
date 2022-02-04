@@ -209,18 +209,18 @@ exoutnameraw = "new_v_old_q-correction"
 
 
 #NAO and EAP
-fnames = (
-    "forcingflxeof_EOF1_SLAB-PIC_eofcorr0_1000yr_run011_ampq3_method4_dmp0",
-    "forcingflxeof_EOF2_SLAB-PIC_eofcorr0_1000yr_run011_ampq3_method4_dmp0",
-    "forcingflxeof_2eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3_method4_dmp0",
-    )
-frcnamelong = ("NAO (EOF1)","EAP (EOF2)","NAO+EAP")
-exname = "NAO_EAP"
+# fnames = (
+#     "forcingflxeof_EOF1_SLAB-PIC_eofcorr0_1000yr_run011_ampq3_method4_dmp0",
+#     "forcingflxeof_EOF2_SLAB-PIC_eofcorr0_1000yr_run011_ampq3_method4_dmp0",
+#     "forcingflxeof_2eofs_SLAB-PIC_eofcorr0_1000yr_run011_ampq3_method4_dmp0",
+#     )
+# frcnamelong = ("NAO (EOF1)","EAP (EOF2)","NAO+EAP")
+# exname = "NAO_EAP"
 
 # # Just compare 90% Variance Run with CESM
-# fnames = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method4_dmp0',)#'forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run009_ampq3',)
-# frcnamelong = ["EOF Forcing (90% Variance)",]
-# exname ="run_comparison"
+fnames = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method4_dmp0',)#'forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run009_ampq3',)
+frcnamelong = ["EOF Forcing (90% Variance)",]
+exname ="run_comparison"
 
 # Examine impact of Ekman Forcing
 # fnames = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_Qek',)
@@ -756,7 +756,8 @@ plt.suptitle("AMV Pattern Comparison ($\degree C$ per $\sigma_{AMV}$)",y=.92,fon
 plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 
-#%% Updated Plot With just the SLAB FULL AND SM COMPARISONS, SM DRAFT 2
+#%% Updated Plot With just the SLAB FULL AND SM COMPARISONS, 
+## SM DRAFT 2 Final
 
 notitle = True
 
@@ -786,7 +787,8 @@ for rid in range(5):
     
     spid = 0
     proj = ccrs.PlateCarree()
-    fig,axs = plt.subplots(2,2,subplot_kw={'projection':proj},figsize=(10,8))
+    fig,axs = plt.subplots(2,2,subplot_kw={'projection':proj},figsize=(9,9),
+                           constrained_layout=True)
     
     
     # figsize=(12,6)
@@ -849,9 +851,10 @@ for rid in range(5):
                                  color=dfcol,linestyle="dashed",linewidth=2,return_line=True)
         ax = viz.label_sp(spid,case='lower',ax=ax,labelstyle="(%s)",fontsize=16,alpha=0.7,fontcolor=dfcol)
     
-    cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction=0.045,pad=0.075)
+    cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction=0.030,pad=0.05)
     cb.set_ticks(cint[::4])
     cb.ax.set_xticklabels(clb,rotation=45)
+    cb.set_label("SST ($K \, \sigma_{AMV}^{-1}$)")
     #cb.ax.set_xticklabels(cint[::2],rotation=90)
     #tick_start = np.argmin(abs(cint-cint[0]))
     #cb.ax.set_xticklabels(cint[tick_start::2],rotation=90)
@@ -1174,7 +1177,8 @@ cl_int = np.arange(-clmax,clmax+cstep,cstep)
 if exname == "NAO_EAP":
     spid = 0
     
-    fig,axs = plt.subplots(1,3,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(14,6))
+    fig,axs = plt.subplots(1,3,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(14,6),
+                           constrained_layout=True)
     for f in range(3):
         
         
@@ -1200,7 +1204,7 @@ if exname == "NAO_EAP":
         cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='vertical',fraction= 0.012,pad=0.05)
     else:
         cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction= 0.04,pad=0.09)
-    #cb.set_label("Contour = %.2f $K \sigma_{AMV}^{-1}$" % cstep)
+    cb.set_label("SST ($K \, \sigma_{AMV}^{-1}$)")
 plt.savefig("%sAMV_Patterns_NAO_EAP_model%i.png" % (figpath,mid),dpi=150,bbox_inches='tight')
 
 #%% Plot Bounding Boxes over CESM Slab Pattern
