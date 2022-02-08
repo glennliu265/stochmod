@@ -36,8 +36,10 @@ projpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/
 datpath     = projpath + '01_Data/'
 input_path  = datpath + 'model_input/'
 output_path = datpath + 'model_output/'
-outpath     = projpath + '02_Figures/20211011/'
+outpath     = projpath + '02_Figures/20220210/'
 proc.makedir(outpath)
+
+darkmode = True
 
 # Load in control data for 50N 30W
 #fullauto =np.load(datpath+"Autocorrelation_30W50N_FULL_PIC_12805.npy",allow_pickle=True)
@@ -49,6 +51,14 @@ labels=["MLD Fixed","MLD Mean","MLD Seasonal","MLD Entrain"]
 #colors=["red","orange","magenta","blue"]
 expcolors = ('blue','orange','magenta','red')
 hblt = 54.61088498433431 # Meters, the mixed layer depth used in CESM Slab
+if darkmode:
+    dfcol      = 'w'
+    dfalph     = 0.30
+    dfalph_col = 0.40
+else:
+    dfcol      = 'k'
+    dfalph     = 0.1
+    dfalph_col = 0.25 
 
 # UPDATED Colors and names for generals (5/25/2021)
 ecol = ["blue",'cyan','gold','red']
@@ -65,7 +75,7 @@ config['ftype']       = "DJFM-MON" # Forcing Type
 config['genrand']     = 0
 config['fstd']        = 1
 config['t_end']       = 120000    # Number of months in simulation
-config['runid']       = "syn007"  # White Noise ID
+config['runid']       = "syn008"  # White Noise ID
 config['fname']       = "flxeof_090pct_SLAB-PIC_eofcorr2.npy" #['NAO','EAP,'EOF3','FLXSTD']
 config['pointmode']   = 1
 config['query']       = [-30,50]
@@ -363,7 +373,7 @@ fig,ax     = plt.subplots(1,1)
 title      = "SST Autocorrelation at %s (Lag 0 = %s)" % (locstringtitle,mons3[mldpt.argmax()])
 ax,ax2,ax3 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,loopvar=params[2],title=title)
 ax.plot(lags,cesmauto2[lags],label="CESM SLAB",color='k')
-ax.plot(lags,fullauto,color='k',label='CESM Full',ls='dashdot')
+ax.plot(lags,fullauto,color=dfcol,label='CESM Full',ls='dashdot')
 
 for i in range(1,4):
     ax.plot(lags,ac[i],label=labels[i],color=expcolors[i])
@@ -416,14 +426,14 @@ fig,ax     = plt.subplots(1,1)
 title      = "SST Autocorrelation (Lag 0 = %s)" % (mons3[mldpt.argmax()])
 ax,ax2 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title)
 ax.plot(lags,cesmauto2[lags],label="CESM SLAB",color='gray')
-ax.fill_between(lags,cfslab[lags,0],cfslab[lags,1],color='gray',alpha=0.10)
+ax.fill_between(lags,cfslab[lags,0],cfslab[lags,1],color='gray',alpha=dfalph)
 
-ax.plot(lags,fullauto,color='k',label='CESM Full',ls='dashdot')
-ax.fill_between(lags,cffull[lags,0],cffull[lags,1],color='k',alpha=0.10)
+ax.plot(lags,fullauto,color=dfcol,label='CESM Full',ls='dashdot')
+ax.fill_between(lags,cffull[lags,0],cffull[lags,1],color=dfcol,alpha=dfalph)
 
 for i in range(1,4):
     ax.plot(lags,ac[i],label=labels[i],color=expcolors[i])
-    ax.fill_between(lags,cfstoch[i,:,0],cfstoch[i,:,1],color=expcolors[i],alpha=0.25)
+    ax.fill_between(lags,cfstoch[i,:,0],cfstoch[i,:,1],color=expcolors[i],alpha=dfalph_col)
 
 ax.legend()
 ax3.set_ylabel("Mixed Layer Depth (m)")
@@ -437,8 +447,6 @@ dampdef = damppt.copy()
 mlddef = mldpt.copy()
 Fptdef = Fpt.copy()
 
-
-#
 #%% Run the Experiment
 #
 
@@ -525,6 +533,7 @@ for vmld in [False,True]:
     config.pop('mldpt',None)
     
 #%%
+
 # Calculate Confidence Levels
 n     = 10000
 conf  = 0.95
@@ -692,6 +701,18 @@ plt.tight_layout()
 plt.savefig("%sAutocorrelation_ConstvVary_MLDConst_SamePlot.png"%outpath,dpi=150)
 
 #%% Save as above section, but add each one incrementally
+"""
+Note this is the section used to generate figures for the following
+presentations
+    - Generals Exam Presentation
+    - Presentation to ECCO/CSU Group
+    - OSM 2022 Presentation
+"""
+
+
+lw         = 3
+markersize = 6#4
+addvar     = False
 
 #plotlags = np.arange(0,24)
 lags    = np.arange(0,25,1)
@@ -712,7 +733,7 @@ for es in range(4):
     #     ylab =  "Atmopsheric Damping ($W/m^{2} \,/^{\circ}C$)"
     # elif es == 3:
     #     addvar = False
-        
+    
     figs,ax = plt.subplots(1,1,figsize=(6,4))
     if addvar:
         ax,ax2,ax3 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title,loopvar=plotvar)
@@ -720,9 +741,10 @@ for es in range(4):
         ax3.yaxis.label.set_color('gray')
     else:
         ax,ax2 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title)
-    ax.plot(lags,cesmauto2[lags],label="CESM1 SLAB",color='gray',marker="o",markersize=4)
+    
+    ax.plot(lags,cesmauto2[lags],label="CESM1 SLAB",color='gray',marker="o",markersize=markersize,lw=lw)
     #ax.scatter(lags,cesmauto2[lags],10,label="",color='k')
-    ax.fill_between(lags,cfslab[lags,0],cfslab[lags,1],color='gray',alpha=0.4)
+    ax.fill_between(lags,cfslab[lags,0],cfslab[lags,1],color='gray',alpha=dfalph)
     
     for i,e in enumerate(loopis):
         
@@ -730,9 +752,12 @@ for es in range(4):
         ax.set_ylabel("")
         
         cfs = confs[e,model,:,:]
-        ax.plot(lags,plotacs[e][model][lags],label=ename[i],color=ecol[i],ls=els[i],marker="o",markersize=4)
+        ax.plot(lags,plotacs[e][model][lags],
+                label=ename[i],color=ecol[i],
+                ls=els[i],marker="o",markersize=markersize,
+                lw=lw)
         #ax.scatter(lags,plotacs[e][model],10,label="",color=ecol[i])
-        ax.fill_between(lags,cfs[lags,0],cfs[lags,1],color=ecol[i],alpha=0.2)
+        ax.fill_between(lags,cfs[lags,0],cfs[lags,1],color=ecol[i],alpha=dfalph_col)
         
         ax.legend(fontsize=8,ncol=3)
         
@@ -746,7 +771,7 @@ for es in range(4):
     ax.set_ylabel("Correlation")
     plt.suptitle("SST Autocorrelation: Non-Entraining Stochastic Model \n Adding Varying Damping and Forcing",fontsize=12)
     plt.tight_layout()
-    plt.savefig("%sAutocorrelation_ConstvVary_MLDConst_SamePlot_%i.png"% (outpath,es),dpi=150)
+    plt.savefig("%sAutocorrelation_LowerHierarchy_%i.png"% (outpath,es),dpi=150)
     print("Done With %i"% es)
 
 
@@ -795,7 +820,49 @@ ax.set_title("Seasonal Cycle at %s"%locstringtitle)
 plt.tight_layout()
 plt.savefig(outpath+"Scycle_MLD_Forcing_%s_Sequence_%s.png"% (locstring,pvarname),dpi=150)
 
+#%% Plot the case with entrainment (upper hierarchy)
+# For adding each variable
 
+lw         = 3
+markersize = 6#4
+addvar     = False
+
+#plotlags = np.arange(0,24)
+lags    = np.arange(0,25,1)
+xtk2    = np.arange(0,25,2)
+
+loopis = [] # Which is to look through
+
+for es in range(2):
+    print(loopis)
+    
+    figs,ax = plt.subplots(1,1,figsize=(6,4))
+    ax,ax2 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title)
+    
+    # Plot CESM1-FULL
+    ax.plot(lags,cesmauto2[lags],label="CESM1 FULL",color=dfcol,marker="o",markersize=markersize,lw=lw)
+    ax.fill_between(lags,cfslab[lags,0],cfslab[lags,1],color=dfcol,alpha=dfalph)
+    
+    for i,e in enumerate(loopis):
+        
+        title=""
+        ax.set_ylabel("")
+        
+        cfs = confs[e,model,:,:]
+        ax.plot(lags,plotacs[e][model][lags],
+                label=ename[i],color=ecol[i],
+                ls=els[i],marker="o",markersize=markersize,
+                lw=lw)
+        ax.fill_between(lags,cfs[lags,0],cfs[lags,1],color=ecol[i],alpha=dfalph_col)
+        
+        ax.legend(fontsize=8,ncol=3)
+        
+    ax.set_ylabel("Correlation")
+    plt.suptitle("SST Autocorrelation: Non-Entraining Stochastic Model \n Adding Varying Damping and Forcing",fontsize=12)
+    plt.tight_layout()
+    plt.savefig("%sAutocorrelation_UpperHierarchy_%i.png"% (outpath,es),dpi=150)
+    print("Done With %i"% es)
+    
 
 #%% Plot 4x4 with variable MLD
 plotacs = acs
@@ -857,13 +924,27 @@ ax.set_title("Seasonal Cycle at %s"%locstringtitle)
 plt.tight_layout()
 plt.savefig(outpath+"Scycle_MLD_Forcing_%s_Narrow.png"%locstring,dpi=150)
 
+# ---------------------------------
+#%% The Entraining Stochastic Model
+# ---------------------------------
 
-#%% Plot 4x4 with ENTRAINMENT
+"""
+In this section, we assess the impact of adding variable damping and forcing
+to the entraining stochastic model.
+
+Note that with constant MLD, there is no entrainment, though it is technically
+possible to set-up one (I just need to alter the model code again...) and it
+makes little physical meaning.
+"""
+
+#%% Plot 4x4 Autocorrelation with ENTRAINMENT
 plotacs = acs
 model   = 3
 
-figs,axs = plt.subplots(2,2,figsize=(8,8))
+spid    = 0
+figs,axs = plt.subplots(2,2,figsize=(10,6),constrained_layout=True)
 for i,e in enumerate([4,5,6,7]):
+    
     ax     = axs.ravel()[i]
     #title  = explongs[e]
     title=""
@@ -874,11 +955,13 @@ for i,e in enumerate([4,5,6,7]):
     ax.scatter(lags,fullauto[lags],10,label="",color='k',ls='dashdot')
     ax.fill_between(lags,cffull[lags,0],cffull[lags,1],color='gray',alpha=0.4)
     ax.set_ylabel("")
+    if i < 2:
+        ax.set_xlabel("")
     
     cfs = confs[e,model,:,:]
-    ax.plot(lags,plotacs[e][model],label="Stochastic Model",color='r')
-    ax.scatter(lags,plotacs[e][model],10,label="",color='r')
-    ax.fill_between(lags,cfs[:,0],cfs[:,1],color='r',alpha=0.4)
+    ax.plot(lags,plotacs[e][model],label="Stochastic Model",color='orange')
+    ax.scatter(lags,plotacs[e][model],10,label="",color='orange')
+    ax.fill_between(lags,cfs[:,0],cfs[:,1],color='orange',alpha=0.4)
     ax.legend()
     if i == 0:
         ax.set_ylabel("Constant Damping",fontsize=14)
@@ -887,9 +970,82 @@ for i,e in enumerate([4,5,6,7]):
         ax.set_title("Variable Forcing",fontsize=14)
     if i == 2:
         ax.set_ylabel("Variable Damping",fontsize=14)
+        
+    ax = viz.label_sp(spid,case='lower',ax=ax,labelstyle="(%s)",fontsize=16,alpha=0.7)
+    spid += 1
+    
 plt.suptitle("Stochastic Model (with Entrainment)",fontsize=14)
 plt.tight_layout()
 plt.savefig("%sAutocorrelation_ConstvVary_Entrain.png"%outpath,dpi=150)
+
+
+#%% Plot the Spectra
+
+# Set Params
+model   = 3
+pct     = 0.10
+nsmooth = 200
+csmooth = 75
+alw     = 3
+xper = np.array([100,50,20,10,5,2])
+xtks = 1/xper
+xlm  = [xtks[0],xtks[-1]]
+
+
+# Get the data
+inssts = []
+for i,e in enumerate([4,5,6,7]):
+    inssts.append(ssts[e][model])
+sstpt = scm.load_cesm_pt(datpath,loadname='full',grabpoint=[-30,50])[0]
+inssts.append(sstpt)
+
+
+# Do the spectral analysis
+nsmooths = np.hstack([np.ones(4)*nsmooth,[csmooth]])
+specs,freqs,CCs,dofs,r1s = scm.quick_spectrum(inssts,nsmooths,pct)
+
+
+# Plot
+spid = 0
+figs,axs = plt.subplots(2,2,figsize=(10,6),constrained_layout=True)
+for i,e in enumerate([4,5,6,7]):
+    
+    ax     = axs.ravel()[i]
+    title=""
+    
+    speclabels = ("Stochastic Model","CESM1-FULL")
+    speccolors = ("orange","black")
+    
+    
+    specsin = [specs[i],]
+    freqsin = [freqs[i],]
+    specsin.append(specs[-1])
+    freqsin.append(freqs[-1])
+    
+    ax,ax2 = viz.plot_freqlin(specsin,freqsin,speclabels,speccolors,lw=alw,
+                         ax=ax,plottitle="",
+                         xlm=xlm,xtick=xtks,return_ax2=True)
+    
+    ax.set_ylabel("")
+    if i < 2:
+        ax.set_xlabel("")
+    
+    ax.legend()
+    if i == 0:
+        ax.set_ylabel("Constant Damping",fontsize=14)
+        ax.set_title("Constant Forcing",fontsize=14)
+    if i == 1:
+        ax.set_title("Variable Forcing",fontsize=14)
+    if i == 2:
+        ax.set_ylabel("Variable Damping",fontsize=14)
+        
+    ax = viz.label_sp(spid,case='lower',ax=ax,labelstyle="(%s)",fontsize=16,alpha=0.7)
+    spid += 1
+    
+plt.suptitle("Stochastic Model (with Entrainment)",fontsize=14)
+plt.tight_layout()
+
+plt.savefig("%sSpectra_ConstvVary_Entrain.png"%outpath,dpi=150)
 
 
 #%% Plot the variables
@@ -920,18 +1076,16 @@ plt.savefig(outpath+"Stochmod_Inputs.png",dpi=150)
 #%% Load PiC Data
 #% ----------------------
 
-st = time.time()
+st      = time.time()
 # Load full sst data from model
-ld  = np.load(datpath+"FULL_PIC_ENSOREM_TS_lag1_pcs2_monwin3.npz" ,allow_pickle=True)
+ld      = np.load(datpath+"FULL_PIC_ENSOREM_TS_lag1_pcs2_monwin3.npz" ,allow_pickle=True)
 sstfull = ld['TS']
-ld2 = np.load(datpath+"SLAB_PIC_ENSOREM_TS_lag1_pcs2_monwin3.npz" ,allow_pickle=True)
+ld2     = np.load(datpath+"SLAB_PIC_ENSOREM_TS_lag1_pcs2_monwin3.npz" ,allow_pickle=True)
 sstslab = ld2['TS']
 
 # Load lat/lon
-lat    = loadmat("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/CESM1_LATLON.mat")['LAT'].squeeze()
-lon360 = loadmat("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/CESM1_LATLON.mat")['LON'].squeeze()
-
-
+lat     = loadmat("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/CESM1_LATLON.mat")['LAT'].squeeze()
+lon360  = loadmat("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/01_Data/CESM1_LATLON.mat")['LON'].squeeze()
 print("Loaded PiC Data in %.2fs"%(time.time()-st))
 
 
