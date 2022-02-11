@@ -87,6 +87,7 @@ if mconfig == "PIC_SLAB":
     mcname = "SLAB-PIC"
 elif mconfig == "PIC_FULL":
     mcname = "FULL-PIC"
+
 bbox    = [260,20,0,65]
 bboxeof = [280,20,0,65]
 
@@ -101,55 +102,79 @@ N_mode = 200
 # Plotting params
 mons3=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
 blabels=[0,0,0,0]
+
+# Correction Mode
+correction = True # Set to True to use [Qnet + lambda*T], rather than [Qnet]
 #%% Open the dataset
 
-# Open the dataset
+# Open the dataset (Net Heat Flux)
 st      = time.time()
+
+# Set up names (need to change this at some point, silly coding...)
 if mconfig == "PIC_SLAB":
     mcname = "SLAB-PIC"
-    
-    # Open dataset
-    ds = xr.open_dataset("%sNHFLX_PIC_SLAB_raw.nc" % datpath) # time x lat x lon
-
-    # Apply land/ice mask
-    msk = np.load(lipath)
-    ds *= msk[None,:,:]
-    
-    # Select Region
-    dsreg = sel_regionxr(ds,bboxeof)
-    
-    # Read out data
-    flxglob = ds.NHFLX.values
-    #flxreg = dsreg.NHFLX.values
-    lon     = ds.lon.values
-    lat     = ds.lat.values
-    slpglob = np.load(datpath + "../CESM_proc/PSL_PIC_SLAB.npy")
-    print("Loaded data in %.2fs"%(time.time()-st))
-    
 elif mconfig == "PIC_FULL":
     mcname = "FULL-PIC"
     
-    # Load Data
-    flxglob = np.load("%s../NHFLX_PIC_FULL.npy"%(datpath)) # yr x mon x lat x lon
-    lon = np.load(datpath+"CESM1_lon360.npy")
-    lon180 = np.load(datpath+"CESM1_lon180.npy")
-    lat    = np.load(datpath+"CESM1_lat.npy") 
+
+if correction: # Load Fprime (=Qnet + lambda*T)
     
-    # Combine time
-    nmon,_,nlat,nlon = flxglob.shape
-    flxglob = flxglob.reshape(nmon*12,nlat,nlon)
+    #Open Dataset
+    ds = xr.open_dataset("%s../Fprime_%s.nc" % (datpath,mconfig))
     
-    # Apply a mask
-    msk = np.load(lipath)
-    flxglob *= msk[None,:,:]
+    # Select Region
+    dsreg = sel_regionxr(ds,bboxeof)
+    #flxreg = dsreg.Fprime.values
+    lon180  = ds.lon.values
+    lon     = np.load(datpath+"CESM1_lon360.npy") # Load 360 data
+    lat     = ds.lat.values
+    flxglob = ds.Fprime.values
     
-    # Load SLP
+    
+else: # Load Qnet Data
+    
+    if mconfig == "PIC_SLAB":
+        # Open dataset
+        ds = xr.open_dataset("%sNHFLX_PIC_SLAB_raw.nc" % datpath) # time x lat x lon
+    
+        # Apply land/ice mask
+        msk = np.load(lipath)
+        ds *= msk[None,:,:]
+        
+        # Select Region
+        dsreg = sel_regionxr(ds,bboxeof)
+        
+        # Read out data
+        flxglob = ds.NHFLX.values
+        #flxreg = dsreg.NHFLX.values
+        lon     = ds.lon.values
+        lat     = ds.lat.values
+        
+    elif mconfig == "PIC_FULL":
+        
+        # Load Data
+        flxglob = np.load("%s../NHFLX_PIC_FULL.npy"%(datpath)) # yr x mon x lat x lon
+        lon = np.load(datpath+"CESM1_lon360.npy")
+        lon180 = np.load(datpath+"CESM1_lon180.npy")
+        lat    = np.load(datpath+"CESM1_lat.npy") 
+        
+        # Combine time
+        nmon,_,nlat,nlon = flxglob.shape
+        flxglob = flxglob.reshape(nmon*12,nlat,nlon)
+        
+        # Apply a mask
+        msk = np.load(lipath)
+        flxglob *= msk[None,:,:]
+        
+
+# Load in the SLP:
+if mconfig == "PIC_SLAB":
+    slpglob = np.load(datpath + "../CESM_proc/PSL_PIC_SLAB.npy")
+else:
     ds = xr.open_dataset("%s../CESM_proc/PSL_PIC_FULL.nc" % datpath)
     slpglob = ds.PSL.values
-    print("Loaded data in %.2fs"%(time.time()-st))
-
-
-
+    
+print("Loaded data in %.2fs"%(time.time()-st))
 #%% Preprocess, EOF Analysis
 st = time.time()
 ntime,nlat,nlon = flxglob.shape
@@ -178,6 +203,7 @@ if debug:
     ax.scatter(t,flxa[:,latf,lonf],label="Detrended")
     ax.legend()
 print("Completed process in %.2fs"%(time.time()-st))
+
 #%% (**) Apply Area Weight (to region) ----------------------------------------------
 wgt = np.sqrt(np.cos(np.radians(lat)))
 
@@ -265,6 +291,8 @@ eofslp = eofslp.reshape(nlon,nlat,12,N_mode)
 bboxtext = "lon%ito%i_lat%ito%i" % (bbox[0],bbox[1],bbox[2],bbox[3])
 bboxstr  = "Lon %i to %i, Lat %i to %i" % (bbox[0],bbox[1],bbox[2],bbox[3])
 savename = "%sNHFLX_%s_%iEOFsPCs_%s.npz" % (datpath,mcname,N_mode,bboxtext)
+if correction:
+    savename = proc.addstrtoext(savename,"_Fprime")
 
 np.savez(savename,**{
     "eofall":eofall,
@@ -285,6 +313,8 @@ elif mconfig == "PIC_FULL":
 bboxtext  = "lon%ito%i_lat%ito%i" % (bbox[0],bbox[1],bbox[2],bbox[3])
 bboxstr   = "Lon %i to %i, Lat %i to %i" % (bbox[0],bbox[1],bbox[2],bbox[3])
 savename  = "%sNHFLX_%s_%iEOFsPCs_%s.npz" % (datpath,mcname,N_mode,bboxtext)
+if correction:
+    savename = proc.addstrtoext(savename,"_Fprime")
 ld        = np.load(savename,allow_pickle=True)
 
 eofall    = ld['eofall']
@@ -529,15 +559,15 @@ print("Saved data to "+savenamefrc)
 #%% (@@) Plot the above EOFs
 # Note this is also the bottom of figure from SM Paper Outline
 
-darkmode = False
+darkmode = True
 if darkmode:
     plt.style.use('dark_background')
-    dfcol = "w"
+    dfcol = "black"
 else:
     plt.style.use('default')
     dfcol = 'k'
 
-notitle = True
+notitle = False
 
 ids = [11,0,1]
 clvl = np.arange(-60,65,5)
@@ -556,11 +586,13 @@ for k in range(2):
     if k == 1:
         blabel = [0,0,0,1]
     ax = axs[k]
+    ax.set_facecolor('white')
     ax  = viz.add_coast_grid(ax,bbox=bbox,line_color="gray",fill_color='gray',blabels=blabel)
     pcm = ax.contourf(lon180,lat,eofall[:,:,ids,k].mean(-1).T,levels=clvl,cmap='RdBu_r')
     cl  = ax.contour(lon180,lat,eofslp[:,:,ids,k].mean(-1).T/100,levels=plvl,colors=dfcol,linewidths=.7)
     ax.clabel(cl,fontsize=10)
-    #ax.set_title(titles[k])
+    if notitle is not True:
+        ax.set_title(titles[k])
     
     ax = viz.label_sp(spid,case='lower',ax=ax,labelstyle="(%s)",fontsize=16,alpha=0.7)
     spid += 1
@@ -771,6 +803,8 @@ elif eofcorr == 2:
 nmax = thresid.max()
 eofforce = eofforce[:,:,:nmax+1,:]
 savenamefrc = "%sflxeof_%03ipct_%s_eofcorr%i.npy" % (datpath,vthres*100,mcname,eofcorr)
+if correction:
+    savename = proc.addstrtoext(savenamefrc,"_Fprime")
 np.save(savenamefrc,eofforce)
 
 #%% Test Plot (Summed EOF)
@@ -859,6 +893,8 @@ for s in tqdm(range(4)):
     
     # Save the output
     savenamefrc = "%sflxeof_%03ipct_%s_eofcorr%i_%s.npy" % (datpath,vthres*100,mcname,eofcorr,monnames[s])
+    if correction:
+        savenamefrc = proc.addstrtoext(savename,"_Fprime")
     print("Saving to %s"%savenamefrc)
     np.save(savenamefrc,eofseas)
 #%%Do some analysis/visualization
