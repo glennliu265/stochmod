@@ -79,15 +79,12 @@ def sel_regionxr(ds,bbox):
         dsreg = ds.sel(lon=slice(bbox[0],bbox[1]),lat=slice(bbox[2],bbox[3]))
     return dsreg
 
-#%%
+#%% User Edits
 
 # Set your configuration
 mconfig = "PIC_FULL"
-if mconfig == "PIC_SLAB":
-    mcname = "SLAB-PIC"
-elif mconfig == "PIC_FULL":
-    mcname = "FULL-PIC"
 
+# Bounding Box of Plotting and EOF Analysis
 bbox    = [260,20,0,65]
 bboxeof = [280,20,0,65]
 
@@ -104,8 +101,17 @@ mons3=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
 blabels=[0,0,0,0]
 
 # Correction Mode
-correction = True # Set to True to use [Qnet + lambda*T], rather than [Qnet]
-#%% Open the dataset
+correction = False # Set to True to use [Qnet + lambda*T], rather than [Qnet]
+#%% Open the dataset ~63.26s
+
+"""
+Output for this section
+-----------------------
+flxglob  - Global Net Heat Flux anomalies      [time x lat x lon360]
+slpglob  - Global sea level pressure anomalies [time x lat x lon360]
+msk      - Land-ice mask                       [lat x lon360]
+lat,lon,lon180 (1-d latitude and longitude arrays)
+"""
 
 # Open the dataset (Net Heat Flux)
 st      = time.time()
@@ -116,12 +122,18 @@ if mconfig == "PIC_SLAB":
 elif mconfig == "PIC_FULL":
     mcname = "FULL-PIC"
     
+lon360flag = True # Flip Qnet)
 
 if correction: # Load Fprime (=Qnet + lambda*T)
     
     #Open Dataset
     ds = xr.open_dataset("%s../Fprime_%s.nc" % (datpath,mconfig))
     
+    if np.any(ds.lon > 180): # Correct for cases where lon is degrees west
+        lon360flag = False
+        print("Flipping lon")
+        
+        
     # Select Region
     dsreg = sel_regionxr(ds,bboxeof)
     #flxreg = dsreg.Fprime.values
@@ -130,6 +142,8 @@ if correction: # Load Fprime (=Qnet + lambda*T)
     lat     = ds.lat.values
     flxglob = ds.Fprime.values
     
+    # Apply land/ice mask
+    msk = np.load(lipath)
     
 else: # Load Qnet Data
     
@@ -175,7 +189,9 @@ else:
     slpglob = ds.PSL.values
     
 print("Loaded data in %.2fs"%(time.time()-st))
-#%% Preprocess, EOF Analysis
+
+
+#%% Preprocess, EOF Analysis ~304.38s
 st = time.time()
 ntime,nlat,nlon = flxglob.shape
 nyr = int(ntime/12)
@@ -185,8 +201,14 @@ slpglob = slpglob.reshape(ntime,nlat,nlon) # [yr x mon x lat x lon] to [time lat
 #slpglob *= msk[None,...]
 
 # Detrend --------------------------------------------------------------------
+sttemp = time.time()
 flxa,linmod,beta,intercept = proc.detrend_dim(flxglob,0)
-slpa,_,_,_ = proc.detrend_dim(slpglob,0)
+print("Detrended Qnet in %.2fs" % (time.time()-sttemp))
+
+sttemp = time.time() # ~212s
+slpa,_,_,_                 = proc.detrend_dim(slpglob,0)
+print("Detrended SLP in %.2fs" % (time.time()-sttemp))
+
 # Plot Spatial Map
 if debug: # Appears to be positive into the ocean
     fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()})
@@ -205,6 +227,7 @@ if debug:
 print("Completed process in %.2fs"%(time.time()-st))
 
 #%% (**) Apply Area Weight (to region) ----------------------------------------------
+# ~1m5s
 wgt = np.sqrt(np.cos(np.radians(lat)))
 
 #plt.plot(wgt)
@@ -353,13 +376,19 @@ for N in tqdm(range(N_modeplot)):
         if sumslp > 0:
             print("Flipping sign for SLP, mode %i month %i" % (N+1,m+1))
             eofslp[:,:,m,N]*=-1
-#%% Preprocess net heat flux variable from above
+#%% Preprocess net heat flux variable from above ~45sec
+#% Apply landice mask to flx
+# Flip flx anomalies to degrees west
+
+st = time.time()
 flxa          *= msk[None,:,:]
 lon360        = np.load(datpath+"../CESM_lon360.npy")
 lon180,flx180 = proc.lon360to180(lon360,flxa.transpose(2,1,0))
 flx180        = flx180.reshape(nlon,nlat,nyr,12).transpose(0,1,3,2) # lon x lat x mon x year
+print("Flipped SLP and FLX in %.2fs" % (time.time()-st))
 
 #%% (**) Now calculate the variance explained using sum of squares
+#% 1m7s
 
 debug = False
 test_mode_index = np.arange(0,N_mode,1)
@@ -384,6 +413,8 @@ eof_corr *= (1/vratio_alone)
 
 # Save all the files
 savename = datpath + "../NHFLX_EOF_Ratios_%s.npz" % mcname
+if correction:
+    savename = proc.addstrtoext(savename,"_Fprime")
 np.savez(savename,**{
     'varflx_EOF':varflx_EOF,
     'varflx_ori':varflx_ori,
@@ -392,10 +423,11 @@ np.savez(savename,**{
     'lon':lon180,
     'lat':lat
     })
-
 #%% Corrected Flux with SLP (Save it all together, EOF and variance explained)
-savename = "%sNHFLX_%s_%iEOFsPCs_%s_eofcorr2.npz" % (datpath,mcname,N_mode,bboxtext)
 
+savename = "%sNHFLX_%s_%iEOFsPCs_%s_eofcorr2.npz" % (datpath,mcname,N_mode,bboxtext)
+if correction:
+    savename = proc.addstrtoext(savename,"_Fprime")
 np.savez(savename,**{
     "varflx_ratio_alone":vratio_alone,
     "eofall":eof_corr,
@@ -407,6 +439,8 @@ np.savez(savename,**{
 
 #%% Load the file from above
 savename     = datpath + "../NHFLX_EOF_Ratios_%s.npz" % mcname
+if correction:
+    savename = proc.addstrtoext(savename,"_Fprime")
 ld           = np.load(savename)
 varflx_EOF   = ld['varflx_EOF']
 varflx_ori   = ld['varflx_ori']
@@ -770,7 +804,6 @@ plt.savefig("%s%s_NHFLX_EOFs%i_%s_NumEOFs_%ipctvar_bymon.png"%(outpath,mcname,N_
 # Calculate correction factor
 eofcorr  = 2
 
-
 nlon,nlat,_,_ = varflx_ratio.shape
 if eofcorr == 1: # Flat variance-based correct
     ampfactor = 1/vthres#thresperc
@@ -803,8 +836,9 @@ elif eofcorr == 2:
 nmax = thresid.max()
 eofforce = eofforce[:,:,:nmax+1,:]
 savenamefrc = "%sflxeof_%03ipct_%s_eofcorr%i.npy" % (datpath,vthres*100,mcname,eofcorr)
+
 if correction:
-    savename = proc.addstrtoext(savenamefrc,"_Fprime")
+    savenamefrc = proc.addstrtoext(savenamefrc,"_Fprime")
 np.save(savenamefrc,eofforce)
 
 #%% Test Plot (Summed EOF)
@@ -894,7 +928,7 @@ for s in tqdm(range(4)):
     # Save the output
     savenamefrc = "%sflxeof_%03ipct_%s_eofcorr%i_%s.npy" % (datpath,vthres*100,mcname,eofcorr,monnames[s])
     if correction:
-        savenamefrc = proc.addstrtoext(savename,"_Fprime")
+        savenamefrc = proc.addstrtoext(savenamefrc,"_Fprime")
     print("Saving to %s"%savenamefrc)
     np.save(savenamefrc,eofseas)
 #%%Do some analysis/visualization
@@ -1093,7 +1127,6 @@ for r in range(len(rids)):
         
         eofaa = proc.sel_region(ineof,lon,lat,rbbox,reg_avg=1,awgt=1)
         aavg_eof[:,m,r] = eofaa.copy()
-        
 
 step = 1
 ylm = [-30,30]
@@ -1118,6 +1151,15 @@ for m in range(12):
     
 
     
+# -------------------------
+#%% Plot Spectra of the PCs
+# -------------------------
 
 
+im      = 0
+N_mode  = 0
+nsmooth = 60
+pct     = 0.10
 
+
+ 
