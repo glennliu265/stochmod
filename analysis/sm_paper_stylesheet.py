@@ -68,6 +68,7 @@ cesmline    =  ["dashed","dotted"]
 # Autocorrelation Plot parameters
 xtk2        = np.arange(0,37,2)
 mons3       = ('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
+mons3       = [viz.return_mon_label(m,nletters=3) for m in np.arange(1,13)]
 conf        = 0.95
 tails       = 2 # Tails for Significance Calculation
 alw         = 3 # Autocorrelation Line Width

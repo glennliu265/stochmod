@@ -39,15 +39,13 @@ import cmocean
 projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath = projpath + '03_Scripts/stochmod/'
 datpath    = projpath + '01_Data/'
-outpath    = projpath + '02_Figures/20211021/'
+outpath    = projpath + '02_Figures/20220214/'
 input_path  = datpath + 'model_input/'
 proc.makedir(outpath)
 
 # Put slab version first, then the load_load func. searches in the same
 # directory replace "SLAB_PIC" with "FULL_PIC"
 frcname = "flxeof_090pct_SLAB-PIC_eofcorr2"
-
-
 
 
 #%% Some utilities
@@ -153,8 +151,6 @@ for model in tqdm(range(2)):
     ampfactor = 1/thresperc
     ampfactors.append(ampfactor)
 
-
-
 #%% Make a few plots
 debug = False
 
@@ -218,9 +214,10 @@ if debug:
     
     fig,ax = plt.subplots(1,1,figsize=(5,4))
     plot_eofbar(mons3,thresid,vthres)
-
+    
     fig,ax   = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(8,4))
     plot_qcorr(lon,lat,qcorrs[model].mean(-1),bboxplot,ax=ax)
+
 
 #%% Plot altogether in a subplot ()
 
@@ -313,9 +310,12 @@ cb.set_label("$Q_{net}$ ,Interval = 5 $W/m^2$ per $\sigma_{PC}$")
 
 
 plt.savefig("%sEOF_Variance_Correction_effects_%s.png" % (outpath,vizstring),bbox_inches='tight',dpi=200)
-#%%
-    
-    
-    
+#%% Test PLot Qcorr
 
+    
+fig,ax   = plt.subplots(1,1,constrained_layout=True,
+                        subplot_kw={'projection':ccrs.PlateCarree()},figsize=(8,6))
+plot_qcorr(lon,lat,qcorrs[model].mean(-1),bboxplot,ax=ax)
+ax.plot(-36,58,markersize=20,marker="x",color="yellow")
+plt.savefig("%sQcorr_Plotpt.png"%(outpath),dpi=150)
 
