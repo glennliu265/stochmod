@@ -35,7 +35,7 @@ startyre = 1900
 # Query Point
 query = [-30,50] # [lon,lat]
 
-# Set Paths
+# Set Path
 projpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 datpath     = projpath + '01_Data/'
 input_path  = datpath + 'model_input/'
@@ -122,6 +122,7 @@ plt.savefig(outpath+"Autocorrelation_CompareHadISST_%s.png" % locstring,dpi=200)
 
 #%% Autocorrelation over a particular region
 
+
 #%%  Spectral Estimate Calculation
 
 # Calculate spectra
@@ -136,7 +137,6 @@ fig,ax = plt.subplots(1,1,figsize=(6,4))
 
 for i in range(4):
     ax.semilogx(freqs[i]*plotdt,specs[i]*freqs[i],color=ecolors[i],label=enames[i]+"$\; (\sigma=%.2f ^{\circ}C$)"%(np.std(ssts[i])))
-    
     ax.semilogx(freqs[i]*plotdt,CCs[i][:,1]*freqs[i],color=ecolors[i],alpha=0.5,ls='dashed')
     ax.semilogx(freqs[i]*plotdt,CCs[i][:,0]*freqs[i],color=ecolors[i],alpha=0.5,ls='dotted')
 
@@ -147,8 +147,6 @@ xtick = ax.get_xticks()
 ax.set_ylabel("Frequency x Power ($\degree C^{2}$)",fontsize=12)
 ax.set_xlabel("Frequency (cycles/year)",fontsize=12)
 htax = viz.twin_freqaxis(ax,freqs[1],"Years",plotdt,mode='log-lin',xtick=xtick)
-
-
 
 
 xlm = [5e-4,10]

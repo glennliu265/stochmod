@@ -46,6 +46,20 @@ import tbx
 # Landice Mask Name
 limaskname = "limask180_FULL-HTR.npy" 
 
+
+# Try a custom simulation
+"""
+Fixed MLD Experiment
+"""
+# cexpname = "hfix50_slab"
+# h_cust = np.ones((288,192,12)) * 50 # 50 m slab
+# custom_params = {}
+# custom_params['h'] = h_cust
+# custom_params['q_ek'] = qek_name
+# #'forcing' and 'lambda' are two other options
+# hconfigs      = [0] # Just run the slab simulation
+
+
 # Model Params
 ampq       = True # Set to true to multiply stochastic forcing by a set value
 mconfig    = "SLAB_PIC" # (Automatically loads both)
@@ -143,6 +157,11 @@ alpha_full  *= limask[:,:,None,None]
 hblt        *= limask[:,:,None]
 qek_raw     *= limask[:,:,None,None]
 
+
+if 'h' in custom_params.keys(): # Replace with custom parameters
+    h = custom_params['h']
+    
+
 # Restrict to region or point (Need to fix this section)
 # ---------------------------
 inputs = [h,kprevall,damping,dampingfull,alpha,alpha_full,hblt,qek_raw]
@@ -179,7 +198,6 @@ d_in = dampingfull.copy()
 lbd_a   = scm.convert_Wm2(d_in,h_in,dt)
 F       = scm.convert_Wm2(f_in,h_in,dt) # [lon x lat x time]
 
-
 #
 # If Option is set, amplitfy F to account for underestimation
 # -----------------------------------------------------------
@@ -204,12 +222,11 @@ if ampq:
 # -----------------------------
 F_noek = F.copy()
 Fek     = scm.convert_Wm2(forcing_qekr,h_in,dt)
-F = F + Fek
+F       = F + Fek
 
 # Integrate Stochastic Model
 # --------------------------
 T,damping_term,forcing_term,entrain_term,Td   = scm.integrate_entrain(h_in,kprev,lbd_a,F,T0=0,multFAC=True,debug=True)
-
 
 beta = scm.calc_beta(h_in)
 lbd  = lbd_a + beta
@@ -223,7 +240,7 @@ ax.set_xlim([11800,12000])
 
 # Save Output
 # -------------
-expname = "%s%s_Qek.npz" % (output_path,frcname)
+expname = "%sstoch_output_forcing%s_Qek.npz" % (output_path,frcname)
 np.savez(expname,**{
     'sst' : T,
     'lon' : lonr,

@@ -34,7 +34,7 @@ datpath     = projpath + '01_Data/'
 datpathgen  = projpath + '01_Data/Generals_Report/'
 input_path  = datpath + 'model_input/'
 output_path = datpath + 'model_output/'
-outpath = projpath + '02_Figures/20210610/'
+outpath = projpath + '02_Figures/20210111/'
 proc.makedir(outpath)
 
 # Load in control data for 50N 30W
@@ -45,13 +45,13 @@ mons3=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
 labels=["MLD Fixed","MLD Mean","MLD Seasonal","MLD Entrain"]
 #labels=["MLD (MAX)","MLD Seasonal","MLD Entrain"]
 #colors=["red","orange","magenta","blue"]
-expcolors = ('blue','orange','magenta','red')
+expcolors = ('orange','red','blue','purple')
 hblt = 54.61088498433431 # Meters, the mixed layer depth used in CESM Slab
 
 
 
 # UPDATED Colors and names for generals (5/25/2021)
-ecol = ["blue",'cyan','gold','red']
+ecol = ["magenta",'cyan','gold','red']
 els  = ["dotted","dashdot","dashed","solid"]
 ename = ["All Constant",
          r"Vary $\alpha$",
@@ -65,13 +65,13 @@ config['ftype']       = "DJFM-MON" # Forcing Type
 config['genrand']     = 0
 config['fstd']        = 1
 config['t_end']       = 120000    # Number of months in simulation
-config['runid']       = "syn001"  # White Noise ID
-config['fname']       = "FLXSTD" #['NAO','EAP,'EOF3','FLXSTD']
+config['runid']       = "syn007"  # White Noise ID
+config['fname']       = "flxeof_090pct_SLAB-PIC_eofcorr2.npy" #['NAO','EAP,'EOF3','FLXSTD']
 config['pointmode']   = 1
 config['query']       = [-30,50]
 config['applyfac']    = 2 # Apply Integration Factor and MLD to forcing
 config['lags']        = np.arange(0,37,1)
-config['output_path'] = projpath + '02_Figures/20210223/'
+config['output_path'] = outpath
 config['smooth_forcing'] = False
 
 config.pop('Fpt',None)

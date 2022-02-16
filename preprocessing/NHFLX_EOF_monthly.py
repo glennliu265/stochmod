@@ -84,6 +84,12 @@ def sel_regionxr(ds,bbox):
 # Set your configuration
 mconfig = "PIC_FULL"
 
+# Set up names (need to change this at some point, silly coding...)
+if mconfig == "PIC_SLAB":
+    mcname = "SLAB-PIC"
+elif mconfig == "PIC_FULL":
+    mcname = "FULL-PIC"
+
 # Bounding Box of Plotting and EOF Analysis
 bbox    = [260,20,0,65]
 bboxeof = [280,20,0,65]
@@ -116,11 +122,7 @@ lat,lon,lon180 (1-d latitude and longitude arrays)
 # Open the dataset (Net Heat Flux)
 st      = time.time()
 
-# Set up names (need to change this at some point, silly coding...)
-if mconfig == "PIC_SLAB":
-    mcname = "SLAB-PIC"
-elif mconfig == "PIC_FULL":
-    mcname = "FULL-PIC"
+
     
 lon360flag = True # Flip Qnet)
 
@@ -310,6 +312,8 @@ eofslp = eofslp.reshape(N_mode,12,nlat,nlon)
 eofslp = eofslp.transpose(3,2,1,0) # [lon x lat x mon x N]
 lon180,eofslp = proc.lon360to180(lon,eofslp.reshape(nlon,nlat,N_mode*12))
 eofslp = eofslp.reshape(nlon,nlat,12,N_mode)
+
+#%% F
 #%% (**) Save the results
 bboxtext = "lon%ito%i_lat%ito%i" % (bbox[0],bbox[1],bbox[2],bbox[3])
 bboxstr  = "Lon %i to %i, Lat %i to %i" % (bbox[0],bbox[1],bbox[2],bbox[3])

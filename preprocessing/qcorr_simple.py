@@ -156,19 +156,20 @@ for mconfig in mconfigs:
         plt.show()
         plt.pcolormesh(dampterm[...,0].T,vmin=-50,vmax=50),plt.colorbar()
         plt.show()
-        
+    
     #%% Do some Exploratory Analysis
     normspec = False
     labels    = ("$Q_{net}$","F'","$\lambda T$","-$\lambda T$ + F'")
     klon,klat = proc.find_latlon(lonf,latf,lon180,lat)
     locstring = "Lon %.f, Lat %.f" % (lon180[klon],lat[klat])
+    ecolors   = ("mediumblue","firebrick","magenta","cyan")
     
     # 1) Compute the power spectra
     nsmooth = 100
     pct     = 0.00
     dtplot  = 3600*24*365 
-    xtks    = [1/100,1/50,1/25,1/10,1/2.5,1/1]
-    xper    = [1/x for x in xtks]
+    xtks    = [1/100,1/50,1/20,1/10,1/2,1/1]
+    xper    = [int(1/x) for x in xtks]
     xlm     = [xtks[0],xtks[-1]]
     
     inflx     = [Q[klon,klat,:],Fprime[klon,klat,:],dampterm[klon,klat,:],Fprime[klon,klat,:]-dampterm[klon,klat,:]]
@@ -177,25 +178,28 @@ for mconfig in mconfigs:
         ylm = [0,3]
         specs = [specs[i]/np.var(inflx[i]) for i in range(len(inflx))]
     else:
-        ylm = [0,2000]
+        ylm = [0,1000]
     
-    fig,ax = plt.subplots(1,1)
-    for i in range(len(inflx)):
+    fig,ax = plt.subplots(1,1,figsize=(8,3))
+    for i in range(len(inflx)-1):
         if i == (len(inflx)-1):
             ls = 'dashed'
         else:
             ls = 'solid'
-        ax.plot(freqs[i]*dtplot,specs[i]/dtplot,label=labels[i],lw=3,ls=ls)
+        ax.plot(freqs[i]*dtplot,specs[i]/dtplot,label=labels[i],lw=3,ls=ls,color=ecolors[i])
     
     plotspec = specs[1] + specs[2]
-    ax.plot(freqs[i]*dtplot,plotspec/dtplot,label=labels[i] + "(Add Spectra)",lw=3,ls=ls)
+    #ax.plot(freqs[i]*dtplot,plotspec/dtplot,label=labels[i] + "(Add Spectra)",lw=3,ls=ls)
     ax.legend()
     ax.set_xticks(xtks)
-    ax.set_xticklabels(xper)
+    ax.set_xticklabels(xper,rotation=45)
     ax.set_xlim(xlm)
     ax.set_ylim(ylm)
-    ax.set_title("Power Spectra Estimates @ %s " % locstring )
+    ax.set_title("Power Spectra @ %s  \n CESM1-%s" % (locstring,mconfig) )
+    ax.set_xlabel("Period (Years)")
+    ax.set_ylabel("Power ($W/m^{2}/cpy$)")
     ax.grid(True,ls='dotted')
+    plt.savefig("%sQnet_Power_Spectra_CESM1-%s.png"% (figpath,mconfig),dpi=150)
     
     #%% Save the updated forcing for the EOF Analysis
     

@@ -107,7 +107,7 @@ dt         = 3600*24*30 # Timestep
 T0         = 0 # Init Temp
 
 # Forcing Correction Method (q-corr)
-ampq   = 3 #0 = none 1 = old method, 2 = method 1, 3 = method 2
+ampq   = 0 #0 = none 1 = old method, 2 = method 1, 3 = method 2
 
 # Damping Significance Test Method
 method = 4 # 1 = No Testing; 2 = SST autocorr; 3 = SST-FLX crosscorr, 4 = Both 
@@ -184,28 +184,28 @@ frcnames = (
 frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2',)
 
 # Single run test (90% variance forcing)
-frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2',)
+frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2_Fprime',)
 
-# Testing NAO, EAP Forcing
-frcnames = ('flxeof_EOF1_SLAB-PIC_eofcorr0',
-            'flxeof_EOF2_SLAB-PIC_eofcorr0')
+# # Testing NAO, EAP Forcing
+# frcnames = ('flxeof_EOF1_SLAB-PIC_eofcorr0',
+#             'flxeof_EOF2_SLAB-PIC_eofcorr0')
 
-# Test the effect of increasing the number of EOFs
-frcnames = (
-            "flxeof_50eofs_SLAB-PIC_eofcorr0",
-            "flxeof_25eofs_SLAB-PIC_eofcorr0",
-            "flxeof_10eofs_SLAB-PIC_eofcorr0",
-            "flxeof_5eofs_SLAB-PIC_eofcorr0",
-            "flxeof_3eofs_SLAB-PIC_eofcorr0",
-            "flxeof_2eofs_SLAB-PIC_eofcorr0",
-            "flxeof_1eofs_SLAB-PIC_eofcorr0"
-            )
+# # Test the effect of increasing the number of EOFs
+# frcnames = (
+#             "flxeof_50eofs_SLAB-PIC_eofcorr0",
+#             "flxeof_25eofs_SLAB-PIC_eofcorr0",
+#             "flxeof_10eofs_SLAB-PIC_eofcorr0",
+#             "flxeof_5eofs_SLAB-PIC_eofcorr0",
+#             "flxeof_3eofs_SLAB-PIC_eofcorr0",
+#             "flxeof_2eofs_SLAB-PIC_eofcorr0",
+#             "flxeof_1eofs_SLAB-PIC_eofcorr0"
+#             )
 
-# Testing seasonal EOFs
-frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2_DJF',
-            'flxeof_090pct_SLAB-PIC_eofcorr2_MAM',
-            'flxeof_090pct_SLAB-PIC_eofcorr2_JJA',
-            'flxeof_090pct_SLAB-PIC_eofcorr2_SON')
+# # Testing seasonal EOFs
+# frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2_DJF',
+#             'flxeof_090pct_SLAB-PIC_eofcorr2_MAM',
+#             'flxeof_090pct_SLAB-PIC_eofcorr2_JJA',
+#             'flxeof_090pct_SLAB-PIC_eofcorr2_SON')
 
 print("Running the following forcings: \n")
 print(*frcnames, sep='\n')

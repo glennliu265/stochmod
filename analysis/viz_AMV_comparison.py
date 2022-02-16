@@ -26,7 +26,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20220128/"
+    figpath     = projpath + "02_Figures/20220210/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -759,7 +759,8 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 #%% Updated Plot With just the SLAB FULL AND SM COMPARISONS, 
 ## SM DRAFT 2 Final
 
-notitle = True
+notitle  = True
+darkmode = True
 
 cmax  = 0.5
 cstep = 0.025
@@ -862,6 +863,113 @@ for rid in range(5):
         plt.suptitle("%s AMV Pattern and Index Variance [Forcing = %s]" % (regionlong[rid],frcnamelong[f]),fontsize=14)
     
     plt.savefig(savename,dpi=150,bbox_inches='tight')
+#%% Summary Figure (OSM Presentation)
+notitle  = True
+darkmode = True
+
+cmax  = 0.5
+cstep = 0.025
+lstep = 0.05
+cint,cl_int=viz.return_clevels(cmax,cstep,lstep)
+clb = ["%.2f"%i for i in cint[::4]]
+
+f = 0
+
+rid = 4
+    
+    
+if darkmode:
+    plt.style.use('dark_background')
+    savename = "%sSST_AMVPattern_Comparison_region%s_%s_dark_summary.png" % (figpath,regions[rid],fnames[f])
+    fig.patch.set_facecolor('black')
+    dfcol = 'k'
+else:
+    plt.style.use('default')
+    savename = "%sSST_AMVPattern_Comparison_region%s_%s_summary.png" % (figpath,regions[rid],fnames[f])
+    fig.patch.set_facecolor('white')
+    dfcol = 'k'
+
+spid = 0
+proj = ccrs.PlateCarree()
+fig,axs = plt.subplots(1,2,subplot_kw={'projection':proj},figsize=(8,3),
+                       constrained_layout=True)
+
+
+# figsize=(12,6)
+# ncol = 3
+# fig,axs = viz.init_2rowodd(ncol,proj,figsize=figsize,oddtop=False,debug=True)
+
+# Plot Stochastic Model Output
+for aid,mid in enumerate([2]):
+    ax = axs.flatten()[aid]
+    
+    # Set Labels, Axis, Coastline
+    if mid == 0:
+        blabel = [1,0,0,0]
+    elif mid == 1:
+        blabel = [0,0,0,1]
+    else:
+        blabel = [0,0,0,0]
+    
+    blabel = [0,0,0,0]
+    
+    # Make the Plot
+    ax = viz.add_coast_grid(ax,bboxplot,blabels=blabel,line_color=dfcol,
+                            fill_color='gray')
+    pcm = ax.contourf(lon,lat,amvpats[f][rid][mid].T,levels=cint,cmap='cmo.balance')
+    ax.pcolormesh(lon,lat,amvpats[f][rid][mid].T,vmin=cint[0],vmax=cint[-1],cmap='cmo.balance',zorder=-1)
+    cl = ax.contour(lon,lat,amvpats[f][rid][mid].T,levels=cl_int,colors="k",linewidths=0.5)
+    ax.clabel(cl,levels=cl_int,fontsize=8)
+    
+    ax.set_title("%s"%(modelnames[mid]))
+    if plotbbox:
+        ax,ll = viz.plot_box(bbox_NNA,ax=ax,leglab="AMV",
+                             color=dfcol,linestyle="dashed",linewidth=2,return_line=True)
+        
+    viz.plot_mask(lon,lat,dmsks[mid],ax=ax,markersize=0.1)
+    ax.set_facecolor=dfcol
+    #ax = viz.label_sp(spid,case='lower',ax=ax,labelstyle="(%s)",fontsize=16,alpha=0.7,fontcolor=dfcol)
+    #spid += 1
+    
+# Plot CESM1
+#axs[1,1].axis('off')
+
+cid = 0
+if cid == 0:
+    ax = axs.flatten()[1]
+    blabel = [0,0,0,1]
+    spid = 1 # Flipped order
+else:
+    ax = axs.flatten()[1]
+    blabel = [1,0,0,1]
+    spid = 1
+        
+blabel = [0,0,0,0]
+# Make the Plot
+ax = viz.add_coast_grid(ax,bboxplot,blabels=blabel,line_color=dfcol,
+                        fill_color='gray')
+pcm = ax.contourf(lon180g,latg,cesmpat[rid][cid].T,levels=cint,cmap='cmo.balance')
+ax.pcolormesh(lon180g,latg,cesmpat[rid][cid].T,vmin=cint[0],vmax=cint[-1],cmap='cmo.balance',zorder=-1)
+cl = ax.contour(lon180g,latg,cesmpat[rid][cid].T,levels=cl_int,colors="k",linewidths=0.5)
+ax.clabel(cl,levels=cl_int,fontsize=8)
+ax.set_title("%s"%(cesmname[cid]))
+if plotbbox:
+    ax,ll = viz.plot_box(bbox_NNA,ax=ax,leglab="AMV",
+                         color=dfcol,linestyle="dashed",linewidth=2,return_line=True)
+#ax = viz.label_sp(spid,case='lower',ax=ax,labelstyle="(%s)",fontsize=16,alpha=0.7,fontcolor=dfcol)
+
+cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='vertical',fraction=0.018,pad=0.02)
+cb.set_ticks(cint[::4])
+#cb.ax.set_xticklabels(clb,rotation=45)
+#cb.set_label("SST ($K \, \sigma_{AMV}^{-1}$)")
+#cb.ax.set_xticklabels(cint[::2],rotation=90)
+#tick_start = np.argmin(abs(cint-cint[0]))
+#cb.ax.set_xticklabels(cint[tick_start::2],rotation=90)
+if notitle is False:
+    plt.suptitle("%s AMV Pattern and Index Variance [Forcing = %s]" % (regionlong[rid],frcnamelong[f]),fontsize=14)
+
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+
 
 #%% Plot AMV Patterns (Comparing N_EOFs)
 

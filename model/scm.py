@@ -685,7 +685,7 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
         damp_ts = np.zeros(t_end)
         entrain_ts = np.zeros(t_end)
         Td_ts   = np.zeros(t_end)
-        
+    
     entrain_term = np.zeros(t_end)
     
     # Prepare the entrainment term
@@ -762,8 +762,8 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
         # Save other variables in debug mode
         # ----------------------------------
         if debug:
-            damp_ts[t] = damp_term
-            noise_ts[t] = noise_term * integration_factor
+            damp_ts[t]    = damp_term
+            noise_ts[t]   = noise_term * integration_factor
             entrain_ts[t] = entrain_term * integration_factor
     if debug:
         return temp_ts,damp_ts,noise_ts,entrain_ts,Td_ts
@@ -1372,7 +1372,6 @@ def synth_stochmod(config,verbose=False,viz=False,
     mld,kprevall,lon,lat,lon360,cesmslabac,damping,forcing,mld1kmean = load_data(config['mconfig'],config['ftype'])
     hblt  = np.load(datpath+"SLAB_PIC_hblt.npy")
     
-    
     if verbose:
         print("Loaded Data")
     
@@ -1389,6 +1388,7 @@ def synth_stochmod(config,verbose=False,viz=False,
             print("Loading Old Forcing")
     
     # Select Forcing [lon x lat x mon]
+    # --------------------------------
     forcing_flag = False
     if config['fname'] == 'NAO':
         forcing = forcing[:,:,0,:]
@@ -1438,7 +1438,12 @@ def synth_stochmod(config,verbose=False,viz=False,
     if 'Fpt' in config:
         Fpt = config['Fpt']
         synthflag.append('forcing')
-        forcing_flag=False # Turn off the forcing Flag
+        
+        if len(Fpt.shape) > 1:
+            forcing_flag = True # Turn on Forcing Flag [Mode x Month]
+            Fpt = make_forcing_pt(Fpt,config['runid'],config['fname'],config['t_end'],input_path,check=False)
+        else:
+            forcing_flag=False # Turn off the forcing Flag
     if 'damppt' in config:
         damppt = config['damppt']
         synthflag.append('damping')
@@ -2036,7 +2041,7 @@ def postprocess_HF(dampingmasked,limask,sellags,lon,pos_upward=True):
 
 
 #%% SCM rewritten.
-def convert_Wm2(invar,h,dt,cp0=3996,rho=1026,verbose=True):
+def convert_Wm2(invar,h,dt,cp0=3996,rho=1026,verbose=True,reverse=False):
     """
     outvar = convert_Wm2(invar,h,dt,cp0=3996,rho=1026,verbose=True)
     
@@ -2044,6 +2049,7 @@ def convert_Wm2(invar,h,dt,cp0=3996,rho=1026,verbose=True):
     by multiplying by dt/(rho*cp0*h).
     If input is not 3D, appends dimensions to the front and assumes
     last dimension is time.
+    Set reverse=True to revert the conversion.
     
     Parameters
     ----------
@@ -2059,6 +2065,8 @@ def convert_Wm2(invar,h,dt,cp0=3996,rho=1026,verbose=True):
         Density of Seawater [kg/m3]. The default is 1026.
     verbose : BOOL, optional
         Set to True to print messages.The default is True
+    reverse : BOOL
+        Set to True to convert from 1/time to W/m2
 
     Returns
     -------
@@ -2083,7 +2091,10 @@ def convert_Wm2(invar,h,dt,cp0=3996,rho=1026,verbose=True):
         h     = np.tile(h,ntile)
     
     # Perform Conversion
-    outvar = invar * dt / (rho*cp0*h)
+    if reverse:
+        outvar = invar * (rho*cp0*h) / dt
+    else:
+        outvar = invar * dt / (rho*cp0*h)
     
     return outvar.squeeze()
 
@@ -2650,6 +2661,7 @@ def integrate_entrain(h,kprev,lbd_a,F,T0=0,multFAC=True,debug=False):
     
     if debug:
         return T,damping_term,forcing_term,entrain_term,Td
+    
     return T
 
 def method1(lbd,include_b=True):

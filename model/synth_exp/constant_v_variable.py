@@ -36,10 +36,10 @@ projpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/
 datpath     = projpath + '01_Data/'
 input_path  = datpath + 'model_input/'
 output_path = datpath + 'model_output/'
-outpath     = projpath + '02_Figures/20220210/'
+outpath     = projpath + '02_Figures/20220214/'
 proc.makedir(outpath)
 
-darkmode = True
+darkmode = False
 
 # Load in control data for 50N 30W
 #fullauto =np.load(datpath+"Autocorrelation_30W50N_FULL_PIC_12805.npy",allow_pickle=True)
@@ -76,7 +76,7 @@ config['genrand']     = 0
 config['fstd']        = 1
 config['t_end']       = 120000    # Number of months in simulation
 config['runid']       = "syn008"  # White Noise ID
-config['fname']       = "flxeof_090pct_SLAB-PIC_eofcorr2.npy" #['NAO','EAP,'EOF3','FLXSTD']
+config['fname']       = "flxeof_090pct_SLAB-PIC_eofcorr2_Fprime.npy" #['NAO','EAP,'EOF3','FLXSTD']
 config['pointmode']   = 1
 config['query']       = [-30,50]
 config['applyfac']    = 2 # Apply Integration Factor and MLD to forcing
@@ -1070,7 +1070,6 @@ ax.set_title("Damping $(W/m^{2})$, mean=%.2f"%(damppt.mean()))
 ax.grid(True,ls='dotted')
 ax.set_xlim([0,11])
 plt.tight_layout()
-plt.savefig(outpath+"Stochmod_Inputs.png",dpi=150)
 
 #% ----------------------
 #%% Load PiC Data

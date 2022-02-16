@@ -26,7 +26,6 @@ from tqdm import tqdm
 import scm
 import time
 import cartopy.crs as ccrs
-
 from scipy import signal
 
 #%% Settings
@@ -36,7 +35,7 @@ projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 datpath     = projpath + '01_Data/'
 input_path  = datpath + 'model_input/'
 output_path = datpath + 'model_output/'
-outpath     = projpath + '02_Figures/20220119/'
+outpath     = projpath + '02_Figures/20220208/'
 proc.makedir(outpath)
 
 # Load in control data for 50N 30W
@@ -204,8 +203,9 @@ cffull = calc_conflag(cesmautofull,conf,tails,1798)
 #%% Plot SST Autocorrelation at the test point
 
 
-notitle = True  # Remove Title for publications
-sepfig  = True  # Plot figures separately, for presentaiton, or together)
+notitle    = True  # Remove Title for publications
+sepfig     = False # Plot figures separately, for presentaiton, or together)
+sepentrain = False  # Separate entrain/non-entraining models
 
 # Figure Separation <1> Figure Creation
 if sepfig:
@@ -257,8 +257,14 @@ for i,e in enumerate([0,1,2,3]):
     ax.plot(lags,plotacs[e][model],label=labels_lower[i],color=ecol_lower[i],ls=els_lower[i],marker="o",markersize=4,lw=lw)
     #ax.scatter(lags,plotacs[e][model],10,label="",color=ecol[i])
     ax.fill_between(lags,cfs[:,0],cfs[:,1],color=ecol_lower[i],alpha=0.2)
-    
-    ax.legend(fontsize=10,ncol=3)
+
+if sepentrain:
+    i = 2
+    ax.plot(lags,ac[i],label=labels_upper[i],color=ecol_upper[i],ls=els_upper[i],marker="o",markersize=3,lw=lw)
+    ax.fill_between(lags,cfstoch[i,:,0],cfstoch[i,:,1],color=ecol_upper[i],alpha=0.25)
+
+
+ax.legend(fontsize=10,ncol=3)
     
 ax.set_ylabel("Correlation")
 
@@ -288,7 +294,12 @@ ax,ax2= viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title)
 ax.plot(lags,cesmautofull,color='k',label='CESM1 Full',ls='dashdot',marker="o",markersize=3,lw=lw)
 ax.fill_between(lags,cffull[lags,0],cffull[lags,1],color='k',alpha=0.10)
 
-for i in range(2,4):
+if sepentrain:
+    plotrange = [3] # Just Entrain
+else:
+    plotrange = [2,3] # Entrain + Vary h
+
+for i in plotrange:
     ax.plot(lags,ac[i],label=labels_upper[i],color=ecol_upper[i],ls=els_upper[i],marker="o",markersize=3,lw=lw)
     ax.fill_between(lags,cfstoch[i,:,0],cfstoch[i,:,1],color=ecol_upper[i],alpha=0.25)
 
@@ -332,6 +343,9 @@ lw         = 3
 markersize = 6
 addvar     = False
 darkmode   = True
+incl_slab  = False
+add_hvar   = True
+ylims      = [-0.05,1.05]
 
 if darkmode:
     plt.style.use('dark_background')
@@ -345,13 +359,16 @@ else:
     dfalph_col = 0.25 
     
 
+
+
 #plotlags = np.arange(0,24)
 lags    = np.arange(0,25,1)
 xtk2    = np.arange(0,25,2)
-for es in range(4):
+for es in range(4+add_hvar):
     loopis = np.arange(0,es+1)
+    if es > 3:
+        loopis = np.arange(0,es)
     print(loopis)
-    
     
     figs,ax = plt.subplots(1,1,figsize=(6,4))
     if addvar:
@@ -361,9 +378,10 @@ for es in range(4):
     else:
         ax,ax2 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title)
     
-    # Plot CESm1-SLAB
-    ax.plot(lags,cesmauto2[lags],label="CESM1 SLAB",color='gray',marker="o",markersize=markersize,lw=lw)
-    ax.fill_between(lags,cfslab[lags,0],cfslab[lags,1],color='gray',alpha=dfalph)
+    if incl_slab is True:
+        # Plot CESm1-SLAB
+        ax.plot(lags,cesmauto2[lags],label="CESM1 SLAB",color='gray',marker="o",markersize=markersize,lw=lw)
+        ax.fill_between(lags,cfslab[lags,0],cfslab[lags,1],color='gray',alpha=dfalph)
     
     # Plot stochastic models
     for i,e in enumerate(loopis):
@@ -375,8 +393,15 @@ for es in range(4):
                 ls=els_lower[i],marker="o",markersize=markersize,
                 lw=lw)
         ax.fill_between(lags,cfs[lags,0],cfs[lags,1],color=ecol_lower[i],alpha=dfalph_col)
-        ax.legend(fontsize=8,ncol=3)
         
+    
+    if es == 4: # Plot hvary if option is set
+        ax.plot(lags,ac[2][lags],label=labels_upper[2],color=ecol_upper[2],ls=els_upper[2],marker="o",markersize=markersize,lw=lw)
+        ax.fill_between(lags,cfstoch[2,lags,0],cfstoch[2,lags,1],color=ecol_upper[2],alpha=0.25)
+        
+    ax.legend(fontsize=8,ncol=3)
+    
+    ax.set_ylim(ylims)
     ax.set_ylabel("Correlation")
     plt.suptitle("SST Autocorrelation: Non-Entraining Stochastic Model \n Adding Varying Damping and Forcing",fontsize=12)
     plt.tight_layout()
@@ -518,12 +543,7 @@ cssts = scm.load_cesm_pt(datpath,loadname='both',grabpoint=[-30,50])
 
 debug    = False
 notitle  = True
-darkmode = True 
 
-if darkmode:
-    plt.style.use("dark_background")
-else:
-    plt.style.use("default")
 
 # Smoothing Params
 nsmooth = 300
@@ -589,9 +609,29 @@ specs,freqs,speclabels,allcols = convert
 
 #%% # Plot the spectra
 
-plottype = 'freqlog'#'freqlin'
+plottype   = 'freqlin'#'freqlin'
+sepentrain = False  # Separate entrain/non-entraining models
+sepfig     = True
+#includevar = False # Include Variance in Legend
+lower_focus = True # Set to true to include specific lines for this particular plot 
 
-sepfig   = True
+if sepentrain:
+    plotids = [[0,1,2,3,8,5],
+               [6,7]
+               ]
+    plotids = [[0,1,2,3,8],
+               [3,5,6,7]
+               ]
+else:
+    if lower_focus:
+        plotids = [[0,3,8],
+                   [3,5,6,7]
+                   ]
+    else:
+        plotids = [[0,1,2,3,8],
+                   [5,6,7]
+                   ]
+
 if notitle:
     titles = ["",""]
 else:
@@ -612,6 +652,7 @@ for i in range(2):
         fig,ax = plt.subplots(1,1,figsize=(8,4))
     else:
         ax = axs[i]
+    
     plotid = plotids[i]
     
     if plottype == "freqxpower":
@@ -623,8 +664,9 @@ for i in range(2):
         ylabel = "Power ($K^2/cpy$)"
     elif plottype == "freqlog":
         ax,ax2 = viz.plot_freqlog(specs[plotid],freqs[plotid],speclabels[plotid],allcols[plotid],
-                             ax=ax,plottitle=titles[i],xtick=xtks,xlm=xlm,return_ax2=True,lw=lw)
-        ax.set_ylim([1e-1,1e1])
+                             ax=ax,plottitle=titles[i],xtick=xtks,xlm=xlm,return_ax2=True,lw=lw,
+                             semilogx=True)
+        #ax.set_ylim([1e-1,1e1])
         ylabel = "Variance ($K^2$)"
     ax2.set_xlabel("Period (Years)")
     if i == 1:
@@ -634,6 +676,7 @@ for i in range(2):
     plt.setp(ax2.get_xticklabels(), rotation=50,fontsize=8)
     plt.setp(ax.get_xticklabels(), rotation=50,fontsize=8)
     
+    # if plottype is not 'freqlog':
     ax.set_ylim(ylm)
     
     
@@ -705,7 +748,97 @@ if sepfig is False:
 # inssts.append(sst[2]) # Append hvary
 # inssts.append(sst[3]) # Append entrain
 # #np.hstack([c_ssts[:3],])
+#%% OSM, Separate Plots
 
+plottype   = 'freqlin'#'freqlin'
+sepentrain = False  # Separate entrain/non-entraining models
+sepfig     = True
+#includevar = False # Include Variance in Legend
+lower_focus = True # Set to true to include specific lines for this particular plot 
+
+if sepentrain:
+    plotids = [[0,1,2,3,8,5],
+               [6,7]
+               ]
+    plotids = [[0,1,2,3,8],
+               [3,5,6,7]
+               ]
+else:
+    if lower_focus:
+        plotids = [[0,3,8],
+                   [3,5,6,7]
+                   ]
+    else:
+        plotids = [[0,1,2,3,8],
+                   [5,6,7]
+                   ]
+
+plotids = [[7,8],[7,8,3],[7,8,3,5],[7,8,5,6]]
+
+if notitle:
+    titles = ["",""]
+else:
+    titles = (r"Adding Varying Damping ($\lambda_a$) and Forcing ($\alpha$)",
+              "Adding Varying Mixed Layer Depth ($h$) and Entrainment"
+              )
+sharetitle = "SST Spectra (50$\degree$N, 30$\degree$W) \n" + \
+"Smoothing (# bands): Stochastic Model (%i), CESM-FULL (%i), CESM-SLAB (%i)" %  (nsmooth,cnsmooths[0],cnsmooths[1])
+
+
+for i in range(len(plotids)):
+
+    fig,ax = plt.subplots(1,1,figsize=(8,4))
+    plotid = plotids[i]
+    
+    if plottype == "freqxpower":
+        ax,ax2 = viz.plot_freqxpower(specs[plotid],freqs[plotid],speclabels[plotid],allcols[plotid],
+                             ax=ax,plottitle="",xtick=xtks,xlm=xlm,return_ax2=True)
+    elif plottype == "freqlin":
+        ax,ax2 = viz.plot_freqlin(specs[plotid],freqs[plotid],speclabels[plotid],allcols[plotid],
+                             ax=ax,plottitle="",xtick=xtks,xlm=xlm,return_ax2=True,lw=lw)
+        ylabel = "Power ($K^2/cpy$)"
+    elif plottype == "freqlog":
+        ax,ax2 = viz.plot_freqlog(specs[plotid],freqs[plotid],speclabels[plotid],allcols[plotid],
+                             ax=ax,plottitle="",xtick=xtks,xlm=xlm,return_ax2=True,lw=lw,
+                             semilogx=True)
+        ylabel = "Variance ($K^2$)"
+    ax2.set_xlabel("Period (Years)")
+    
+    if i == 1:
+        ax.set_ylabel("")
+    ax.set_xlabel("")
+    
+    plt.setp(ax2.get_xticklabels(), rotation=50,fontsize=8)
+    plt.setp(ax.get_xticklabels(), rotation=50,fontsize=8)
+    
+    # if plottype is not 'freqlog':
+    ax.set_ylim(ylm)
+    
+    ax2.set_xlabel("")
+    xtk2 = ax2.get_xticklabels()
+    xtk2new = np.repeat("",len(xtk2))
+    ax2.set_xticklabels(xtk2new)
+    
+    ax.set_xticklabels(1/xtks)
+    
+    ax.set_xlabel('Period (Years)',fontsize=12)
+    ax.set_ylabel("Power ($K^2/cpy$)")
+    
+    savename = "%sNASST_Spectra_Stochmod_%s_%s_pct%03i_part%i.png" % (outpath,plottype,smoothname,pct*100,i)
+    plt.savefig(savename,dpi=200,bbox_inches='tight')
+
+        
+
+
+#%%
+
+
+fig, ax= plt.subplots(1,1)
+dtplot = 3600*24*365
+
+ax.semilogx(freqs[0]*dtplot,specs[0]/dtplot)
+ax.set_xticks(xtks)
+ax.set_xlim([xtks[0],xtks[-1]])
 
 
 # Get the spectra
@@ -908,15 +1041,12 @@ for i in range(2):
     
     ax.set_ylim(ylm)
     
-    
     ax2.set_xlabel("")
     xtk2 = ax2.get_xticklabels()
     xtk2new = np.repeat("",len(xtk2))
     ax2.set_xticklabels(xtk2new)
     
     ax.set_xticklabels(1/xtks)
-    
-
     
     if sepfig is True: # Save separate figures
         ax.set_xlabel('Period (Years)',fontsize=12)

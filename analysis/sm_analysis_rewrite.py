@@ -73,7 +73,6 @@ fnames = ["forcingflxeof_qek_50eofs_SLAB-PIC_1000yr_run005",
           "forcingflxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run006"
           ]
 
-
 # ## Compare types of forcing and effect of applying ampq
 fnames = ["forcingflxstd_SLAB-PIC_1000yr_run006_ampq0",
           "forcingflxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run006_ampq0",
@@ -235,6 +234,17 @@ fnames   = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method4_
 # 90% Variance forcing with Ekman Forcing, needs n_models=1 as an additional argument
 fnames   = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_Qek',)
 
+
+
+
+
+# Return to spatio-temporally fixed MLD
+fnames = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method4_dmp0_hfix50_slab',)
+
+# Fprime run, no amp
+fnames = ("forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_1000yr_run011_ampq0_method4_dmp0",)
+
+
 print("Now processing the following files: \n ")
 print(*fnames, sep='\n')
 
@@ -254,6 +264,7 @@ for frcname in tqdm(fnames):
     scm.postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,mask_pacific=True,
                                 savesep=savesep,useslab=useslab,mask_damping=mask_damping,n_models=n_models)
     print("Completed Post-processing for Experiment: %s" % expid)
+    
 #%% Visualize AMV
 if viz_AMV:
     # Regional Analysis Settings

@@ -321,10 +321,7 @@ for i in range(2):
 fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal')
 plt.suptitle("Sum(EOF^2)",y=1.05)
 
-
-
 diff = np.nanmean(alphasum[1],2) - np.nanmean(alphasum[0],2)
-
 # --------------------- --------------------- --------------------- ---------------------
 #%% Compute seasonal averages
 
@@ -794,7 +791,7 @@ for row,subfig in enumerate(subfigs):
 plt.savefig(outpath+"Seasonal_Inputs_CESM-SLAB.png",dpi=200,bbox_inches='tight')
 
 # ----------------------------------------
-# %% Plot Differences in Heat FLux Feedback
+# %% Plot Differences in Heat Flux Feedback
 # ----------------------------------------
 
 notitle = True
