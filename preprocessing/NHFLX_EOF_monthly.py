@@ -82,7 +82,7 @@ def sel_regionxr(ds,bbox):
 #%% User Edits
 
 # Set your configuration
-mconfig = "PIC_FULL"
+mconfig = "PIC_SLAB"
 
 # Set up names (need to change this at some point, silly coding...)
 if mconfig == "PIC_SLAB":
@@ -107,7 +107,17 @@ mons3=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
 blabels=[0,0,0,0]
 
 # Correction Mode
-correction = False # Set to True to use [Qnet + lambda*T], rather than [Qnet]
+correction     = True # Set to True to use [Qnet + lambda*T], rather than [Qnet]
+rolln          = 0
+
+if rolln != 1: # Add rolln to end of file name
+    print("Adding extra string for indexing")
+    rollnstr       = "_rolln%s" % str(rolln)
+    correction_str = "_Fprime_rolln0"
+else: # No rolln for case where it is T(t-1)
+    rollnstr       = ""
+    correction_str = "_Fprime"
+
 #%% Open the dataset ~63.26s
 
 """
@@ -129,7 +139,7 @@ lon360flag = True # Flip Qnet)
 if correction: # Load Fprime (=Qnet + lambda*T)
     
     #Open Dataset
-    ds = xr.open_dataset("%s../Fprime_%s.nc" % (datpath,mconfig))
+    ds = xr.open_dataset("%s../Fprime_%s%s.nc" % (datpath,mconfig,rollnstr))
     
     if np.any(ds.lon > 180): # Correct for cases where lon is degrees west
         lon360flag = False
@@ -191,7 +201,6 @@ else:
     slpglob = ds.PSL.values
     
 print("Loaded data in %.2fs"%(time.time()-st))
-
 
 #%% Preprocess, EOF Analysis ~304.38s
 st = time.time()
@@ -319,7 +328,7 @@ bboxtext = "lon%ito%i_lat%ito%i" % (bbox[0],bbox[1],bbox[2],bbox[3])
 bboxstr  = "Lon %i to %i, Lat %i to %i" % (bbox[0],bbox[1],bbox[2],bbox[3])
 savename = "%sNHFLX_%s_%iEOFsPCs_%s.npz" % (datpath,mcname,N_mode,bboxtext)
 if correction:
-    savename = proc.addstrtoext(savename,"_Fprime")
+    savename = proc.addstrtoext(savename,correction_str)
 
 np.savez(savename,**{
     "eofall":eofall,
@@ -341,7 +350,7 @@ bboxtext  = "lon%ito%i_lat%ito%i" % (bbox[0],bbox[1],bbox[2],bbox[3])
 bboxstr   = "Lon %i to %i, Lat %i to %i" % (bbox[0],bbox[1],bbox[2],bbox[3])
 savename  = "%sNHFLX_%s_%iEOFsPCs_%s.npz" % (datpath,mcname,N_mode,bboxtext)
 if correction:
-    savename = proc.addstrtoext(savename,"_Fprime")
+    savename = proc.addstrtoext(savename,correction_str)
 ld        = np.load(savename,allow_pickle=True)
 
 eofall    = ld['eofall']
@@ -418,7 +427,7 @@ eof_corr *= (1/vratio_alone)
 # Save all the files
 savename = datpath + "../NHFLX_EOF_Ratios_%s.npz" % mcname
 if correction:
-    savename = proc.addstrtoext(savename,"_Fprime")
+    savename = proc.addstrtoext(savename,correction_str)
 np.savez(savename,**{
     'varflx_EOF':varflx_EOF,
     'varflx_ori':varflx_ori,
@@ -431,7 +440,7 @@ np.savez(savename,**{
 
 savename = "%sNHFLX_%s_%iEOFsPCs_%s_eofcorr2.npz" % (datpath,mcname,N_mode,bboxtext)
 if correction:
-    savename = proc.addstrtoext(savename,"_Fprime")
+    savename = proc.addstrtoext(savename,correction_str)
 np.savez(savename,**{
     "varflx_ratio_alone":vratio_alone,
     "eofall":eof_corr,
@@ -444,7 +453,7 @@ np.savez(savename,**{
 #%% Load the file from above
 savename     = datpath + "../NHFLX_EOF_Ratios_%s.npz" % mcname
 if correction:
-    savename = proc.addstrtoext(savename,"_Fprime")
+    savename = proc.addstrtoext(savename,correction_str)
 ld           = np.load(savename)
 varflx_EOF   = ld['varflx_EOF']
 varflx_ori   = ld['varflx_ori']
@@ -842,7 +851,7 @@ eofforce = eofforce[:,:,:nmax+1,:]
 savenamefrc = "%sflxeof_%03ipct_%s_eofcorr%i.npy" % (datpath,vthres*100,mcname,eofcorr)
 
 if correction:
-    savenamefrc = proc.addstrtoext(savenamefrc,"_Fprime")
+    savenamefrc = proc.addstrtoext(savenamefrc,correction_str)
 np.save(savenamefrc,eofforce)
 
 #%% Test Plot (Summed EOF)
@@ -932,7 +941,7 @@ for s in tqdm(range(4)):
     # Save the output
     savenamefrc = "%sflxeof_%03ipct_%s_eofcorr%i_%s.npy" % (datpath,vthres*100,mcname,eofcorr,monnames[s])
     if correction:
-        savenamefrc = proc.addstrtoext(savenamefrc,"_Fprime")
+        savenamefrc = proc.addstrtoext(savenamefrc,correction_str)
     print("Saving to %s"%savenamefrc)
     np.save(savenamefrc,eofseas)
 #%%Do some analysis/visualization

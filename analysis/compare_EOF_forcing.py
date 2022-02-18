@@ -137,7 +137,7 @@ else:
     #Qnetname   = "NHFLX_%s-PIC_200EOFsPCs_lon260to20_lat0to65_eofcorr2.npz" % mconfig
     
     Qnetname = "NHFLX_%s-PIC_200EOFsPCs_lon260to20_lat0to65.npz" % mconfig
-    Fprimename = proc.addstrtoext(Qnetname,"_Fprime")
+    Fprimename = proc.addstrtoext(Qnetname,"_Fprime_rolln0")
     sumaxis = 1
     modeaxis = -1
 

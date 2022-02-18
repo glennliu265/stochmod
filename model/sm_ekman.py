@@ -79,7 +79,7 @@ dt         = 3600*24*30 # Timestep
 T0         = 0 # Init Temp
 
 # Forcing Correction Method (q-corr)
-ampq   = 3 #0 = none 1 = old method, 2 = method 1, 3 = method 2
+ampq   = 0 #0 = none 1 = old method, 2 = method 1, 3 = method 2
 
 # Damping Significance Test Method
 method = 4 # 1 = No Testing; 2 = SST autocorr; 3 = SST-FLX crosscorr, 4 = Both 
@@ -91,7 +91,7 @@ debug = False
 
 #expname = 
 
-frcname = "flxeof_090pct_SLAB-PIC_eofcorr2"
+frcname = "flxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0"
 
 qek_name = "Qek_eof_090pct_FULL_PIC_eofcorr0.npy"
 
@@ -158,8 +158,8 @@ hblt        *= limask[:,:,None]
 qek_raw     *= limask[:,:,None,None]
 
 
-if 'h' in custom_params.keys(): # Replace with custom parameters
-    h = custom_params['h']
+# if 'h' in custom_params.keys(): # Replace with custom parameters
+#     h = custom_params['h']
     
 
 # Restrict to region or point (Need to fix this section)

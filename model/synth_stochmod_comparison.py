@@ -65,7 +65,7 @@ config['fname']       = "flxeof_090pct_FULL-PIC_eofcorr2.npy"   #['NAO','EAP,'EO
 #config['fname']       = 'FLXSTD'
 config['pointmode']   = 1          # Set to 1 to generate a single point
 config['query']       = [-30,50]   # Point to run model at (SPG Test)
-config['query']       = [-77,28]   # Point to run model at  (GS)
+#config['query']       = [-77,28]   # Point to run model at  (GS)
 #config['query']       = [-36,58]  # SE Greenland
 config['applyfac']    = 2          # Apply Integration Factor and MLD to forcing
 config['lags']        = np.arange(0,37,1)
@@ -191,23 +191,29 @@ exname = "Fprime-v-Qnet"
 #config_custom = config.copy()
 #config['fname'] = "flxeof_090pct_FULL-PIC_eofcorr2_Fprime.npy"
 
-Fload     = np.load(input_path+"flxeof_090pct_FULL-PIC_eofcorr2_Fprime.npy")
+
+# Get indices of target point
 lonf,latf = config['query']
 klon,klat = proc.find_latlon(lonf,latf,lon,lat)
-Fptload   = Fload[klon,klat,:,:] 
 locstring = "Lon %.f, Lat %.f" % (lon[klon],lat[klat])
 locfn     = "lon%i_lat%i" % (lon[klon],lat[klat])
+
+# Get the points
+Fload     = np.load(input_path+"flxeof_090pct_FULL-PIC_eofcorr2_Fprime.npy")
+Fload2    = np.load(input_path+"flxeof_090pct_FULL-PIC_eofcorr2_Fprime_rolln0.npy")
+Fptload   = Fload[klon,klat,:,:] 
+Fptload2  = Fload2[klon,klat,:,:] 
 
 # -----------------
 # Set up the inputs
 # -----------------
 mid     = 3 # Model id (50m,Const,Vary,Entrain)
-mnames  = ["$Q_{net}$ (Corrected)","$F'$"]
-alphas  = [Fptdef,Fptload]
-lbds    = [dampdef,dampdef]
-mlds    = [mlddef ,mlddef]
+mnames  = ["$Q_{net}$ (Corrected)","$F'$ ($T_{t-1}$)","$F'$ ($T_{t}$)"]
+alphas  = [Fptdef,Fptload,Fptload2]
+lbds    = [dampdef,dampdef,dampdef]
+mlds    = [mlddef ,mlddef,mlddef]
 nexps   = len(mnames)
-mcolors = ["mediumblue","firebrick"] 
+mcolors = ["mediumblue","firebrick","magenta"] 
 
 #for v in enumerate([alphas,lbds,mlds]):
 fig,ax = plt.subplots(1,1)
@@ -306,8 +312,8 @@ xlm  = [1e-2,5e0]
 xper = np.array([100,50,20,10,5,2])
 xtks = 1/xper
 xlm  = [xtks[0],xtks[-1]]
-ylm  = [0,0.5]
-
+#ylm  = [0,0.5]
+ylm   = [0,2.5]
 
 # Do spectral analysis
 specs,freqs,CCs,dofs,r1s = scm.quick_spectrum(inssts,nsmooth,pct)

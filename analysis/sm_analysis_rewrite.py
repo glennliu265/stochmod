@@ -244,6 +244,9 @@ fnames = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method4_dm
 # Fprime run, no amp
 fnames = ("forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_1000yr_run011_ampq0_method4_dmp0",)
 
+# Fprime run, with rolln
+fnames = ("forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run011_ampq0_method4_dmp0",)
+
 
 print("Now processing the following files: \n ")
 print(*fnames, sep='\n')

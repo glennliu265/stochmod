@@ -184,7 +184,7 @@ frcnames = (
 frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2',)
 
 # Single run test (90% variance forcing)
-frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2_Fprime',)
+frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0',)
 
 # # Testing NAO, EAP Forcing
 # frcnames = ('flxeof_EOF1_SLAB-PIC_eofcorr0',

@@ -10,7 +10,6 @@ Copied blocks from the stochmod_synth script
 @author: gliu
 """
 
-
 import numpy as np
 from scipy.io import loadmat,savemat
 import matplotlib.pyplot as plt
