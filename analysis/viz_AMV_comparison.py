@@ -539,7 +539,8 @@ for f in tqdm(range(len(fnames))):
         
         spid = 0
         proj = ccrs.PlateCarree()
-        fig,axs = plt.subplots(2,3,subplot_kw={'projection':proj},figsize=(12,6))
+        fig,axs = plt.subplots(2,3,subplot_kw={'projection':proj},constrained_layout=True,
+                               figsize=(14,8))
         # 
         # figsize=(12,6)
         # ncol = 3
@@ -627,7 +628,8 @@ else:
     dfcol = 'k'
 
 proj = ccrs.PlateCarree()
-fig,axs = plt.subplots(2,3,subplot_kw={'projection':proj},figsize=(12,6))
+fig,axs = plt.subplots(2,3,
+                       subplot_kw={'projection':proj},figsize=(12,6))
 # 
 # figsize=(12,6)
 # ncol = 3
@@ -864,8 +866,9 @@ for rid in range(5):
     
     plt.savefig(savename,dpi=150,bbox_inches='tight')
 #%% Summary Figure (OSM Presentation)
-notitle  = True
-darkmode = True
+notitle    = True
+darkmode   = True
+cbar_horiz = True
 
 cmax  = 0.5
 cstep = 0.025
@@ -874,8 +877,18 @@ cint,cl_int=viz.return_clevels(cmax,cstep,lstep)
 clb = ["%.2f"%i for i in cint[::4]]
 
 f = 0
-
 rid = 4
+
+if cbar_horiz is True:
+    corient  = 'horizontal'
+    cfraction = 0.07
+    cpad      = 0.05
+    figsize   = (10,5)
+else:
+    corient  = 'horizontal'
+    cfraction = 0.018
+    cpad      = 0.02
+    figsize   = (8,3)
     
     
 if darkmode:
@@ -891,7 +904,7 @@ else:
 
 spid = 0
 proj = ccrs.PlateCarree()
-fig,axs = plt.subplots(1,2,subplot_kw={'projection':proj},figsize=(8,3),
+fig,axs = plt.subplots(1,2,subplot_kw={'projection':proj},figsize=figsize,
                        constrained_layout=True)
 
 
@@ -958,7 +971,10 @@ if plotbbox:
                          color=dfcol,linestyle="dashed",linewidth=2,return_line=True)
 #ax = viz.label_sp(spid,case='lower',ax=ax,labelstyle="(%s)",fontsize=16,alpha=0.7,fontcolor=dfcol)
 
-cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='vertical',fraction=0.018,pad=0.02)
+
+
+
+cb = fig.colorbar(pcm,ax=axs.flatten(),orientation=corient,fraction=cfraction,pad=cpad)
 cb.set_ticks(cint[::4])
 #cb.ax.set_xticklabels(clb,rotation=45)
 #cb.set_label("SST ($K \, \sigma_{AMV}^{-1}$)")

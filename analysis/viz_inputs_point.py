@@ -55,8 +55,10 @@ frcname = "flxeof_090pct_FULL-PIC_eofcorr2"
 #frcname = "Qek_eof_090pct_FULL_PIC_eofcorr0"
 
 # Which point do you want to visualize conditions for?
-lonf = -30
-latf = 50
+lonf = -55#-30
+latf = 11 #50
+flocstring = "lon%i_lat%i" % (lonf,latf)
+locstring = "%i$\degree$N, %i$\degree$W" % (latf,np.abs(lonf))
 
 # Additional Plotting Parameters
 bbox = [-80,0,10,65]
@@ -167,11 +169,11 @@ beta = scm.calc_beta(h)
 
 monstr_kprv = np.append(mons3,'Jan')
 fig,ax = plt.subplots(1,1,figsize=(6,4),constrained_layout=True)
-viz.viz_kprev(hpt,kprev,locstring="50$\degree$N, 30$\degree$W",
+viz.viz_kprev(hpt,kprev,locstring=locstring,
               ax=ax,msize=50,mstyle="x",lw=2.5)
 ax.grid(True,ls='dotted')
 ax.set_xticklabels(monstr_kprv)
-plt.savefig(outpath+"MLD_Detrainment_month_SPGPoint.png",dpi=200)
+plt.savefig(outpath+"MLD_Detrainment_month_%s.png" % (flocstring),dpi=200)
 
 
 
@@ -275,7 +277,7 @@ for m in range(2): # Loop for SLAB, and FULL
     ax1.grid(True,ls='dotted')
     ax1.legend(ls, [l.get_label() for l in ls],loc='upper center')
     ax1.set_title(title)
-    plt.savefig(outpath+"Scycle_MLD_Forcing_%s_Triaxis_%s.png"% (locstring,mcf),dpi=150,bbox_inches='tight')
+    plt.savefig(outpath+"Scycle_MLD_Forcing_%s_Triaxis_%s.png"% (flocstring,mcf),dpi=150,bbox_inches='tight')
 
 # ****************************************************************************
 #%% Some Basinwide Plots...
@@ -383,12 +385,17 @@ fig.colorbar(pcm,ax=axs.flatten())
 
 #%% Plot max MLD variations
 
+bboxplot    = [-80,0,5,60]
 hrange= np.nanmax(h,axis=2) - np.nanmin(h,axis=2)
+
+
 fig,ax =  plt.subplots(1,1,figsize=(8,4),subplot_kw={'projection':ccrs.PlateCarree()})
 
-pcm=ax.contourf(lon,lat,hrange.T,cmap=cmocean.cm.dense,extend='both')
-ax = viz.add_coast_grid(ax=ax,bbox=bbox,blabels=[0,0,0,0],fill_color='gray')
-fig.colorbar(pcm,ax=axs.flatten())
+pcm=ax.pcolormesh(lon,lat,hrange.T,vmin=0,vmax=125,cmap=cmocean.cm.dense)
+ax = viz.add_coast_grid(ax=ax,bbox=bboxplot,fill_color='gray')
+fig.colorbar(pcm,ax=ax)
+
+
 
 #%% Experiment with nonlinear colormap
 
