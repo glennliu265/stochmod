@@ -244,9 +244,17 @@ exname ="run_comparison"
 
  
 # Try Method 5
-fnames = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method5_dmp0',)#'forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run009_ampq3',)
-frcnamelong = ["EOF Forcing (90% Variance)",]
+fnames = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run013_ampq3_method5_dmp0',)#'forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run009_ampq3',)
+
+
+#frcnamelong = ["EOF Forcing (90% Variance) run 2%02d" % (i) for i in range(10)]
 exname ="run_comparison" 
+
+
+# Visualize Continuous run 200, Fprime (need to rerun without ampq... fudge)
+fnames =["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_dmp0"%i for i in range(10)]
+frcnamelong = ["$F'$ run 2%02d" % (i) for i in range(10)]
+exname ="Fprime_amq0_method5_cont"
 
 # Examine impact of Ekman Forcing
 # fnames = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_Qek',)
@@ -431,7 +439,6 @@ for f in range(len(frcnamelong)):
 rid_sel = [0,5,6,2,4]
 mid_sel = [0,2]
 
-
 plt.style.use("default")
 
 for f in range(len(frcnamelong)):
@@ -478,8 +485,6 @@ for f in range(len(frcnamelong)):
 # -------------------------------------------
 #%% Next load/plot the AMV Patterns
 
-
-
 # Load for stochastic model experiments
 amvpats  = []
 amvids   = []
@@ -522,7 +527,6 @@ sel_rid = 4
 bboxplot = [-80,0,5,60]
 plotbbox = False
 def plot_amvpat(lon,lat,amvpat,ax,add_bbox=False,bbox_NNA=[-80, 0, 10, 65],blabel=[1,0,0,1]):
-    
     ax = viz.add_coast_grid(ax,bboxplot,blabels=blabel,ignore_error=True)
     pcm = ax.contourf(lon,lat,amvpat,levels=cint,cmap=cmocean.cm.balance)
     ax.pcolormesh(lon,lat,amvpat,vmin=cint[0],vmax=cint[-1],cmap=cmocean.cm.balance,zorder=-1)
@@ -552,7 +556,6 @@ for f in tqdm(range(len(fnames))):
     for rid in range(5):
         if rid != sel_rid:
             continue
-        
         
         if darkmode:
             plt.style.use('dark_background')
@@ -797,7 +800,6 @@ cint,cl_int=viz.return_clevels(cmax,cstep,lstep)
 clb = ["%.2f"%i for i in cint[::4]]
 
 f = 0
-
 for rid in range(5):
     if rid != sel_rid:
         continue
@@ -891,6 +893,114 @@ for rid in range(5):
         plt.suptitle("%s AMV Pattern and Index Variance [Forcing = %s]" % (regionlong[rid],frcnamelong[f]),fontsize=14)
     
     plt.savefig(savename,dpi=150,bbox_inches='tight')
+    
+#%% Compare AMV Patterns for a selected model
+# (For Continuous Runs)
+
+if "cont" in exname:
+    
+    
+    mid     = 2
+    rid     = 2
+    nexps   = len(fnames)
+    plotcb  = False
+    
+    # Get AMV Patterns
+    # ----------------
+    amvpats_cont = np.zeros((len(lon),len(lat),nexps)) * np.nan # [lon x lat x exp]
+    amvids_cont  = np.zeros((amvids[0][0][0].shape[0],nexps)) * np.nan # [time x exp]
+    for f in range(nexps):
+        amvpats_cont[...,f] = amvpats[f][rid][mid]
+        amvids_cont[...,f]  = amvids[f][rid][mid]
+        
+    # Plot for each segment
+    # ---------------------
+    rowcol  = (2,5)
+    
+    ylabels = ["%03d to %03d" % (i*1000,i*1000+999) for i in range(nexps)]
+    
+    fig,axs = plt.subplots(rowcol[0],rowcol[1],subplot_kw={'projection':proj},figsize=(16,6),
+                           constrained_layout=True)
+    spid = 0
+    for f in range(10):
+        ax = axs.flatten()[f]
+        
+        # Set Labels, Axis, Coastline
+        blabel = [0,0,0,0]
+        if f%rowcol[1] == 0:
+            blabel[0]  = 1
+        if f > rowcol[1] -1:
+            blabel[-1] = 1
+        
+        # Make the Plot
+        ax = viz.add_coast_grid(ax,bboxplot,blabels=blabel,line_color=dfcol,
+                                fill_color='gray',ignore_error=True)
+        ax.set_title("Years %s" % ylabels[f])
+        
+        # Plot contours
+        pcm = ax.contourf(lon,lat,amvpats_cont[...,f].T,levels=cint,cmap=cmocean.cm.balance,extend='both')
+        cl = ax.contour(lon,lat,amvpats_cont[...,f].T,levels=cl_int,colors="k",linewidths=0.5)
+        ax.clabel(cl,levels=cl_int,fontsize=8)
+        
+        # Plot Mask
+        viz.plot_mask(lon,lat,dmsks[mid],ax=ax,markersize=0.1)
+        
+        # Label Subplots
+        ax = viz.label_sp(spid,case='lower',ax=ax,labelstyle="(%s)",fontsize=12,alpha=0.7,fontcolor=dfcol)
+        spid += 1
+        
+    # Colorbar
+    if plotcb:
+        cb = fig.colorbar(pcm,ax=axs.flatten(),fraction=0.010,pad=0.01)
+        cb.set_label("AMV Pattern ($K \sigma_{AMV}^{-1}$)")
+    
+    # Saving Figure 
+    plt.savefig("%sAMV_Comparison_%s_%s_model%i.png" % (figpath,exname,regions[rid],mid),dpi=150)
+    
+    
+    # Plot the average pattern, compare with CESM
+    # -------------------------------------------
+    amv_avg     = amvpats_cont.mean(-1)
+    amv_std_avg = np.var(amvids_cont,0).mean(-1) 
+    cid     = 1 if mid<1 else 0 # Select CESM comparison
+    fig,axs = plt.subplots(1,2,subplot_kw={'projection':proj},figsize=(8,3),
+                           constrained_layout=True)
+    spid = 0
+    for i in range(2):
+        ax = axs.flatten()[i]
+        if i == 0:
+            blabel  = [1,0,0,1]
+            amvplot = amv_avg.T 
+            ptitle   = "Stochastic Model (%s, $\sigma_{AMV}^{2}=%.4f$)" % (modelnames[mid],amv_std_avg)
+            plon,plat = lon,lat
+        else:
+            blabel = [0,0,0,1]
+            amvplot = cesmpat[rid][cid].T
+            ptitle   = "CESM1 (%s, $\sigma_{AMV}^{2}=%.4f$)" % (cesmname[cid],np.var(cesmidx[rid][cid]))
+            plon,plat = lon180g,latg
+        ax = viz.add_coast_grid(ax,bboxplot,blabels=blabel,line_color=dfcol,
+                                fill_color='gray',ignore_error=True)
+        ax.set_title(ptitle)
+        
+        # Plot contours
+        pcm = ax.contourf(plon,plat,amvplot,levels=cint,cmap=cmocean.cm.balance,extend='both')
+        cl = ax.contour(plon,plat,amvplot,levels=cl_int,colors="k",linewidths=0.5)
+        ax.clabel(cl,levels=cl_int,fontsize=8)
+        
+        # Plot Mask
+        if i == 0:
+            viz.plot_mask(lon,lat,dmsks[mid],ax=ax,markersize=0.1)
+        
+        # Label Subplots
+        ax = viz.label_sp(spid,case='lower',ax=ax,labelstyle="(%s)",fontsize=16,alpha=0.7,fontcolor=dfcol)
+        spid += 1
+        
+    # Saving Figure 
+    plt.savefig("%sAMV_Comparison_%s_%s_model%i_AVG.png" % (figpath,exname,regions[rid],mid),dpi=150)
+    
+    
+    
+    
 #%% Summary Figure (OSM Presentation)
 notitle    = True
 darkmode   = True
