@@ -633,11 +633,13 @@ def noentrain(t_end,lbd,T0,F,FAC,multFAC=1,debug=False):
     return temp_ts
 
 # Entrain Model (Single Point)
-def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=False):
+def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=False,
+            Tdgrab=None):
     """
     SST Stochastic Model, with Entrainment
     Integrated with the forward method at a single point
     assuming lambda at a constant monthly timestep
+    If Tdgrab is given, appends to front for Td calculations, then removes.
     
     Parameters
     ----------
@@ -664,7 +666,9 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
         Set to true to output each term separately
     debugprint : BOOL, optional
         Set to true to print messages at each timestep. The default is False.
-
+    Td0 : Array of len[Tdgrab]
+        Initial temperatures below the mixed layer from previous experiments to append
+    
     Returns
     -------
     temp_ts : ARRAY [t_end,]
@@ -678,23 +682,32 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
     """
     
     # Preallocate
-    temp_ts = np.zeros(t_end)
+    temp_ts = np.zeros(t_end) * T0
     
+    # If Tdgrab is on, Grab the temperatures
+    if Tdgrab is None:
+        t0  = 0 # Start from 0
+        Td0 = None
+    else: # New length is t_end + len(Tdgrab)
+        t0  = len(Tdgrab)
+        Td0 = None # Set to this initially
+        t_end += len(Tdgrab) # Append years to beginning of simulation
+        temp_ts = np.concatenate([Tdgrab,temp_ts])
+        
     if debug:
-        noise_ts = np.zeros(t_end)
-        damp_ts = np.zeros(t_end)
+        noise_ts   = np.zeros(t_end)
+        damp_ts    = np.zeros(t_end)
         entrain_ts = np.zeros(t_end)
-        Td_ts   = np.zeros(t_end)
-    
+        Td_ts      = np.zeros(t_end)
     entrain_term = np.zeros(t_end)
     
     # Prepare the entrainment term
     explbd = np.exp(np.copy(-lbd))
     #explbd[explbd==1] = 0
     
-    Td0 = None # Set Td=None Initially
+        
     # Loop for integration period (indexing convention from matlab)
-    for t in range(t_end):
+    for t in np.arange(t0,t_end,1):
         
         # Get the month (start from Jan, so +1)
         m  = (t+1)%12
@@ -705,12 +718,14 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
         # --------------------------
         # Calculate entrainment term
         # --------------------------
-        if t<12: # Start Entrainment term after first 12 months
+        if (t<12) and (Tdgrab is None): # Start Entrainment term after first 12 months
+            if debugprint:
+                print("Skipping t=%i" % t)
             entrain_term = 0
-        else:
+        else: # Otherwise, 
             if beta[m-1] == 0: # For months with no entrainment
                 entrain_term = 0
-                Td0 = None # Reset Td0 term
+                Td0          = None # Reset Td0 term
                 if debugprint:
                     print("No entrainment on month %i"%m)
                     print("--------------------\n")
@@ -765,7 +780,15 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
             damp_ts[t]    = damp_term
             noise_ts[t]   = noise_term * integration_factor
             entrain_ts[t] = entrain_term * integration_factor
+    
+    # Now Remove initial values from variables
+    temp_ts = temp_ts[t0:] # Remove intial Tdgrab values
+    
     if debug:
+        damp_ts    = damp_ts[t0:]
+        noise_ts   = noise_ts[t0:]
+        entrain_ts = entrain_ts[t0:]
+        Td_ts      = Td_ts[t0:]
         return temp_ts,damp_ts,noise_ts,entrain_ts,Td_ts
     return temp_ts
 
@@ -1964,6 +1987,7 @@ def prep_HF(damping,rsst,rflx,p,tails,dof,mode,
             2 --> SST autocorrelation based
             3 --> SST-FLX cross correlation based
             4 --> Both 2 and 3
+            5 --> Both, but replace FULL with SLAB if insignificant
         --- OPTIONAL ---
         8) returnall BOOL
             Set to True to return masks and frequency
@@ -2005,7 +2029,7 @@ def prep_HF(damping,rsst,rflx,p,tails,dof,mode,
         mtot = np.copy(mflx)
         mall = np.copy(mflx)  
         mult = 1
-    elif mode == 4:
+    elif mode == 4 or mode == 5:
         mtot = msst + mflx
         mall = msst * mflx
         mult = 2
@@ -2154,8 +2178,8 @@ def load_inputs(mconfig,frcname,input_path,load_both=False,method=4):
         kprevall  = np.load(input_path+"FULL_PIC_HMXL_kprev.npy") # Entraining Month
     
     # Load Atmospheric Damping [lon180 x lat x mon]
-    if mconfig == "SLAB_PIC":
-        damping   = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig005_dof894_mode%i.npy" % method)
+    if mconfig == "SLAB_PIC": # Note older versions used dof894.... why?
+        damping   = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig005_dof893_mode%i.npy" % method)
     elif mconfig == "FULL_PIC":
         damping   = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig005_dof1893_mode%i.npy" % method)
     elif mconfig =="FULL_HTR":
@@ -2164,8 +2188,8 @@ def load_inputs(mconfig,frcname,input_path,load_both=False,method=4):
         print("Currently supported damping mconfig are [SLAB_PIC,FULL_PIC,FULL_HTR]")
         
     # Load both damping
-    if load_both: 
-        dampingslab   = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig005_dof894_mode%i.npy"%method)
+    if load_both:  # Note older versions used dof894.... why?
+        dampingslab   = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig005_dof893_mode%i.npy"%method)
         dampingfull   = np.load(input_path+"FULL_PIC"+"_NHFLX_Damping_monwin3_sig005_dof1893_mode%i.npy"%method)
         
     # Load Alpha (Forcing Amplitudes) [lon180 x lat x pc x mon], easier for tiling
@@ -2582,7 +2606,8 @@ def integrate_noentrain(lbd,F,T0=0,multFAC=True,debug=False):
     #explbd[explbd==1] =0 # Set the term to zero where damping is insignificant
     
     # Preallocate
-    T            = np.zeros((nlon,nlat,ntime)) * T0
+    T            = np.zeros((nlon,nlat,ntime))
+    T[:,:,0]     = T0 # Set first value
     damping_term = T.copy()
     forcing_term = T.copy()
     
@@ -2597,7 +2622,7 @@ def integrate_noentrain(lbd,F,T0=0,multFAC=True,debug=False):
         # Form the terms and step forrward
         damping_term[:,:,t] = explbd[:,:,m-1] * T[:,:,t-1]
         forcing_term[:,:,t] = FAC[:,:,m-1] * F[:,:,t]
-        T[:,:,t] = damping_term[:,:,t] + forcing_term[:,:,t]
+        T[:,:,t]            = damping_term[:,:,t] + forcing_term[:,:,t]
     
     # Apply masked based on forcing term
     msk = F.sum(2)
@@ -2610,7 +2635,34 @@ def integrate_noentrain(lbd,F,T0=0,multFAC=True,debug=False):
         return T,damping_term,forcing_term
     return T
 
-def integrate_entrain(h,kprev,lbd_a,F,T0=0,multFAC=True,debug=False):
+def integrate_entrain(h,kprev,lbd_a,F,T0=0,multFAC=True,debug=False,Td0=False):
+    """
+    
+    Parameters
+    ----------
+    h : ARRAY [12,]
+        MIXED LAYER DEPTHS (M)
+    kprev : ARRAY [12,]
+        INDICES OF DETRAINMENT MONTH
+    lbd_a : ARRAY
+        DESCRIPTION.
+    F : TYPE
+        DESCRIPTION.
+    T0 : TYPE, optional
+        DESCRIPTION. The default is 0.
+    multFAC : TYPE, optional
+        DESCRIPTION. The default is True.
+    debug : TYPE, optional
+        DESCRIPTION. The default is False.
+    Td0 : ARRAY [len(Tdgrab)]
+        DESCRIPTION. The default is False.
+
+    Returns
+    -------
+    TYPE
+        DESCRIPTION.
+
+    """
     
     nlon,nlat,ntime = F.shape
     
@@ -2627,12 +2679,11 @@ def integrate_entrain(h,kprev,lbd_a,F,T0=0,multFAC=True,debug=False):
         FAC = calc_FAC(lbd)
     
     # Preallocate
-    T            = np.zeros((nlon,nlat,ntime)) * T0
+    T      = np.zeros((nlon,nlat,ntime))
     damping_term = T.copy()
     forcing_term = T.copy()
     entrain_term = T.copy()
     Td           = T.copy()
-    
     # Loop for each point
     for a in tqdm(range(nlat)):
         
@@ -2642,8 +2693,17 @@ def integrate_entrain(h,kprev,lbd_a,F,T0=0,multFAC=True,debug=False):
             if np.any(np.isnan(F[o,a,:])):
                 continue
             
+            # Get Last [Tdgrab] values for selected point
+            if Td0 is not False:
+                Tdgrab = Td0[o,a,:]
+            else:
+                Tdgrab = None
+                
+            # If initial values are provided, get value
+            T0_in = T0[o,a]
+            
             # Integrate in time
-            temp_ts,damp_ts,noise_ts,entrain_ts,Td_ts = entrain(ntime,lbd[o,a,:],T0,F[o,a,:],beta[o,a,:],h[o,a,:],kprev[o,a,:],FAC[o,a,:],multFAC=multFAC,debug=True,debugprint=False)
+            temp_ts,damp_ts,noise_ts,entrain_ts,Td_ts = entrain(ntime,lbd[o,a,:],T0_in,F[o,a,:],beta[o,a,:],h[o,a,:],kprev[o,a,:],FAC[o,a,:],multFAC=multFAC,debug=True,debugprint=False,Tdgrab=Tdgrab)
             
             # Save outputs
             T[o,a,:]            = temp_ts.copy()
@@ -2702,6 +2762,7 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
                    method=4,chk_damping=False,
                    custom_params = {},
                    hconfigs=[0,1,2],
+                   continue_run=False,Tdgrab=24,
                    ):
     
     """
@@ -2728,7 +2789,7 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
     15. useslab [BOOL] :
     16. savesep [BOOL] :
     17. intgrQ [BOOL]  :
-    18. method [INT]
+    18. method [INT]   : Heat Flux Significance Testing Method
     ...
     
     19. chk_damping [BOOL]: set True to set negative damping values to 0
@@ -2743,6 +2804,8 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
             0 : non-entrain, constant mld, slab parameters
             1 : non-entrain, seasonal mld, full parameters
             2 : entraining , seasonal mld, full parameters
+    22. continue_run [STR]: Full path+Name of output experiment to take T0 and Td' from.'
+    23. Tdgrab [INT]: Number of previous months to take from previous run for Td' calculation'
     """
     
     start = time.time()
@@ -2773,7 +2836,6 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
         print("Found custom Damping!")
         damping = custom_params['lambda']
         dampingfull = damping.copy()
-    
     
     # Apply landice mask to all inputs
     # --------------------------------
@@ -2839,9 +2901,17 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
         qek_flag = False
         
 
+    # Load data from an older experiment to continue the run
+    # ------------------------------------------------------
+    if continue_run:
+        print("Loading old data from %s"%(continue_run))
+        ld = np.load(continue_run,allow_pickle=True)
+        T_old = ld['sst']
+    else:
+        T_old = False
+        print("Initializing Experiment from T0=0...")
         
-    
-    
+        
     T_all = [] # Run 3 experiments
     for exp in hconfigs:
         if exp == 0: # SLAB Parameters
@@ -2852,6 +2922,18 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
             h_in = h.copy() # Variable MLD
             f_in = forcing_full
             d_in = dampingfull.copy()
+            
+        
+        # Get old data
+        # ------------
+        if continue_run:
+            T0 = T_old[exp][:,:,-1] # Take the last timestep [lon x lat]
+            if exp == 2: #Entraining
+                Td0 = T_old[exp][:,:,-Tdgrab:] # Take last Tdgrab years [lon x lat x Tdgrab]
+        else:
+            T0  = np.zeros((len(lonr),len(latr)))
+            Td0 = False
+            
         
         if useslab: # In special cases, use slab for forcing and damping
             print("Warning! Using CESM-SLAB Parameters for all cases!")
@@ -2862,8 +2944,6 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
         # ---------------
         lbd_a   = convert_Wm2(d_in,h_in,dt)
         F       = convert_Wm2(f_in,h_in,dt) # [lon x lat x time]
-        
-
         
         #
         # If Option is set, amplitfy F to account for underestimation
@@ -2895,9 +2975,9 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
         # Integrate Stochastic Model
         # --------------------------
         if exp < 2:
-            T   = integrate_noentrain(lbd_a,F,T0=0,multFAC=True,debug=False)
+            T   = integrate_noentrain(lbd_a,F,T0=T0,multFAC=True,debug=False)
         else:
-            T   = integrate_entrain(h_in,kprev,lbd_a,F,T0=0,multFAC=True,debug=False)
+            T   = integrate_entrain(h_in,kprev,lbd_a,F,T0=T0,multFAC=True,debug=False,Td0=Td0)
         
         T_all.append(T)
         

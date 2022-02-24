@@ -22,7 +22,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20211018/"
+    figpath     = projpath + "02_Figures/20220222/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -50,7 +50,7 @@ lags = np.arange(0,37,1)
 # Options to determine the experiment ID
 mconfig   = "SLAB_PIC"
 nyrs      = 1000        # Number of years to integrate over
-runid     = "011"
+runid     = "013"
 savesep   = False # Set to True if output was saved separately
 useslab   = False # Set to True if you only used slab output for all simulations
 
@@ -253,7 +253,14 @@ fnames   = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_Qek',)
 # Test witha single output, rerun
 fnames = ("forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method4_dmp0",)
 
+# Test method 2
+fnames = ("forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method2_dmp0",)
 
+# Test method 5
+fnames = ("forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method5_dmp0",)
+
+# Test method 5 with rerun
+fnames = ("forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run013_ampq3_method5_dmp0",)
 
 print("Now processing the following files: \n ")
 print(*fnames, sep='\n')

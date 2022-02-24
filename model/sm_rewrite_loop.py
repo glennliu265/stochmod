@@ -93,13 +93,20 @@ mconfig    = "SLAB_PIC"
 #flxeof_qek_50eofs_SLAB-PIC
 
 # Running Parameters
-runid      = "011"
-pointmode  = 0 
-points     = [-30,50]
-bboxsim    = [-80,0,0,65] # Simulation Box
+runids      = ["2%02d"%i for i in range(10)]#"011"
+pointmode   = 0 
+points      = [-30,50]
+bboxsim     = [-80,0,0,65] # Simulation Box
 
 useslab    = False # Set to True to use SLAB_CESM parameters for all...
 savesep    = False # Set to True to save the outputs differently
+
+# Option to start new
+continuous = True # continue run between each runid
+
+# Set to False to start new run from 0
+startfile    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_output/stoch_output_forcingforcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method5_dmp0_1000yr_run011_ampq3_method2_dmp0.npz"
+
 
 # Additional Constants
 t_end      = 12000 # Sim Length
@@ -107,10 +114,10 @@ dt         = 3600*24*30 # Timestep
 T0         = 0 # Init Temp
 
 # Forcing Correction Method (q-corr)
-ampq   = 0 #0 = none 1 = old method, 2 = method 1, 3 = method 2
+ampq   = 3 #0 = none 1 = old method, 2 = method 1, 3 = method 2
 
 # Damping Significance Test Method
-method = 4 # 1 = No Testing; 2 = SST autocorr; 3 = SST-FLX crosscorr, 4 = Both 
+method = 5 # 1 = No Testing; 2 = SST autocorr; 3 = SST-FLX crosscorr, 4 = Both 
 
 # Point information
 lonf = -30
@@ -181,10 +188,13 @@ frcnames = (
             "flxeof_1eofs_SLAB-PIC_eofcorr0"
             )
 
-frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2',)
+frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0',)
 
 # Single run test (90% variance forcing)
-frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0',)
+#frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0',)
+
+# Rerun, 
+#frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2',)
 
 # # Testing NAO, EAP Forcing
 # frcnames = ('flxeof_EOF1_SLAB-PIC_eofcorr0',
@@ -212,26 +222,40 @@ print(*frcnames, sep='\n')
 
 #%%
 st = time.time()
+
 for f in range(len(frcnames)):
     frcname    = frcnames[f]
-    expname    = "%sstoch_output_forcing%s_%iyr_run%s_ampq%i_method%i_dmp0.npz" % (output_path,frcname,int(t_end/12),runid,ampq,method) 
-    # dmp0 indicates that points with insignificant lbd_a were set to zero.
-    # previously, they were set to np.nan, or the whole damping term was set to zero
-    
-    # Check if results exist
-    query = glob.glob(expname)
-    if len(query) > 0:
-        overwrite = input("Found existing file(s) \n %s. \n Overwite? (y/n)" % (str(query)))
-    else:
-        overwrite = 'y'
-    # Skip forcing
-    if overwrite == 'n':
-        continue
-    
-    scm.run_sm_rewrite(expname,mconfig,input_path,limaskname,
-                       runid,t_end,frcname,ampq,
-                       bboxsim,pointmode,points=[lonf,latf],
-                       dt=3600*24*30,
-                       debug=False,check=False,useslab=useslab,savesep=savesep,method=method)
-print("Completed in %.2fs" % (time.time()-st))
+    expnames = []
+    for r,runid in enumerate(runids):
+        
+        expname    = "%sstoch_output_forcing%s_%iyr_run%s_ampq%i_method%i_dmp0.npz" % (output_path,frcname,int(t_end/12),runid,ampq,method) 
+        # dmp0 indicates that points with insignificant lbd_a were set to zero.
+        # previously, they were set to np.nan, or the whole damping term was set to zero
+        
+        if continuous:
+            if r == 0: # First Run
+                if startfile is False: # Initialize from zero
+                    continue_run = False 
+                else: # Initialize from startfile
+                    continue_run = startfile
+            else:
+                continue_run=expnames[r-1] # Use Previous file
+        
+        # Check if results exist
+        query = glob.glob(expname)
+        if len(query) > 0:
+            overwrite = input("Found existing file(s) \n %s. \n Overwite? (y/n)" % (str(query)))
+        else:
+            overwrite = 'y'
+        # Skip forcing
+        if overwrite == 'n':
+            continue
+        
+        scm.run_sm_rewrite(expname,mconfig,input_path,limaskname,
+                           runid,t_end,frcname,ampq,
+                           bboxsim,pointmode,points=[lonf,latf],
+                           dt=3600*24*30,
+                           debug=False,check=False,useslab=useslab,savesep=savesep,method=method)
+        expnames.append(expname)
+    print("Completed in %.2fs" % (time.time()-st))
 
