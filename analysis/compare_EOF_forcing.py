@@ -52,7 +52,7 @@ elif stormtrack == 0:
     
     datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/"
     #datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/"
-    outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220113/"
+    outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220222/"
 
     lipath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/landicemask_enssum.npy"
     #llpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/"
@@ -68,13 +68,14 @@ figpath     = projpath + "02_Figures/20220214/"
 proc.makedir(figpath)
 
 mconfig = "FULL"
-
+correct_qnet = True
 
 lonf = -30
 latf = 50
 
 mons3       = [viz.return_mon_label(m,nletters=3) for m in np.arange(1,13)]
-vlabels  = ["$Q_{net} \, (Corrected)$","$F'$"]
+vlabels    = ["$Q_{net} \, (Corrected)$","$F'$"]
+vlabels_fn = ("Qnet","Fprime")
 summodes = False # Set to True to load the summed modes
 
 plt.style.use('default') 
@@ -116,8 +117,6 @@ def correct_forcing(F,lbd,h,dt=3600*24*30):
 
 # Tile Lambda
 #lbd = np.tile(lbd,nyrs)
-
-
 #%% Load in forcing
 
 
@@ -189,18 +188,19 @@ locstring = "Lon %.f, Lat %.f" % (lonf,latf)
 #%% Apply amplitude correction based on lambda
 
 nmode   = eofs[0].shape[modeaxis]
-eofcorr = np.zeros(eofs[0].shape)
-
-for N in tqdm(range(nmode)):
-    if summodes:
-        Fin = eofs[0][:,:,N,:] # [lon x lat x month]
-        eofcorr[:,:,N,:] = correct_forcing(Fin,lbd,h_in)
-    else:
-        Fin = eofs[0][:,:,:,N] # [lon x lat x month]
-        eofcorr[:,:,:,N] = correct_forcing(Fin,lbd,h_in)
+if correct_qnet:
+    eofcorr = np.zeros(eofs[0].shape)
     
-eofuncorr = eofs[0].copy()
-eofs[0] = eofcorr
+    for N in tqdm(range(nmode)):
+        if summodes:
+            Fin = eofs[0][:,:,N,:] # [lon x lat x month]
+            eofcorr[:,:,N,:] = correct_forcing(Fin,lbd,h_in)
+        else:
+            Fin = eofs[0][:,:,:,N] # [lon x lat x month]
+            eofcorr[:,:,:,N] = correct_forcing(Fin,lbd,h_in)
+        
+    eofuncorr = eofs[0].copy()
+    eofs[0] = eofcorr
 
 #np.nanmax(np.abs(eofcorr-eofuncorr))
     
@@ -336,35 +336,91 @@ for im in range(12):
     plt.savefig("%sQnet_v_Fprime_Monthly_EOF_Pattern_ALL_month%02d.png"% (figpath,im+1),
                 dpi=150)
     
-#%% Plot seasonal averages
+#%% Plot seasonal averages of each type of forcing, and the difference
 
 # Plotting params
 bboxplot   = [-100,20,0,65]
-cint   = np.arange(-10,10.5,.5)
 
-# Calcualte differences and seasonal average
-eofrss_diff  = eofrss_all[1,...] - eofrss_all[0,...]
-savgs,snames = proc.calc_savg(eofrss_diff,debug=True,return_str=True)
 
-fig,axs = plt.subplots(2,2,figsize=(12,8),constrained_layout=True,
-                       subplot_kw={'projection':ccrs.PlateCarree()})
-for i in range(4):
+
+
+for f in range(3):
     
-    blabel = [0,0,0,0]
-    if i > 1:
-        blabel[-1] = 1
-    if i in [0,2]:
-        blabel[0]  = 1
+    if f < 2:
+        cint   = np.arange(0,105,5)
+        # Get the forcing type
+        eofrss_diff = eofrss_all[f,...]
+        ptitle  = "Forcing Amplitude (%s)" % (vlabels[f])
+        outname = "%sForcingAmplitude_%s.png" % (figpath,vlabels_fn[f])
+        cmap = 'cmo.thermal_r'
+    else:
+        cint    = np.arange(-10,10.5,.5)
+        # Calcualte differences and seasonal average
+        eofrss_diff  = eofrss_all[1,...] - eofrss_all[0,...]
+        ptitle  = "Seasonally-Averaged Differences in Forcing Amplitude \n %s - %s" % (vlabels[1], vlabels[0])
+        outname = "%sQnet-v-Fprime_Savg_EOF_Pattern_Differences.png"% (figpath)
+        cmap = 'cmo.balance'
+        
+    savgs,snames = proc.calc_savg(eofrss_diff,debug=True,return_str=True)
     
-    ax = axs.flatten()[i]
-    ax.set_title(snames[i])
-    ax = viz.add_coast_grid(ax,bbox=bboxplot,blabels=blabel,fill_color='gray')
-    cf = ax.contourf(lon,lat,savgs[i].T,levels=cint,cmap='cmo.balance',extend='both')
+    fig,axs = plt.subplots(2,2,figsize=(12,8),constrained_layout=True,
+                           subplot_kw={'projection':ccrs.PlateCarree()})
+    for i in range(4):
+        
+        blabel = [0,0,0,0]
+        if i > 1:
+            blabel[-1] = 1
+        if i in [0,2]:
+            blabel[0]  = 1
+        
+        ax = axs.flatten()[i]
+        ax.set_title(snames[i])
+        ax = viz.add_coast_grid(ax,bbox=bboxplot,blabels=blabel,fill_color='gray')
+        cf = ax.contourf(lon,lat,savgs[i].T,levels=cint,cmap=cmap,extend='both')
+        
+    plt.suptitle(ptitle)
     
-plt.suptitle("Seasonally-Averaged Differences in Forcing Amplitude \n %s - %s" % (vlabels[1], vlabels[0]))
+    cb = fig.colorbar(cf,ax=axs.flatten(),orientation='horizontal',fraction=0.045)
+    
+    plt.savefig(outname,
+                dpi=150)
 
-cb = fig.colorbar(cf,ax=axs.flatten(),orientation='horizontal',fraction=0.045)
 
 
-plt.savefig("%sQnet-v-Fprime_Savg_EOF_Pattern_Differences.png"% (figpath),
-            dpi=150)
+#%% Plot seasonal averages for a given mode
+
+
+N_modes = np.arange(0,10,1)
+
+# Plotting params
+bboxplot   = [-100,20,0,65]
+cint   = np.arange(-60,65,5)
+
+for N_mode in N_modes:
+    for f in range(2):
+        
+        
+        # Get forcing and compute seasonal average
+        eof_sel  =  eofs[f][:,:,:,N_mode]
+        savgs,snames = proc.calc_savg(eof_sel,debug=True,return_str=True)
+        
+        fig,axs = plt.subplots(2,2,figsize=(12,8),constrained_layout=True,
+                               subplot_kw={'projection':ccrs.PlateCarree()})
+        for i in range(4):
+            blabel = [0,0,0,0]
+            if i > 1:
+                blabel[-1] = 1
+            if i in [0,2]:
+                blabel[0]  = 1
+            
+            ax = axs.flatten()[i]
+            ax.set_title(snames[i])
+            ax = viz.add_coast_grid(ax,bbox=bboxplot,blabels=blabel,fill_color='gray')
+            cf = ax.contourf(lon,lat,savgs[i].T,levels=cint,cmap='cmo.balance',extend='both')
+            
+        plt.suptitle("Seasonally-Averaged Forcing: %s, EOF %i" % (vlabels[f], N_mode+1))
+        
+        cb = fig.colorbar(cf,ax=axs.flatten(),orientation='horizontal',fraction=0.045)
+        cb.set_label("Forcing ($Wm^{-2}$)")
+        plt.savefig("%s%s_Savg_EOF_Pattern_Differences_mode%i.png"% (figpath,vlabels_fn[f],N_mode+1),
+                    dpi=150)

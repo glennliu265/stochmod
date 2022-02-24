@@ -5,8 +5,8 @@
 viz_damping
 Created on Tue Aug 11 00:19:08 2020
 
-
 Script to visualize damping parameter...
+
 @author: gliu
 """
 
@@ -36,7 +36,7 @@ mode    = 4      # (1) No mask (2) SST only (3) Flx only (4) Both
 savevar = 1     # Option to save calulated variable
 # Set Paths
 datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/"
-outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/2020913/"
+outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220222/"
 # Plotting
 bbox = [280, 360, 0, 90]
 cmap = cmocean.cm.tempo

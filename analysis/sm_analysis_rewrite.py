@@ -50,7 +50,7 @@ lags = np.arange(0,37,1)
 # Options to determine the experiment ID
 mconfig   = "SLAB_PIC"
 nyrs      = 1000        # Number of years to integrate over
-runid     = "006"
+runid     = "011"
 savesep   = False # Set to True if output was saved separately
 useslab   = False # Set to True if you only used slab output for all simulations
 
@@ -246,6 +246,13 @@ fnames = ("forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_1000yr_run011_ampq0_met
 
 # Fprime run, with rolln
 fnames = ("forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run011_ampq0_method4_dmp0",)
+
+# 90% Variance forcing with Ekman Forcing, ,Fprime; needs n_models=1 as an additional argument
+fnames   = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_Qek',)
+
+# Test witha single output, rerun
+fnames = ("forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method4_dmp0",)
+
 
 
 print("Now processing the following files: \n ")

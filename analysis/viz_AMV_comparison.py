@@ -26,7 +26,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20220210/"
+    figpath     = projpath + "02_Figures/20220222/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -221,6 +221,32 @@ exoutnameraw = "new_v_old_q-correction"
 fnames = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method4_dmp0',)#'forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run009_ampq3',)
 frcnamelong = ["EOF Forcing (90% Variance)",]
 exname ="run_comparison"
+
+
+# Examine impact of Ekman Forcing and Fprime
+#fnames = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_Qek',)
+#frcnamelong = ["EOF Forcing (Fprime, 90% Variance) with Ekman",]
+
+
+# Examine impact of Ekman Forcing and Fprime
+fnames = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run011_ampq0_method4_dmp0',)
+frcnamelong = ["EOF Forcing (Fprime, 90% Variance)",]
+
+# # RERUN: Just compare 90% Variance Run with CESM
+fnames = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method4_dmp0',)#'forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run009_ampq3',)
+frcnamelong = ["EOF Forcing (90% Variance)",]
+exname ="run_comparison"
+
+# Try Method 2
+fnames = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method2_dmp0',)#'forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run009_ampq3',)
+frcnamelong = ["EOF Forcing (90% Variance)",]
+exname ="run_comparison"
+
+ 
+# Try Method 5
+fnames = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method5_dmp0',)#'forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run009_ampq3',)
+frcnamelong = ["EOF Forcing (90% Variance)",]
+exname ="run_comparison" 
 
 # Examine impact of Ekman Forcing
 # fnames = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_Qek',)

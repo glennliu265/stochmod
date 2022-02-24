@@ -9,10 +9,6 @@ Created on Wed Sep  1 04:40:06 2021
 @author: gliu
 """
 
-
-from amv import proc, viz
-import tbx
-import scm
 import numpy as np
 import cartopy.crs as ccrs
 import matplotlib.pyplot as plt
@@ -47,7 +43,9 @@ elif stormtrack == 1:
     sys.path.append(
         "/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model/")
 
-
+from amv import proc, viz
+import tbx
+import scm
 # %% Functions
 
 def calc_dx_dy(longitude, latitude):
@@ -175,10 +173,22 @@ np.savez(savename,**{
     })
     
 
+#%% Load the PLots
+
+ldname = "%s../CESM_FULL-PIC_1-3lag_correlation_SST_TAU.npz" % (datpath)
+ld     = np.load(ldname,allow_pickle=True)
+
+corrcs = ld['lag_corr']
+lags   = ld['lags']
+vnames = ld['vnames']
+lon360 = ld['lon360']
+lat    = ld['lat']
+
 #%% Lets make some plots
 bboxplot = [-90,0,0,75]
 
-fig,axs = plt.subplots(3,3,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(18,18))
+fig,axs = plt.subplots(3,3,constrained_layout=True,
+                       subplot_kw={'projection':ccrs.PlateCarree()},figsize=(18,18))
 
 levels = np.arange(1,1,0.1)
 vlm = [-1,1]
@@ -200,8 +210,6 @@ for v in tqdm(range(len(invars))):
         ax.clabel(cl)
 fig.colorbar(pcm,ax=axs.ravel().tolist(),orientation='vertical',shrink=0.85,pad=0.01,anchor=(1.5,0.7))
 plt.savefig("%sLagCorrelationMaps.png"%(figpath),dpi=150,bbox_inches='tight')
-
-
 #%%
 
 timescale = 1/(1-corrcs)
@@ -213,7 +221,7 @@ fig,axs = plt.subplots(3,3,subplot_kw={'projection':ccrs.PlateCarree()},figsize=
 #levels = np.arange(1,1,0.1)
 vlm = [0,12]
 levels = np.arange(0,13,1)
-for v in tqdm(range(len(invars))):
+for v in tqdm(range(3)):
     
     for i in range(len(lags)):
         ax = axs[v,i]
