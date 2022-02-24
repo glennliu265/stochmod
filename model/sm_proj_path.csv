@@ -1,0 +1,5 @@
+﻿Category,stormtrack,mbp2019
+amv_mod_path,/home/glliu/00_Scripts/01_Projects/00_Commons/,/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/
+scm_mod_path,/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model/,/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/
+input_path,/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/model_input/,/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/
+output_path,/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/model_output/,/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_output/
