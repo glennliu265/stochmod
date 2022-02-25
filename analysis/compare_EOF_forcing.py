@@ -38,7 +38,6 @@ from tqdm import tqdm
 import cmocean
 #%%
 stormtrack = 0
-
 if stormtrack == 1:
     # Module Paths
     sys.path.append("/home/glliu/00_Scripts/01_Projects/00_Commons/")
@@ -80,7 +79,8 @@ summodes = False # Set to True to load the summed modes
 
 plt.style.use('default') 
 
-
+# Apply variance threshold (if vthres < 1)
+vthres  = 0.90
 #%% Use the function used for sm_rewrite.py, load in lambda
 # [lon x lat x month]
 
@@ -203,6 +203,55 @@ if correct_qnet:
     eofs[0] = eofcorr
 
 #np.nanmax(np.abs(eofcorr-eofuncorr))
+
+#%% If option is set, apply the variance threshold criterion
+
+
+# Calculate cumulative variance at each EOF
+
+if vthres < 1:
+    
+    for f in range(2): # Loop for each forcing type
+        
+        # Get needed information
+        varexpall = varexps[f]
+        N_mode    = varexpall.shape[0]
+        eofall    = eofs[f]
+    
+        # Calculate cumulative variance explained
+        # ---------------------------------------
+        cvarall = np.zeros(varexpall.shape)
+        for i in range(N_mode):
+            cvarall[i,:] = varexpall[:i+1,:].sum(0)
+            
+        # Find indices of a variance threshold
+        # ------------------------------------
+        thresid = np.argmax(cvarall>vthres,axis=0)
+        thresperc = []
+        for i in range(12):
+            
+            print("Before")
+            print(cvarall[thresid[i]-1,i])
+            print("After")
+            print(cvarall[thresid[i],i])
+            
+            # Append percentage
+            thresperc.append(cvarall[thresid[i],i])
+        thresperc = np.array(thresperc)
+        
+        # Drop EOFs beyond the threshold
+        # ------------------------------
+        eofforce = eofall.copy() # [lon x lat x month x pc]
+        cvartest = cvarall.copy()
+        for i in range(12):
+            # Set all points after crossing the variance threshold to zero
+            stop_id = thresid[i]
+            print("Variance of %f  at EOF %i for Month %i "% (cvarall[stop_id,i],stop_id+1,i+1))
+            eofforce[:,:,i,stop_id+1:] = 0
+            cvartest[stop_id+1:,i] = 0
+        
+        eofs[f] = eofforce # !! Replace the variable 
+
     
 #%% Example Seasonal Cycle in forcing at selected point
 
@@ -341,20 +390,17 @@ for im in range(12):
 # Plotting params
 bboxplot   = [-100,20,0,65]
 
-
-
-
 for f in range(3):
     
     if f < 2:
-        cint   = np.arange(0,105,5)
+        cint   = np.arange(0,110,10)
         # Get the forcing type
         eofrss_diff = eofrss_all[f,...]
         ptitle  = "Forcing Amplitude (%s)" % (vlabels[f])
         outname = "%sForcingAmplitude_%s.png" % (figpath,vlabels_fn[f])
         cmap = 'cmo.thermal_r'
     else:
-        cint    = np.arange(-10,10.5,.5)
+        cint    = np.arange(-10,11,1)
         # Calcualte differences and seasonal average
         eofrss_diff  = eofrss_all[1,...] - eofrss_all[0,...]
         ptitle  = "Seasonally-Averaged Differences in Forcing Amplitude \n %s - %s" % (vlabels[1], vlabels[0])
