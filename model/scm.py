@@ -27,7 +27,7 @@ from amv import proc
 import time
 import yo_box as ybx
 import tbx
-
+import pandas as pd
 
 #%% Helper Functions/Utilities
 
@@ -1011,7 +1011,7 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
                             returnresults=False,preload=None,
                             mask_pacific=False,savesep=False,
                             useslab=True,mask_damping=False,
-                            n_models=None):
+                            n_models=None,verbose=False):
     """
     Script to postprocess stochmod output
     
@@ -1101,8 +1101,9 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
     # (Defaults to method 4) 0 = Failed test
     # Output indicates whicn regions to include
     # ------------------------------------------
-    mskslab = np.load(rawpath+"SLAB_PIC_NHFLX_Damping_monwin3_sig005_dof893_mode4_mask.npy")
-    mskfull = np.load(rawpath+"FULL_PIC_NHFLX_Damping_monwin3_sig005_dof1893_mode4_mask.npy")
+    moden   = proc.get_stringnum(expid,"method",nchars=1,verbose=verbose) # Get mode number from experiment name
+    mskslab = np.load(rawpath+"SLAB_PIC_NHFLX_Damping_monwin3_sig005_dof893_mode%s_mask.npy" %  moden)
+    mskfull = np.load(rawpath+"FULL_PIC_NHFLX_Damping_monwin3_sig005_dof1893_mode%s_mask.npy"% moden)
     dmskin = [mskslab,mskfull]
     dmsks  = []
     for i in range(2): # select region, append
@@ -3101,6 +3102,33 @@ def load_limopt_amv(datpath=None):
         
     return ssts,idxs,lons,lats,times
 
+def load_pathdict(device,csvpath=None,csvname=None):
+    """
+    Parameters
+    ----------
+    device : STR
+        currently supports 'stormtrack','mbp2019'
+    
+    csvpath : STR, optional
+        Path to csv. The default is None.
+    csvname : STR, optional
+        Name of csv. The default is None.
+    Returns
+    -------
+    pathdict : DICT
+        DICT with keys of the "Category" column and
+        entries for the corresponding devices
+    """
+    
+    
+    if csvpath is None:
+        csvpath = "model/" # Assumed to be in the model folder
+    if csvname is None:
+        csvname = "sm_proj_path.csv" # Default Name
+    df          = pd.read_csv(csvpath+csvname)
+    pathdict    = {df['Category'][i]: df[device][i] for i in range(len(df))}
+    return pathdict
+    
     
 
 #%%
