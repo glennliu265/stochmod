@@ -91,12 +91,10 @@ frcnamelong = ["var(Q)-based",
                "90% Variance (q-corr)"]
     #"90% Threshold (no-qcorr)"]
 
-
 fnames = ["forcingflxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run006_ampq0",
           "forcingflxeof_q-ek_090pct_SLAB-PIC_eofcorr1_1000yr_run009_ampq0",
           "forcingflxeof_090pct_SLAB-PIC_eofcorr1_1000yr_run006_ampq1",
           "forcingflxeof_q-ek_090pct_SLAB-PIC_eofcorr1_1000yr_run009_ampq1"]
-
 
 frcnamelong = ["90% Variance",
                "90% Variance (q-ek)",
@@ -181,9 +179,6 @@ fnames = ("forcingflxeof_EOF1_SLAB-PIC_eofcorr0_1000yr_runtest009_ampq3",
 
 ## Rewritten (with slab/full forcing/damping) (run010) ---
 
-
-
-
 # Seasonal Analysis
 #stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr2_MAM_1000yr_run010_ampq3.npz
 fnames   = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3',
@@ -234,10 +229,6 @@ fnames   = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method4_
 # 90% Variance forcing with Ekman Forcing, needs n_models=1 as an additional argument
 fnames   = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_Qek',)
 
-
-
-
-
 # Return to spatio-temporally fixed MLD
 fnames = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method4_dmp0_hfix50_slab',)
 
@@ -262,9 +253,24 @@ fnames = ("forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method5_dm
 # Test method 5 with rerun
 fnames = ("forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run013_ampq3_method5_dmp0",)
 
+# Test method 5 with rerun
+fnames =["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_dmp0" %i for i in range(10)]
+
+# Test method 5 with Qnet, ampq = 0
+fnames =["forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run2%02d_ampq3_method5_dmp0" %i for i in range(10)]
+
+# The 
+fnames =["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run011_ampq0_method5_dmp0",]
+
+# 
+fnames =["forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method5_dmp0",]
+
+# Test Fprime with Ampq run11, method4
+fnames =["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run011_ampq3_method4_dmp0",]
+
+
 print("Now processing the following files: \n ")
 print(*fnames, sep='\n')
-
 
 n_models=1 # SET TO 1 for EKMAN FORCING< None for all others!!!!
 #%% Post Process Outputs (Calculate AMV, Autocorrelation)
@@ -276,7 +282,6 @@ for frcname in tqdm(fnames):
         n_models = 1
     else:
         n_models = None
-        
         
     scm.postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,mask_pacific=True,
                                 savesep=savesep,useslab=useslab,mask_damping=mask_damping,n_models=n_models)

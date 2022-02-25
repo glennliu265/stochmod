@@ -51,10 +51,16 @@ lags = np.arange(0,37,1)
 mconfig   = "SLAB_PIC"
 nyrs      = 1000        # Number of years to integrate over
 
-# Visualize Continuous run 200, Fprime (need to rerun without ampq... fudge)
+# Visualize Continuous run 200, Fprime
 fnames =["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_dmp0"%i for i in range(10)]
 frcnamelong = ["$F'$ run 2%02d" % (i) for i in range(10)]
 exname ="Fprime_amq0_method5_cont"
+
+
+# Visualize Continuous run 200, Qnet 
+fnames =["forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run2%02d_ampq3_method5_dmp0"%i for i in range(10)]
+frcnamelong = ["$F'$ run 2%02d" % (i) for i in range(10)]
+exname ="Qnet_amq3_method5_cont"
 
 
 #%% Functions
@@ -115,6 +121,8 @@ mons3=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
 conf  = 0.95
 tails = 2
 
+proj = ccrs.PlateCarree()
+dfcol = "k"
 
 #%% load some additional data
 
@@ -393,9 +401,16 @@ for f in tqdm(range(len(fnames))):
 # (For Continuous Runs)
 
 mid     = 2
-rid     = 2
+rid     = 4
 nexps   = len(fnames)
 plotcb  = False
+
+cmax  = 0.5
+cstep = 0.025
+lstep = 0.05
+cint,cl_int=viz.return_clevels(cmax,cstep,lstep)
+clb = ["%.2f"%i for i in cint[::4]]
+
 
 # Get AMV Patterns
 # ----------------

@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-
 Loopable version of sm_rewrite
 Created on Tue Sep 21 10:42:25 2021
 
@@ -16,7 +15,7 @@ import time
 
 #%% Set the location
 
-stormtrack =0
+stormtrack = 0
 
 if stormtrack == 0:
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -93,7 +92,7 @@ mconfig    = "SLAB_PIC"
 #flxeof_qek_50eofs_SLAB-PIC
 
 # Running Parameters
-runids      = ["2%02d"%i for i in range(10)]#"011"
+runids      = ["011",]#["2%02d"%i for i in range(10)]#"011"
 pointmode   = 0 
 points      = [-30,50]
 bboxsim     = [-80,0,0,65] # Simulation Box
@@ -117,7 +116,7 @@ T0         = 0 # Init Temp
 ampq   = 3 #0 = none 1 = old method, 2 = method 1, 3 = method 2
 
 # Damping Significance Test Method
-method = 5 # 1 = No Testing; 2 = SST autocorr; 3 = SST-FLX crosscorr, 4 = Both 
+method = 4 # 1 = No Testing; 2 = SST autocorr; 3 = SST-FLX crosscorr, 4 = Both 
 
 # Point information
 lonf = -30
@@ -171,8 +170,6 @@ frcnames = (
             "flxeof_1eofs_SLAB-PIC_eofcorr0"
             )
 
-
-
 #frcnames = ("flxeof_2eofs_SLAB-PIC_eofcorr0",)
 
 #frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2',)
@@ -188,8 +185,8 @@ frcnames = (
             "flxeof_1eofs_SLAB-PIC_eofcorr0"
             )
 
+#frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0',)
 frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0',)
-
 # Single run test (90% variance forcing)
 #frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0',)
 
