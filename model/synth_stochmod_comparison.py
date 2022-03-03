@@ -67,6 +67,7 @@ config['pointmode']   = 1          # Set to 1 to generate a single point
 config['query']       = [-30,50]   # Point to run model at (SPG Test)
 #config['query']       = [-77,28]   # Point to run model at  (GS)
 #config['query']       = [-36,58]  # SE Greenland
+config['query']       = [-29,15.5] # Problem (eastern) Tropic Point
 config['applyfac']    = 2          # Apply Integration Factor and MLD to forcing
 config['lags']        = np.arange(0,37,1)
 config['output_path'] = outpath # Note need to fix this
@@ -81,7 +82,7 @@ config.pop('mldpt',None)
 conf  = 0.95
 tails = 2
 
-darkmode=True
+darkmode=False
 #%% Functions
 
 def interp_quad(ts):
@@ -231,6 +232,7 @@ ax.legend()
 End Loading Section
 """
 print("Found %i experiments"% (nexps))
+
 #%% Now run the stochastic model n times
 
 ssts = []

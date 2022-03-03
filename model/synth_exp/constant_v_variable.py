@@ -36,7 +36,7 @@ projpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/
 datpath     = projpath + '01_Data/'
 input_path  = datpath + 'model_input/'
 output_path = datpath + 'model_output/'
-outpath     = projpath + '02_Figures/20220214/'
+outpath     = projpath + '02_Figures/20220225/'
 proc.makedir(outpath)
 
 darkmode = False
@@ -75,8 +75,8 @@ config['ftype']       = "DJFM-MON" # Forcing Type
 config['genrand']     = 0
 config['fstd']        = 1
 config['t_end']       = 120000    # Number of months in simulation
-config['runid']       = "syn008"  # White Noise ID
-config['fname']       = "flxeof_090pct_SLAB-PIC_eofcorr2_Fprime.npy" #['NAO','EAP,'EOF3','FLXSTD']
+config['runid']       = "syn009"  # White Noise ID
+config['fname']       = "flxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0.npy" #['NAO','EAP,'EOF3','FLXSTD']
 config['pointmode']   = 1
 config['query']       = [-30,50]
 config['applyfac']    = 2 # Apply Integration Factor and MLD to forcing

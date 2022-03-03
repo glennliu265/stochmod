@@ -104,8 +104,6 @@ ax,pcm      = plot_enso(lon,lat,plotvar,ptitle,cblab,ax=ax,bboxplot=bboxplot,cin
 
 loopm = np.concatenate([[11,],np.arange(0,11,1)])
 
-
-
 for mid in range(2):
     for N in range(2):
         fig,axs  = plt.subplots(4,3,constrained_layout=True,figsize=(12,12),
@@ -120,7 +118,6 @@ for mid in range(2):
         plt.suptitle("ENSO Pattern (%s, EOF %i)"% (mconfigs[mid],N+1))
         savename = "%sENSO_Pattern_Monthly_%s_EOF%i" % (figpath,mconfigs[mid],N+1)
         plt.savefig(savename,dpi=150)
-
 
 # Plot the colorbar
 ornt = 'v'
@@ -154,10 +151,10 @@ nyr,_,nlat,nlon = ts_enso.shape
 tsa_enso    = ts_enso - ts_enso.mean(0)[None,...] # Deseason
 
 #%% Let's check a particular point
-lonf      = -55+360
-latf      = 11
-# lonf      = -32+360
-# latf      = 14
+# lonf      = -55+360
+# latf      = 11
+lonf      = -32+360
+latf      = 14
 # lonf = -30+360
 # latf      = 60
 klon,klat = proc.find_latlon(lonf,latf,nolon,nolat)
@@ -204,7 +201,7 @@ xtk2      = lags[::2]
 basemonth = 2 # (not the index but actual month!!)
 autocorr,confs = scm.calc_autocorr(tspts,lags,basemonth,calc_conf=True)
 
-fig,ax = plt.subplots(1,1,figsize=(10,3))
+fig,ax = plt.subplots(1,1,figsize=(8,4))
 ptitle="%s SST  Autocorrelation for CESM-%s @ %s" % (mons3[basemonth-1],mconfigs[mid],locstring)
 ax,ax2 = viz.init_acplot(basemonth-1,xtk2,lags,ax=ax,title=ptitle)
 

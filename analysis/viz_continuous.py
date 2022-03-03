@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 import sys
 import cmocean
 from tqdm import tqdm
+
 #%% Set Paths, Import Custom Modules
 stormtrack = 0
 if stormtrack == 0:
@@ -23,7 +24,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20220222/"
+    figpath     = projpath + "02_Figures/20220305/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -56,12 +57,13 @@ fnames =["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_a
 frcnamelong = ["$F'$ run 2%02d" % (i) for i in range(10)]
 exname ="Fprime_amq0_method5_cont"
 
+# # Visualize Continuous run 200, Qnet 
+# fnames =["forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run2%02d_ampq3_method5_dmp0"%i for i in range(10)]
+# frcnamelong = ["$F'$ run 2%02d" % (i) for i in range(10)]
+# exname ="Qnet_amq3_method5_cont"
 
-# Visualize Continuous run 200, Qnet 
-fnames =["forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run2%02d_ampq3_method5_dmp0"%i for i in range(10)]
-frcnamelong = ["$F'$ run 2%02d" % (i) for i in range(10)]
-exname ="Qnet_amq3_method5_cont"
-
+# Plotting Params
+darkmode=False
 
 #%% Functions
 def calc_conflag(ac,conf,tails,n):
@@ -748,7 +750,6 @@ for f in tqdm(range(len(frcnamelong))):
     plt.suptitle("Regional AMV Index Spectra (Forcing=%s)"%(frcnamelong[f]),y=1.01)
     savename = "%sSST_Spectra_Comparison_%s_Linear-Decadal.png" % (figpath,fnames[f])
     plt.savefig(savename,dpi=150,bbox_inches='tight')
-
 
 
 #%%

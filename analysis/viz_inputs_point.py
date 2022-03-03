@@ -126,10 +126,13 @@ bbcol       = ["Blue","Red","Yellow","Black","Black"]
 bbcol       = ["Blue","Red","Yellow","Black","Black","magenta","red"]
 bbsty       = ["solid","dashed","solid","dotted","dotted","dashed","dotted"]
 
+method = 5
+lagstr = 'lag1'
+
 #%% Load All Inputs (Basinwide)
 
 # Use the function used for sm_rewrite.py
-inputs = scm.load_inputs('SLAB_PIC',frcname,input_path,load_both=True)
+inputs = scm.load_inputs('SLAB_PIC',frcname,input_path,load_both=True,method=method,lagstr=lagstr)
 lon,lat,h,kprevall,dampingslab,dampingfull,alpha,alpha_full = inputs
 
 innames = ["Longitude","Latitude",

@@ -1585,7 +1585,7 @@ def synth_stochmod(config,verbose=False,viz=False,
         return autocorr,sst,dampingterm,forcingterm,entrainterm,Td,kmonth,params,specout
 
 def quick_spectrum(sst,nsmooth,pct,
-                   opt=1,dt=None,clvl=[.95]):
+                   opt=1,dt=None,clvl=[.95],verbose=False):
     """
     Quick spectral estimate of an array of timeseries
 
@@ -2123,7 +2123,7 @@ def convert_Wm2(invar,h,dt,cp0=3996,rho=1026,verbose=True,reverse=False):
     
     return outvar.squeeze()
 
-def load_inputs(mconfig,frcname,input_path,load_both=False,method=4):
+def load_inputs(mconfig,frcname,input_path,load_both=False,method=4,lagstr="lag1"):
     """
     lon,lat,mld,kprevall,damping,alpha = load_inputs(mconfig,frcname,input_path)
     
@@ -2147,6 +2147,8 @@ def load_inputs(mconfig,frcname,input_path,load_both=False,method=4):
         2 - SST Autocorr
         3 - SST-FLX Crosscorr
         4 - Both 2 and 3 (Default)
+    lagstr : STR
+        Lags included (lag1,lag12, or lag123)
     
     Returns
     -------
@@ -2180,18 +2182,18 @@ def load_inputs(mconfig,frcname,input_path,load_both=False,method=4):
     
     # Load Atmospheric Damping [lon180 x lat x mon]
     if mconfig == "SLAB_PIC": # Note older versions used dof894.... why?
-        damping   = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig005_dof893_mode%i.npy" % method)
+        damping   = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig005_dof893_mode%i_%s.npy" % (method,lagstr))
     elif mconfig == "FULL_PIC":
-        damping   = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig005_dof1893_mode%i.npy" % method)
+        damping   = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig005_dof1893_mode%i_%s.npy" % (method,lagstr))
     elif mconfig =="FULL_HTR":
-        damping   = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig020_dof082_mode%i.npy" % method)
+        damping   = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig020_dof082_mode%i_%s.npy" % (method,lagstr))
     else:
         print("Currently supported damping mconfig are [SLAB_PIC,FULL_PIC,FULL_HTR]")
         
     # Load both damping
     if load_both:  # Note older versions used dof894.... why?
-        dampingslab   = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig005_dof893_mode%i.npy"%method)
-        dampingfull   = np.load(input_path+"FULL_PIC"+"_NHFLX_Damping_monwin3_sig005_dof1893_mode%i.npy"%method)
+        dampingslab   = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig005_dof893_mode%i_%s.npy" % (method,lagstr))
+        dampingfull   = np.load(input_path+"FULL_PIC"+"_NHFLX_Damping_monwin3_sig005_dof1893_mode%i_%s.npy" % (method,lagstr))
         
     # Load Alpha (Forcing Amplitudes) [lon180 x lat x pc x mon], easier for tiling
     if frcname == "allrandom":
@@ -2763,7 +2765,7 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
                    method=4,chk_damping=False,
                    custom_params = {},
                    hconfigs=[0,1,2],
-                   continue_run=False,Tdgrab=24,
+                   continue_run=False,Tdgrab=24,lagstr="lag1"
                    ):
     
     """
@@ -2818,7 +2820,7 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
     # Load data in
     # ------------
     lon,lat,h,kprevall,damping,dampingfull,alpha,alpha_full = load_inputs(mconfig,frcname,input_path,
-                                                                          load_both=True,method=method)
+                                                                          load_both=True,method=method,lagstr=lagstr)
     hblt = np.load(input_path + "SLAB_PIC_hblt.npy") # Slab fixed MLD
     hblt = np.ones(hblt.shape) * hblt.mean(2)[:,:,None]
     

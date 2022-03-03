@@ -117,6 +117,7 @@ ampq   = 3 #0 = none 1 = old method, 2 = method 1, 3 = method 2
 
 # Damping Significance Test Method
 method = 4 # 1 = No Testing; 2 = SST autocorr; 3 = SST-FLX crosscorr, 4 = Both 
+lagstr = "lag12"
 
 # Point information
 lonf = -30
@@ -252,7 +253,7 @@ for f in range(len(frcnames)):
                            runid,t_end,frcname,ampq,
                            bboxsim,pointmode,points=[lonf,latf],
                            dt=3600*24*30,
-                           debug=False,check=False,useslab=useslab,savesep=savesep,method=method)
+                           debug=False,check=False,useslab=useslab,savesep=savesep,method=method,lagstr=lagstr)
         expnames.append(expname)
     print("Completed in %.2fs" % (time.time()-st))
 

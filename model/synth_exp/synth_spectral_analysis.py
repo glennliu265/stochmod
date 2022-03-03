@@ -33,7 +33,7 @@ projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 datpath     = projpath + '01_Data/'
 input_path  = datpath + 'model_input/'
 output_path = datpath + 'model_output/'
-outpath     = projpath + '02_Figures/20220214/'
+outpath     = projpath + '02_Figures/20220225/'
 proc.makedir(outpath)
 
 # Load in control data for 50N 30W
@@ -58,7 +58,7 @@ config['genrand']     = 1          # Toggle to generate new random timeseries
 config['fstd']        = 1          # Set the standard deviation N(0,fstd)
 config['t_end']       = 120000     # Number of months in simulation
 config['runid']       = "syn009"   # White Noise ID
-config['fname']       = "flxeof_090pct_FULL-PIC_eofcorr2_Fprime.npy"   #['NAO','EAP,'EOF3','FLXSTD']
+config['fname']       = "flxeof_090pct_FULL-PIC_eofcorr2_Fprime_rolln0.npy"   #['NAO','EAP,'EOF3','FLXSTD']
 #config['fname']       = 'FLXSTD'
 config['pointmode']   = 1          # Set to 1 to generate a single point
 config['query']       = [-30,50]   # Point to run model at 
