@@ -36,7 +36,7 @@ projpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/
 datpath     = projpath + '01_Data/'
 input_path  = datpath + 'model_input/'
 output_path = datpath + 'model_output/'
-outpath     = projpath + '02_Figures/20220214/'
+outpath     = projpath + '02_Figures/20220305/'
 proc.makedir(outpath)
 
 # Load in control data for 50N 30W
@@ -55,24 +55,26 @@ els = ["dashdot","solid","dotted","dashed"]
 
 # Set up Configuration
 config = {}
-config['mconfig']     = "SLAB_PIC" # Model Configuration
+config['mconfig']     = "FULL_PIC" # Model Configuration
 config['ftype']       = "DJFM-MON" # Forcing Type
 config['genrand']     = 1          # Toggle to generate new random timeseries
 config['fstd']        = 1          # Set the standard deviation N(0,fstd)
 config['t_end']       = 120000     # Number of months in simulation
 config['runid']       = "syn009"   # White Noise ID
-config['fname']       = "flxeof_090pct_FULL-PIC_eofcorr2.npy"   #['NAO','EAP,'EOF3','FLXSTD']
+config['fname']       = "flxeof_090pct_FULL-PIC_eofcorr2_Fprime_rolln0.npy"   #['NAO','EAP,'EOF3','FLXSTD']
 #config['fname']       = 'FLXSTD'
+
 config['pointmode']   = 1          # Set to 1 to generate a single point
 config['query']       = [-30,50]   # Point to run model at (SPG Test)
 #config['query']       = [-77,28]   # Point to run model at  (GS)
 #config['query']       = [-36,58]  # SE Greenland
 config['query']       = [-29,15.5] # Problem (eastern) Tropic Point
+
 config['applyfac']    = 2          # Apply Integration Factor and MLD to forcing
-config['lags']        = np.arange(0,37,1)
-config['output_path'] = outpath # Note need to fix this
+config['lags']           = np.arange(0,37,1)
+config['output_path']    = outpath # Note need to fix this
 config['smooth_forcing'] = False
-config['method'] =3 
+config['method']         = 0 #3 Refers to Forcing Correction Method
 
 config.pop('Fpt',None)
 config.pop('damppt',None)
@@ -185,7 +187,9 @@ alphas = [] List of ARRAY[12,N_mode]
 lbds   = [] List of ARRAY[12]
 """
 
+# ---------------------------------------
 #%% Experiment 1, Using Amplified Forcing
+# ---------------------------------------
 exname = "Fprime-v-Qnet"
 
 # Load forcing for a single point
@@ -227,6 +231,64 @@ for i in range(nexps):
     ax.plot(mons3,ts_plot,label=mnames[i],ls=ls)
     ax.set_title("Forcing Amplitude")
 ax.legend()
+
+
+# ---------------------------------------
+#%% Experiment 2, Testing MLD Effects in Tropical Point
+#  LON: 29 W  |  LAT: 15.5 N
+# ---------------------------------------
+exname = "TropMLD_lon29_lat16"
+
+# Load forcing for a single point
+#config_custom = config.copy()
+#config['fname'] = "flxeof_090pct_FULL-PIC_eofcorr2_Fprime.npy"
+
+
+# Get indices of target point
+lonf,latf = config['query']
+klon,klat = proc.find_latlon(lonf,latf,lon,lat)
+locstring = "Lon %.f, Lat %.f" % (lon[klon],lat[klat])
+locfn     = "lon%i_lat%i" % (lon[klon],lat[klat])
+
+
+# Set different mixed layers
+mldorig    = mlddef.copy()
+mld_springdrop = mlddef.copy()
+mld_springdrop[3:9] = mlddef[5:11]
+mld_springdrop[9:11] = mlddef[3:5]
+# plot mixed layer
+fig,ax = plt.subplots(1,1)
+ax.plot(mons3,mldorig,label="Original MLD",marker="+",color='mediumblue')
+ax.plot(mons3,mld_springdrop,label="No Spring Persistence",marker="x",color='firebrick')
+ax.legend()
+ax.grid(True,ls='dotted')
+ax.set_xlim([0,11])
+ax.set_ylabel("MLD (m)")
+plt.savefig("%sCustom_MLD_%s.png"%(outpath,exname))
+
+
+mldmax = np.ones(12)*mlddef.max()
+mldmin = np.ones(12)*mlddef.min()
+
+# Get the points
+Fload     = np.load(input_path+"flxeof_090pct_FULL-PIC_eofcorr2_Fprime.npy")
+Fload2    = np.load(input_path+"flxeof_090pct_FULL-PIC_eofcorr2_Fprime_rolln0.npy")
+
+Fptload   = Fload[klon,klat,:,:] 
+Fptload2  = Fload2[klon,klat,:,:] 
+
+# -----------------
+# Set up the inputs
+# -----------------
+mid     = 3 # Model id (50m,Const,Vary,Entrain)
+mnames  = ["Default MLD","No Spring Persistence","MLD max","MLD min"]
+alphas  = [Fptdef,Fptdef,Fptdef,Fptdef]
+lbds    = [dampdef,dampdef,dampdef,dampdef]
+mlds    = [mlddef ,mld_springdrop,mldmax,mldmin]
+nexps   = len(mnames)
+mcolors = ["mediumblue","firebrick","magenta","orange"] 
+
+
     
 """
 End Loading Section
@@ -363,3 +425,49 @@ ax.set_ylabel("Power ($K^2/cpy$)")
 
 savename = "%sSpectra_Stochmod_%s_%s_%s_%s.png" % (outpath,exname,plottype,locstring,smoothname)
 plt.savefig(savename,dpi=200,bbox_inches='tight')
+
+#%% Just Plot the SST Itself
+
+custom_xlim = [0,1000]
+fig,axs = plt.subplots(3,1,sharey=True)
+for i in range(3):
+    ax = axs[i]
+    ax.plot(inssts[i],color=incolors[i],label=innames[i]+" (Var = %.3f)" % (np.var(inssts[i])),lw=0.5)
+    ax.axhline(0,color="gray",ls='dotted')
+    
+    if custom_xlim:
+        ax.set_xlim(custom_xlim)
+    else:
+        ax.set_xlim([0,len(inssts[i])])
+    ax.legend()
+    
+#%% Barplot of frequency variance
+
+sstvars    = [np.var(sst) for sst in inssts]
+sstvars_lp = [np.var(proc.lp_butter(sst,120,6)) for sst in inssts]
+labels1    = ["%.2f"%sst for sst in sstvars]
+labels2    = ["%.2f"%sst for sst in sstvars_lp]
+
+# Make Plot
+fig,ax = plt.subplots(1,1,figsize=(8,4))
+
+# Plot Variance
+bars1 = ax.bar(innames,sstvars,color='seagreen',label="Raw")
+ax,rects = viz.label_barplots(labels1 ,ax=ax,rects=bars1,fontsize=12,fontcolor='seagreen')
+
+# Plot LP Variance
+bars2 = ax.bar(innames,sstvars_lp,color='thistle',label="10-year Low Pass Filtered")
+ax,rects = viz.label_barplots(labels2 ,ax=ax,rects=bars2,fontsize=12,fontcolor='thistle')
+
+# Adjust labels, grids, axes
+ax.set_xticklabels(innames,rotation=10)
+ax.grid(True,ls='dotted')
+ax.set_ylabel("SST Variance ($K^2$)")
+ax.set_xlabel("Simulation/Experiment Name")
+ax.set_ylim([0,0.90])
+ax.legend()
+
+savename = "%sSpectra_Stochmod_%s_Barplot_%s.png" % (outpath,exname,locstring)
+plt.savefig(savename,dpi=200,bbox_inches='tight')
+
+
