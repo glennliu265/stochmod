@@ -800,7 +800,6 @@ ax.grid(True,ls='dotted')
 
 rects = ax.patches
 labels = thresid
-
 for rect, label in zip(rects, labels):
     height = rect.get_height()
     ax.text(

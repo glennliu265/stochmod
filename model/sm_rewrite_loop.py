@@ -92,12 +92,12 @@ mconfig    = "SLAB_PIC"
 #flxeof_qek_50eofs_SLAB-PIC
 
 # Running Parameters
-runids      = ["011",]#["2%02d"%i for i in range(10)]#"011"
+runids      = ["e00",]#["2%02d"%i for i in range(10)]#"011"
 pointmode   = 0 
 points      = [-30,50]
 bboxsim     = [-80,0,0,65] # Simulation Box
 
-useslab    = False # Set to True to use SLAB_CESM parameters for all...
+useslab    = True # Set to True to use SLAB_CESM parameters for all...
 savesep    = False # Set to True to save the outputs differently
 
 # Option to start new
@@ -117,7 +117,7 @@ ampq   = 3 #0 = none 1 = old method, 2 = method 1, 3 = method 2
 
 # Damping Significance Test Method
 method = 4 # 1 = No Testing; 2 = SST autocorr; 3 = SST-FLX crosscorr, 4 = Both 
-lagstr = "lag12"
+lagstr = "lag1"
 
 # Point information
 lonf = -30

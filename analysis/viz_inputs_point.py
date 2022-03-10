@@ -44,19 +44,20 @@ import cmocean
 projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath = projpath + '03_Scripts/stochmod/'
 datpath    = projpath + '01_Data/'
-outpath    = projpath + '02_Figures/20220128/'
+outpath    = projpath + '02_Figures/20220309/'
 input_path  = datpath + 'model_input/'
 proc.makedir(outpath)
 
 
 # Put slab version first, then the load_load func. searches in the same
 # directory replace "SLAB_PIC" with "FULL_PIC"
-frcname = "flxeof_090pct_FULL-PIC_eofcorr2"
+frcname = "flxeof_090pct_FULL-PIC_eofcorr2_Fprime_rolln0"
+#frcname = "flxeof_090pct_FULL-PIC_eofcorr2"
 #frcname = "Qek_eof_090pct_FULL_PIC_eofcorr0"
 
 # Which point do you want to visualize conditions for?
-lonf = -55#-30
-latf = 11 #50
+lonf = -30#-55#
+latf = 50#11 #50
 flocstring = "lon%i_lat%i" % (lonf,latf)
 locstring = "%i$\degree$N, %i$\degree$W" % (latf,np.abs(lonf))
 
@@ -221,8 +222,8 @@ def make_patch_spines_invisible(ax):
 
 # plotting specs
 plotylab = ("Mixed-Layer Depth ($m$)",
-            "Forcing Amplitude $(W/m^2)$",
-            "Heat Flux Feedback $(Wm^{-2} \, ^{\circ} C^{-1})$"
+            "Forcing Amplitude $(Wm^{-2})$",
+            "Heat Flux Feedback $(Wm^{-2} \, K^{-1})$"
             )
 plotlab  = ("h",r"$ F'$",r"$\lambda_a$")
 plotmarker =("o","d","x")

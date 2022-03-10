@@ -268,6 +268,9 @@ fnames =["forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method5_dmp
 # Test Fprime with Ampq run11, method4
 fnames =["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run011_ampq3_method4_dmp0",]
 
+# Trying out slab params only (run e00)
+fnames =["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_rune00_ampq3_method4_dmp0",]
+
 
 print("Now processing the following files: \n ")
 print(*fnames, sep='\n')

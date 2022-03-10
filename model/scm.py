@@ -1640,9 +1640,9 @@ def quick_spectrum(sst,nsmooth,pct,
         
         # Calculate Spectrum
         if isinstance(nsmooth,int):
-            sps = ybx.yo_spec(sstin,opt,nsmooth,pct,debug=False)
+            sps = ybx.yo_spec(sstin,opt,nsmooth,pct,debug=False,verbose=verbose)
         else:
-            sps = ybx.yo_spec(sstin,opt,nsmooth[i],pct,debug=False)
+            sps = ybx.yo_spec(sstin,opt,nsmooth[i],pct,debug=False,verbose=verbose)
         
         
         # Save spectrum and frequency, convert to 1/sec
@@ -2123,7 +2123,8 @@ def convert_Wm2(invar,h,dt,cp0=3996,rho=1026,verbose=True,reverse=False):
     
     return outvar.squeeze()
 
-def load_inputs(mconfig,frcname,input_path,load_both=False,method=4,lagstr="lag1"):
+def load_inputs(mconfig,frcname,input_path,load_both=False,method=4,lagstr="lag1",
+                loadpoint=False):
     """
     lon,lat,mld,kprevall,damping,alpha = load_inputs(mconfig,frcname,input_path)
     
@@ -2171,6 +2172,9 @@ def load_inputs(mconfig,frcname,input_path,load_both=False,method=4,lagstr="lag1
     lon           = np.load(input_path+"CESM1_lon180.npy")
     lat           = np.load(input_path+"CESM1_lat.npy")
     nlon,nlat     = len(lon),len(lat)
+    if loadpoint: # Get indices if needed
+        lonf,latf = loadpoint
+        klon,klat = proc.find_latlon(lonf,latf,lon,lat)
     
     # Load Data (MLD and kprev) [lon180 x lat x mon]
     if mconfig == "FULL_HTR": # Load ensemble mean historical MLDs
@@ -2206,10 +2210,17 @@ def load_inputs(mconfig,frcname,input_path,load_both=False,method=4,lagstr="lag1
             frcnamefull = frcname.replace("SLAB","FULL")
             print(frcnamefull)
             alpha_full  = np.load(input_path+frcnamefull+".npy")
+            if loadpoint:
+                return lon,lat,h[klon,klat,:],kprevall[klon,klat,:],dampingslab[klon,klat,:],dampingfull[klon,klat,:],alpha[klon,klat,...],alpha_full[klon,klat,...]
             return lon,lat,h,kprevall,dampingslab,dampingfull,alpha,alpha_full
-        
+    
+    # Load point data
+    if loadpoint:
+        return lon,lat,h[klon,klat,:],kprevall[klon,klat,:],damping[klon,klat,:],alpha[klon,klat,...],alpha_full[klon,klat,...]
     return lon,lat,h,kprevall,damping,alpha,alpha_full
 
+
+    
 
 def make_forcing(alpha,runid,frcname,t_end,input_path,check=True,alpha_full=None):
     """
@@ -2857,7 +2868,7 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
     if pointmode == 0:
         outputs,lonr,latr = cut_regions(inputs,lon,lat,bboxsim,pointmode,points=points)
     else:
-        outputs = cut_regions(inputs,lon,lat,bboxsim,pointmode,points=points)
+        outputs           = cut_regions(inputs,lon,lat,bboxsim,pointmode,points=points)
     h,kprev,damping,dampingfull,alpha,alpha_full,hblt = outputs
     
     
@@ -2885,7 +2896,6 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
     # Generate White Noise
     # --------------------
     forcing,forcing_full = make_forcing(alpha,runid,frcname,t_end,input_path,check=check,alpha_full=alpha_full)
-    
     
     # If option is set, repeat procedure to load in ekman forcing
     # ------------------------------------------------------------

@@ -256,6 +256,12 @@ fnames =["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_a
 frcnamelong = ["$F'$ run 2%02d" % (i) for i in range(10)]
 exname ="Fprime_amq0_method5_cont"
 
+# Trying out slab params only (run e00)
+fnames =["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_rune00_ampq3_method4_dmp0",]
+
+exname = "ALL SLAB"
+
+
 # Examine impact of Ekman Forcing
 # fnames = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_Qek',)
 # frcnamelong = ["EOF Forcing (90% Variance) with Ekman",]
@@ -318,9 +324,9 @@ cesmline   =  ["dashed","dotted"]
 
 # Autocorrelation PLots
 xtk2       = np.arange(0,37,2)
-mons3=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
-conf  = 0.95
-tails = 2
+mons3      = ('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
+conf       = 0.95
+tails      = 2
 
 
 #%% load some additional data
