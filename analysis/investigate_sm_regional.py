@@ -166,6 +166,7 @@ for f,fname in tqdm(enumerate(fnames)):
         
     # Quick Transpose
     ssts = ssts.transpose(1,2,3,0) # --> [lon,lat,year,time,model]
+    
     # Select Region
     ssts_reg,lonr2,latr2 = proc.sel_region(ssts,lonr,latr,reg_sel,autoreshape=True)
     sst_all.append(ssts_reg)
@@ -423,7 +424,7 @@ method = 5
 lagstr = 'lag1'
 
 frcname     = "flxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0"
-input_path = datpath + "model_input/"
+input_path = datpath + "../model_input/"
 
 # Use the function used for sm_rewrite.py
 inputs = scm.load_inputs('SLAB_PIC',frcname,input_path,load_both=True,method=method,lagstr=lagstr)
@@ -628,3 +629,232 @@ for vthres_sel in tqdm(vthreses):
     plt.suptitle("Red (SLAB), Blue (FULL), Yellow ($\sigma^2_{SST}$ >  %.2f $K^{2}$)"% (vthres_sel))
     plt.savefig("%sPoint_Comparison_thres%iyrs_thresval%.2f_wmap.png"% (figpath,int(1/thresvals[t]),vthres_sel),dpi=150,bbox_inches='tight')
 # add spectra?
+
+#%% Do the same as Above, but this time for the SST Spectra
+t        = 2
+mid      = 2 
+
+vthreses = [0.08,0.10,0.12,0.14,0.16,0.18,0.20]
+palpha   = 0.05
+salpha   = 0.3 # Seleccted Alpha
+
+npts = len(lonr2)*len(latr2)
+
+for v,vthres_sel in tqdm(enumerate(vthreses)):
+    
+    # Get Threshold
+    kthres     = specvars[:,:,mid,t] > vthres_sel
+    kthres = kthres.flatten()
+    
+    # Get specs
+    specsplot = spec_sm[mid,...].reshape(npts,spec_sm.shape[-1])# points x freq
+    
+    # Make Figure
+    fig,ax = plt.subplots(1,1,figsize=(10,3))
+    ln1    = ax.plot(freqs[0]*dtplot,specsplot.T/dtplot,label="",lw=1,alpha=0.1,color='k')
+    ln1_se = ax.plot(freqs[0]*dtplot,specsplot[kthres,:].T/dtplot,label="",lw=1,alpha=0.5,color='yellow')
+    
+    ax.axvline(thresvals[t],ls='dashed',lw=2,color="r")
+    
+    #ax.axhline(thresvals[t],ls='dashed',lw=2,color="r")
+    
+    ax.set_xlim([xtks[0],xtks[-1]])
+    ax.set_xlabel("Period (Years)")
+    ax.set_ylabel("Power ($K^2 cpy^{-1}$)")
+    ax.grid(True)
+
+    ax2 = ax.twiny()
+    ax2.set_xlim([xtks[0],xtks[-1]])
+    ax2.set_xticks(xtks)
+    ax2.set_xticklabels(xper,fontsize=8,rotation=45)
+    ax2.grid(True,ls='dotted',color='gray')
+    ax2.set_xlabel("Period (Years)")
+    ax.set_title("%s Points with $\sigma_{SST}$ > %.2f $K^2$ at Periods > %i yrs" % (kthres.sum(),vthres_sel,1/thresvals[t]))
+
+    plt.savefig("%sSST_Spectra_Comparison_%s_tthres%iyr_vthres%.2f.png"%(figpath,locfstring,1/thresvals[t],vthres_sel),dpi=150,bbox_inches='tight')
+
+# -------------------------------------
+#%% -- Make Some Parameter Scatterplots
+# -------------------------------------
+
+# Data Preparation ...
+
+# Compute the variance (SM)
+sst_all_var = np.var(sst_all,2) # [lon x lat x model]
+
+# Compute variance (CESM)
+sst_var_cesm = np.zeros([nlonr,nlatr,2])*np.nan # [lon x lat x model (FULL,SLAB)]
+for i in range(2):
+    sst_var_cesm[...,i] = sst_cesm[i].var(2)
+    
+# Set up input parameters
+slabparam = [damping,hblt,np.linalg.norm(alpha,axis=2)]
+fullparam = [dampingfull,h,np.linalg.norm(alpha_full,axis=2)]
+smparams  = [fullparam,slabparam]
+vnames  = ("Heat Flux Feedback $(Wm^{-2} K^{-1})$",
+           "Mixed-Layer Depth ($m$)",
+           "Forcing Amplitude $(W/m^2)$",
+            )
+vnamesf = ("lbd","mld","frc")
+
+# Calculate "Effective" Parameters
+cp0     = 3996
+rho     = 1026
+dt      = 3600*24*30
+conv    = dt/(rho*cp0)
+slabeff = [damping/hblt*conv,
+           np.linalg.norm(alpha,axis=2)/hblt*conv]
+fulleff = [dampingfull/h*conv,
+           np.linalg.norm(alpha_full,axis=2)/h*conv]
+smparamseff = [fulleff,slabeff]
+vnameseff   = ("Effective Damping $K month^{-1}$",
+               "Effective Forcing $K month^{-1}$")
+vnamesfeff  = ("lbdeff","frceff")
+
+#%% Scatterplot 1 (Mean Damping vs SST Variance)
+
+fig,axs = plt.subplots(1,3,figsize=(12,8),sharex=True,sharey=True)
+
+for mid,ax in enumerate(axs):
+    #ax.set_aspect('equal', adjustable='box')
+    ax.set_title(modelnames[mid])
+    
+    
+    if mid == 0:
+        xvar = damping.mean(2)
+    else:
+        xvar = dampingfull.mean(2)
+        
+    sigpts = (dmsks[mid] == 1).flatten()
+    
+    
+    ax.scatter(xvar.flatten()[sigpts],sst_all_var[...,mid].flatten()[sigpts],color=mcolors[mid],marker="o",facecolors='none',alpha=0.75)
+    ax.scatter(xvar.flatten()[~sigpts],sst_all_var[...,mid].flatten()[~sigpts],color='gray',marker="x",alpha=1)
+    
+    if mid == 0:
+        ax.set_ylabel("SST Variance ($K^2$)")
+    if mid == 1:
+        ax.set_xlabel("Damping ($Wm^{-2}K^{-1}$)")
+    ax.grid(True,ls='dotted',color='gray')
+    
+
+#%%
+fig,axs = plt.subplots(1,3,figsize=(12,8),sharex=True,sharey=True)
+
+for mid,ax in enumerate(axs):
+    #ax.set_aspect('equal', adjustable='box')
+    ax.set_title(modelnames[mid])
+    
+    
+    if mid == 0:
+        xvar = hblt.min(2)
+    else:
+        xvar = h.min(2)
+        
+    sigpts = (dmsks[mid] == 1).flatten()
+    
+    
+    ax.scatter(xvar.flatten()[sigpts],sst_all_var[...,mid].flatten()[sigpts],color=mcolors[mid],marker="o",facecolors='none',alpha=0.75)
+    ax.scatter(xvar.flatten()[~sigpts],sst_all_var[...,mid].flatten()[~sigpts],color='gray',marker="x",alpha=1)
+    
+    if mid == 0:
+        ax.set_ylabel("SST Variance ($K^2$)")
+    if mid == 1:
+        ax.set_xlabel("MLD (m)")
+    ax.grid(True,ls='dotted',color='gray')
+    
+
+#%% CESM vs. SM
+
+
+
+
+
+vmethod = "Mean" # Mean,Max,Min
+
+
+v = 2
+
+
+
+inparams  = smparamseff # smparams, or smparamseff
+inlabels  =  vnameseff  # vnames  , or vnameseff
+inlabelsf = vnamesfeff  # vnamesf , or vnamesfeff
+vrange    = len(inparams)
+
+cmap = 'plasma'
+for vmethod in tqdm(["Mean","Max","Min"]):
+    for v in range(vrange):
+        fig,axs = plt.subplots(1,3,figsize=(12,8),sharex=True,sharey=True,constrained_layout=True)
+        for mid,ax in enumerate(axs):
+            ax.set_aspect('equal', adjustable='box')
+            ax.set_title(modelnames[mid])
+            
+            # Set the input parameters
+            if mid == 0:
+                xvar = sst_var_cesm[...,1] # SLAB
+                cvarin = inparams[1][v]
+            else:
+                xvar = sst_var_cesm[...,0] # FULL
+                cvarin = inparams[0][v]
+                
+            # Make Adjustments
+            if vmethod == "Mean":
+                cvar = cvarin.mean(2)
+            elif vmethod == "Max":
+                cvar = cvarin.max(2)
+            elif vmethod == "Min":
+                cvar = cvarin.min(2)
+            else:
+                print("vmethod must be one of [Mean,Max,Min]")
+                continue
+                
+            sigpts = (dmsks[mid] == 1).flatten()
+            
+            
+            pts=ax.scatter(xvar.flatten()[sigpts],sst_all_var[...,mid].flatten()[sigpts],
+                           c=cvar.flatten()[sigpts],
+                           marker="o",alpha=0.55,cmap=cmap)
+            pts=ax.scatter(xvar.flatten()[~sigpts],sst_all_var[...,mid].flatten()[~sigpts],
+                           c=cvar.flatten()[~sigpts],
+                           marker="x",alpha=1,cmap=cmap)
+            
+            ax.plot([0,1],[0,1],color="k",lw=0.75,ls='dotted')
+            
+            
+            if mid == 0:
+                ax.set_ylabel("Stochastic Model SST Variance ($K^2$)")
+            if mid == 1:
+                ax.set_xlabel("CESM SST Variance ($K^2$)")
+            ax.grid(True,ls='dotted',color='gray')
+        ax.set_xlim([0,0.6])
+        ax.set_ylim([0,0.6])
+        cb = fig.colorbar(pts,ax=axs.flatten(),orientation='vertical',fraction=0.015,pad=0.02)
+        cb.set_label(vmethod + " " + inlabels[v])
+        savename = "%sRegion_%s_Scatterplot_CESMvsSM_%s_%s.png" % (figpath,reg_strf,inlabelsf[v],vmethod)
+        plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+
+#%% Quickly check the forcing
+bboxinset = [-70,-15,10,18]
+plotvars = [np.linalg.norm(alpha_full,axis=2),np.linalg.norm(alpha,axis=2),
+            np.linalg.norm(alpha_full,axis=2)-np.linalg.norm(alpha,axis=2)]
+
+fig,axs = plt.subplots(3,1,subplot_kw={'projection':ccrs.PlateCarree()})
+for i in range(3):
+    ax = axs[i]
+    if i < 2:
+        vlm = [10,25]
+        cmap='cmo.solar'
+        title = "%s %s" % (mconfigs[i],vnames[2])
+    else:
+        vlm = [-3,3]
+        cmap='cmo.balance'
+        title = "FULL - SLAB"
+    ax = viz.add_coast_grid(ax,bbox=bboxinset,fill_color='gray')
+    pcm = ax.pcolormesh(lonr2,latr2,plotvars[i].mean(-1).T
+                        ,vmin=vlm[0],vmax=vlm[1],cmap=cmap)
+    ax.set_title(title)
+    fig.colorbar(pcm,ax=ax)
+
+
