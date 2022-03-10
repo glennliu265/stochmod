@@ -237,7 +237,7 @@ ax.legend()
 #%% Experiment 2, Testing MLD Effects in Tropical Point
 #  LON: 29 W  |  LAT: 15.5 N
 # ---------------------------------------
-exname = "TropMLD_lon29_lat16"
+exname = "TropMLD_lon29_lat16_damping"
 
 # Load forcing for a single point
 #config_custom = config.copy()
@@ -266,6 +266,23 @@ ax.set_xlim([0,11])
 ax.set_ylabel("MLD (m)")
 plt.savefig("%sCustom_MLD_%s.png"%(outpath,exname))
 
+# Set different damping
+method = 5
+lagstr = 'lag1'
+dampload_slab = np.load(input_path+"SLAB_PIC_NHFLX_Damping_monwin3_sig005_dof893_mode%i_%s.npy" % (method,lagstr))
+dampload_full = np.load(input_path+"FULL_PIC_NHFLX_Damping_monwin3_sig005_dof1893_mode%i_%s.npy" % (method,lagstr))
+dampslab = dampload_slab[klon,klat,:]
+dampfull = dampload_full[klon,klat,:]
+fig,ax = plt.subplots(1,1)
+ax.plot(mons3,dampslab,label="Damp Slab",color="orange")
+ax.plot(mons3,dampfull,label="Damp Full",color="mediumblue")
+#ax.plot(mons3,dampdef,label="Default")
+ax.legend()
+ax.grid(True,ls='dotted')
+ax.set_xlim([0,11])
+ax.set_ylabel("Heat Flux Damping ($Wm^{-2}K^{-1}$)")
+plt.savefig("%sCustom_Damping_%s.png"%(outpath,exname))
+
 
 mldmax = np.ones(12)*mlddef.max()
 mldmin = np.ones(12)*mlddef.min()
@@ -281,10 +298,11 @@ Fptload2  = Fload2[klon,klat,:,:]
 # Set up the inputs
 # -----------------
 mid     = 3 # Model id (50m,Const,Vary,Entrain)
-mnames  = ["Default MLD","No Spring Persistence","MLD max","MLD min"]
+mnames  = ["MLD (original)","No Spring Persistence","MLD original + Slab Damping","No Spring + Slab Damping"]
 alphas  = [Fptdef,Fptdef,Fptdef,Fptdef]
-lbds    = [dampdef,dampdef,dampdef,dampdef]
-mlds    = [mlddef ,mld_springdrop,mldmax,mldmin]
+lbds    = [dampdef,dampdef,dampslab,dampslab]
+#mlds    = [mlddef ,mld_springdrop,mldmax,mldmin]
+mlds    = [mlddef ,mld_springdrop,mlddef,mld_springdrop]
 nexps   = len(mnames)
 mcolors = ["mediumblue","firebrick","magenta","orange"] 
 
@@ -294,6 +312,62 @@ mcolors = ["mediumblue","firebrick","magenta","orange"]
 End Loading Section
 """
 print("Found %i experiments"% (nexps))
+
+# ---------------------------------------
+#%% Experiment 2, Testing Damping Effects in Tropical Point
+#  LON: 29 W  |  LAT: 15.5 N
+# ---------------------------------------
+
+exname = "TropMLD_lon29_lat16_damping_test"
+
+# Get indices of target point
+lonf,latf = config['query']
+klon,klat = proc.find_latlon(lonf,latf,lon,lat)
+locstring = "Lon %.f, Lat %.f" % (lon[klon],lat[klat])
+locfn     = "lon%i_lat%i" % (lon[klon],lat[klat])
+
+# Set different damping
+method = 5
+lagstr = 'lag1'
+dampload_slab = np.load(input_path+"SLAB_PIC_NHFLX_Damping_monwin3_sig005_dof893_mode%i_%s.npy" % (method,lagstr))
+dampload_full = np.load(input_path+"FULL_PIC_NHFLX_Damping_monwin3_sig005_dof1893_mode%i_%s.npy" % (method,lagstr))
+dampslab = dampload_slab[klon,klat,:]
+dampfull = dampload_full[klon,klat,:]
+fig,ax = plt.subplots(1,1)
+ax.plot(mons3,dampslab,label="Damp Slab",color="orange")
+ax.plot(mons3,dampfull,label="Damp Full",color="mediumblue")
+#ax.plot(mons3,dampdef,label="Default")
+ax.legend()
+ax.grid(True,ls='dotted')
+ax.set_xlim([0,11])
+ax.set_ylabel("Heat Flux Damping ($Wm^{-2}K^{-1}$)")
+plt.savefig("%sCustom_Damping_%s.png"%(outpath,exname))
+
+
+mldmax = np.ones(12)*mlddef.max()
+mldmin = np.ones(12)*mlddef.min()
+
+# Get the points
+Fload     = np.load(input_path+"flxeof_090pct_FULL-PIC_eofcorr2_Fprime.npy")
+Fload2    = np.load(input_path+"flxeof_090pct_FULL-PIC_eofcorr2_Fprime_rolln0.npy")
+
+Fptload   = Fload[klon,klat,:,:] 
+Fptload2  = Fload2[klon,klat,:,:] 
+
+# -----------------
+# Set up the inputs
+# -----------------
+mid     = 3 # Model id (50m,Const,Vary,Entrain)
+mnames  = ["Slab Damping","Full Damping"]
+alphas  = [Fptdef,Fptdef]
+lbds    = [dampfull,dampslab]
+#mlds    = [mlddef ,mld_springdrop,mldmax,mldmin]
+mlds    = [mlddef ,mlddef]
+nexps   = len(mnames)
+mcolors = ["mediumblue","orange"] 
+
+
+
 
 #%% Now run the stochastic model n times
 
@@ -464,10 +538,10 @@ ax.set_xticklabels(innames,rotation=10)
 ax.grid(True,ls='dotted')
 ax.set_ylabel("SST Variance ($K^2$)")
 ax.set_xlabel("Simulation/Experiment Name")
-ax.set_ylim([0,0.90])
+ax.set_ylim([0,0.45])
 ax.legend()
 
-savename = "%sSpectra_Stochmod_%s_Barplot_%s.png" % (outpath,exname,locstring)
+savename = "%sSpectra_Stochmod_%s_Barplot_%s.png" % (outpath,exname,locfn)
 plt.savefig(savename,dpi=200,bbox_inches='tight')
 
 
