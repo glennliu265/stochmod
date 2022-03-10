@@ -7,6 +7,13 @@ synth_stochmod_spectra
 and
 constant_v_variable
 
+
+Contains Plots for
+ - Stochastic Model Plots (ACs, Spectra)
+ - Presentations, successively adding lines for lower/upper hierarchy
+ - AGU 2021 Poster (Vertically stacked AC and Spectra)
+ - OSM Plots
+
 Created on Wed Oct  6 22:17:26 2021
 
 @author: gliu
@@ -14,19 +21,12 @@ Created on Wed Oct  6 22:17:26 2021
 """
 
 import numpy as np
-from scipy.io import loadmat,savemat
 import matplotlib.pyplot as plt
 import sys
 sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
 sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
 from amv import proc,viz
-import yo_box as ybx
-from scipy.interpolate import interp1d
-from tqdm import tqdm
 import scm
-import time
-import cartopy.crs as ccrs
-from scipy import signal
 
 #%% Settings
 
@@ -35,7 +35,7 @@ projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 datpath     = projpath + '01_Data/'
 input_path  = datpath + 'model_input/'
 output_path = datpath + 'model_output/'
-outpath     = projpath + '02_Figures/20220208/'
+outpath     = projpath + '02_Figures/20220311/'
 proc.makedir(outpath)
 
 # Load in control data for 50N 30W
@@ -79,15 +79,15 @@ config['ftype']       = "DJFM-MON" # Forcing Type
 config['genrand']     = 0          # Toggle to generate new random timeseries
 config['fstd']        = 1          # Set the standard deviation N(0,fstd)
 config['t_end']       = 120000     # Number of months in simulation
-config['runid']       = "syn007"   # White Noise ID
-config['fname']       = "flxeof_090pct_SLAB-PIC_eofcorr2.npy"   #['NAO','EAP,'EOF3','FLXSTD']
+config['runid']       = "syn009"   # White Noise ID
+config['fname']       = "flxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0.npy"   #['NAO','EAP,'EOF3','FLXSTD']
 config['pointmode']   = 1          # Set to 1 to generate a single point
 config['query']       = [-30,50]   # Point to run model at 
 config['applyfac']    = 2          # Apply Integration Factor and MLD to forcing
 config['lags']        = np.arange(0,37,1)
 config['output_path'] = outpath # Note need to fix this
 config['smooth_forcing'] = False
-config['method']      = 3 
+config['method']      = 0 # Correction Factor (q-corr, lambda-based)
 config['favg' ]       = False
 
 config.pop('Fpt',None)
@@ -97,7 +97,7 @@ config.pop('mldpt',None)
 
 
 # Plotting Mode
-darkmode = True
+darkmode = False
 if darkmode:
     plt.style.use("dark_background")
     dfcol = "w"
@@ -200,8 +200,7 @@ for m in range(4):
 cfslab = calc_conflag(cesmauto2,conf,tails,898)
 cffull = calc_conflag(cesmautofull,conf,tails,1798)
 
-#%% Plot SST Autocorrelation at the test point
-
+#%% Plot SST Autocorrelation at the test point (SM Paper)
 
 notitle    = True  # Remove Title for publications
 sepfig     = False # Plot figures separately, for presentaiton, or together)
@@ -215,14 +214,13 @@ else:
     
     # Plot Lower Hierarchy
     ax = axs[0]
-
-lw = 3
-
 if notitle:
     title = ""
 else:
     title = r"Adding Varying Damping ($\lambda_a$) and Forcing ($\alpha$)"
 
+# Indicate Plotting Options
+lw = 3
 plotacs = c_acs
 model   = 1
 
@@ -236,6 +234,7 @@ ylab    = "Forcing ($W/m^{2}$)"
 plotvar = damppt
 ylab =  "Atmospheric Damping ($W/m^{2}$)"
 
+# Initialize PLot
 xtk2       = np.arange(0,37,2)
 if addvar:
     ax,ax2,ax3 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title,loopvar=plotvar)
@@ -243,29 +242,25 @@ if addvar:
     ax3.yaxis.label.set_color('gray')
 else:
     ax,ax2 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title)
-ax.plot(lags,cesmauto2[lags],label="CESM1 SLAB",color='gray',marker="o",markersize=4,lw=lw)
-#ax.scatter(lags,cesmauto2[lags],10,label="",color='k')
-ax.fill_between(lags,cfslab[lags,0],cfslab[lags,1],color='gray',alpha=0.4)
-#ax.grid(minor=True)
-
-for i,e in enumerate([0,1,2,3]):
     
+# Plot CESM
+ax.plot(lags,cesmauto2[lags],label="CESM1 SLAB",color='gray',marker="o",markersize=4,lw=lw)
+ax.fill_between(lags,cfslab[lags,0],cfslab[lags,1],color='gray',alpha=0.4)
+
+# Plot for each model in lower hierarchy
+for i,e in enumerate([0,1,2,3]):
     title=""
     ax.set_ylabel("")
-    
     cfs = confs[e,model,:,:]
     ax.plot(lags,plotacs[e][model],label=labels_lower[i],color=ecol_lower[i],ls=els_lower[i],marker="o",markersize=4,lw=lw)
-    #ax.scatter(lags,plotacs[e][model],10,label="",color=ecol[i])
     ax.fill_between(lags,cfs[:,0],cfs[:,1],color=ecol_lower[i],alpha=0.2)
-
 if sepentrain:
     i = 2
     ax.plot(lags,ac[i],label=labels_upper[i],color=ecol_upper[i],ls=els_upper[i],marker="o",markersize=3,lw=lw)
     ax.fill_between(lags,cfstoch[i,:,0],cfstoch[i,:,1],color=ecol_upper[i],alpha=0.25)
 
-
+# Set labels, legend
 ax.legend(fontsize=10,ncol=3)
-    
 ax.set_ylabel("Correlation")
 
 # --------------------------------------------
@@ -328,9 +323,294 @@ else:
     ax = viz.label_sp(1,case='lower', ax=ax, fontsize=16, labelstyle="(%s)")
     plt.savefig(outpath+"Autocorrelation_2-PANEL_%s.png"%locstring,dpi=200,bbox_inches='tight')
 
+
+
+
+#%% Load and calculate CESM Spectra
+
+cssts = scm.load_cesm_pt(datpath,loadname='both',grabpoint=[-30,50])
+
+#%% Calculate Spectra
+
+debug    = False
+notitle  = True
+
+
+# Smoothing Params
+nsmooth = 350
+cnsmooths = [100,100]
+pct        = 0.10
+
+smoothname = "smth-obs%03i-full%02i-slab%02i" % (nsmooth,cnsmooths[0],cnsmooths[1])
+
+# Spectra Plotting Params
+plottype = "freqlin"
+xlm  = [1e-2,5e0]
+#xper = np.array([200,100,50,25,10,5,2,1,0.5]) # number of years
+xper = np.array([100,50,20,10,5,2])
+xtks = 1/xper
+xlm  = [xtks[0],xtks[-1]]
+ylm  = [0,3.0]
+plotids = [[0,1,2,3,8],
+           [5,6,7]
+           ]
+
+
+# Combine lower and upper hierarchy
+inssts   = [c_ssts[0][1],c_ssts[1][1],c_ssts[2][1],c_ssts[3][1],sst[1],sst[2],sst[3],cssts[0],cssts[1]]
+nsmooths = np.concatenate([np.ones(len(inssts)-2)*nsmooth,cnsmooths])
+labels   = np.concatenate([labels_lower,labels_upper[1:],['CESM-FULL','CESM-SLAB']])
+speclabels = ["%s (%.2f$ \, K^{2}$)" % (labels[i],np.var(inssts[i])) for i in range(len(inssts))]
+allcols  = np.concatenate([ecol_lower,ecol_upper[1:],[dfcol,"gray"]])
+
+# Calculate Autocorrelation (?)
+allacs,allconfs = scm.calc_autocorr(inssts,lags,kmonth+1,calc_conf=True)
+
+# Convert Dict --> Array
+oac=[]
+ocf=[]
+for i in range(len(allacs)):
+    oac.append(allacs[i])
+    ocf.append(allconfs[i])
+allacs=oac
+allconfs=ocf
+
+if debug: # Check if variables were properly concatenated using ACs
+    fig,axs = plt.subplots(1,2,figsize=(16,4))
+    ax = axs[0]
+    plotac = allacs[:4]
+    for i in range(4):
+        ax.plot(lags,plotac[i],label=labels_lower[i],color=ecol_lower[i],)
+    ax.legend()
+    ax = axs[1]
+    plotac = allacs[4:]
+    for i in range(3):
+        ax.plot(lags,plotac[i],label=labels_upper[i+1],color=ecol_upper[i+1],)
+    ax.legend()
+
+# Do spectral Analysis
+specs,freqs,CCs,dofs,r1s = scm.quick_spectrum(inssts,nsmooths,pct)
+#cspecs,cfreqs,cCCs,cdofs,cr1s = scm.quick_spectrum(cssts,cnsmooths,pct)
+
+# Convert to list for indexing NumPy style
+convert = [specs,freqs,speclabels,allcols]
+for i in range(len(convert)):
+    convert[i] = np.array(convert[i])
+specs,freqs,speclabels,allcols = convert
+
+# Compute the variance of each ts
+sstvars     = [np.var(insst) for insst in inssts]
+sstvars_lp  = [np.var(proc.lp_butter(insst,120,6)) for insst in inssts]
+sststds = [np.std(insst) for insst in inssts]
+
+sstvars_str = ["%s (%.2f $K^2$)" % (labels[sv],sstvars[sv]) for sv in range(len(sstvars))]
+
+#%% # Plot the spectra
+
+plottype    = 'freqlin'#'freqlin'
+sepentrain  = False  # Separate entrain/non-entraining models
+sepfig      = False
+#includevar = False # Include Variance in Legend
+lower_focus = False # Set to true to include specific lines for this particular plot 
+periodx     = False # Set to true to have just 1 x-axis, with periods
+linearx     = 1 # Keep frequency axis linear, period axis marked 
+lw          = 3
+incl_legend = True 
+
+
+xtks = [0.01, 0.02, 0.05, 0.1 , 0.2 , 0.5 ]
+
+if sepentrain:
+    plotids = [[0,1,2,3,8,5],
+               [6,7]
+               ]
+    plotids = [[0,1,2,3,8],
+               [3,5,6,7]
+               ]
+else:
+    if lower_focus:
+        plotids = [[0,3,8],
+                   [3,5,6,7]
+                   ]
+    else:
+        plotids = [[0,1,2,3,8],
+                   [5,6,7]
+                   ]
+
+if notitle:
+    titles = ["",""]
+else:
+    titles = (r"Adding Varying Damping ($\lambda_a$) and Forcing ($\alpha$)",
+              "Adding Varying Mixed Layer Depth ($h$) and Entrainment"
+              )
+sharetitle = "SST Spectra (50$\degree$N, 30$\degree$W) \n" + \
+"Smoothing (# bands): Stochastic Model (%i), CESM-FULL (%i), CESM-SLAB (%i)" %  (nsmooth,cnsmooths[0],cnsmooths[1])
+
+#% Plot the spectra
+if sepfig is False:
+    fig,axs = plt.subplots(1,2,figsize=(16,4))
+
+
+for i in range(2):
+    
+    if sepfig is True:
+        fig,ax = plt.subplots(1,1,figsize=(8,4))
+    else:
+        ax = axs[i]
+    
+    plotid = plotids[i]
+    
+    if plottype == "freqxpower":
+        ax,ax2 = viz.plot_freqxpower(specs[plotid],freqs[plotid],speclabels[plotid],allcols[plotid],
+                             ax=ax,plottitle=titles[i],xtick=xtks,xlm=xlm,return_ax2=True)
+    elif plottype == "freqlin":
+        ax,ax2 = viz.plot_freqlin(specs[plotid],freqs[plotid],speclabels[plotid],allcols[plotid],
+                             ax=ax,plottitle=titles[i],xtick=xtks,xlm=xlm,return_ax2=True,lw=lw,linearx=linearx)
+        ylabel = "Power ($K^2/cpy$)"
+    elif plottype == "freqlog":
+        ax,ax2 = viz.plot_freqlog(specs[plotid],freqs[plotid],speclabels[plotid],allcols[plotid],
+                             ax=ax,plottitle=titles[i],xtick=xtks,xlm=xlm,return_ax2=True,lw=lw,
+                             semilogx=True)
+        #ax.set_ylim([1e-1,1e1])
+        ylabel = "Variance ($K^2$)"
+        
+    #ax2.set_xlabel("Period (Years)")
+    if i == 1:
+        ax.set_ylabel("")
+    ax.set_xlabel("")
+        
+    plt.setp(ax2.get_xticklabels(), rotation=90,fontsize=12)
+    plt.setp(ax.get_xticklabels(), rotation=0,fontsize=12)
+    
+    # if plottype is not 'freqlog':
+    ax.set_ylim(ylm)
+    
+    if periodx: # Switch Frequency with Period for x-axis.
+        ax2.set_xlabel("")
+        xtk2 = ax2.get_xticklabels()
+        xtk2new = np.repeat("",len(xtk2))
+        ax2.set_xticklabels(xtk2new)
+        ax.set_xticklabels(1/xtks)
+    
+    if incl_legend:
+        lgd = viz.reorder_legend(ax)
+        #ax.legend()
+    if sepfig is True: # Save separate figures
+        if periodx:
+            ax.set_xlabel('Period (Years)',fontsize=12)
+        else:
+            ax.set_xlabel('Frequency (cycles/year)',fontsize=12)
+        ax.set_ylabel("Power ($K^2/cpy$)")
+        
+        savename = "%sNASST_Spectra_Stochmod_%s_%s_pct%03i_part%i.png" % (outpath,plottype,smoothname,pct*100,i)
+        plt.savefig(savename,dpi=200,bbox_inches='tight')
+    else:
+        if i == 0:
+             ax.set_xlabel("")
+             ax.set_ylabel("Power ($K^2/cpy$)")
+        #if i == 1:
+           # ax.set_xlabel("Period (Years)")
+        ax = viz.label_sp(i,case='lower', ax=ax, fontsize=16, labelstyle="(%s)")
+
+if sepfig is False:
+    #fig.text(0.5, -0.05, 'Frequency (cycles/year)', ha='center',fontsize=12)
+    if periodx:
+        fig.text(0.5, -0.05, 'Period (Years)', ha='center',fontsize=12)
+    else:
+        fig.text(0.5, 1.05, 'Period (Years)', ha='center',fontsize=12)
+        fig.text(0.5, -0.05, 'Frequency (cycles/year)', ha='center',fontsize=12)
+    #plt.suptitle("SST Power Spectra at 50$\degree$N, 30$\degree$W",y=1.15,fontsize=14)
+    if notitle is False:
+        plt.suptitle(sharetitle,y=1.05,fontsize=14)
+    savename = "%sNASST_Spectra_Stochmod_%s_%s_pct%03i.png" % (outpath,plottype,smoothname,pct*100)
+    plt.savefig(savename,dpi=200,bbox_inches='tight')
+
+
+# plotid = 
+# if plottype == "freqxpower":
+#     ax = viz.plot_freqxpower(specs[:4],freqs[:4],speclabels[:4],allcols[:4],
+#                          ax=ax,plottitle=r"Adding Varying Damping ($\lambda_a$) and Forcing ($\alpha$)",xtick=xtks,xlm=xlm)
+# elif plottype == "freqlin":
+#     ax = viz.plot_freqlin(specs[:4],freqs[:4],speclabels[:4],allcols[:4],
+#                          ax=ax,plottitle=r"Adding Varying Damping ($\lambda_a$) and Forcing ($\alpha$)",xtick=xtks,xlm=xlm)
+# elif plottype == "freqlog":
+#     ax = viz.plot_freqlog(specs[:4],freqs[:4],speclabels[:4],allcols[:4],
+#                          ax=ax,plottitle="Adding Varying Mixed Layer Depth ($h$) and Entrainment",xtick=xtks,xlm=xlm)
+
+
+# ax = axs[1]
+# if plottype == "freqxpower":
+#     ax = viz.plot_freqxpower(specs[4:],freqs[4:],speclabels[4:],allcols[4:],
+#                          ax=ax,plottitle="Adding Varying Mixed Layer Depth ($h$) and Entrainment",xtick=xtks,xlm=xlm)
+# elif plottype == "freqlin":
+#     ax = viz.plot_freqlin(specs[4:],freqs[4:],speclabels[4:],allcols[4:],
+#                          ax=ax,plottitle="Adding Varying Mixed Layer Depth ($h$) and Entrainment",xtick=xtks,xlm=xlm)
+# elif plottype == "freqlog":
+#     ax = viz.plot_freqlog(specs[4:],freqs[4:],speclabels[4:],allcols[4:],
+#                          ax=ax,plottitle="Adding Varying Mixed Layer Depth ($h$) and Entrainment",xtick=xtks,xlm=xlm)
+# ax.set_ylabel("")
+
+# #plt.suptitle("Regional AMV Index Spectra (unsmoothed, Forcing=%s)"%(frcnamelong[f]))
+
+
+
+
+# (all const, varyforce, vary damp)
+# inssts.insert(sst[1]) # Append all vary/constanth
+# inssts.append(sst[2]) # Append hvary
+# inssts.append(sst[3]) # Append entrain
+# #np.hstack([c_ssts[:3],])
+
+#%% Barplots
+
+fig,axs = plt.subplots(1,2,constrained_layout=True,sharey=True,figsize=(8,4))
+
+for i in range(2):
+    
+    # Get Axis and plotids
+    ax = axs.flatten()[i]
+    plotid = plotids[i]
+    
+    # Plot the bars
+    bar   = ax.bar(np.array(labels)[plotid],np.array(sstvars)[plotid],
+                   color=np.array(allcols)[plotid],
+                   alpha=1)
+    
+    #viz.label_barplots(np.array(sstvars)[plotid],ax=ax)
+    
+    barlp = ax.bar(np.array(labels)[plotid],np.array(sstvars_lp)[plotid],
+                   color=np.array(allcols)[plotid],width=0.8,hatch="//",alpha=0.3)
+    
+    #viz.label_barplots(np.array(sstvars_lp)[plotid],ax=ax)
+    
+    # Label the bars
+    
+    
+    # Set Labels, Grids
+    if i == 0:
+        ax.set_ylabel("SST Variance ($K^2$)")
+        fig.text(0.5, -0.05, 'Model Configuration', ha='center',fontsize=12)
+        
+    ax.set_xticklabels(np.array(labels)[plotid],rotation=45)
+    ax.grid(True,ls='dashed')
+
+#%%
+
+
+# fig, ax= plt.subplots(1,1)
+# dtplot = 3600*24*365
+
+# ax.semilogx(freqs[0]*dtplot,specs[0]/dtplot)
+# ax.set_xticks(xtks)
+# ax.set_xlim([xtks[0],xtks[-1]])
+
+"""
+Presentation Plots (Successively Adding Lines)
+"""
+# ------------------------------
 #%%  Sucessively Add Each Line 
 # This is for the LOWER hierarchy
-
+# ------------------------------
 """
 Note this is the section used to generate figures for the following
 presentations
@@ -357,9 +637,6 @@ else:
     dfcol      = 'k'
     dfalph     = 0.1
     dfalph_col = 0.25 
-    
-
-
 
 #plotlags = np.arange(0,24)
 lags    = np.arange(0,25,1)
@@ -408,8 +685,9 @@ for es in range(4+add_hvar):
     plt.savefig("%sAutocorrelation_LowerHierarchy_%i.png"% (outpath,es),dpi=150)
     print("Done With %i"% es)
 
+# ---------------------------------------------
 #%% Upper Hierarchy (succesively Add each line)
-
+# ---------------------------------------------
 lw         = 3
 markersize = 3#4
 addvar     = False
@@ -447,8 +725,93 @@ for es in range(2):
     plt.savefig("%sAutocorrelation_UpperHierarchy_%i.png"% (outpath,es),dpi=150)
     print("Done With %i"% es)
 
-#%% AGU Style Plot (Vertically Stacked)
 
+"""
+Conference Plots
+"""
+# ----------------------
+#%% OSM, Separate Plots
+# ----------------------
+
+plottype   = 'freqlin'#'freqlin'
+sepentrain = False  # Separate entrain/non-entraining models
+sepfig     = True
+#includevar = False # Include Variance in Legend
+lower_focus = True # Set to true to include specific lines for this particular plot 
+
+if sepentrain:
+    plotids = [[0,1,2,3,8,5],
+               [6,7]
+               ]
+    plotids = [[0,1,2,3,8],
+               [3,5,6,7]
+               ]
+else:
+    if lower_focus:
+        plotids = [[0,3,8],
+                   [3,5,6,7]
+                   ]
+    else:
+        plotids = [[0,1,2,3,8],
+                   [5,6,7]
+                   ]
+
+plotids = [[7,8],[7,8,3],[7,8,3,5],[7,8,5,6]]
+
+if notitle:
+    titles = ["",""]
+else:
+    titles = (r"Adding Varying Damping ($\lambda_a$) and Forcing ($\alpha$)",
+              "Adding Varying Mixed Layer Depth ($h$) and Entrainment"
+              )
+sharetitle = "SST Spectra (50$\degree$N, 30$\degree$W) \n" + \
+"Smoothing (# bands): Stochastic Model (%i), CESM-FULL (%i), CESM-SLAB (%i)" %  (nsmooth,cnsmooths[0],cnsmooths[1])
+
+
+for i in range(len(plotids)):
+
+    fig,ax = plt.subplots(1,1,figsize=(8,4))
+    plotid = plotids[i]
+    
+    if plottype == "freqxpower":
+        ax,ax2 = viz.plot_freqxpower(specs[plotid],freqs[plotid],speclabels[plotid],allcols[plotid],
+                             ax=ax,plottitle="",xtick=xtks,xlm=xlm,return_ax2=True)
+    elif plottype == "freqlin":
+        ax,ax2 = viz.plot_freqlin(specs[plotid],freqs[plotid],speclabels[plotid],allcols[plotid],
+                             ax=ax,plottitle="",xtick=xtks,xlm=xlm,return_ax2=True,lw=lw)
+        ylabel = "Power ($K^2/cpy$)"
+    elif plottype == "freqlog":
+        ax,ax2 = viz.plot_freqlog(specs[plotid],freqs[plotid],speclabels[plotid],allcols[plotid],
+                             ax=ax,plottitle="",xtick=xtks,xlm=xlm,return_ax2=True,lw=lw,
+                             semilogx=True)
+        ylabel = "Variance ($K^2$)"
+    ax2.set_xlabel("Period (Years)")
+    
+    if i == 1:
+        ax.set_ylabel("")
+    ax.set_xlabel("")
+    
+    plt.setp(ax2.get_xticklabels(), rotation=50,fontsize=8)
+    plt.setp(ax.get_xticklabels(), rotation=50,fontsize=8)
+    
+    # if plottype is not 'freqlog':
+    ax.set_ylim(ylm)
+    
+    ax2.set_xlabel("")
+    xtk2 = ax2.get_xticklabels()
+    xtk2new = np.repeat("",len(xtk2))
+    ax2.set_xticklabels(xtk2new)
+    
+    ax.set_xticklabels(1/xtks)
+    
+    ax.set_xlabel('Period (Years)',fontsize=12)
+    ax.set_ylabel("Power ($K^2/cpy$)")
+    
+    savename = "%sNASST_Spectra_Stochmod_%s_%s_pct%03i_part%i.png" % (outpath,plottype,smoothname,pct*100,i)
+    plt.savefig(savename,dpi=200,bbox_inches='tight')
+# -------------------------------------------------------
+#%% Autocorrelation AGU Style Plot (Vertically Stacked)
+# -------------------------------------------------------
 fig,axs     = plt.subplots(2,1,figsize=(6,8),sharex=True,sharey=True)
 
 
@@ -533,318 +896,9 @@ mlddef = mldpt.copy()
 Fptdef = Fpt.copy()
 
 plt.savefig(outpath+"Autocorrelation_2-PANEL_%s_vertical.png"%locstring,dpi=200,bbox_inches='tight')
-#%% Load and calculate CESM Spectra
-
-cssts = scm.load_cesm_pt(datpath,loadname='both',grabpoint=[-30,50])
-
-
-
-#%% Calculate Spectra
-
-debug    = False
-notitle  = True
-
-
-# Smoothing Params
-nsmooth = 300
-cnsmooths = [75,65]
-pct        = 0.10
-
-smoothname = "smth-obs%03i-full%02i-slab%02i" % (nsmooth,cnsmooths[0],cnsmooths[1])
-
-# Spectra Plotting Params
-plottype = "freqlin"
-xlm  = [1e-2,5e0]
-#xper = np.array([200,100,50,25,10,5,2,1,0.5]) # number of years
-xper = np.array([100,50,20,10,5,2])
-xtks = 1/xper
-xlm  = [xtks[0],xtks[-1]]
-ylm  = [0,3.0]
-plotids = [[0,1,2,3,8],
-           [5,6,7]
-           ]
-
-
-# Combine lower and upper hierarchy
-inssts   = [c_ssts[0][1],c_ssts[1][1],c_ssts[2][1],c_ssts[3][1],sst[1],sst[2],sst[3],cssts[0],cssts[1]]
-nsmooths = np.concatenate([np.ones(len(inssts)-2)*nsmooth,cnsmooths])
-labels   = np.concatenate([labels_lower,labels_upper[1:],['CESM-FULL','CESM-SLAB']])
-speclabels = ["%s (%.2f$ \, K^{2}$)" % (labels[i],np.var(inssts[i])) for i in range(len(inssts))]
-allcols  = np.concatenate([ecol_lower,ecol_upper[1:],[dfcol,"gray"]])
-
-# Calculate Autocorrelation (?)
-allacs,allconfs = scm.calc_autocorr(inssts,lags,kmonth+1,calc_conf=True)
-
-# Convert Dict --> Array
-oac=[]
-ocf=[]
-for i in range(len(allacs)):
-    oac.append(allacs[i])
-    ocf.append(allconfs[i])
-allacs=oac
-allconfs=ocf
-
-if debug: # Check if variables were properly concatenated using ACs
-    fig,axs = plt.subplots(1,2,figsize=(16,4))
-    ax = axs[0]
-    plotac = allacs[:4]
-    for i in range(4):
-        ax.plot(lags,plotac[i],label=labels_lower[i],color=ecol_lower[i],)
-    ax.legend()
-    ax = axs[1]
-    plotac = allacs[4:]
-    for i in range(3):
-        ax.plot(lags,plotac[i],label=labels_upper[i+1],color=ecol_upper[i+1],)
-    ax.legend()
-
-# Do spectral Analysis
-specs,freqs,CCs,dofs,r1s = scm.quick_spectrum(inssts,nsmooths,pct)
-#cspecs,cfreqs,cCCs,cdofs,cr1s = scm.quick_spectrum(cssts,cnsmooths,pct)
-
-# Convert to list for indexing NumPy style
-convert = [specs,freqs,speclabels,allcols]
-for i in range(len(convert)):
-    convert[i] = np.array(convert[i])
-specs,freqs,speclabels,allcols = convert
-
-#%% # Plot the spectra
-
-plottype   = 'freqlin'#'freqlin'
-sepentrain = False  # Separate entrain/non-entraining models
-sepfig     = True
-#includevar = False # Include Variance in Legend
-lower_focus = True # Set to true to include specific lines for this particular plot 
-
-if sepentrain:
-    plotids = [[0,1,2,3,8,5],
-               [6,7]
-               ]
-    plotids = [[0,1,2,3,8],
-               [3,5,6,7]
-               ]
-else:
-    if lower_focus:
-        plotids = [[0,3,8],
-                   [3,5,6,7]
-                   ]
-    else:
-        plotids = [[0,1,2,3,8],
-                   [5,6,7]
-                   ]
-
-if notitle:
-    titles = ["",""]
-else:
-    titles = (r"Adding Varying Damping ($\lambda_a$) and Forcing ($\alpha$)",
-              "Adding Varying Mixed Layer Depth ($h$) and Entrainment"
-              )
-sharetitle = "SST Spectra (50$\degree$N, 30$\degree$W) \n" + \
-"Smoothing (# bands): Stochastic Model (%i), CESM-FULL (%i), CESM-SLAB (%i)" %  (nsmooth,cnsmooths[0],cnsmooths[1])
-
-#% Plot the spectra
-if sepfig is False:
-    fig,axs = plt.subplots(1,2,figsize=(16,4))
-
-
-for i in range(2):
-    
-    if sepfig is True:
-        fig,ax = plt.subplots(1,1,figsize=(8,4))
-    else:
-        ax = axs[i]
-    
-    plotid = plotids[i]
-    
-    if plottype == "freqxpower":
-        ax,ax2 = viz.plot_freqxpower(specs[plotid],freqs[plotid],speclabels[plotid],allcols[plotid],
-                             ax=ax,plottitle=titles[i],xtick=xtks,xlm=xlm,return_ax2=True)
-    elif plottype == "freqlin":
-        ax,ax2 = viz.plot_freqlin(specs[plotid],freqs[plotid],speclabels[plotid],allcols[plotid],
-                             ax=ax,plottitle=titles[i],xtick=xtks,xlm=xlm,return_ax2=True,lw=lw)
-        ylabel = "Power ($K^2/cpy$)"
-    elif plottype == "freqlog":
-        ax,ax2 = viz.plot_freqlog(specs[plotid],freqs[plotid],speclabels[plotid],allcols[plotid],
-                             ax=ax,plottitle=titles[i],xtick=xtks,xlm=xlm,return_ax2=True,lw=lw,
-                             semilogx=True)
-        #ax.set_ylim([1e-1,1e1])
-        ylabel = "Variance ($K^2$)"
-    ax2.set_xlabel("Period (Years)")
-    if i == 1:
-        ax.set_ylabel("")
-    ax.set_xlabel("")
-        
-    plt.setp(ax2.get_xticklabels(), rotation=50,fontsize=8)
-    plt.setp(ax.get_xticklabels(), rotation=50,fontsize=8)
-    
-    # if plottype is not 'freqlog':
-    ax.set_ylim(ylm)
-    
-    
-    ax2.set_xlabel("")
-    xtk2 = ax2.get_xticklabels()
-    xtk2new = np.repeat("",len(xtk2))
-    ax2.set_xticklabels(xtk2new)
-    
-    ax.set_xticklabels(1/xtks)
-    
-
-    
-    if sepfig is True: # Save separate figures
-        ax.set_xlabel('Period (Years)',fontsize=12)
-        ax.set_ylabel("Power ($K^2/cpy$)")
-        
-        savename = "%sNASST_Spectra_Stochmod_%s_%s_pct%03i_part%i.png" % (outpath,plottype,smoothname,pct*100,i)
-        plt.savefig(savename,dpi=200,bbox_inches='tight')
-    else:
-        if i == 0:
-             ax.set_xlabel("")
-             ax.set_ylabel("Power ($K^2/cpy$)")
-        #if i == 1:
-           # ax.set_xlabel("Period (Years)")
-        ax = viz.label_sp(i,case='lower', ax=ax, fontsize=16, labelstyle="(%s)")
-        
-
-if sepfig is False:
-    #fig.text(0.5, -0.05, 'Frequency (cycles/year)', ha='center',fontsize=12)
-    fig.text(0.5, -0.05, 'Period (Years)', ha='center',fontsize=12)
-    #plt.suptitle("SST Power Spectra at 50$\degree$N, 30$\degree$W",y=1.15,fontsize=14)
-    if notitle is False:
-        plt.suptitle(sharetitle,y=1.05,fontsize=14)
-    savename = "%sNASST_Spectra_Stochmod_%s_%s_pct%03i.png" % (outpath,plottype,smoothname,pct*100)
-    plt.savefig(savename,dpi=200,bbox_inches='tight')
-
-
-# plotid = 
-# if plottype == "freqxpower":
-#     ax = viz.plot_freqxpower(specs[:4],freqs[:4],speclabels[:4],allcols[:4],
-#                          ax=ax,plottitle=r"Adding Varying Damping ($\lambda_a$) and Forcing ($\alpha$)",xtick=xtks,xlm=xlm)
-# elif plottype == "freqlin":
-#     ax = viz.plot_freqlin(specs[:4],freqs[:4],speclabels[:4],allcols[:4],
-#                          ax=ax,plottitle=r"Adding Varying Damping ($\lambda_a$) and Forcing ($\alpha$)",xtick=xtks,xlm=xlm)
-# elif plottype == "freqlog":
-#     ax = viz.plot_freqlog(specs[:4],freqs[:4],speclabels[:4],allcols[:4],
-#                          ax=ax,plottitle="Adding Varying Mixed Layer Depth ($h$) and Entrainment",xtick=xtks,xlm=xlm)
-
-
-# ax = axs[1]
-# if plottype == "freqxpower":
-#     ax = viz.plot_freqxpower(specs[4:],freqs[4:],speclabels[4:],allcols[4:],
-#                          ax=ax,plottitle="Adding Varying Mixed Layer Depth ($h$) and Entrainment",xtick=xtks,xlm=xlm)
-# elif plottype == "freqlin":
-#     ax = viz.plot_freqlin(specs[4:],freqs[4:],speclabels[4:],allcols[4:],
-#                          ax=ax,plottitle="Adding Varying Mixed Layer Depth ($h$) and Entrainment",xtick=xtks,xlm=xlm)
-# elif plottype == "freqlog":
-#     ax = viz.plot_freqlog(specs[4:],freqs[4:],speclabels[4:],allcols[4:],
-#                          ax=ax,plottitle="Adding Varying Mixed Layer Depth ($h$) and Entrainment",xtick=xtks,xlm=xlm)
-# ax.set_ylabel("")
-
-# #plt.suptitle("Regional AMV Index Spectra (unsmoothed, Forcing=%s)"%(frcnamelong[f]))
-
-
-
-
-# (all const, varyforce, vary damp)
-# inssts.insert(sst[1]) # Append all vary/constanth
-# inssts.append(sst[2]) # Append hvary
-# inssts.append(sst[3]) # Append entrain
-# #np.hstack([c_ssts[:3],])
-#%% OSM, Separate Plots
-
-plottype   = 'freqlin'#'freqlin'
-sepentrain = False  # Separate entrain/non-entraining models
-sepfig     = True
-#includevar = False # Include Variance in Legend
-lower_focus = True # Set to true to include specific lines for this particular plot 
-
-if sepentrain:
-    plotids = [[0,1,2,3,8,5],
-               [6,7]
-               ]
-    plotids = [[0,1,2,3,8],
-               [3,5,6,7]
-               ]
-else:
-    if lower_focus:
-        plotids = [[0,3,8],
-                   [3,5,6,7]
-                   ]
-    else:
-        plotids = [[0,1,2,3,8],
-                   [5,6,7]
-                   ]
-
-plotids = [[7,8],[7,8,3],[7,8,3,5],[7,8,5,6]]
-
-if notitle:
-    titles = ["",""]
-else:
-    titles = (r"Adding Varying Damping ($\lambda_a$) and Forcing ($\alpha$)",
-              "Adding Varying Mixed Layer Depth ($h$) and Entrainment"
-              )
-sharetitle = "SST Spectra (50$\degree$N, 30$\degree$W) \n" + \
-"Smoothing (# bands): Stochastic Model (%i), CESM-FULL (%i), CESM-SLAB (%i)" %  (nsmooth,cnsmooths[0],cnsmooths[1])
-
-
-for i in range(len(plotids)):
-
-    fig,ax = plt.subplots(1,1,figsize=(8,4))
-    plotid = plotids[i]
-    
-    if plottype == "freqxpower":
-        ax,ax2 = viz.plot_freqxpower(specs[plotid],freqs[plotid],speclabels[plotid],allcols[plotid],
-                             ax=ax,plottitle="",xtick=xtks,xlm=xlm,return_ax2=True)
-    elif plottype == "freqlin":
-        ax,ax2 = viz.plot_freqlin(specs[plotid],freqs[plotid],speclabels[plotid],allcols[plotid],
-                             ax=ax,plottitle="",xtick=xtks,xlm=xlm,return_ax2=True,lw=lw)
-        ylabel = "Power ($K^2/cpy$)"
-    elif plottype == "freqlog":
-        ax,ax2 = viz.plot_freqlog(specs[plotid],freqs[plotid],speclabels[plotid],allcols[plotid],
-                             ax=ax,plottitle="",xtick=xtks,xlm=xlm,return_ax2=True,lw=lw,
-                             semilogx=True)
-        ylabel = "Variance ($K^2$)"
-    ax2.set_xlabel("Period (Years)")
-    
-    if i == 1:
-        ax.set_ylabel("")
-    ax.set_xlabel("")
-    
-    plt.setp(ax2.get_xticklabels(), rotation=50,fontsize=8)
-    plt.setp(ax.get_xticklabels(), rotation=50,fontsize=8)
-    
-    # if plottype is not 'freqlog':
-    ax.set_ylim(ylm)
-    
-    ax2.set_xlabel("")
-    xtk2 = ax2.get_xticklabels()
-    xtk2new = np.repeat("",len(xtk2))
-    ax2.set_xticklabels(xtk2new)
-    
-    ax.set_xticklabels(1/xtks)
-    
-    ax.set_xlabel('Period (Years)',fontsize=12)
-    ax.set_ylabel("Power ($K^2/cpy$)")
-    
-    savename = "%sNASST_Spectra_Stochmod_%s_%s_pct%03i_part%i.png" % (outpath,plottype,smoothname,pct*100,i)
-    plt.savefig(savename,dpi=200,bbox_inches='tight')
-
-        
-
-
-#%%
-
-
-fig, ax= plt.subplots(1,1)
-dtplot = 3600*24*365
-
-ax.semilogx(freqs[0]*dtplot,specs[0]/dtplot)
-ax.set_xticks(xtks)
-ax.set_xlim([xtks[0],xtks[-1]])
-
-
-# Get the spectra
-#specs,freqs,CCs,dofs,r1s = scm.quick_spectrum(sstin,nsmooth,pct)
-#%% AGU Version (Vertically Stacked)
-
+# -------------------------------------------------------
+#%% Spectra AGU Version (Vertically Stacked)
+# -------------------------------------------------------
 debug = False
 
 # Smoothing Params
@@ -944,7 +998,6 @@ plt.suptitle(sharetitle,fontsize=14,y=.925)
 savename = "%sNASST_Spectra_Stochmod_%s_%s_pct%03i_vertical.png" % (outpath,plottype,smoothname,pct*100)
 plt.savefig(savename,dpi=200,bbox_inches='tight')
 
-#%% Make a plot with an inset
 from mpl_toolkits.axes_grid.inset_locator import (inset_axes, InsetPosition,
                                                   mark_inset)
 
@@ -980,8 +1033,10 @@ plt.suptitle("SST Power Spectra at 50N, 30W",y=1.05)
 savename = "%sNASST_Spectra_Stochmod_%s_nsmooth%i_pct%03i.png" % (outpath,plottype,nsmooth,pct*100)
 plt.savefig(savename,dpi=200,bbox_inches='tight')
 
-#%% Plot Specific ranges similar to Patrizio et al. 2021
 
+# ------------------------------------------------------
+#%% Plot Specific ranges similar to Patrizio et al. 2021
+# ------------------------------------------------------
 
 plottype = 'freqlog'#'freqlin'
 # Shorter Timescales
@@ -1071,3 +1126,11 @@ if sepfig is False:
         plt.suptitle(sharetitle,y=1.05,fontsize=14)
     savename = "%sNASST_Spectra_Stochmod_%s_%s_pct%03i.png" % (outpath,plottype,smoothname,pct*100)
     plt.savefig(savename,dpi=200,bbox_inches='tight')
+
+
+"""
+Incomplete Section (wip)
+"""
+# ----------------------------
+#%% Make a plot with an inset
+# ----------------------------
