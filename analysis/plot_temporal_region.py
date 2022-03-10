@@ -28,7 +28,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20220128/"
+    figpath     = projpath + "02_Figures/20220315/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -49,13 +49,35 @@ import tbx
 proc.makedir(figpath)
 #%% Experimental Configurations
 
+mconfig   = "SLAB_PIC"
+nyrs      = 1000        # Number of years to integrate over
+
+
+continuous = True # Set to True to Load a continuous run with the lines below
+
+
+if continuous:
+    # Do a continuous Run
+    # -------------------
+    fnames   = ["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_dmp0"%i for i in range(10)]
+    frcnamelong = ["$F'$ run 2%02d" % (i) for i in range(10)]
+    exname   = "Fprime_amq0_method5_cont"
+else:
+    # Options to determine the experiment ID (Old Format)
+    # --------------------------------------------------
+    runid      = "011"
+    
+    # Indicate the experiment file name, display name (for plotting), and output save name
+    fname       = 'forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method4_dmp0'
+    frcnamelong = "EOF Forcing (90% Variance)"
+    exname      ="90perc_variance"
+
+#%% Other Settings
+
 # Analysis Options
 lags = np.arange(0,37,1)
 
-# Options to determine the experiment ID
-mconfig   = "SLAB_PIC"
-nyrs      = 1000        # Number of years to integrate over
-runid     = "011"
+# Set the Visualization mode
 darkmode   = False
 if darkmode:
     plt.style.use("dark_background")
@@ -63,12 +85,6 @@ if darkmode:
 else:
     plt.style.use("default")
     dfcol = "k"
-
-
-# Indicate the experiment file name, display name (for plotting), and output save name
-fname = 'forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method4_dmp0'
-frcnamelong = "EOF Forcing (90% Variance)"
-exname ="90perc_variance"
 
 # Calculate in place (or load output from sm_postprocess_output)
 calc_inplace=False
@@ -128,16 +144,64 @@ xtks  = 1/xper
 xlm   = [xtks[0],xtks[-1]]
 
 
+#%% Silly functions to repackage postprocessed output (need to stop using dicts)
+
+
+
+def unpack_smdict(indict):
+    """
+    Takes a dict of [run][region][models][OTHERDIMS] and unpacks it into
+    an array [unpackaged]
+
+    """
+    # Get "Outer Shell" dimensions
+    nrun    = len(indict)
+    nregion = len(indict[0])
+    nmodels = len(indict[0][0])
+    
+    # For Autocorrelation
+    otherdims = indict[0][0][0].shape
+    
+    # Preallocate
+    newshape = np.concatenate([[nrun,nregion,nmodels],otherdims])
+    unpacked = np.zeros(newshape) * np.nan
+    
+    # Loop thru dict
+    for run in range(nrun):
+        for reg in range(nregion):
+            for mod in range(nmodels):
+                unpacked[run,reg,mod,:] = indict[run][reg][mod]
+    return unpacked
+
+def repack_smdict(inarr,nregion,nmodels):
+    """
+    Repackages a numpy array of inarr[region x model x otherdims] to 
+    outdict{region}{model}
+    """
+    outdict = {}
+    for reg in range(nregion):
+        indict = {}
+        for mod in range(nmodels):
+            indict[mod] = inarr[reg,mod,:]
+        outdict[reg] = indict.copy()
+    return outdict
+
+
+
 #%% load some additional data
 
 # Load lat/lon regional
+
 # Get one of the outputs
+if continuous:
+    fname = fnames[0] # Take first one to load lat/lon
 ldname = "%sstoch_output_%s.npz" % (datpath,fname)
 if exname == "numEOFs":
     ldname = ldname.replace("50","2")
 ld     = np.load(ldname,allow_pickle=True)
 lon    = ld['lon']
 lat    = ld['lat']
+
 
 # Load global lat/lon
 lon180g,latg  = scm.load_latlon(rawpath)
@@ -147,20 +211,47 @@ lon180g,latg  = scm.load_latlon(rawpath)
 # -------------------------------------------
 
 if ~calc_inplace:
+    
     # Load for stochastic model experiments
-    rsst_fn = "%sproc/SST_Region_Autocorrelation_%s.npz" % (datpath,fname)
-    ld = np.load(rsst_fn,allow_pickle=True)#.item()
-    sstac   = ld['autocorr_region'].item() # I think its [region][model][lag]
-    kmonths  = ld['kmonths'].item()
+    # -------------------------------------
+    if continuous: # Load for each run
+        
+        sstac   = [] # [run][region][model][lag]
+        kmonths = [] 
+        for f,fname in enumerate(fnames):
+            rsst_fn = "%sproc/SST_Region_Autocorrelation_%s.npz" % (datpath,fname)
+            ld = np.load(rsst_fn,allow_pickle=True)#.item()
+            sstac.append(ld['autocorr_region'].item()) # I think its [region][model][lag]
+            kmonths.append(ld['kmonths'].item())
+        kmonths = kmonths[0] # Just take the first
+        
+        
+        # Extract the region and take the average
+        nrun    = len(sstac)
+        nregion = len(sstac[0])
+        nmodels = len(sstac[0][0])
+        nlags   = len(sstac[0][0][0])
+        sstac_rearr = unpack_smdict(sstac)
+        sstac_avg   = sstac_rearr.mean(0) # [region x model x lag]
+
+        # Repack as dict
+        sstac       = repack_smdict(sstac_avg,nregion,nmodels)
+        
+    else:
+        rsst_fn = "%sproc/SST_Region_Autocorrelation_%s.npz" % (datpath,fname)
+        ld = np.load(rsst_fn,allow_pickle=True)#.item()
+        sstac   = ld['autocorr_region'].item() # I think its [region][model][lag]
+        kmonths  = ld['kmonths'].item()
     
     # Load data for CESM1-PIC
+    # -----------------------
     cesmacs= []
     expid      = "CESM1-PIC"
     rsst_fn    = "%s/proc/SST_Region_Autocorrelation_%s_ensorem0.npz" % (datpath,expid)
     ldc        = np.load(rsst_fn,allow_pickle=True)
     cesmacs    = ldc['autocorr_region'].item() # [Region] x [Model]
     
-    # Calculate Confidence internals ----
+    # Calculate Confidence internals -----------------------------------------
     
     
     # Stochastic Model
@@ -203,10 +294,6 @@ Confidence Intervals:
 cfstoch [Region x Model x Lag x Upper/Lower]
 cfcesm  [Region x Model x Lag x Upper/Lower]
 """
-
-
-
-
     
 #%% Plot Bounding Boxes (STG)Locator
 
@@ -265,24 +352,38 @@ plt.savefig("%sSPG-NAT_Locator.png"%figpath,dpi=100,bbox_inches='tight',transpar
 #%% Load Stochastic Model Output (Regional SSTs)
 
 # Load in SSTs for each region
-# Load the dictionary [h-const, h-vary, entrain]
-rsst_fn = "%s/proc/SST_RegionAvg_%s.npy" % (datpath,fname)
-sst = np.load(rsst_fn,allow_pickle=True).item()
-sstdict = sst
-
-# Identify the variance for each region and load in numpy arrays
-sstall  = np.zeros((len(regions),len(modelnames),nyrs*12)) # Region x Model x Time
-sstvars = np.zeros((len(regions),len(modelnames))) # Region x Model
-
-# An unfortunate nested loop... 
-for rid in range(len(regions)):
-    for model in range(len(modelnames)):
-        sstin  = sstdict[rid][model]
-        sstvar = np.var(sstin)
-        print("Variance for region %s, model %s is %f" % (regions[rid],modelnames[model],sstvar))
-        
-        sstall[rid,model,:] = sstin.copy()
-        sstvars[rid,model]   = sstvar
+# ----------------------------
+if continuous: 
+    # Load in regional SST for each run
+    ssts = []
+    for f,fname in enumerate(fnames):
+        rsst_fn = "%s/proc/SST_RegionAvg_%s.npy" % (datpath,fname)
+        ssts.append(np.load(rsst_fn,allow_pickle=True).item())
+    
+    # Unpack it
+    ssts_allrun = unpack_smdict(ssts) # [run x region x model x time]
+    #sstall      = ssts_allrun.mean(0) # [region x model x time]
+    #sstvar      = np.var(sstall,2)    # [region x model]
+    
+else:
+    # Load the dictionary [h-const, h-vary, entrain]
+    rsst_fn = "%s/proc/SST_RegionAvg_%s.npy" % (datpath,fname)
+    sst = np.load(rsst_fn,allow_pickle=True).item()
+    sstdict = sst
+    
+    # Identify the variance for each region and load in numpy arrays
+    sstall  = np.zeros((len(regions),len(modelnames),nyrs*12)) # Region x Model x Time
+    sstvars = np.zeros((len(regions),len(modelnames))) # Region x Model
+    
+    # An unfortunate nested loop... 
+    for rid in range(len(regions)):
+        for model in range(len(modelnames)):
+            sstin  = sstdict[rid][model]
+            sstvar = np.var(sstin)
+            print("Variance for region %s, model %s is %f" % (regions[rid],modelnames[model],sstvar))
+            
+            sstall[rid,model,:] = sstin.copy()
+            sstvars[rid,model]   = sstvar
 
 #% Load corresponding CESM Data ------------------
 expid      = "CESM1-PIC"
@@ -301,78 +402,143 @@ for rid in range(len(regions)-1):
         sstvarscesm[rid,model]   = sstvar
 #%% Do some spectral analysis
 
-ssmooth    = 65
-cnsmooths  = [75,65]
+
+
+ssmooth    = 30        # Stochastic Model Smoothing
+cnsmooths  = [100,100] # CESM1 Smoothing
 pct        = 0.10
-nsmooth    = np.concatenate([np.ones(3)*ssmooth,np.ones(2)*cnsmooths])
-smoothname = "smth-obs%03i-full%02i-slab%02i" % (ssmooth,cnsmooths[0],cnsmooths[1])
+alpha      = 0.05      # For CI Calculatuions
+
+sdof       = 1000       # Degrees of freedom
+cdofs      = [898,1798] #
 
 
-pct     = 0.10
-dofs    = [1000,1000,898,1798] # In number of years
+if continuous:
 
-# # Unpack and stack data (DELETE This section, I think it's a holdover)
-# insst = []
-# for model in range(len(modelnames)):
-#     insst.append(sstall[rid,model,:]) # Append each stochastic model result
-#     #print(np.var(sstall[fid,rid,model,:]))
-# insst.append(sstcesm[rid][0]) # Append CESM-FULL
-# insst.append(sstcesm[rid][1]) # Append CESM-SLAB 
-
-# insstvars = []
-# for s in insst:
-#     insstvars.append(np.var(s))
-#     #print(np.var(s))
-
-# # Calculate Spectra and confidence Intervals
-# specs,freqs,CCs,dofs,r1s = scm.quick_spectrum(insst,nsmooth,pct)
-# alpha = 0.05
-# bnds = []
-# for nu in dofs:
-#     lower,upper = tbx.confid(alpha,nu*2)
-#     bnds.append([lower,upper])
+    # Loop for each region
+    ss = []
+    ff = []
+    cc = []
+    bb = []
+    vv = []
     
-
-# Loop for each region
-ss = []
-ff = []
-cc = []
-bb = []
-vv = []
-for rid in range(len(regions)):
+    # Calculate for CESM and SM Separately
+    for rid in range(len(regions)):
+        
+        # Preallocate arrays for average for each model
+        sm_avgspec = []
+        sm_avgCC   = []
+        sm_avgr1   = [] 
+        sm_avgvar  = []
+        for mid in range(len(modelnames)):
+            
+            # First, Compute SM Spectra for each RUN
+            # ---------------------------------------
+            # Setup
+            sst_sel = ssts_allrun[:,rid,mid,:] # [run x time]
+            insst = [sst_sel[run,:] for run in range(nrun)]
+            
+            # Calculate Spectra for all runs of a selected rid/model
+            specs,freqs,CCs,dofs,r1s = scm.quick_spectrum(insst,ssmooth,pct)
+            
+            # Assign to temporary variable # smspecs_all [run,region,nmodels,nreqs]
+            if rid == 0:
+                nfreqs = specs[0].shape[0]
+                smspecs_all = np.zeros((nrun,nregion,nmodels,nfreqs)) * np.nan
+            for run in range(nrun):
+                smspecs_all[:,rid,mid,:] = specs[run].copy()
+            
+            # Take average of SM
+            # ------------------
+            sm_avgspec.append(np.array(specs).mean(0))
+            sm_avgCC.append(np.array(CCs).mean(0))
+            sm_avgr1.append(np.mean(r1s))
+            sm_avgvar.append(np.mean(np.var(sst_sel,1),0))
+            
+            
+        
+        # Compute for CESM
+        # ----------------
+        insst_cesm                    =  [sstcesm[rid][0],sstcesm[rid][1]]
+        cspecs,cfreqs,cCCs,cdofs,cr1s = scm.quick_spectrum(insst_cesm,cnsmooths,pct)
+        cvars = [np.var(csst) for csst in insst_cesm]
+        
+        
+        # Combine with CESM
+        # -----------------
+        ss.append(sm_avgspec+cspecs)
+        ff.append([freqs[0],freqs[0],freqs[0]]  +cfreqs)
+        cc.append(sm_avgCC +cCCs)
+        dofs.append([dofs[0],dofs[0],dofs[0]] +cdofs)
+        r1s.append(sm_avgr1 + cr1s)
+        vv.append(sm_avgvar + cvars)
+            
+        # Calculate Confidence Inervals
+        # -----------------------------
+        bnds = []
+        for nu in dofs:
+            lower,upper = tbx.confid(alpha,nu*2)
+            bnds.append([lower,upper])
+        bb.append(bnds)
+else:
+    nsmooth    = np.concatenate([np.ones(3)*ssmooth,np.ones(2)*cnsmooths])
+    smoothname = "smth-obs%03i-full%02i-slab%02i" % (ssmooth,cnsmooths[0],cnsmooths[1])
     
-    # Get SSTs
-    insst = []
-    for mid in range(len(modelnames)):
-        # Append each stochastic model result
-        insst.append(sstall[rid,mid,:])
-    insst.append(sstcesm[rid][0])
-    insst.append(sstcesm[rid][1])
+    pct     = 0.10
+    dofs    = [1000,1000,898,1798] # In number of years
     
-    # Calculate the variance
-    insstvars = []
-    for s in insst:
-        insstvars.append(np.var(s))
-    
-    # Calculate Spectra and confidence Intervals
-    specs,freqs,CCs,dofs,r1s = scm.quick_spectrum(insst,nsmooth,pct)
-    alpha = 0.05
-    bnds = []
-    for nu in dofs:
-        lower,upper = tbx.confid(alpha,nu*2)
-        bnds.append([lower,upper])
-    
-    ss.append(specs)
-    ff.append(freqs)
-    cc.append(CCs)
-    bb.append(bnds)
-    vv.append(insstvars)
-    
+    # Loop for each region
+    ss = []
+    ff = []
+    cc = []
+    bb = []
+    vv = []
+    for rid in range(len(regions)):
+        
+        # Get SSTs
+        insst = []
+        for mid in range(len(modelnames)):
+            # Append each stochastic model result
+            insst.append(sstall[rid,mid,:])
+        insst.append(sstcesm[rid][0])
+        insst.append(sstcesm[rid][1])
+        
+        # Calculate the variance
+        insstvars = []
+        for s in insst:
+            insstvars.append(np.var(s))
+        
+        # Calculate Spectra and confidence Intervals
+        specs,freqs,CCs,dofs,r1s = scm.quick_spectrum(insst,nsmooth,pct)
+        
+        bnds = []
+        for nu in dofs:
+            lower,upper = tbx.confid(alpha,nu*2)
+            bnds.append([lower,upper])
+        
+        ss.append(specs)
+        ff.append(freqs)
+        cc.append(CCs)
+        bb.append(bnds)
+        vv.append(insstvars)
+        
 specsall  = ss # array[forcing][region][model]
 freqsall  = ff
 Cfsall    = cc
 bndsall   = bb
 sstvarall = vv
+
+"""
+
+Key Outputs
+
+specsall  [region][model] spectra
+freqsall  [region][model] frequencies
+Cfsall    [region][model] confidence intervals (AR1 h0)
+bndsall   [region][model] confidence bounds (chi2)
+sstvarall [region][model] SST variances
+
+"""
 
 #%% Function to add subplot labels
 
@@ -384,6 +550,11 @@ sstvarall = vv
 alw = 3
 exclude_consth = True # Set to true to NOT plot constant h model
 notitle        = True
+
+if continuous: # Number of spectra to plot
+    nspecs = 5
+else:
+    nspec = len(insst)
 
 
 if exclude_consth:
@@ -441,7 +612,7 @@ for i in range(2):
     ax  = axs[1,i]
     rid = order[i]
     
-    speclabels = ["%s (%.3f $^{\circ}C^2$)" % (specnames[i],sstvarall[rid][i]) for i in range(len(insst)) ]
+    speclabels = ["%s (%.3f $^{\circ}C^2$)" % (specnames[i],sstvarall[rid][i]) for i in range(nspecs) ]
     
     ax,ax2 = viz.plot_freqlin(specsall[rid],freqsall[rid],speclabels,speccolors,lw=alw,
                          ax=ax,plottitle=regionlong[rid],
@@ -534,7 +705,7 @@ for i in range(2):
         specylim = [0,1] 
         
     
-    speclabels = ["%s (%.3f $^{\circ}C^2$)" % (specnames[i],sstvarall[rid][i]) for i in range(len(insst)) ]
+    speclabels = ["%s (%.3f $^{\circ}C^2$)" % (specnames[i],sstvarall[rid][i]) for i in range(nspecs) ]
     
     
     ax,ax2 = viz.plot_freqlin(specsall[rid],freqsall[rid],speclabels,speccolors,lw=alw,
@@ -580,8 +751,9 @@ alw            = 3
 exclude_consth = True # Set to true to NOT plot constant h model
 notitle        = True
 plotslab       = False # Set to True to plot the slab model simulation
-
-plotlog        = True # Set to True to Plot in Log Scale
+plotlog        = False # Set to True to Plot in Log Scale
+linearx        = 1 # Keep frequency axis linear, period axis marked (Works only with plotlog=False)
+periodx        = False
 
 if exclude_consth:
     plotid = [1,2]
@@ -593,16 +765,13 @@ else:
 if plotslab is False: # Remove slab simulation
     plotidspec.remove(4)
     specylim_spg = [0,0.42]
-    specylim_stg = [0,0.15]
+    specylim_stg = [0,0.175]
 else:
     specylim_spg = [0,0.8]
     specylim_stg = [0,0.3]
 
 rids = [0,6,5,]
 order = rids
-
-
-
 
 # Do Plotting
 # ---------------
@@ -636,7 +805,7 @@ for i in range(len(rids)):
         ax.plot(lags,cesmacs[rid][cid],color=cesmcolor[cid],label=cesmname[cid],lw=alw)
         ax.fill_between(lags,cfcesm[rid,cid,lags,0],cfcesm[rid,cid,lags,1],
                         color=cesmcolor[cid],alpha=0.10)
-        
+    
     if i >0: # Set ylabel to false for all plots except leftmost
         ax.set_ylabel("")
         ax.yaxis.set_ticklabels([])
@@ -659,7 +828,7 @@ for i in range(len(rids)):
     rid = order[i]
     
     #speclabels = ["%s (%.3f $^{\circ}C^2$)" % (specnames[i],sstvarall[rid][i]) for i in range(len(insst)) ]
-    speclabels=["" for i in range(len(insst))]
+    speclabels=["" for i in range(nspecs)]
     
     
     if plotlog:
@@ -671,18 +840,28 @@ for i in range(len(rids)):
         ax,ax2 = viz.plot_freqlin(specsall[rid],freqsall[rid],speclabels,speccolors,lw=alw,
                              ax=ax,plottitle=regionlong[rid],
                              xlm=xlm,xtick=xtks,return_ax2=True,
-                             plotids=plotidspec,legend=False)
+                             plotids=plotidspec,legend=False,linearx=linearx)
+        
+        
+        # Add confidence intervals
     
     # Turn off title and second axis labels
-    ax.set_title("")
-    ax2.set_xlabel("")
-    sxtk2 = ax2.get_xticklabels()
-    sxtk2new = np.repeat("",len(sxtk2))
-    ax2.set_xticklabels(sxtk2new)
+    if periodx: # Switch Frequency with Period for x-axis.
+        ax2.set_xlabel("")
+        sxtk2 = ax2.get_xticklabels()
+        xtk2new = np.repeat("",len(sxtk2))
+        ax2.set_xticklabels(sxtk2new)
+        ax.set_xticklabels(1/xtks)
+        
+        # Move period labels to ax1
+        ax.set_xticklabels(xper)
+        ax.set_xlabel("Period (Years)")
+    else:
+        if i == 1:
+            ax2.set_xlabel("Period (Years)")
     
-    # Move period labels to ax1
-    ax.set_xticklabels(xper)
-    ax.set_xlabel("Period (Years)")
+    
+    ax.grid(True,ls='dotted',alpha=0.5)
     
     if plotlog is False:
         rotation  =55
@@ -691,7 +870,10 @@ for i in range(len(rids)):
         rotation  =0
         xfontsize =8
     
-    plt.setp(ax.get_xticklabels(), rotation=rotation,fontsize=xfontsize)
+    if periodx:
+        plt.setp(ax.get_xticklabels(), rotation=rotation,fontsize=xfontsize)
+    else:
+        plt.setp(ax2.get_xticklabels(), rotation=rotation,fontsize=xfontsize)
     
     if i == 0:# Turn off y label except for leftmost plot
         ax.set_ylabel("Power Spectrum ($K^2 /cpy$)")
