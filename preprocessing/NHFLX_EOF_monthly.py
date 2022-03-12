@@ -527,7 +527,6 @@ xtk = np.arange(1,N_mode+1,1)
 ytk = np.arange(15,105,5)
 fig,ax = plt.subplots(1,1)
 
-
 for m in range(12):
     plt.plot(modes,cvarall[:,m]*100,label="Month %i"% (m+1),marker="o",markersize=4)
 ax.legend(fontsize=8,ncol=2)
@@ -539,7 +538,10 @@ ax.grid(True,ls='dotted')
 ax.set_xlim([1,N_modeplot])
 #ax.axhline(80)
 #ax.set_xticks(xtk)
-plt.savefig("%s%s_NHFLX_EOFs%i_%s_ModevCumuVariance_bymon.png"%(outpath,mcname,N_modeplot,bboxtext),dpi=150)
+savename = "%s%s_NHFLX_EOFs%i_%s_ModevCumuVariance_bymon.png"%(outpath,mcname,N_modeplot,bboxtext)
+if correction:
+    savename = proc.addstrtoext(savename,correction_str)
+plt.savefig(savename,dpi=150)
 
 # ------------------------------------------------
 # %% Make the Forcings...
@@ -549,7 +551,7 @@ plt.savefig("%s%s_NHFLX_EOFs%i_%s_ModevCumuVariance_bymon.png"%(outpath,mcname,N
 #% Save a select number of EOFs
 # -----------------------------
 eofcorr       = 0
-N_mode_choose = 3
+N_mode_choose = 1
 
 # Select the mode
 eofforce      = eofall.copy()
@@ -569,6 +571,8 @@ elif eofcorr == 2: # Correct based on the LOCAL variance explained at each point
     eofforce  *= ampfactor[:,:,None,:] 
 
 savenamefrc   = "%sflxeof_%ieofs_%s_eofcorr%i.npy" % (datpath,N_mode_choose,mcname,eofcorr)
+if correction:
+    savenamefrc = proc.addstrtoext(savenamefrc,correction_str)
 np.save(savenamefrc,eofforce)
 print("Saved data to "+savenamefrc)
 
@@ -577,7 +581,7 @@ print("Saved data to "+savenamefrc)
 # -----------------------------
 
 eofcorr       = 0
-N_mode_choose = 0
+N_mode_choose = 1
 
 # Select the mode
 eofforce = eofall.copy()
@@ -597,7 +601,11 @@ elif eofcorr == 2: # Correct based on the LOCAL variance explained at each point
     eofforce *= ampfactor
 
 eofforce = eofforce[:,:,None,:] # lon x lat x pc x mon
+
 savenamefrc   = "%sflxeof_EOF%i_%s_eofcorr%i.npy" % (datpath,N_mode_choose+1,mcname,eofcorr)
+if correction:
+    savenamefrc = proc.addstrtoext(savenamefrc,correction_str)
+
 np.save(savenamefrc,eofforce)
 print("Saved data to "+savenamefrc)
 
