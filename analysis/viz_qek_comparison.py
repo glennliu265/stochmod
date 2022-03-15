@@ -30,7 +30,7 @@ import cartopy.crs as ccrs
 
 datpath = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_output/'
 fnames  = ["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_dmp0" %i for i in range(10)]
-figpath = projpath + "02_Figures/20220315/"
+figpath = datpath + "../../02_Figures/20220315/"
 proc.makedir(figpath)
 
 #%% From SM Stylesheet
@@ -111,7 +111,7 @@ for q in range(2):
             expid = fnames[f]
             mid  = 2
         else:
-            expid = fnames[f]
+            expid = fnames[f] + "_Qek"
             mid  = 0
         
         
@@ -183,10 +183,6 @@ freqsm   = freqs[0]
 
 #%% Make the Plot
 
-
-
-
-
 dtplot     = 3600*24*365
 rid_sel    =[0,5,6,]
 specnames_ratio = ("log( With $Q_ek$ / Without $Q_{ek}$)","log( With $Q_ek$ / CESM-FULL)")
@@ -199,6 +195,7 @@ amvplot    = np.nanmean(amvpats_all[1,:,7,:,:],0)
 numerspec  = smspecs[1,:,:,:].mean(0) # [region x freq]
 denomspec  = smspecs[0,:,:,:].mean(0)
 cid        = 0 # 0 = FULL, 1 = SLAB
+
 
 # Initialize figure
 fig = plt.figure(constrained_layout=True, facecolor='w',figsize=(12,8))
@@ -229,8 +226,8 @@ ax.set_title("Entraining with $Q_{ek}$ ($\sigma^2_{AMV}$ = %.4f$K^2$)"%(plotvar)
 ax = viz.add_coast_grid(ax,bboxplot,line_color='k',
                         fill_color='gray')
 pcm = ax.contourf(lonr,latr,amvplot.T,levels=cint,cmap='cmo.balance')
-cl = ax.contour(lonr,latr,amvplot.T,levels=cl_int,colors="k",linewidths=0.5)
-ax.clabel(cl,levels=cl_int,fontsize=8)
+cl = ax.contour(lonr,latr,amvplot.T,levels=cint,colors="k",linewidths=0.5)
+ax.clabel(cl,levels=cint[::2],fontsize=10,fmt="%.02f")
 viz.plot_mask(lonr,latr,dmsks[1],ax=ax,markersize=0.5)
 
 
