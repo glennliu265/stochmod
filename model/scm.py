@@ -1054,8 +1054,9 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
     bbox_NA_new = [-80,0,10,65]
     bbox_ST_w  = [-80,-40,20,40]
     bbox_ST_e  = [-40,-10,20,40]
-    regions = ("SPG","STG","TRO","NAT","NNAT","STGe","STGw")        # Region Names
-    bboxes = (bbox_SP,bbox_ST,bbox_TR,bbox_NA,bbox_NA_new,bbox_ST_e,bbox_ST_w) # Bounding Boxes
+    bbox_NA_ex = [-80,0,20,60]
+    regions = ("SPG","STG","TRO","NAT","NNAT","STGe","STGw","NATex")        # Region Names
+    bboxes = (bbox_SP,bbox_ST,bbox_TR,bbox_NA,bbox_NA_new,bbox_ST_e,bbox_ST_w,bbox_NA_ex) # Bounding Boxes
     
     #% ---- Read in Data ----
     start = time.time()
@@ -3143,6 +3144,31 @@ def load_pathdict(device,csvpath=None,csvname=None):
     
     
 
-#%%
+#%% Silly Functions to Deal with sm data formats
+def unpack_smdict(indict):
+    """
+    Takes a dict of [run][region][models][OTHERDIMS] and unpacks it into
+    an array [unpackaged]
+
+    """
+    # Get "Outer Shell" dimensions
+    nrun    = len(indict)
+    nregion = len(indict[0])
+    nmodels = len(indict[0][0])
+    
+    # For Autocorrelation
+    otherdims = indict[0][0][0].shape
+    print("Found... Runs (%i) Regions (%i) ; Models (%i) ; Otherdims (%s)" % (nrun,nregion,nmodels,str(otherdims)))
+    
+    # Preallocate
+    newshape = np.concatenate([[nrun,nregion,nmodels],otherdims])
+    unpacked = np.zeros(newshape) * np.nan
+    
+    # Loop thru dict
+    for run in range(nrun):
+        for reg in range(nregion):
+            for mod in range(nmodels):
+                unpacked[run,reg,mod,:] = indict[run][reg][mod]
+    return unpacked
 
 
