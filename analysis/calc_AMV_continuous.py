@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 import sys
 import cmocean
 from tqdm import tqdm
+import xarray as xr
 #%% Set Paths, Import Custom Modules
 stormtrack = 0
 if stormtrack == 0:
@@ -23,7 +24,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20220305/"
+    figpath     = projpath + "02_Figures/20220315/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -52,7 +53,7 @@ mconfig   = "SLAB_PIC"
 nyrs      = 1000        # Number of years to integrate over
 
 # Visualize Continuous run 200, Fprime
-fnames   = ["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_dmp0"%i for i in range(10)]
+fnames   = ["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method4_dmp0"%i for i in range(10)]
 frcnamelong = ["$F'$ run 2%02d" % (i) for i in range(10)]
 exname   = "Fprime_amq0_method5_cont"
 
@@ -95,8 +96,10 @@ bbox_ST     = [-80,-10,20,40]
 bbox_TR     = [-75,-15,10,20]
 bbox_NA     = [-80,0 ,0,65]
 bbox_NA_new = [-80,0,10,65]
-bbox_ST_w  = [-80,-40,20,40]
-bbox_ST_e  = [-40,-10,20,40]
+bbox_ST_w   = [-80,-40,20,40]
+bbox_ST_e   = [-40,-10,20,40]
+bbox_NAextr = [-80,0,20,60]
+
 regions = ("SPG","STG","TRO","NAT","NNAT","STGe","STGw")        # Region Names
 bboxes = (bbox_SP,bbox_ST,bbox_TR,bbox_NA,bbox_NA_new,bbox_ST_e,bbox_ST_w) # Bounding Boxes
 regionlong = ("Subpolar","Subtropical","Tropical","North Atlantic","North Atlantic","Subtropical (East)","Subtropical (West)",)
@@ -151,6 +154,9 @@ lat    = ld['lat']
 # Load global lat/lon
 lon180g,latg  = scm.load_latlon(rawpath)
 
+# Load dmsks
+dmsks = scm.load_dmasks(bbox=[lon[0],lon[-1],lat[0],lat[-1]])
+dmsks.append(dmsks[-1])
 #%% For each model read in the data
 
 if debug:
@@ -172,21 +178,62 @@ for f,fname in tqdm(enumerate(fnames)):
     sst_all.append(ssts_ann)
 sst_all = np.concatenate(sst_all,axis=3) # [model x lon x lat x year]
 
+#%% Load data for CESM
+
+# Copied from Explore_Regional_Properties.ipynb, 03/11/2022
+mconfigs = ("SLAB","FULL")
+cdatpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/"
+bbox     = [np.floor(lonr[0]),np.ceil(lonr[-1]),np.floor(latr[0]),np.ceil(latr[-1])]
+print("Simulation bounding Box is %s "% (str(bbox)))
+
+sst_cesm = []
+for mconfig in mconfigs:
+    fname   = "%sCESM1_%s_postprocessed_NAtl.nc" % (cdatpath,mconfig)
+    ds      = xr.open_dataset(fname)
+    dsreg   = ds.sel(lon=slice(bbox[0],bbox[1]),lat=slice(bbox[2],bbox[3]))
+    sst_cesm.append(dsreg.SST.values)
+
+
+
 #%% Now Compute the AMV Pattern
-amvbboxes          = ([-80,0,10,65],[-80,0,20,60],[-80,0,10,60])
+
+applymask          = True
+amvbboxes          = ([-80,0,10,65],[-80,0,20,60],[-80,0,40,60],[-80,0,0,65])
 nboxes             = len(amvbboxes)
 nmod,nlon,nlat,nyr = sst_all.shape
 
-# Compute the AMV Pattern
-amvpats = np.zeros((nmod,nlon,nlat,nboxes))*np.nan
-amvids  = np.zeros((nmod,nyr,nboxes))*np.nan
+# Compute the AMV Pattern (for the stochastic model)
+amvpats = np.zeros((nmod,nlon,nlat,nboxes))*np.nan # [model x lon x lat x region]
+amvids  = np.zeros((nmod,nyr,nboxes))      *np.nan
+camvpats  = [] # [bbox][cesm-config]
+camvids   = []
 for b,bbin in tqdm(enumerate(amvbboxes)):
+    
+    
+    # Do for Stochastic Models
     for mid in range(nmod):
+        
+        if applymask:
+            inmask = dmsks[mid]
+        else:
+            inmask = None
         sst_in = sst_all[mid,...]
         amvid,amvpat = proc.calc_AMVquick(sst_in,lonr,latr,bbin,anndata=True,
-                                          runmean=False,dropedge=5,mask=None)
-        amvpats[mid,...,b] = amvpat.copy()
+                                          runmean=False,dropedge=5,mask=inmask)
+        amvpats[mid,...,b]  = amvpat.copy()
         amvids[mid,...,b]   = amvid.copy()
+        
+    # Do for CESM
+    cpats = []
+    cids  = []
+    for i in range(2):
+        sst_in = sst_cesm[i]
+        amvid,amvpat = proc.calc_AMVquick(sst_in,lonr,latr,bbin,anndata=False,
+                                          runmean=False,dropedge=5,mask=None)
+        cpats.append(amvpat)
+        cids.append(amvid)
+    camvpats.append(cpats)
+    camvids.append(cids)
 
 #%% Plot Traditional AMV Pattern (3 Panel) for each AMV bbox
 
@@ -240,8 +287,168 @@ cb = fig.colorbar(cf,ax=axs.flatten(),fraction=0.0156)
 cb.set_label("AMV Pattern ($K \sigma_{AMV}^{-1}$)")
 plt.savefig("%sAMV_Comparison_bboxes.png"%(figpath),dpi=150)
 
+#%% Redo Stochastic Model Paper Plot
+# Copied from viz_AMV_comparison.py (03/11/2022)
+
+# Plot settings
+notitle    = True
+darkmode   = False
+cmax       = 0.5
+cstep      = 0.025
+lstep      = 0.05
+cint,cl_int=viz.return_clevels(cmax,cstep,lstep)
+clb        = ["%.2f"%i for i in cint[::4]]
+
+
+sel_rid   = 3
+
+plotbbox  = False
+
+
+# Begin Plotting
+# ----------------
+rid   = sel_rid
+bbin  = amvbboxes[rid]
+bbstr = "lon%ito%i_lat%ito%i" % (bbin[0],bbin[1],bbin[2],bbin[3])
+
+spid = 0
+proj = ccrs.PlateCarree()
+fig,axs = plt.subplots(2,2,subplot_kw={'projection':proj},figsize=(9,9),
+                       constrained_layout=True)
+
+if darkmode:
+    plt.style.use('dark_background')
+    
+    
+    savename = "%sSST_AMVPattern_Comparison_%s_region%s_mask%i_dark.png" % (figpath,fnames[f],bbstr,applymask)
+    fig.patch.set_facecolor('black')
+    dfcol = 'k'
+else:
+    plt.style.use('default')
+    savename = "%sSST_AMVPattern_Comparison_%s_region%s_mask%i.png" % (figpath,fnames[f],bbstr,applymask)
+    fig.patch.set_facecolor('white')
+    dfcol = 'k'
+
+
+
+
+# figsize=(12,6)
+# ncol = 3
+# fig,axs = viz.init_2rowodd(ncol,proj,figsize=figsize,oddtop=False,debug=True)
+
+# Plot Stochastic Model Output
+for aid,mid in enumerate([0,2]):
+    ax = axs.flatten()[aid]
+    
+    # Set Labels, Axis, Coastline
+    if mid == 0:
+        blabel = [1,0,0,0]
+    elif mid == 1:
+        blabel = [0,0,0,1]
+    else:
+        blabel = [0,0,0,0]
+    
+    # Make the Plot
+    ax = viz.add_coast_grid(ax,bboxplot,blabels=blabel,line_color=dfcol,
+                            fill_color='gray')
+    pcm = ax.contourf(lon,lat,amvpats[mid,:,:,rid].T,levels=cint,cmap='cmo.balance')
+    ax.pcolormesh(lon,lat,amvpats[mid,:,:,rid].T,vmin=cint[0],vmax=cint[-1],cmap='cmo.balance',zorder=-1)
+    cl = ax.contour(lon,lat,amvpats[mid,:,:,rid].T,levels=cl_int,colors="k",linewidths=0.5)
+    ax.clabel(cl,levels=cl_int,fontsize=8)
+    
+    
+    ax.set_title("%s ($\sigma^2_{AMV}$ = %.04f $K^2$)"%(modelnames[mid],np.var(amvids[mid,:,rid])))
+    if plotbbox:
+        ax,ll = viz.plot_box(amvbboxes[rid],ax=ax,leglab="AMV",
+                             color=dfcol,linestyle="dashed",linewidth=2,return_line=True)
+        
+    viz.plot_mask(lon,lat,dmsks[mid],ax=ax,markersize=0.3)
+    ax.set_facecolor=dfcol
+    ax = viz.label_sp(spid,case='lower',ax=ax,labelstyle="(%s)",fontsize=16,alpha=0.7,fontcolor=dfcol)
+    spid += 1
+    
+# Plot CESM1
+#axs[1,1].axis('off')
+
+for cid in range(2):
+    
+    ax = axs[1,cid]
+    if cid == 0:
+        #ax = axs[1,0]
+        blabel = [1,0,0,1]
+        spid = 2
+        
+        #spid = 3 # Flipped order
+    else:
+        blabel = [0,0,0,1]
+        #ax = axs[1,0]
+        
+        spid = 3
+        
+    # Make the Plot
+    ax = viz.add_coast_grid(ax,bboxplot,blabels=blabel,line_color=dfcol,
+                            fill_color='gray')
+    pcm = ax.contourf(lon,lat,camvpats[rid][cid].T,levels=cint,cmap='cmo.balance')
+    ax.pcolormesh(lon,lat,camvpats[rid][cid].T,vmin=cint[0],vmax=cint[-1],cmap='cmo.balance',zorder=-1)
+    cl = ax.contour(lon,lat,camvpats[rid][cid].T,levels=cl_int,colors="k",linewidths=0.5)
+    ax.clabel(cl,levels=cl_int,fontsize=8)
+    ax.set_title("CESM-%s ($\sigma^2_{AMV}$ = %.04f $K^2$)"%(mconfigs[cid],np.var(camvids[rid][cid])))
+    if plotbbox:
+        ax,ll = viz.plot_box(amvbboxes[rid],ax=ax,leglab="",
+                             color=dfcol,linestyle="dashed",linewidth=2,return_line=True)
+    ax = viz.label_sp(spid,case='lower',ax=ax,labelstyle="(%s)",fontsize=16,alpha=0.7,fontcolor=dfcol)
+
+cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction=0.030,pad=0.05)
+cb.set_ticks(cint[::4])
+cb.ax.set_xticklabels(clb,rotation=45)
+cb.set_label("SST ($K \, \sigma_{AMV}^{-1}$)")
+#cb.ax.set_xticklabels(cint[::2],rotation=90)
+#tick_start = np.argmin(abs(cint-cint[0]))
+#cb.ax.set_xticklabels(cint[tick_start::2],rotation=90)
+if notitle is False:
+    plt.suptitle("%s AMV Pattern and Index Variance [Forcing = %s]" % (regionlong[rid],frcnamelong[f]),fontsize=14)
+
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+
+
 #%% Lets analyze conditions at a particular point
 input_path = datpath+"model_input/"
 frcname    = "flxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0"
 inputs     = scm.load_inputs('SLAB_PIC',frcname,input_path,load_both=True)
 lon,lat,h,kprevall,dampingslab,dampingfull,alpha,alpha_full = inputs
+
+
+#%% SM Paper Draft 3 (CESM AMV Inset for Seasonal Cycle Figure)
+
+# Calculate the AMV over bounding box bbin
+cid      = 1 # Set the CESM model
+bbin     = [-80,0,20,60]
+bboxplot = [-80,0,10,60] 
+sst_in = sst_cesm[cid]
+amvid,amvpat = proc.calc_AMVquick(sst_in,lonr,latr,bbin,anndata=True,
+                                  runmean=False,dropedge=5,mask=inmask)
+
+# Prepare Tick Labels
+cl_int    = np.arange(-0.45,0.50,0.05)
+cb_lab    = np.arange(-.5,.6,.1)
+
+# Make the Plot
+fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(6,4))
+ax = viz.add_coast_grid(ax,bbox=bboxplot)
+ax = viz.add_coast_grid(ax,bboxplot,blabels=[1,0,0,1],line_color=dfcol,
+                        fill_color='gray')
+pcm = ax.contourf(lon,lat,amvpat.T,levels=cint,cmap='cmo.balance',extend='both')
+#ax.pcolormesh(lon,lat,amvpat.T,vmin=cint[0],vmax=cint[-1],cmap='cmo.balance',zorder=-1)
+cl = ax.contour(lon,lat,amvpat.T,levels=cl_int,colors="k",linewidths=0.5)
+ax.scatter(-30,50,200,marker="*",facecolor='yellow',zorder=9,edgecolor='k',linewidth=.5)
+ax.clabel(cl,levels=cl_int,fontsize=8)
+
+# Add Colorbar, Reduce tick labels
+cb = fig.colorbar(pcm,ax=ax,orientation="horizontal",fraction=0.050,pad=0.1)
+cb.set_label("SST ($K \sigma_{AMV}^{-1}$)")
+cb.set_ticks(cb_lab)
+
+plt.savefig("%sAMV_Patterns_Indv_%s.png"% (figpath,mconfigs[cid]),dpi=200,bbox_inches='tight')
+
+#%%
