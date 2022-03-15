@@ -82,7 +82,7 @@ def sel_regionxr(ds,bbox):
 #%% User Edits
 
 # Set your configuration
-mconfig = "PIC_SLAB"
+mconfig = "PIC_FULL"
 
 # Set up names (need to change this at some point, silly coding...)
 if mconfig == "PIC_SLAB":
@@ -551,7 +551,7 @@ plt.savefig(savename,dpi=150)
 #% Save a select number of EOFs
 # -----------------------------
 eofcorr       = 0
-N_mode_choose = 1
+N_mode_choose = 2
 
 # Select the mode
 eofforce      = eofall.copy()
@@ -581,7 +581,7 @@ print("Saved data to "+savenamefrc)
 # -----------------------------
 
 eofcorr       = 0
-N_mode_choose = 1
+N_mode_choose = 0
 
 # Select the mode
 eofforce = eofall.copy()

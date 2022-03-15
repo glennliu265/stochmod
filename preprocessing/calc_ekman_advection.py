@@ -28,7 +28,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20210104/"
+    figpath     = projpath + "02_Figures/20210315/"
    
     lipath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/landicemask_enssum.npy"
     
@@ -98,10 +98,13 @@ mons3 = ('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'
 
 centered  = True # Set to True to load centered-difference temperature
 calc_dT   = False # Set to True to recalculate temperature gradients (Part 1)
-calc_dtau = False # Set to True to perform wind-stress regressions to PCs (Part 2)
-calc_qek  = False # set to True to calculate ekman forcing 
+calc_dtau = True # Set to True to perform wind-stress regressions to PCs (Part 2)
+calc_qek  = True # set to True to calculate ekman forcing 
 debug     = True # Set to True to visualize for debugging
 
+# Fprime or Qnet
+correction     = True # Set to True to Use Fprime (T + lambda*T) instead of Qnet
+correction_str = "_Fprime_rolln0" # Add this string for loading/saving
 # -------------------
 #%% Part 1: LOAD DATA
 # -------------------
@@ -190,7 +193,7 @@ if calc_dT:
         'lat':lat})
     print("Saved centered difference output to: %s" % savename)
 
-    #%% Experimenting with other 
+    #% Experimenting with other 
     
     # https://gradsaddict.blogspot.com/2019/11/python-tutorial-temperature-advection.html?m=0
     
@@ -256,7 +259,11 @@ if debug:
 N_mode = 200
 
 # Load the PCs
-ld        = np.load("%sNHFLX_FULL-PIC_%sEOFsPCs_lon260to20_lat0to65.npz" % (rawpath,N_mode),allow_pickle=True)
+savename = "%sNHFLX_FULL-PIC_%sEOFsPCs_lon260to20_lat0to65.npz" % (rawpath,N_mode)
+if correction:
+    savename = proc.addstrtoext(savename,correction_str)
+    
+ld        = np.load(savename,allow_pickle=True)
 pcall     = ld['pcall'] # [PC x MON x TIME]
 eofall    = ld['eofall']
 eofslp    = ld['eofslp']
@@ -381,9 +388,10 @@ if calc_dtau:
 
     #% Save the files
     # ---------------------------------
-    
     # Save output...
     savename = "%sFULL-PIC_Monthly_NHFLXEOF_TAUX_TAUY_centered%i.npz" % (rawpath,centered)
+    if correction:
+        savename = proc.addstrtoext(savename,correction_str)
     np.savez(savename,**{
         'taux':taux_pat_fin,
         'tauy':tauy_pat_fin,
@@ -395,6 +403,8 @@ if calc_dtau:
 #% Load the files otherwise
 else:
     savename = "%sFULL-PIC_Monthly_NHFLXEOF_TAUX_TAUY_centered%i.npz" % (rawpath,centered)
+    if correction:
+        savename = proc.addstrtoext(savename,correction_str)
     ld = np.load(savename)
     taux_pat_fin = ld['taux']
     tauy_pat_fin = ld['tauy']
@@ -574,6 +584,8 @@ if calc_qek:
 
     # Save output output
     savename = "%sFULL-PIC_Monthly_NHFLXEOF_Qek_centered%i.npz" % (rawpath,centered)
+    if correction:
+        savename = proc.addstrtoext(savename,correction_str)
     np.savez(savename,**{
         'q_ek':q_ek180,
         'u_ek':u_ek180,
@@ -584,6 +596,8 @@ if calc_qek:
 else:
     
     savename = "%sFULL-PIC_Monthly_NHFLXEOF_Qek_centered%i.npz" % (rawpath,centered)
+    if correction:
+        savename = proc.addstrtoext(savename,correction_str)
     ld = np.load(savename)
     q_ek180 = ld['q_ek']
     u_ek180 = ld['u_ek']
@@ -730,6 +744,8 @@ qekforce= qekforce.transpose(0,1,3,2) # [lon x lat x pc x mon]
 nmax = thresid.max()
 qekforce = qekforce[:,:,:nmax+1,:]
 savenamefrc = "%sQek_eof_%03ipct_%s_eofcorr%i.npy" % (datpath,vthres*100,"FULL_PIC",eofcorr)
+if correction:
+    savenamefrc = proc.addstrtoext(savenamefrc,correction_str)
 np.save(savenamefrc,qekforce)
 
 print("Saved postprocessed Q-ek forcing to %s" % (savenamefrc))
@@ -801,6 +817,8 @@ savenamenew     = "%sflxeof_qek_%ieofs_%s_JJA.npy" % (rawpath,N_mode_choose,mcna
 
 if loadagain:
     savenamefrc   = "%sflxeof_qek_%ieofs_%s.npy" % (rawpath,N_mode_choose,mcname)
+    if correction:
+        savenamefrc = proc.addstrtoext(savenamefrc,correction_str)
     eofforce = np.load(savenamefrc)
 
 eofforceseas = np.mean(eofforce[:,:,:,saveid],-1,keepdims=True) # Take mean along month axis

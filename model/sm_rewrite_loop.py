@@ -81,8 +81,8 @@ import scm
 limaskname = "limask180_FULL-HTR.npy" 
 
 # Model Params
-ampq       = True # Set to true to multiply stochastic forcing by a set value
 mconfig    = "SLAB_PIC"
+
 #"flxeof_090pct_SLAB-PIC_eofcorr1"
 #"flxeof_q-ek_090pct_SLAB-PIC_eofcorr1" #"flxeof_090pct_SLAB-PIC_eofcorr1"
 #"flxeof_qek_50eofs_SLAB-PIC" #"uniform" "flxeof_5eofs_SLAB-PIC"
@@ -92,37 +92,43 @@ mconfig    = "SLAB_PIC"
 #flxeof_qek_50eofs_SLAB-PIC
 
 # Running Parameters
-runids      = ["e00",]#["2%02d"%i for i in range(10)]#"011"
+runids      = ["2%02d"%i for i in range(10)]#"011"
 pointmode   = 0 
 points      = [-30,50]
 bboxsim     = [-80,0,0,65] # Simulation Box
+hconfigs    = [2,] # Which MLD configuration to use
 
-useslab    = True # Set to True to use SLAB_CESM parameters for all...
-savesep    = False # Set to True to save the outputs differently
+# Toggles
+useslab     = False # Set to True to use SLAB_CESM parameters for all...
+savesep     = False # Set to True to save the outputs differently
 
-# Option to start new
-continuous = True # continue run between each runid
+# Continuous Run Options
+continuous  = True  # Set to True to continue run between each runid. Set to False to start new run from T0
+# Select startfile for when run == 0. Default is to start from zero
+startfile   = None  
+#"/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_output/stoch_output_forcingforcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method5_dmp0_1000yr_run011_ampq3_method2_dmp0.npz"
 
-# Set to False to start new run from 0
-startfile    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_output/stoch_output_forcingforcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method5_dmp0_1000yr_run011_ampq3_method2_dmp0.npz"
-
+# ADD EKMAN FORCING (or other custom parameters)
+custom_params = {}
+custom_params['q_ek'] = "Qek_eof_090pct_FULL_PIC_eofcorr0_Fprime_rolln0.npy"
 
 # Additional Constants
+# --------------------
 t_end      = 12000 # Sim Length
 dt         = 3600*24*30 # Timestep
 T0         = 0 # Init Temp
 
 # Forcing Correction Method (q-corr)
-ampq   = 3 #0 = none 1 = old method, 2 = method 1, 3 = method 2
+ampq       = 0 #0 = none 1 = old method, 2 = method 1, 3 = method 2
 
 # Damping Significance Test Method
-method = 4 # 1 = No Testing; 2 = SST autocorr; 3 = SST-FLX crosscorr, 4 = Both 
-lagstr = "lag1"
+method     = 5 # 1 = No Testing; 2 = SST autocorr; 3 = SST-FLX crosscorr, 4 = Both 
+lagstr     = "lag1"
 
 # Point information
-lonf = -30
-latf = 50
-debug = False
+lonf       = -30
+latf       = 50
+debug      = False
 
 # Indicate Forcing Files to Loop Thru
 
@@ -188,6 +194,24 @@ frcnames = (
 
 #frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0',)
 frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0',)
+
+
+# Updated EOF TSest
+frcnames = ('flxeof_EOF1_SLAB-PIC_eofcorr0_Fprime_rolln0',
+            'flxeof_EOF2_SLAB-PIC_eofcorr0_Fprime_rolln0',
+            'flxeof_2eofs_SLAB-PIC_eofcorr0_Fprime_rolln0')
+
+
+# Updated Seasonal EOFs
+frcnames = ('flxeof_090pct_FULL-PIC_eofcorr2_DJF_Fprime_rolln0',
+            'flxeof_090pct_FULL-PIC_eofcorr2_MAM_Fprime_rolln0',
+            'flxeof_090pct_FULL-PIC_eofcorr2_JJA_Fprime_rolln0',
+            'flxeof_090pct_FULL-PIC_eofcorr2_SON_Fprime_rolln0')
+
+
+frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0',)
+
+
 # Single run test (90% variance forcing)
 #frcnames = ('flxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0',)
 
@@ -226,15 +250,22 @@ for f in range(len(frcnames)):
     expnames = []
     for r,runid in enumerate(runids):
         
-        expname    = "%sstoch_output_forcing%s_%iyr_run%s_ampq%i_method%i_dmp0.npz" % (output_path,frcname,int(t_end/12),runid,ampq,method) 
+        
+        expname    = "%sstoch_output_forcing%s_%iyr_run%s_ampq%i_method%i_dmp0.npz" % (output_path,frcname,int(t_end/12),runid,ampq,method,) 
         # dmp0 indicates that points with insignificant lbd_a were set to zero.
         # previously, they were set to np.nan, or the whole damping term was set to zero
+        if 'q_ek' in custom_params.keys():
+            print("Using Ekman Forcing!")
+            correction_str = '_Qek'
+            expname = proc.addstrtoext(expname,correction_str)
+        
         
         if continuous:
             if r == 0: # First Run
                 if startfile is False: # Initialize from zero
                     continue_run = False 
                 else: # Initialize from startfile
+                    print("Initializing run 0 from %s" % startfile)
                     continue_run = startfile
             else:
                 continue_run=expnames[r-1] # Use Previous file
@@ -253,7 +284,9 @@ for f in range(len(frcnames)):
                            runid,t_end,frcname,ampq,
                            bboxsim,pointmode,points=[lonf,latf],
                            dt=3600*24*30,
-                           debug=False,check=False,useslab=useslab,savesep=savesep,method=method,lagstr=lagstr)
+                           debug=False,check=False,useslab=useslab,savesep=savesep
+                           ,method=method,lagstr=lagstr,hconfigs=hconfigs,
+                           custom_params=custom_params)
         expnames.append(expname)
     print("Completed in %.2fs" % (time.time()-st))
 
