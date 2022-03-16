@@ -279,9 +279,30 @@ if correction:
 np.save(savenamefrc,eofforce)
 print("Saved data to "+savenamefrc)
 
-#%%
+#%% Monthly Forcing
+
+# Load the Forcing
+vthres  = 0.90
+eofcorr = 2
 
 
+savenamefrc = "%sflxeof_%03ipct_%s_eofcorr%i.npy" % (datpath,vthres*100,mcname,eofcorr)
+if correction:
+    savenamefrc = proc.addstrtoext(savenamefrc,correction_str)
+eofforce = np.load(savenamefrc)
 
+
+monids   = [[11,0,1],[2,3,4],[5,6,7],[8,9,10]]
+monnames = ("DJF","MAM","JJA","SON")
+for s in tqdm(range(4)):
+    # Calculate seasonal average
+    eofseas = np.mean(eofforce[:,:,:,monids[s]],-1,keepdims=True)
+    
+    # Save the output
+    savenamefrc = "%sflxeof_%03ipct_%s_eofcorr%i_%s.npy" % (datpath,vthres*100,mcname,eofcorr,monnames[s])
+    if correction:
+        savenamefrc = proc.addstrtoext(savenamefrc,correction_str)
+    print("Saving to %s"%savenamefrc)
+    np.save(savenamefrc,eofseas)
     
     
