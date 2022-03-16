@@ -22,9 +22,16 @@ from tqdm import tqdm
 # sys.path.append("/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model/")
 # from amv import proc,viz
 
-datpath  = "/vortex/jetstream/climate/data1/yokwon/CESM1_LE/downloaded/ocn/proc/tseries/monthly/HMXL/"
-ncsearch = "b.e11.B1850C5CN.f09_g16.005.pop.h.HMXL.*.nc"
-varkeep  = ["HMXL","TLONG","TLAT","time"]
+#%%
+
+varname = "BSF" # "HMXL"
+
+datpath  = "/vortex/jetstream/climate/data1/yokwon/CESM1_LE/downloaded/ocn/proc/tseries/monthly/%s/" % varname
+ncsearch = "b.e11.B1850C5CN.f09_g16.005.pop.h.%s.*.nc" % varname
+varkeep  = [varname,"TLONG","TLAT","time"]
+
+#%%
+
 
 # Get file names
 globby = datpath+ncsearch
@@ -58,7 +65,7 @@ ds = xr.open_mfdataset(nclist,concat_dim='time',
 
 # Load variables in 
 st = time.time()
-hmxl = ds.HMXL.values
+hmxl = ds[varname].values
 tlon = ds.TLONG.values
 tlat = ds.TLAT.values
 times = ds.time.values
@@ -96,13 +103,13 @@ def getpt_pop_array(lonf,latf,invar,tlon,tlat,searchdeg=0.75,printfind=True,verb
         if verbose:
             print("Returning NaN because no points were found for LAT%.1f LON%.1f"%(latf,lonf))
         return np.nan
-        exit
+        
     
     
     # Locate points on variable
     if invar.shape[:2] != tlon.shape:
         print("Warning, dimensions do not line up. Make sure invar is Lat x Lon x Otherdims")
-        exit
+        
     
     return invar[latid,lonid,:].mean(0) # Take mean along first dimension
 
@@ -149,8 +156,8 @@ print("Finished in %f seconds" % (time.time()-start))
 dsproc = xr.DataArray(hclim,
                   dims={'lon':lon1,'lat':lat,'time':times},
                   coords={'lon':lon1,'lat':lat,'time':times},
-                  name = 'HMXL'
+                  name = varname
                   )
-dsproc.to_netcdf("/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/HMXL/HMXL_PIC.nc",
-                 encoding={'HMXL': {'zlib': True}})
+dsproc.to_netcdf("/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/%s_PIC.nc" % (varname)),
+                 encoding={varname: {'zlib': True}})
 
