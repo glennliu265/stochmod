@@ -17,6 +17,8 @@ import sys
 import cmocean
 from tqdm import tqdm
 import xarray as xr
+
+import matplotlib.patheffects as PathEffects
 #%% Set Paths, Import Custom Modules
 stormtrack = 0
 if stormtrack == 0:
@@ -53,7 +55,7 @@ mconfig   = "SLAB_PIC"
 nyrs      = 1000        # Number of years to integrate over
 
 # Visualize Continuous run 200, Fprime
-fnames   = ["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method4_dmp0"%i for i in range(10)]
+fnames   = ["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_dmp0"%i for i in range(10)]
 frcnamelong = ["$F'$ run 2%02d" % (i) for i in range(10)]
 exname   = "Fprime_amq0_method5_cont"
 
@@ -197,7 +199,7 @@ for mconfig in mconfigs:
 
 #%% Now Compute the AMV Pattern
 
-applymask          = True
+applymask          = False
 amvbboxes          = ([-80,0,10,65],[-80,0,20,60],[-80,0,40,60],[-80,0,0,65])
 nboxes             = len(amvbboxes)
 nmod,nlon,nlat,nyr = sst_all.shape
@@ -263,7 +265,7 @@ plt.savefig("%sAMV_Comparison_bbox_allmodels.png"%(figpath),dpi=150)
 
 #%% Compare BBOX for a selected model
 
-mid       = 0
+mid       = 2
 bbox_plot = [-85,5,0,60]
 fig,axs   = plt.subplots(1,3,figsize=(12,6),
                        subplot_kw={'projection':ccrs.PlateCarree()},constrained_layout=True)
@@ -299,8 +301,9 @@ lstep      = 0.05
 cint,cl_int=viz.return_clevels(cmax,cstep,lstep)
 clb        = ["%.2f"%i for i in cint[::4]]
 
+cl_int=cint
 
-sel_rid   = 3
+sel_rid   = 1
 
 plotbbox  = False
 
@@ -352,16 +355,15 @@ for aid,mid in enumerate([0,2]):
     ax = viz.add_coast_grid(ax,bboxplot,blabels=blabel,line_color=dfcol,
                             fill_color='gray')
     pcm = ax.contourf(lon,lat,amvpats[mid,:,:,rid].T,levels=cint,cmap='cmo.balance')
-    ax.pcolormesh(lon,lat,amvpats[mid,:,:,rid].T,vmin=cint[0],vmax=cint[-1],cmap='cmo.balance',zorder=-1)
+    #ax.pcolormesh(lon,lat,amvpats[mid,:,:,rid].T,vmin=cint[0],vmax=cint[-1],cmap='cmo.balance',zorder=-1)
     cl = ax.contour(lon,lat,amvpats[mid,:,:,rid].T,levels=cl_int,colors="k",linewidths=0.5)
-    ax.clabel(cl,levels=cl_int,fontsize=8)
-    
+    ax.clabel(cl,levels=cl_int[::2],fontsize=8,fmt="%.02f")
     
     ax.set_title("%s ($\sigma^2_{AMV}$ = %.04f $K^2$)"%(modelnames[mid],np.var(amvids[mid,:,rid])))
     if plotbbox:
         ax,ll = viz.plot_box(amvbboxes[rid],ax=ax,leglab="AMV",
                              color=dfcol,linestyle="dashed",linewidth=2,return_line=True)
-        
+    
     viz.plot_mask(lon,lat,dmsks[mid],ax=ax,markersize=0.3)
     ax.set_facecolor=dfcol
     ax = viz.label_sp(spid,case='lower',ax=ax,labelstyle="(%s)",fontsize=16,alpha=0.7,fontcolor=dfcol)
@@ -391,7 +393,7 @@ for cid in range(2):
     pcm = ax.contourf(lon,lat,camvpats[rid][cid].T,levels=cint,cmap='cmo.balance')
     ax.pcolormesh(lon,lat,camvpats[rid][cid].T,vmin=cint[0],vmax=cint[-1],cmap='cmo.balance',zorder=-1)
     cl = ax.contour(lon,lat,camvpats[rid][cid].T,levels=cl_int,colors="k",linewidths=0.5)
-    ax.clabel(cl,levels=cl_int,fontsize=8)
+    ax.clabel(cl,levels=cl_int[::2],fontsize=8,fmt="%.02f")
     ax.set_title("CESM-%s ($\sigma^2_{AMV}$ = %.04f $K^2$)"%(mconfigs[cid],np.var(camvids[rid][cid])))
     if plotbbox:
         ax,ll = viz.plot_box(amvbboxes[rid],ax=ax,leglab="",
@@ -426,8 +428,8 @@ cid      = 1 # Set the CESM model
 bbin     = [-80,0,20,60]
 bboxplot = [-80,0,10,60] 
 sst_in = sst_cesm[cid]
-amvid,amvpat = proc.calc_AMVquick(sst_in,lonr,latr,bbin,anndata=True,
-                                  runmean=False,dropedge=5,mask=inmask)
+amvid,amvpat = proc.calc_AMVquick(sst_in,lonr,latr,bbin,anndata=False,
+                                  runmean=False,dropedge=5)
 
 # Prepare Tick Labels
 cl_int    = np.arange(-0.45,0.50,0.05)
@@ -451,4 +453,129 @@ cb.set_ticks(cb_lab)
 
 plt.savefig("%sAMV_Patterns_Indv_%s.png"% (figpath,mconfigs[cid]),dpi=200,bbox_inches='tight')
 
+#%% Plot of regional AMV with bounding Boxes (moved from plot_temporal_region)
+
+
+"""
+Old Param Combinations that worked...
+
+Having the bounding box and legend box right below it
+bboxtemp = [-90,5,15,68]
+fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(4.5,3))
+ax.text(-69,69,"Bounding Boxes",ha='center',bbox=props,fontsize=12) # (works for SPG Only)
+ax.legend(ncol=1,fontsize=8,loc=6,bbox_to_anchor=(0, .75))
+
+"""
+
+cid      = 0
+rids     = [0,6,5,]
+bboxtemp = [-85,-5,15,65]
+cint     = np.arange(-0.45,0.50,0.05)
+plotamv  = True # Add AMV Plot as backdrop (False=WhiteBackdrop)
+
+plotamvpat = camvpats[1][0]
+
+
+# Start the PLot
+
+fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(3,2))
+ax = viz.add_coast_grid(ax,bboxtemp,fill_color='gray',ignore_error=True)
+if plotamv:
+    pcm = ax.contourf(lon,lat,plotamvpat.T,cmap='cmo.balance',levels=cint)
+fig.patch.set_alpha(1)  # solution
+
+# # Plot the amv pattern
+props = dict(boxstyle='square', facecolor='white', alpha=0.8)
+
+
+# Add text
+txtspg  = ax.text(-38,50,"SPG",ha='center',fontsize=15,weight='bold') 
+txtstgw = ax.text(-60,27,"STGw",ha='center',fontsize=15,weight='bold') 
+txtstge = ax.text(-25,27,"STGe",ha='center',fontsize=15,weight='bold') 
+for txt in [txtspg,txtstgw,txtstge]:
+    txt.set_path_effects([PathEffects.withStroke(linewidth=2.5, foreground='w')])
+
+
+# First PLot Solid lines below
+for bb in rids:
+    ax,ll = viz.plot_box(bboxes[bb],ax=ax,leglab=regions[bb],
+                          color=bbcol[bb],linestyle="solid",linewidth=3,return_line=True)
+
+# Then plot dashed lines above
+ls = []
+for bb in rids:
+    
+    ax,ll = viz.plot_box(bboxes[bb],ax=ax,leglab=regions[bb],
+                          color=bbcol[bb],linestyle="dashed",linewidth=3,return_line=True)
+    ls.append(ll)
+
+plt.savefig("%sRegional_BBOX_Locator_wamv.png"%figpath,dpi=100,bbox_inches='tight',transparent=True)
+
+
+#%% Compare averaged and non-averaged AMV Pattern
+
+bbin = [-80,0,20,60]
+nrun = 10
+# Compute the AMV Pattern (for the stochastic model)
+amvpats_m = np.zeros((nrun,nlon,nlat))*np.nan # [model x lon x lat x region]
+amvids_m  = np.zeros((nrun,1000))      *np.nan
+apply_mask = False
+mid        = 0
+
+# Do for Stochastic Models
+for chunk in tqdm(range(nrun)):
+    
+    sst_in = sst_all[mid,...,chunk*1000:(chunk+1)*1000]
+    amvid,amvpat = proc.calc_AMVquick(sst_in,lonr,latr,bbin,anndata=True,
+                                      runmean=False,dropedge=5,mask=None)
+    
+    amvpats_m[chunk,:,:]  = amvpat.copy()
+    amvids_m[chunk,:]   = amvid.copy()
+
 #%%
+
+fig,axs = plt.subplots(2,5,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(12,6),
+                       constrained_layout=True)
+for c in range(10):
+    ax = axs.flatten()[c]
+    ax = viz.add_coast_grid(ax,bbox=bboxplot)
+    #amvpat = amvpats_m[c,...]
+   # amvpat = patup[c,7,0,:,:]
+    pcm = ax.contourf(lon,lat,amvpat.T,levels=cint,cmap='cmo.balance',extend='both')
+    #ax.pcolormesh(lon,lat,amvpat.T,vmin=cint[0],vmax=cint[-1],cmap='cmo.balance',zorder=-1)
+    cl = ax.contour(lon,lat,amvpat.T,levels=cl_int,colors="k",linewidths=0.5)
+    ax.clabel(cl,levels=cl_int,fontsize=8)
+
+
+#%% Load the weird stuff and compare
+# Unpack and load AMV Patterns
+
+
+amvpats = []
+amvids  = []
+q = 1
+for f in range(len(fnames)):
+    if q == 0:
+        expid = fnames[f]
+        mid  = 2
+    else:
+        expid = fnames[f]
+        mid  = 0
+    
+    
+    rsst_fn = "%sproc/AMV_Region_%s.npz" % (datpath,expid)
+    print("Loading %s" % rsst_fn)
+    ld = np.load(rsst_fn,allow_pickle=True)#.item()
+    
+    amvidx = ld['amvidx_region'].item()
+    amvpat = ld['amvpat_region'].item()
+    
+    amvpats.append(amvpat)
+    amvids.append(amvidx)
+
+# Unpack dicts into array [nrun,nreg,nmod,nlon,nlat]
+patup = scm.unpack_smdict(amvpats) # 
+idxup = scm.unpack_smdict(amvids)
+
+
+
