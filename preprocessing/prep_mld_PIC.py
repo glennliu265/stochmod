@@ -158,6 +158,6 @@ dsproc = xr.DataArray(hclim,
                   coords={'lon':lon1,'lat':lat,'time':times},
                   name = varname
                   )
-dsproc.to_netcdf("/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/%s_PIC.nc" % (varname)),
+dsproc.to_netcdf("/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/%s_PIC.nc" % (varname),
                  encoding={varname: {'zlib': True}})
 
