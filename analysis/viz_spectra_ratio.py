@@ -219,3 +219,112 @@ ax = axs[0]
 ax.text(-0.15, 0.55, rationame, va='bottom', ha='center',rotation='vertical',
         rotation_mode='anchor',transform=ax.transAxes)
 plt.savefig("%sSpectra_Ratio_%s_%s.png"% (figpath,rationame_fn,smoothname),dpi=150)
+
+
+#%% Randomly grab and plot barotropic streamfunction
+
+bsf_ds = xr.open_dataset(datpath+"../CESM_proc/BSF_PIC.nc")
+ds_reg = bsf_ds.BSF.sel(lon=slice(bboxplot[0],bboxplot[1]),
+                    lat=slice(bboxplot[2],bboxplot[3]))
+
+bsf = ds_reg.values
+bsf_mean = bsf.mean(-1)
+
+#%% PLot BSF
+ratiosel     = entrain_full
+rationame    = "log($\sigma^2_{entrain}$/$\sigma^2_{full}$)"
+rationame_fn = "log_entrain_full"
+
+use_contours = True
+cints       = np.arange(-1.5,1.55,0.05)
+cl_ints     = np.arange(-1.5,1.6,0.1)
+
+bsfcint     = np.arange(-30,32,2)
+fig,axs = plt.subplots(1,3,subplot_kw={'projection':ccrs.PlateCarree()},
+                       constrained_layout=True,figsize=(12,4)) 
+for t in range(3):
+    blabel = [0,0,0,1]
+    if t == 0:
+        blabel[0] = 1
+    
+    ax = axs.flatten()[t]
+    print(t)
+    if t == 0:
+        ptitle = r"> %03d Years" % (1/threses[t][1])
+    else:
+        ptitle = "%03d to %03d Years" % (1/threses[t][1],1/threses[t][0])
+    ax.set_title(ptitle)
+    ax = viz.add_coast_grid(ax,bbox=bboxplot,blabels=blabel,fill_color='gray')
+    if use_contours:
+        pcm = ax.contourf(ds.lon,ds.lat,ratiosel[:,:,t].T,levels=cints,extend='both',cmap='cmo.balance')
+        #cl = ax.contour(ds.lon,ds.lat,ratiosel[:,:,t].T,levels=cl_ints,colors='k',linewidths=0.5)
+        #ax.clabel(cl,cl_ints[::2],fmt="%.1f")
+    else:
+        pcm = ax.pcolormesh(ds.lon,ds.lat,ratiosel[:,:,t].T,vmin=-1.5,vmax=1.5,cmap='cmo.balance')
+        
+    cl = ax.contour(ds_reg.lon,ds_reg.lat,bsf_mean.T,colors='k',levels=bsfcint,linewidths=0.5)
+    ax.clabel(cl,bsfcint[::4])
+    
+fig.colorbar(pcm,ax=axs.flatten(),fraction=0.025,pad=0.01)
+ax = axs[0]
+ax.text(-0.15, 0.55, rationame, va='bottom', ha='center',rotation='vertical',
+        rotation_mode='anchor',transform=ax.transAxes)
+plt.savefig("%sSpectra_Ratio_%s_%sBSF.png"% (figpath,rationame_fn,smoothname),dpi=150)
+
+
+#%% SM Draft Plot
+use_contours = False
+cints       = np.arange(-1.5,1.6,0.1)
+cl_ints     = cints#np.arange(-1.5,1.8,0.3)
+cl_alpha     = 1
+fig,axs = plt.subplots(3,3,subplot_kw={'projection':ccrs.PlateCarree()},
+                       constrained_layout=True,figsize=(12,10))
+
+for row in range(3):
+    
+    if row == 0:
+        ratiosel     = full_slab
+        rationame    =  "FULL/SLAB"# "log($\sigma^2_{full}$/$\sigma^2_{slab}$)"
+        rationame_fn = "log_full_slab"
+    elif row == 1:
+        ratiosel  = entrain_hvary
+        rationame = "Entrain/Non-Entraining"#"log($\sigma^2_{entrain}$/$\sigma^2_{h vary}$)"
+        rationame_fn = "log_entrain_hvary"
+    elif row == 2:
+        ratiosel     = entrain_full
+        rationame    = "Entrain/FULL"#"log($\sigma^2_{entrain}$/$\sigma^2_{full}$)"
+        rationame_fn = "log_entrain_full"
+    
+    for t in range(3):
+        ax = axs[row,t]
+        
+        blabel = [0,0,0,0]
+        if t == 0:
+            blabel[0] = 1
+        if row == 2:
+            blabel[-1] = 1
+        
+        if row == 0:
+            if t == 0:
+                ptitle = r"> %d Years" % (1/threses[t][1])
+            else:
+                ptitle = "%d to %d Years" % (1/threses[t][1],1/threses[t][0])
+            
+            ax.set_title(ptitle)
+        
+        ax = viz.add_coast_grid(ax,bbox=bboxplot,blabels=blabel,fill_color='gray',ignore_error=True)
+        if use_contours:
+            pcm = ax.contourf(ds.lon,ds.lat,ratiosel[:,:,t].T,levels=cints,extend='both',cmap='cmo.balance')
+            cl = ax.contour(ds.lon,ds.lat,ratiosel[:,:,t].T,levels=cl_ints,colors='k',linewidths=0.5,alpha=cl_alpha)
+            ax.clabel(cl,cl_ints[::2],fmt="%.1f")
+        else:
+            pcm = ax.pcolormesh(ds.lon,ds.lat,ratiosel[:,:,t].T,vmin=-1.5,vmax=1.5,cmap='cmo.balance')
+
+    #fig.colorbar(pcm,ax=axs.flatten(),fraction=0.025,pad=0.01)
+    ax = axs[row,0]
+    ax.text(-0.15, 0.55, rationame, va='bottom', ha='center',rotation='vertical',
+            rotation_mode='anchor',transform=ax.transAxes)
+cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction=0.035,pad=0.01)
+cb.set_label("SST Log Ratio")
+
+plt.savefig("%sSpectra_Ratio_combine_%sBSF.png"% (figpath,smoothname),dpi=150)
