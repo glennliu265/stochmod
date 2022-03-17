@@ -55,7 +55,7 @@ savesep   = False # Set to True if output was saved separately
 useslab   = False # Set to True if you only used slab output for all simulations
 
 # Additional Analysis Options
-mask_damping = True # Set to True to mask out damping points that failed the T-Test
+mask_damping = False # Set to True to mask out damping points that failed the T-Test
 
 # Analysis (7/26/2021, comparing 80% variance threshold and 5 or 3 EOFs)
 #fnames      = ["flxeof_080pct_SLAB-PIC","flxeof_5eofs_SLAB-PIC","flxeof_3eofs_SLAB-PIC"]
@@ -270,6 +270,21 @@ fnames =["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run011_amp
 
 # Trying out slab params only (run e00)
 fnames =["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_rune00_ampq3_method4_dmp0",]
+
+# 2 EOFs Test, Updated with F'
+fnames = ('forcingflxeof_2eofs_SLAB-PIC_eofcorr0_Fprime_rolln0_1000yr_run011_ampq0_method5_dmp0',
+          'forcingflxeof_EOF1_SLAB-PIC_eofcorr0_Fprime_rolln0_1000yr_run011_ampq0_method5_dmp0',
+          'forcingflxeof_EOF2_SLAB-PIC_eofcorr0_Fprime_rolln0_1000yr_run011_ampq0_method5_dmp0')
+
+# SSeasonal Analysis Rewrite
+fnames   = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run011_ampq0_method5_dmp0',
+            'forcingflxeof_090pct_FULL-PIC_eofcorr2_DJF_Fprime_rolln0_1000yr_run011_ampq0_method5_dmp0',
+            'forcingflxeof_090pct_FULL-PIC_eofcorr2_MAM_Fprime_rolln0_1000yr_run011_ampq0_method5_dmp0',
+            'forcingflxeof_090pct_FULL-PIC_eofcorr2_JJA_Fprime_rolln0_1000yr_run011_ampq0_method5_dmp0',
+            'forcingflxeof_090pct_FULL-PIC_eofcorr2_SON_Fprime_rolln0_1000yr_run011_ampq0_method5_dmp0')
+
+# Qekman runs (continuous run 200)
+fnames = ["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_dmp0_Qek" %i for i in range(10)]
 
 
 print("Now processing the following files: \n ")

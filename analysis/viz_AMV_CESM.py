@@ -253,7 +253,6 @@ for i in tqdm(range(5)):
     samvids.append(amvids)
     
     
-    
 #%% Quick viz
 clvl = np.arange(-.5,.525,.025)
 
@@ -579,7 +578,6 @@ plt.savefig("%sAMV_Patterns_ObsLIMopt_v_CESM.png"% (outpath),dpi=200,bbox_inches
 #%% Plot CESM-AMV Alone (for SM_Paper_Outline)
 i = 2
 
-
 # Prepare Tick labels
 cb_lab = ["%.2f"%(n) for n in cl_int]
 
@@ -880,8 +878,6 @@ for p in range(len(amvpat)):
     ax.set_title(modelnames[p] + " AMV Pattern ($\circ C$ per $\sigma_{AMV}$)")
     fig.colorbar(pcm,ax=ax,orientation='horizontal',shrink=0.75)#,pad=0.015)
     plt.savefig("%sAMV_Pattern_regionNAT_model%s.png"%(figpath,modelnames[p]),dpi=200,bbox_tight='inches')
-
-
 
 #
 # %% Calculate NASSTI

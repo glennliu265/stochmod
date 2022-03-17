@@ -26,7 +26,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20220222/"
+    figpath     = projpath + "02_Figures/20220315/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -251,16 +251,36 @@ fnames = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run013_ampq3_method5_dm
 exname ="run_comparison" 
 
 
-# Visualize Continuous run 200, Fprime (need to rerun without ampq... fudge)
-fnames =["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_dmp0"%i for i in range(10)]
-frcnamelong = ["$F'$ run 2%02d" % (i) for i in range(10)]
-exname ="Fprime_amq0_method5_cont"
+
 
 # Trying out slab params only (run e00)
 fnames =["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_rune00_ampq3_method4_dmp0",]
 
 exname = "ALL SLAB"
 
+# Visualize Continuous run 200, Fprime 
+fnames =["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_dmp0"%i for i in range(10)]
+frcnamelong = ["$F'$ run 2%02d" % (i) for i in range(10)]
+exname ="Fprime_amq0_method5_cont"
+
+
+
+# Seasonal Pattern Updates
+fnames   = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run011_ampq0_method5_dmp0',
+            'forcingflxeof_090pct_FULL-PIC_eofcorr2_DJF_Fprime_rolln0_1000yr_run011_ampq0_method5_dmp0',
+            'forcingflxeof_090pct_FULL-PIC_eofcorr2_MAM_Fprime_rolln0_1000yr_run011_ampq0_method5_dmp0',
+            'forcingflxeof_090pct_FULL-PIC_eofcorr2_JJA_Fprime_rolln0_1000yr_run011_ampq0_method5_dmp0',
+            'forcingflxeof_090pct_FULL-PIC_eofcorr2_SON_Fprime_rolln0_1000yr_run011_ampq0_method5_dmp0')
+frcnamelong = ("Annual","Winter","Spring","Summer","Fall")
+exname = "seasonal"
+
+
+# 2 EOFs Test, Updated with F'
+fnames = ('forcingflxeof_EOF1_SLAB-PIC_eofcorr0_Fprime_rolln0_1000yr_run011_ampq0_method5_dmp0',
+          'forcingflxeof_EOF2_SLAB-PIC_eofcorr0_Fprime_rolln0_1000yr_run011_ampq0_method5_dmp0',
+          'forcingflxeof_2eofs_SLAB-PIC_eofcorr0_Fprime_rolln0_1000yr_run011_ampq0_method5_dmp0',)
+frcnamelong = ("NAO (EOF1)","EAP (EOF2)","NAO+EAP")
+exname = "NAO_EAP"
 
 # Examine impact of Ekman Forcing
 # fnames = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_Qek',)
@@ -300,18 +320,18 @@ bbox_ST     = [-80,-10,20,40]
 bbox_TR     = [-75,-15,10,20]
 bbox_NA     = [-80,0 ,0,65]
 bbox_NA_new = [-80,0,10,65]
-bbox_ST_w  = [-80,-40,20,40]
-bbox_ST_e  = [-40,-10,20,40]
-regions = ("SPG","STG","TRO","NAT","NNAT","STGe","STGw")        # Region Names
-bboxes = (bbox_SP,bbox_ST,bbox_TR,bbox_NA,bbox_NA_new,bbox_ST_e,bbox_ST_w) # Bounding Boxes
-regionlong = ("Subpolar","Subtropical","Tropical","North Atlantic","North Atlantic","Subtropical (East)","Subtropical (West)",)
-bbcol  = ["Blue","Red","Yellow","Black","Black"]
-bbcol      = ["Blue","Red","Yellow","Black","Black","magenta","red"]
-bbsty      = ["solid","dashed","solid","dotted","dotted","dashed","dotted"]
+bbox_ST_w   = [-80,-40,20,40]
+bbox_ST_e   = [-40,-10,20,40]
+regions     = ("SPG","STG","TRO","NAT","NNAT","STGe","STGw")        # Region Names
+bboxes      = (bbox_SP,bbox_ST,bbox_TR,bbox_NA,bbox_NA_new,bbox_ST_e,bbox_ST_w) # Bounding Boxes
+regionlong  = ("Subpolar","Subtropical","Tropical","North Atlantic","North Atlantic","Subtropical (East)","Subtropical (West)",)
+bbcol       = ["Blue","Red","Yellow","Black","Black"]
+bbcol       = ["Blue","Red","Yellow","Black","Black","magenta","red"]
+bbsty       = ["solid","dashed","solid","dotted","dotted","dashed","dotted"]
 
 
-cint   = np.arange(-0.45,0.50,0.05) # Used this for 7/26/2021 Meeting
-cl_int = np.arange(-0.45,0.50,0.05)
+cint      = np.arange(-0.45,0.50,0.05) # Used this for 7/26/2021 Meeting
+cl_int    = np.arange(-0.45,0.50,0.05)
 #bboxplot = [-100,20,0,80]
 
 modelnames  = ("Constant h","Vary h","Entraining")
@@ -532,12 +552,12 @@ sel_rid = 4
 #bboxplot = [-85, 5 ,5,60]
 bboxplot = [-80,0,5,60]
 plotbbox = False
-def plot_amvpat(lon,lat,amvpat,ax,add_bbox=False,bbox_NNA=[-80, 0, 10, 65],blabel=[1,0,0,1]):
+def plot_amvpat(lon,lat,amvpat,ax,add_bbox=False,bbox_NNA=[-80, 0, 10, 65],blabel=[1,0,0,1],clab_interval=1):
     ax = viz.add_coast_grid(ax,bboxplot,blabels=blabel,ignore_error=True)
     pcm = ax.contourf(lon,lat,amvpat,levels=cint,cmap=cmocean.cm.balance)
     ax.pcolormesh(lon,lat,amvpat,vmin=cint[0],vmax=cint[-1],cmap=cmocean.cm.balance,zorder=-1)
     cl = ax.contour(lon,lat,amvpat,levels=cl_int,colors="k",linewidths=0.5)
-    ax.clabel(cl,levels=cl_int,fontsize=8)
+    ax.clabel(cl,levels=cl_int[::clab_interval],fontsize=8,fmt="%.02f")
     
     if add_bbox:
         ax,ll = viz.plot_box(bbox_NNA,ax=ax,leglab="AMV",
@@ -1186,8 +1206,7 @@ if exname == "seasonal":
     
     plt.savefig("%sSeasonal_comparison_amvpat.png" % figpath,dpi=150,bbox_inches='tight')
 
-#%% Seasonality comparison, new plot
-
+#%% Seasonality comparison
 if exname == "seasonal":
     mid   = 2 # Model id  (hconst, hvary, entrain)
     rid   = 4 # Region id (See regions variable)
@@ -1290,7 +1309,8 @@ if exname == "seasonal":
             if row == 1:
                 blabel[-1]=1 # Add bottom labels
             
-        ax = viz.add_coast_grid(ax,bboxplot,blabels=blabel,fill_color='gray')
+        ax = viz.add_coast_grid(ax,bboxplot,blabels=blabel
+                                ,fill_color='gray',ignore_error=True)
         
         # Plot and set the title
         plotamv = plotamvs[sid+1][rid][mid]
@@ -1328,16 +1348,20 @@ cbvert  = False
 rid = 4
 mid = 2
 
-clmax = 0.5
-cstep = .05
+clmax  = 0.5
+cstep  = .025
 cint   = np.arange(-clmax,clmax+cstep,cstep) # Used this for 7/26/2021 Meeting
-cl_int = np.arange(-clmax,clmax+cstep,cstep)
+cl_int = np.arange(-clmax,clmax+cstep,0.05)
 
+cl_int = cint # Overwrite
+proj   = ccrs.PlateCarree() 
 if exname == "NAO_EAP":
-    spid = 0
     
-    fig,axs = plt.subplots(1,3,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(14,6),
-                           constrained_layout=True)
+    spid = 0
+    fig,axs=viz.init_2rowodd(2,proj,figsize=(14,6),oddtop=False,debug=False)
+    
+    # fig,axs = plt.subplots(1,3,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(14,6),
+    #                        constrained_layout=True)
     for f in range(3):
         
         
@@ -1349,20 +1373,25 @@ if exname == "NAO_EAP":
         ax = axs[f]
         ax  = viz.add_coast_grid(ax,bbox=bboxplot,blabels=[0,0,0,0],fill_color='gray')
         
-        pcm,ax = plot_amvpat(lon,lat,amvpats[f][rid][mid].T,ax,blabel=blabel)
+        pcm,ax = plot_amvpat(lon,lat,amvpats[f][rid][mid].T,ax,blabel=blabel,clab_interval=2)
         
         
         if notitle is False:
             ax.set_title("%s"%(frcnamelong[f]))
         
-        viz.plot_mask(lon,lat,dmsks[mid],ax=ax,markersize=0.1)
+        viz.plot_mask(lon,lat,dmsks[mid],ax=ax,markersize=0.2)
         
         ax = viz.label_sp(spid,case='lower',ax=ax,labelstyle="(%s)",fontsize=16,alpha=0.7)
         spid += 1
-    if cbvert:
-        cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='vertical',fraction= 0.012,pad=0.05)
+    
+    if tworow:
+        flatten_axis = axs
     else:
-        cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction= 0.04,pad=0.09)
+        flatten_axis = axs.flatten()
+    if cbvert:
+        cb = fig.colorbar(pcm,ax=flatten_axis,orientation='vertical',fraction= 0.012,pad=0.05)
+    else:
+        cb = fig.colorbar(pcm,ax=flatten_axis,orientation='horizontal',fraction= 0.05,pad=0.04)
     cb.set_label("SST ($K \, \sigma_{AMV}^{-1}$)")
 plt.savefig("%sAMV_Patterns_NAO_EAP_model%i.png" % (figpath,mid),dpi=150,bbox_inches='tight')
 
