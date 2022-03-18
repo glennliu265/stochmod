@@ -1347,6 +1347,7 @@ notitle = True
 cbvert  = False
 rid = 4
 mid = 2
+tworow = False
 
 clmax  = 0.5
 cstep  = .025
@@ -1358,10 +1359,11 @@ proj   = ccrs.PlateCarree()
 if exname == "NAO_EAP":
     
     spid = 0
-    fig,axs=viz.init_2rowodd(2,proj,figsize=(14,6),oddtop=False,debug=False)
-    
-    # fig,axs = plt.subplots(1,3,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(14,6),
-    #                        constrained_layout=True)
+    if tworow:
+        fig,axs=viz.init_2rowodd(2,proj,figsize=(14,8),oddtop=False,debug=False)
+    else:
+        fig,axs = plt.subplots(1,3,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(14,6),
+                                constrained_layout=True)
     for f in range(3):
         
         

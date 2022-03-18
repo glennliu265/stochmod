@@ -339,18 +339,28 @@ thresvals   = (1/20,1/10,1/5) # 1/yr
 # Search for variance at lower frequencies for each threshold
 thresids_sm = [(freqs[0]*dtplot)<= (thres) for thres in thresvals]
 
-def calc_specvar(freq,spec,thresval,dtthres,droplast=True):
+def calc_specvar(freq,spec,thresval,dtthres,droplast=True
+                 ,upperthres=None,return_thresids=False):
     """
+    Calculate variance of spectra BELOW a certain threshold
+    
     Inputs:
-        freq     [ARRAY] : frequencies (1/sec)
-        spec     [ARRAY] : spectra (Power/cps) [otherdims ..., freq]
-        thresval [FLOAT] : Threshold frequency (in units of dtthres)
-        dtthres  [FLOAT] : Units of thresval (in seconds)
-        droplast [BOOL]  : True,start from lowest freq (left riemann sum)
+        freq     [ARRAY]   : frequencies (1/sec)
+        spec     [ARRAY]   : spectra (Power/cps) [otherdims ..., freq]
+        thresval [FLOAT]   : Threshold frequency (in units of dtthres)
+        dtthres  [FLOAT]   : Units of thresval (in seconds)
+        droplast [BOOL]    : True,start from lowest freq (left riemann sum)
+        upperthres [FLOAT] : Upper threshold (in units of dtthres)
+        return_thresids [BOOL] : Set to True to just return the threshold indices
     """
     # Get indices of frequencies less than the threshold
-    thresids = freq*dtthres <= thresval
-    
+    if upperthres is None:
+        thresids = freq*dtthres <= thresval
+    else:
+        thresids = (freq*dtthres >= thresval) * (freq*dtthres <= thresval)
+    if return_thresids:
+        return thresids
+        
     # Limit to values
     specthres = spec[...,thresids]
     freqthres = freq[thresids]

@@ -61,9 +61,6 @@ mnames     = ["FULL","SLAB"]
 snames     = ["spectra_%s_PIC-%s.nc" % (smoothname,mnames[i]) for i in range(2)]
 
 
-
-
-
 # Other Params
 bboxplot = [-80,0,0,60]
 mons3    = [viz.return_mon_label(m,nletters=3) for m in np.arange(1,13)]

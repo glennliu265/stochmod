@@ -161,6 +161,7 @@ def unpack_smdict(indict):
     
     # For Autocorrelation
     otherdims = indict[0][0][0].shape
+    print("Found... Runs (%i) Regions (%i) ; Models (%i) ; Otherdims (%i)" % (nrun,nregion,nmodels,str(otherdims)))
     
     # Preallocate
     newshape = np.concatenate([[nrun,nregion,nmodels],otherdims])
@@ -838,12 +839,13 @@ for i in range(len(rids)):
                              plotids=plotidspec,legend=False)
     else:
         ax,ax2 = viz.plot_freqlin(specsall[rid],freqsall[rid],speclabels,speccolors,lw=alw,
-                             ax=ax,plottitle=regionlong[rid],
+                             ax=ax,plottitle=regionlong[rid],plotconf=Cfsall[rid],
                              xlm=xlm,xtick=xtks,return_ax2=True,
                              plotids=plotidspec,legend=False,linearx=linearx)
         
         
         # Add confidence intervals
+        
     
     # Turn off title and second axis labels
     if periodx: # Switch Frequency with Period for x-axis.
@@ -921,17 +923,32 @@ ax.legend(ncol=1,fontsize=8,loc=6,bbox_to_anchor=(0, .75))
 
 """
 
-cid = 0
-rids = [0,6,5,]
+cid      = 0
+rids     = [0,6,5,]
 bboxtemp = [-85,-5,15,65]
+cint     = np.arange(-0.45,0.50,0.05)
+plotamv  = True # Add AMV Plot as backdrop (False=WhiteBackdrop)
+
+# Load the CESM1-FULL AMV Pattern
+# Load data for CESM1-PIC
+expid      = "CESM1-PIC"
+rsst_fn    = "%s/proc/AMV_Region_%s_ensorem0.npz" % (datpath,expid)
+ldc        = np.load(rsst_fn,allow_pickle=True)
+cesmpat = ldc['amvpat_region'].item()
+cesmidx = ldc['amvidx_region'].item()
+long,latg = scm.load_latlon()
+
+
+# Start the PLot
 
 fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(3,2))
 ax = viz.add_coast_grid(ax,bboxtemp,fill_color='gray',ignore_error=True)
+if plotamv:
+    pcm = ax.contourf(long,latg,cesmpat[4][0].T,cmap='cmo.balance',levels=cint)
+
 fig.patch.set_alpha(1)  # solution
 # # Plot the amv pattern
 props = dict(boxstyle='square', facecolor='white', alpha=0.8)
-
-
 #ax.text()
 
 #ax.text(-69,69,"Bounding Boxes",ha='center',bbox=props,fontsize=12) # (works for SPG Only)
@@ -1020,11 +1037,11 @@ ax.set_ylim([-2.25,2.25])
     
 #%%
     
-spec_num = -1
+spec_num  = 2 # Number in specsall[r]
 ref       = 'FULL' # [SLAB or FULL or ref_num]
 ref_num   = 0
-plotlog  = True
-recip    = False
+plotlog   = True
+recip     = False
 
 # Interpolate the data
 freqslab   = freqsall[0][-1]
@@ -1056,7 +1073,7 @@ for r in rid_sel:
         
     
     # Interpolate selected spectra to reference frequencies
-    spec_interp = np.interp(reffreq,freqs[spec_num],specsall[r][spec_num])
+    spec_interp = np.interp(reffreq,freqsall[r][spec_num],specsall[r][spec_num])
     
     # Compute the ratio
     if recip:
@@ -1087,11 +1104,11 @@ plt.savefig("%sRegional_Spectra_Ratio_%s.png"%(figpath,flab),dpi=150,bbox_inche=
 
 #%% Make Multiple Panels
 
-spec_num = -1
+spec_num  = 2
 ref       = 'FULL' # [SLAB or FULL or ref_num]
 ref_num   = 0
-plotlog  = True
-recip    = False
+plotlog   = True
+recip     = False
 
 # Interpolate the data
 freqslab   = freqsall[0][-1]
@@ -1104,10 +1121,6 @@ if debug:
     ax.loglog(freqslab*dtplot,interpfull/dtplot,label="Interp")
     ax.loglog(freqfull*dtplot,specsall[0][-2]/dtplot,ls='dashed',label="Original")
     ax.set_xlim([1e-2,1e0])
-
-
-
-
 
 spec_nums = [-1,2]
 refs      = ['FULL','FULL']
@@ -1125,8 +1138,10 @@ for a in range(2):
     ref_num  = ref_nums[a]
     
     
+    print(a)
     
     for r in rid_sel:
+        print(r)
         
         # Interpolate to Reference Frequency
         if ref == 'FULL':
@@ -1142,17 +1157,17 @@ for a in range(2):
             
         
         # Interpolate selected spectra to reference frequencies
-        spec_interp = np.interp(reffreq,freqs[spec_num],specsall[r][spec_num])
+        spec_interp = np.interp(reffreq,freqsall[r][spec_num],specsall[r][spec_num])
         
         
         # Compute the ratio
         if recip:
             specratio = refspec/spec_interp
-            ylab = "%s/%s" % (ref,specnames[spec_num])
+            ylab = "%s / %s" % (ref,specnames[spec_num])
             flab = "%s-%s" % (ref,specnames[spec_num])
         else:
             specratio = spec_interp/refspec
-            ylab = "%s/%s" % (specnames[spec_num],refnames[a])
+            ylab = "%s / %s" % (specnames[spec_num],refnames[a])
             flab = "%s-%s" % (refnames[a],specnames[spec_num])
             
         if plotlog:
@@ -1161,7 +1176,7 @@ for a in range(2):
         
         ln = ax.semilogx(reffreq*dtplot,specratio,label=regions[r],lw=4,color=bbcol[r])
     if a == 0:
-        ax.legend(ncol=2)
+        ax.legend(ncol=2,loc="lower left")
         ax.set_xlabel("")
     else:
         ax.set_xlabel("Period (Years)")
@@ -1172,6 +1187,7 @@ for a in range(2):
     ax.axhline(0,ls='dashed',color="k")
     ax.grid(True,ls='dotted')
     ax.set_ylim([-2.25,2.25])
+    
     
     ax = viz.label_sp(spid,case='lower',ax=ax,labelstyle="(%s)",fontsize=16,alpha=0.7)
     spid += 1
