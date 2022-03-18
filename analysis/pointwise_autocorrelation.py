@@ -161,7 +161,7 @@ cfs_final   = cfs_final.reshape(nlon,nlat,12,nthres+1,nlags,12,2)
 
 
 # Save Output
-savename = "%sCESM1_PIC-FULL_SST_autocorrelation_thres0.npz" %  outpath
+savename = "%sCESM1_PIC-FULL_SST_autocorrelation_thres%i.npz" %  (outpath,nthres)
 
 np.savez(savename,**{
     'class_count' : count_final,
@@ -175,30 +175,141 @@ np.savez(savename,**{
 
 #%% Try to plot a point
 
-savename = "%sCESM1_PIC-FULL_SST_autocorrelation_thres%s.npz" %  (outpatt,nthres)
+savename = "%sCESM1_PIC-FULL_SST_autocorrelation_thres%s.npz" %  (outpath,nthres)
 ld = np.load(savename,allow_pickle=True)
 
-count_final = ld['class_count']
-acs_final  = ld['acs']
-lon = ld['lon']
-lat = ld['lat']
 
+colors = ['b','r']
+
+count_final = ld['class_count']
+acs_final   = ld['acs']
+lon         = ld['lon']
+lat         = ld['lat']
+
+thresholds  = ld['thresholds']
+thresname   = []
+if nthres == 1:
+    thresname.append("$T'$ <= %i"% thresholds[0])
+    thresname.append("$T'$ > %i" % thresholds[0])
+else:
+    for th in range(nthres):
+        thval= thresholds[th]
+        
+        if thval != 0:
+            sig = ""
+        else:
+            sig = "$\sigma$"
+        
+        if th == 0:
+            tstr = "$T'$ <= %i %s" % (thval,sig)
+        elif th == nthres:
+            tstr = "$T'$ > %i %s" % (thval,sig)
+        else:
+            tstr = "%i < $T'$ =< %i %s" % (thresholds[th-1],thval,sig)
+        thresname.append(th)
+        
 
 lonf = -30
 latf = 50
 
 klon,klat = proc.find_latlon(lonf,latf,lon,lat)
 
-kmonth = 2
+kmonth = 4
 
 fig,ax =plt.subplots(1,1)
 
 ax,ax2 = viz.init_acplot(kmonth,np.arange(0,38,2),lags,ax=ax)
-ax.plot(lags,acs_final[klon,klat,kmonth,0,:,kmonth],label="Cold Anomalies (%i)" % (count_final[klon,klat,kmonth,0]),color='b')
-ax.plot(lags,acs_final[klon,klat,kmonth,1,:,kmonth],label="Warm Anomalies (%i)" % (count_final[klon,klat,kmonth,1]),color='r')
+for th in range(nthres+1):
+    ax.plot(lags,acs_final[klon,klat,kmonth,th,:,kmonth],marker="o",
+            color=colors[th],lw=2,
+            label="%s (n=%i)" % (thresname[th],count_final[klon,klat,kmonth,th]))
+    #ax.plot(lags,acs_final[klon,klat,kmonth,0,:,kmonth],label="Cold Anomalies (%i)" % (count_final[klon,klat,kmonth,0]),color='b')
+    #ax.plot(lags,acs_final[klon,klat,kmonth,1,:,kmonth],label="Warm Anomalies (%i)" % (count_final[klon,klat,kmonth,th]),color='r')
+    #ax.legend()
+
 ax.legend()
 
+plt.savefig("%sAutocorrelation_WarmCold.png"%figpath,dpi=150)
+#%% load data for MLD
 
+ksel = 1#"max"
+
+# Use the function used for sm_rewrite.py
+frcname    = "flxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0"
+input_path = datpath + "model_input/"
+lagstr     = "lag1"
+method     = 5 # Damping Correction Method
+inputs = scm.load_inputs('SLAB_PIC',frcname,input_path,load_both=True,method=method,lagstr=lagstr)
+long,latg,h,kprevall,dampingslab,dampingfull,alpha,alpha_full = inputs
+hblt   = np.load(input_path + "SLAB_PIC_hblt.npy") # Slab fixed MLD
+hblt   = np.ones(hblt.shape) * hblt.mean(2)[:,:,None]
+
+# Compute Specific Region
+reg_sel  = [lon[0],lon[-1],lat[0],lat[-1]]
+#reg_sel   = [-80,0,30,65]
+inputs = [h,kprevall,dampingslab,dampingfull,alpha,alpha_full,hblt]
+outputs,lonr2,latr2 = scm.cut_regions(inputs,long,latg,reg_sel,0)
+h,kprev,damping,dampingfull,alpha,alpha_full,hblt = outputs
+
+
+
+if ksel == 'max':
+    
+    # Get indices of kprev
+    hmax = np.argmax(h,axis=2)
+    
+    # Select autocorrelation function of maximum month
+    acmax = np.zeros((nlon,nlat,nthres+1,nlags))*np.nan
+    for o in tqdm(range(nlon)):
+        for a in range(nlat):
+            kpt = hmax[o,a,]
+            acmax[o,a,...] = acs_final[o,a,kpt,:,:,kpt]
+else:
+    acmax = acs_final[:,:,ksel,:,:,ksel]
+#% Integrate
+integr_ac = np.trapz(acmax,x=lags,axis=-1)
+
+#%% Visualize (Works for warm/cold)
+bboxplot = [-80,0,0,60]
+
+intitles = ("Cold","Warm")
+
+fig,axs = plt.subplots(1,3,subplot_kw={'projection':ccrs.PlateCarree()},
+                      constrained_layout=True,figsize=(14,6))
+for th in range(3):
+    ax = axs[th]
+    
+    if th < nthres+1:
+        plotac = integr_ac[:,:,th].T
+        title  = "%s Anomalies (%s K)" % (intitles[th],thresname[th])
+        cmap   = "cmo.amp"
+        vlm    = [0,10]
+    else:
+        plotac = (integr_ac[:,:,1] - integr_ac[:,:,0]).T
+        title  = "Warm - Cold Anomalies"
+        cmap   = "cmo.balance"
+        vlm    = [-3,3]
+    
+    ax = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="gray")
+    ax.set_title(title)
+    pcm = ax.pcolormesh(lon,lat,plotac,cmap=cmap,
+                        vmin=vlm[0],vmax=vlm[1])
+    
+    if th == 2:
+        cl = ax.contour(lon,lat,plotac,levels=[0,],colors="k",linewidths=.75)
+        
+    else:
+        cl = ax.contour(lon,lat,plotac,levels=np.arange(0,14,2),colors="w",linewidths=.75)
+    ax.clabel(cl,)
+    
+    if th == 0:
+        cb = fig.colorbar(pcm,ax=axs[:2].flatten(),orientation='horizontal',fraction=0.04)
+        cb.set_label("Integrated Timescale (Months)")
+    elif th == 2:
+        cb = fig.colorbar(pcm,ax=ax,orientation='horizontal',fraction=0.04,pad=0.01)
+        cb.set_label("Difference (Months)")
+plt.suptitle("Integrated ACF (to 36 months) for CESM1-FULL PiC",fontsize=14,y=.88)
+plt.savefig("%sIntegratedACF_Cold_Warm_Anomalies_CESM_PiC_ksel%i.png"%(figpath,ksel),dpi=150)
 #%%
 
 """
