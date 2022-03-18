@@ -387,6 +387,17 @@ for i in range(4):
     ax.set_title(snames[i])
 fig.colorbar(pcm,ax=axs.flatten())
 
+#%% Plot "Cumulative beta"
+
+
+
+betacumu = beta.sum(-1)
+fig,ax =  plt.subplots(1,1,figsize=(7,7),subplot_kw={'projection':ccrs.PlateCarree()})
+ax = viz.add_coast_grid(ax=ax,bbox=bbox,fill_color='gray')
+pcm = ax.contourf(lon,lat,betacumu.T)
+cb=fig.colorbar(pcm,ax=ax)
+
+
 #%% Plot max MLD variations
 
 bboxplot    = [-80,0,5,60]
@@ -1001,6 +1012,102 @@ cb.set_label("Mixed-layer depth (m)")
 if notitle is False:
     plt.suptitle("Seasonal Mean Mixed Layer Depth Differences in meters \n (CESM1 - WOA 1994)",fontsize=14,y=.94)
 plt.savefig("%sMLD_Differences-CESM1_WOA1994_Savg.png" %(outpath),dpi=200,bbox_inches='tight')
+
+# -------------------------
+#%% Compare CESM with MIMOC
+# -------------------------
+import glob
+
+recalc = False
+
+
+if recalc:
+    mldpath = datpath + "MIMOC_ML_v2.2_PT_S/"
+    #testpath = mldpath + "MIMOC_ML_v2.2_PT_S_MLP_month01.nc"
+    nclist = glob.glob(mldpath+"*.nc")
+    nclist.sort()
+    print(nclist)
+    
+    # Read in and concatenate by month variable
+    ds_all = []
+    for nc in nclist:
+        ds = xr.open_dataset(nc)
+        print(ds)
+        ds_all.append(ds.DEPTH_MIXED_LAYER)
+    ds_all = xr.concat(ds_all,dim="month")
+    
+    
+    # Get dimensions, read to numpy array
+    lenlon = len(ds_all[0].LONG)
+    lenlat = len(ds_all[0].LAT)
+    mmlon = np.linspace(0,360,lenlon)
+    mmlat = np.linspace(-90,90,lenlat)
+    mm_mld = np.zeros((12,lenlat,lenlon))*np.nan
+    for d,ds in enumerate(ds_all):
+        mm_mld[d,:,:] = ds.values
+        
+    # Now Interpolate
+    deg = 1 #Placeholder
+    tol = 1
+    lon360,_ = scm.load_latlon(lon360=True)
+    outvar,lat5,lon5 = proc.coarsen_byavg(mm_mld,mmlat,mmlon,deg,tol,newlatlon=[lon360,lat],usenan=True,latweight=False)
+
+    # Save netcdf
+    savenetcdf = datpath+"MIMOC_ML_v2.2_regriddedCESM_noweight.nc"
+    ds = proc.numpy_to_da(outvar,np.arange(0,12,1),lat5,lon5,"MLD",savenetcdf=savenetcdf)
+else:
+    savenetcdf = datpath+"MIMOC_ML_v2.2_regriddedCESM_noweight.nc"
+    ds = xr.open_dataset(savenetcdf)
+
+# Reload and regrid
+mm_mld = ds.MLD.values # {month x lat x lon}
+lon360 = ds.lon.values
+mm_mld = mm_mld.transpose(2,1,0)
+_,mm_mld = proc.lon360to180(lon360,mm_mld)
+
+# Compute Differences, Then seasonal Average
+mld_diff = h-mm_mld
+hdiff_savg,monstrs=proc.calc_savg(mld_diff,return_str=True,debug=True)
+mm_savg,monstrs = proc.calc_savg(mm_mld,return_str=True,debug=True)
+#%% Make the Plot
+
+notitle = True
+plotmld = False # Tur to just plot mimoc seasonal avg
+
+fig,axs = plt.subplots(2,2,figsize=(7,7),constrained_layout=True,
+                      subplot_kw={'projection':ccrs.PlateCarree()})
+
+sp_id = 0
+for s,ax in enumerate(axs.flatten()):
+    
+    blabel = [0,0,0,0]
+    if s%2 == 0:
+        blabel[0] = 1
+    if s>1:
+        blabel[-1]=1    
+    
+    print(s)
+    if plotmld:
+        pcm = ax.pcolormesh(lon,lat,mm_savg[s].T,vmin=-250,vmax=250,cmap='cmo.balance')
+        fig.colorbar(pcm,ax=ax)
+    else:
+        pcm = ax.pcolormesh(lon,lat,hdiff_savg[s].T,vmin=-250,vmax=250,cmap='cmo.balance')
+    
+    
+    ax = viz.add_coast_grid(ax=ax,bbox=bbox,fill_color='gray',blabels=blabel)
+    ax.set_title(monstrs[s])
+    
+    ax = viz.label_sp(sp_id,ax=ax,fontsize=14,fig=fig,labelstyle="(%s)",case='lower',alpha=.75)
+    sp_id += 1
+cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction=0.035,pad=0.05)
+cb.set_label("Mixed-layer depth (m)")
+if notitle is False:
+    plt.suptitle("Seasonal Mean Mixed Layer Depth Differences in meters \n (CESM1 - MIMOC)",fontsize=14,y=.94)
+plt.savefig("%sMLD_Differences-CESM1_MIMOC_Savg.png" %(outpath),dpi=200,bbox_inches='tight')
+
+
+
+
 
 # -------------------------------------------------------
 #%% Plot Seasonal Variation in parameters for each region
