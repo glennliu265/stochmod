@@ -17,26 +17,22 @@ import glob
 from scipy.io import loadmat
 from tqdm import tqdm
 
+import xesmf as xe
 # import sys
 # sys.path.append("/home/glliu/00_Scripts/01_Projects/00_Commons/")
 # sys.path.append("/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model/")
 # from amv import proc,viz
 
-#%%
+#%% User Edits
 
-varname = "BSF" # "HMXL"
-
+varname  = "BSF" # "HMXL"
+use_xesmf = False
 datpath  = "/vortex/jetstream/climate/data1/yokwon/CESM1_LE/downloaded/ocn/proc/tseries/monthly/%s/" % varname
 ncsearch = "b.e11.B1850C5CN.f09_g16.005.pop.h.%s.*.nc" % varname
 varkeep  = [varname,"TLONG","TLAT","time"]
 
-#%%
-
-
-# Get file names
-globby = datpath+ncsearch
-nclist =glob.glob(globby)
-nclist.sort()
+method   = 'bilinear'
+#%% Functions
 
 # Define preprocessing variable
 def preprocess(ds,varlist=varkeep):
@@ -56,29 +52,6 @@ def preprocess(ds,varlist=varkeep):
          print("Corrected time to be from %s to %s"% (startyr,endyr))
     return ds
 
-# Read in variables
-ds = xr.open_mfdataset(nclist,concat_dim='time',
-                   preprocess=preprocess,
-                   combine='nested',
-                   parallel="True",
-                  )
-
-# Load variables in 
-st = time.time()
-hmxl = ds[varname].values
-tlon = ds.TLONG.values
-tlat = ds.TLAT.values
-times = ds.time.values
-print("Read out data in %.2fs"%(time.time()-st))
-
-
-# Set up target latitude and longitude
-latlonmat = "/home/glliu/01_Data/CESM1_LATLON.mat"
-ll  = loadmat(latlonmat)
-lat = ll['LAT'].squeeze()
-lon = ll["LON"].squeeze()
-lon1 = np.hstack([lon[lon>=180]-360,lon[lon<180]])
-#lon1,_ = proc.lon360to180(lon,np.zeros((288,192,1)))
 
 def getpt_pop_array(lonf,latf,invar,tlon,tlat,searchdeg=0.75,printfind=True,verbose=False):
     
@@ -104,60 +77,117 @@ def getpt_pop_array(lonf,latf,invar,tlon,tlat,searchdeg=0.75,printfind=True,verb
             print("Returning NaN because no points were found for LAT%.1f LON%.1f"%(latf,lonf))
         return np.nan
         
-    
-    
     # Locate points on variable
     if invar.shape[:2] != tlon.shape:
         print("Warning, dimensions do not line up. Make sure invar is Lat x Lon x Otherdims")
         
-    
     return invar[latid,lonid,:].mean(0) # Take mean along first dimension
 
+#%% Load in data
 
-# Transpose the data
-h = hmxl.transpose(1,2,0) # [384,320,time]
-h.shape
 
-# Loop time
+# Get file names
+globby = datpath+ncsearch
+nclist =glob.glob(globby)
+nclist.sort()
 
-start = time.time()
-icount= 0
-stol  = 0.75
-hclim = np.zeros((lon1.shape[0],lat.shape[0],h.shape[2]))
-for o in tqdm(range(lon1.shape[0])):
-    
-    # Get Longitude Value
-    lonf = lon1[o]
-    
-    # Convert to degrees Easth
-    if lonf < 0:
-        lonf = lonf + 360
-    
-    for a in range(0,lat.shape[0]):
-        
-        
-        # Get latitude indices
-        latf = lat[a]
-        
-        # Get point
-        value = getpt_pop_array(lonf,latf,h,tlon,tlat,searchdeg=stol,printfind=False)
-        if np.any(np.isnan(value)):
-            msg = "Land Point @ lon %f lat %f" % (lonf,latf)
-            hclim[o,a,:] = np.ones(h.shape[2])*np.nan
-            
-        else:
-            hclim[o,a,:] = value.copy()
-        icount +=1
-        #print("Completed %i of %i" % (icount,lon1.shape[0]*lat.shape[0]))
-        
-        
-print("Finished in %f seconds" % (time.time()-start))  
 
-dsproc = xr.DataArray(hclim,
-                  dims={'lon':lon1,'lat':lat,'time':times},
-                  coords={'lon':lon1,'lat':lat,'time':times},
-                  name = varname
+
+
+# Set up target latitude and longitude
+latlonmat = "/home/glliu/01_Data/CESM1_LATLON.mat"
+ll   = loadmat(latlonmat)
+lat  = ll['LAT'].squeeze()
+lon  = ll["LON"].squeeze()
+lon1 = np.hstack([lon[lon>=180]-360,lon[lon<180]])
+#lon1,_ = proc.lon360to180(lon,np.zeros((288,192,1)))
+
+# Read in variables
+ds = xr.open_mfdataset(nclist,concat_dim='time',
+                   preprocess=preprocess,
+                   combine='nested',
+                   parallel="True",
                   )
-dsproc.to_netcdf("/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/%s_PIC.nc" % (varname),
-                 encoding={varname: {'zlib': True}})
+
+
+if use_xesmf:
+    start = time.time()
+    
+    # Get Data Array, and rename coordinates to lon/lat
+    ds_in = ds[varname]
+    ds_in = ds_in.rename({"TLONG": "lon", "TLAT": "lat"})
+    
+    # Define new grid (note: seems to support flipping longitude)
+    ds_out = xr.Dataset({'lat':lat,
+                         'lon':lon1})
+    
+    # Initialize Regridder
+    regridder = xe.Regridder(ds_in,ds_out,method,periodic=True)
+    print(regridder)
+    
+    # Regrid
+    dsproc = regridder(ds_in)
+    print("Finished regridding in %f seconds" % (time.time()-start))  
+    
+    # Save the data
+    dsproc.to_netcdf("/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/%s_PIC.nc" % (varname),
+                     encoding={varname: {'zlib': True}})
+    
+else:
+
+    # Load variables in 
+    st    = time.time()
+    hmxl  = ds[varname].values
+    tlon  = ds.TLONG.values
+    tlat  = ds.TLAT.values
+    times = ds.time.values
+    print("Read out data in %.2fs"%(time.time()-st))
+    
+
+    # Transpose the data
+    h = hmxl.transpose(1,2,0) # [384,320,time]
+    h.shape
+    
+    # Loop time
+    
+    start = time.time()
+    icount= 0
+    stol  = 0.75
+    hclim = np.zeros((lon1.shape[0],lat.shape[0],h.shape[2]))
+    for o in tqdm(range(lon1.shape[0])):
+        
+        # Get Longitude Value
+        lonf = lon1[o]
+        
+        # Convert to degrees Easth
+        if lonf < 0:
+            lonf = lonf + 360
+        
+        for a in range(0,lat.shape[0]):
+            
+            
+            # Get latitude indices
+            latf = lat[a]
+            
+            # Get point
+            value = getpt_pop_array(lonf,latf,h,tlon,tlat,searchdeg=stol,printfind=False)
+            if np.any(np.isnan(value)):
+                msg = "Land Point @ lon %f lat %f" % (lonf,latf)
+                hclim[o,a,:] = np.ones(h.shape[2])*np.nan
+                
+            else:
+                hclim[o,a,:] = value.copy()
+            icount +=1
+            #print("Completed %i of %i" % (icount,lon1.shape[0]*lat.shape[0]))
+            
+            
+    print("Finished in %f seconds" % (time.time()-start))  
+    
+    dsproc = xr.DataArray(hclim,
+                      dims={'lon':lon1,'lat':lat,'time':times},
+                      coords={'lon':lon1,'lat':lat,'time':times},
+                      name = varname
+                      )
+    dsproc.to_netcdf("/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/%s_PIC.nc" % (varname),
+                     encoding={varname: {'zlib': True}})
 
