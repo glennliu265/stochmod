@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 
-Regrid MLD to cartesian lat/lon grid
+Regrid MLD (or selected variable) to cartesian lat/lon grid
 and prepare seasonal means
 
 Created on Tue Feb  2 21:24:45 2021
@@ -18,20 +18,40 @@ from scipy.io import loadmat
 from tqdm import tqdm
 
 import xesmf as xe
-# import sys
-# sys.path.append("/home/glliu/00_Scripts/01_Projects/00_Commons/")
-# sys.path.append("/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model/")
-# from amv import proc,viz
 
 #%% User Edits
 
-varname  = "BSF" # "HMXL"
-use_xesmf = False
-datpath  = "/vortex/jetstream/climate/data1/yokwon/CESM1_LE/downloaded/ocn/proc/tseries/monthly/%s/" % varname
-ncsearch = "b.e11.B1850C5CN.f09_g16.005.pop.h.%s.*.nc" % varname
-varkeep  = [varname,"TLONG","TLAT","time"]
+varname       = "HMXL" # "HMXL"
+mconfig       = "FULL_PIC" # [FULL_PIC, SLAB_PIC, FULL_HTR]
 
-method   = 'bilinear'
+use_xesmf     = True # Use xESMF for regridding. False = box average
+method        = "bilinear" # regridding method
+
+use_mfdataset = False # Open all datasets at once (currently only works for PIC, boxavg)
+outpath       = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/%s/" % varname
+
+# Set ncsearch string on stormtrack based on input dataset
+catdim  = 'time'
+savesep = False # Save all files together
+if mconfig == "FULL_PIC":
+    ncsearch      = "b.e11.B1850C5CN.f09_g16.*.pop.h.%s.*.nc" % varname
+elif mconfig == "SLAB_PIC":
+    ncsearch      = "e.e11.B1850C5CN.f09_g16.*.pop.h.%s.*.nc" % varname
+elif mconfig == "FULL_HTR":
+    ncsearch      = "b.e11.B20TRC5CNBDRD.f09_g16.*.pop.h.%s.*.nc" % varname
+    catdim  = 'ensemble'
+    savesep = True # Save each ensemble member separately
+    use_mfdataset = False
+
+# Adjust data path on stormtrack
+if varname == "SSS":
+    datpath   = "/vortex/jetstream/climate/data1/yokwon/CESM1_LE/processed/ocn/proc/tseries/monthly/SSS/"
+else:
+    datpath   = "/vortex/jetstream/climate/data1/yokwon/CESM1_LE/downloaded/ocn/proc/tseries/monthly/%s/" % varname
+
+# Set up variables to keep for preprocessing script
+varkeep   = [varname,"TLONG","TLAT","time"]
+
 #%% Functions
 
 # Define preprocessing variable
@@ -85,14 +105,16 @@ def getpt_pop_array(lonf,latf,invar,tlon,tlat,searchdeg=0.75,printfind=True,verb
 
 #%% Load in data
 
+if not use_xesmf:
+    method = "boxAVG"
+
+savename = "%s%s_%s_%s.nc" % (outpath,varname,mconfig,method)
 
 # Get file names
 globby = datpath+ncsearch
 nclist =glob.glob(globby)
 nclist.sort()
-
-
-
+print("Found %i items" % (len(nclist)))
 
 # Set up target latitude and longitude
 latlonmat = "/home/glliu/01_Data/CESM1_LATLON.mat"
@@ -102,36 +124,75 @@ lon  = ll["LON"].squeeze()
 lon1 = np.hstack([lon[lon>=180]-360,lon[lon<180]])
 #lon1,_ = proc.lon360to180(lon,np.zeros((288,192,1)))
 
-# Read in variables
-ds = xr.open_mfdataset(nclist,concat_dim='time',
-                   preprocess=preprocess,
-                   combine='nested',
-                   parallel="True",
-                  )
+# Read in variables (all at once)
+if use_mfdataset or not use_xesmf:
+    ds = xr.open_mfdataset(nclist,concat_dim='time',
+                       preprocess=preprocess,
+                       combine='nested',
+                       parallel="True",
+                      )
 
-
+# Define new grid (note: seems to support flipping longitude)
+ds_out = xr.Dataset({'lat':lat,
+                     'lon':lon1})
 if use_xesmf:
+
     start = time.time()
-    
+
     # Get Data Array, and rename coordinates to lon/lat
-    ds_in = ds[varname]
-    ds_in = ds_in.rename({"TLONG": "lon", "TLAT": "lat"})
+    if ~use_mfdataset:
+        
+        ds_rgrd = [] # Loop thru each array (mfdataset doesn't seem to be working?)
+        for nc in tqdm(range(len(nclist))):
+            ds = xr.open_dataset(nclist[nc])
+            
+            ds = ds.rename({"TLONG": "lon", "TLAT": "lat"})
+            da = ds
+            #da = ds[varname] # Using dataarray seems to throw an error
+            
+            # Initialize Regridder
+            regridder = xe.Regridder(da,ds_out,method,periodic=True)
+            #print(regridder)
+                        
+            # Regrid
+            daproc = regridder(da[varname]) # Need to input dataarray
+            
+            print("Finished regridding in %f seconds" % (time.time()-start))
+            ds_rgrd.append(daproc)
+            
+            # Save each ensemble member separately (or time period)
+            if savesep: 
+                savename = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/%s_%s_%s_num%02i.nc" % (varname,mconfig,method,nc)
+                daproc.to_netcdf(savename,
+                                 encoding={varname: {'zlib': True}})
+                
+        # Concatenate along selected dimension
+        if not savesep:
+            dsproc = xr.concat(ds_rgrd,dim=catdim)
+        
+    else: # Do all at once (seems to be failing due to cf compliant issue)
+        
+        ds = ds.rename({"TLONG": "lon", "TLAT": "lat"})
+        #ds = ds.rename_dims({"nlon": "longitude", "nlat": "latitude"})
+        da = ds#[varname]
+        
+        # Define new grid (note: seems to support flipping longitude)
+        ds_out = xr.Dataset({'lat':lat,
+                             'lon':lon1})
     
-    # Define new grid (note: seems to support flipping longitude)
-    ds_out = xr.Dataset({'lat':lat,
-                         'lon':lon1})
+        # Initialize Regridder
+        regridder = xe.Regridder(da,ds_out,method,periodic=True)
+        print(regridder)
     
-    # Initialize Regridder
-    regridder = xe.Regridder(ds_in,ds_out,method,periodic=True)
-    print(regridder)
     
-    # Regrid
-    dsproc = regridder(ds_in)
-    print("Finished regridding in %f seconds" % (time.time()-start))  
+        # Regrid
+        dsproc = regridder(da[varname])
+        print("Finished regridding in %f seconds" % (time.time()-start))  
     
     # Save the data
-    dsproc.to_netcdf("/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/%s_PIC.nc" % (varname),
-                     encoding={varname: {'zlib': True}})
+    if not savesep:
+        dsproc.to_netcdf(savename,
+                         encoding={varname: {'zlib': True}})
     
 else:
 
