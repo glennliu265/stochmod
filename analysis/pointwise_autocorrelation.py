@@ -5,7 +5,7 @@
 Compute pointwise autocorrelation for CESM or stochastic model outputs
 Support separate calculation for warm and cold anomalies
 
-Based on pointwise_autocorrelation.py
+Based on postprocess_autocorrelation.py
 
 Created on Thu Mar 17 17:09:18 2022
 
@@ -29,21 +29,37 @@ import cartopy.crs as ccrs
 #%% Select dataset to postprocess
 
 # Autocorrelation parameters
-lags   = np.arange(0,37)
-lagname = "lag%02ito%02i" % (lags[0],lags[-1]) 
+# --------------------------
+lags        = np.arange(0,37)
+lagname     = "lag%02ito%02i" % (lags[0],lags[-1]) 
 thresholds  = [0,] # Standard Deviations
 conf        = 0.95
 tails       = 2
 
-# Set Output Directory
-figpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220317/'
-proc.makedir(figpath)
+mconfig    = "PIC-FULL"
+thresholds = [0,]
+thresname  = "thres" + "to".join(["%i" % i for i in thresholds])
+varname    = "SST"
 
+
+
+# Set Output Directory
+# --------------------
+figpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220325/'
+proc.makedir(figpath)
+outpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/'
+savename   = "%sCESM1_%s_%s_autocorrelation_%s.npz" %  (outpath,mconfig,varname,thresname)
+print("Output will save to %s" % savename)
+
+# Plotting Params
+# ---------------
+colors = ['b','r','k']
+
+#%%
 
 # Postprocess Continuous SM  Run
 # ------------------------------
 datpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_output/"
-outpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_output/proc/"
 fnames      = ["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_dmp0"%i for i in range(10)]
 onames      = ["spectra_%s_Fprime_rolln0_ampq0_method5_dmp0_run2%02d.nc" % (lagname,i) for i in range(10)]
 mnames      = ["constant h","vary h","entraining"] 
@@ -51,7 +67,6 @@ mnames      = ["constant h","vary h","entraining"]
 # Postproess Continuous CESM Run
 # ------------------------------
 datpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/"
-outpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_output/proc/"
 fnames     = ["CESM1_FULL_postprocessed_NAtl.nc","CESM1_SLAB_postprocessed_NAtl.nc"]
 mnames     = ["FULL","SLAB"] 
 onames     = ["spectra_%s_PIC-%s.nc" % (lagname,mnames[i]) for i in range(2)]
@@ -62,7 +77,10 @@ mons3    = [viz.return_mon_label(m,nletters=3) for m in np.arange(1,13)]
 
 #%% Read in the data
 
-sst_fn = fnames[0]
+if mconfig == "PIC_FULL":
+    sst_fn = fnames[0]
+elif mconfig == "PIC_SLAB":
+    sst_fn = fnames[1]
 print("Processing: " + sst_fn)
 
 # Load in SST [model x lon x lat x time] Depending on the file format
@@ -90,12 +108,6 @@ elif 'nc' in sst_fn:
 
 #%% Set some more things...
 
-thresholds = [0,]
-thresname  = "thres" + "to".join(["%i" % i for i in thresholds])
-
-varname = "SST"
-mconfig = "PIC-FULL"
-savename   = "%sCESM1_%s_%s_autocorrelation_%s.npz" %  (outpath,mconfig,varname,thresname)
 
 #%% Do the calculations
 """
@@ -123,10 +135,10 @@ npts_valid           = sst_valid.shape[0]
 # Split to Year x Month
 sst_valid = sst_valid.reshape(npts_valid,nyr,12)
 
-# Preallocate
-class_count = np.zeros((npts_valid,12,nthres+1)) # [pt x eventmonth x threshold]
-sst_acs     = np.zeros((npts_valid,12,nthres+1,nlags))  # [pt x eventmonth x threshold x lag]
-sst_cfs     = np.zeros((npts_valid,12,nthres+1,nlags,2))  # [pt x eventmonth x threshold x lag x bounds]
+# Preallocate (nthres + 1 (for all thresholds), and last is all data)
+class_count = np.zeros((npts_valid,12,nthres+2)) # [pt x eventmonth x threshold]
+sst_acs     = np.zeros((npts_valid,12,nthres+2,nlags))  # [pt x eventmonth x threshold x lag]
+sst_cfs     = np.zeros((npts_valid,12,nthres+2,nlags,2))  # [pt x eventmonth x threshold x lag x bounds]
 
 # A pretty ugly loop....
 # Now loop for each month
@@ -137,33 +149,46 @@ for im in range(12):
     sst_mon = sst_valid[:,:,im] # [pts x yr]
     sst_mon_classes = proc.make_classes_nd(sst_mon,thresholds,dim=1,debug=False)
     
-    for th in range(nthres+1): # Loop for each threshold
-        for pt in tqdm(range(npts_valid)): # Loop for each point
-            
-            # Get years which fulfill criteria
-            yr_mask     = np.where(sst_mon_classes[pt,:] == th)[0]
-            sst_in      = sst_valid[pt,yr_mask,:] # [year,month]
-            sst_in      = sst_in.T
-            class_count[pt,im,th] = len(yr_mask) # Record # of events 
-            
-            # Compute the lagcovariance (with detrending)
-            ac = proc.calc_lagcovar(sst_in,sst_in,lags,im+1,1) # [lags]
-            cf = proc.calc_conflag(ac,conf,tails,len(yr_mask)) # [lags, cf]
+    for th in range(nthres+2): # Loop for each threshold
+    
+        if th < nthres + 1: # Calculate/Loop for all points
+            for pt in tqdm(range(npts_valid)): 
+                
+                # Get years which fulfill criteria
+                yr_mask     = np.where(sst_mon_classes[pt,:] == th)[0]
+                sst_in      = sst_valid[pt,yr_mask,:] # [year,month]
+                sst_in      = sst_in.T
+                class_count[pt,im,th] = len(yr_mask) # Record # of events 
+                
+                # Compute the lagcovariance (with detrending)
+                ac = proc.calc_lagcovar(sst_in,sst_in,lags,im+1,1) # [lags]
+                cf = proc.calc_conflag(ac,conf,tails,len(yr_mask)) # [lags, cf]
+                
+                # Save to larger variable
+                sst_acs[pt,im,th,:] = ac.copy()
+                sst_cfs[pt,im,th,:,:]  = cf.copy()
+                # End Loop Point -----------------------------
+        
+        else: # Use all Data
+            print("Now computing for all data on loop %i"%th)
+            # Reshape to [month x yr x npts]
+            sst_in    = sst_valid.transpose(2,1,0)
+            acs = proc.calc_lagcovar_nd(sst_in,sst_in,lags,im+1,1)
+            cfs = proc.calc_conflag(acs,conf,tails,nyr)
             
             # Save to larger variable
-            sst_acs[pt,im,th,:] = ac.copy()
-            sst_cfs[pt,im,th,:,:]  = cf.copy()
-            # End Loop Point
-            
-        # End Loop Threshold
-    # End Loop Event Month
+            sst_acs[:,im,th,:] = ac.copy()
+            sst_cfs[:,im,th,:,:]  = cf.copy()
+            class_count[:,im,th]   = nyr
+        # End Loop Threshold -----------------------------
+        
+    # End Loop Event Month -----------------------------
 
 # Now Replace into original matrices
-
 # Preallocate
-count_final = np.zeros((npts,12,nthres+1)) * np.nan
-acs_final   = np.zeros((npts,12,nthres+1,nlags)) * np.nan
-cfs_final   = np.zeros((npts,12,nthres+1,nlags,2)) * np.nan
+count_final = np.zeros((npts,12,nthres+2)) * np.nan
+acs_final   = np.zeros((npts,12,nthres+2,nlags)) * np.nan
+cfs_final   = np.zeros((npts,12,nthres+2,nlags,2)) * np.nan
 
 # Replace
 count_final[okpts,...] = class_count
@@ -171,40 +196,15 @@ acs_final[okpts,...]   = sst_acs
 cfs_final[okpts,...]   = sst_cfs
 
 # Reshape output
-count_final = count_final.reshape(nlon,nlat,12,nthres+1)
-acs_final   = acs_final.reshape(nlon,nlat,12,nthres+1,nlags)
-cfs_final   = cfs_final.reshape(nlon,nlat,12,nthres+1,nlags,2)
+count_final = count_final.reshape(nlon,nlat,12,nthres+2)
+acs_final   = acs_final.reshape(nlon,nlat,12,nthres+2,nlags)
+cfs_final   = cfs_final.reshape(nlon,nlat,12,nthres+2,nlags,2)
 
-# Save Output
-np.savez(savename,**{
-    'class_count' : count_final,
-    'acs' : acs_final,
-    'cfs' : cfs_final,
-    'thresholds' : thresholds,
-    'lon' : lon,
-    'lat' : lat,
-    'lags': lags
-    },allow_pickle=True)
-
-
-#%% Try to plot a point
-
-savename = "%sCESM1_PIC-FULL_SST_autocorrelation_thres%s.npz" %  (outpath,nthres)
-ld = np.load(savename,allow_pickle=True)
-
-
-colors = ['b','r']
-
-count_final = ld['class_count']
-acs_final   = ld['acs']
-lon         = ld['lon']
-lat         = ld['lat']
-
-thresholds  = ld['thresholds']
-thresname   = []
+# Get Threshold Labels
+threslabs   = []
 if nthres == 1:
-    thresname.append("$T'$ <= %i"% thresholds[0])
-    thresname.append("$T'$ > %i" % thresholds[0])
+    threslabs.append("$T'$ <= %i"% thresholds[0])
+    threslabs.append("$T'$ > %i" % thresholds[0])
 else:
     for th in range(nthres):
         thval= thresholds[th]
@@ -220,23 +220,52 @@ else:
             tstr = "$T'$ > %i %s" % (thval,sig)
         else:
             tstr = "%i < $T'$ =< %i %s" % (thresholds[th-1],thval,sig)
-        thresname.append(th)
+        threslabs.append(th)
+threslabs.append("ALL")
+
+
+
+#%Save Output
+np.savez(savename,**{
+    'class_count' : count_final,
+    'acs' : acs_final,
+    'cfs' : cfs_final,
+    'thresholds' : thresholds,
+    'lon' : lon,
+    'lat' : lat,
+    'lags': lags,
+    'threslabs' : threslabs
+    },allow_pickle=True)
+
+#%% Try to plot a point
+
+#
+ld = np.load(savename,allow_pickle=True)
+
+
+
+count_final = ld['class_count']
+acs_final   = ld['acs']
+lon         = ld['lon']
+lat         = ld['lat']
+
+thresholds  = ld['thresholds']
+threslabs   = ld['threslabs']
         
 
 lonf = -30
 latf = 50
 
 klon,klat = proc.find_latlon(lonf,latf,lon,lat)
+kmonth = 0
 
-kmonth = 4
-
-fig,ax =plt.subplots(1,1)
+fig,ax = plt.subplots(1,1)
 
 ax,ax2 = viz.init_acplot(kmonth,np.arange(0,38,2),lags,ax=ax)
-for th in range(nthres+1):
-    ax.plot(lags,acs_final[klon,klat,kmonth,th,:,kmonth],marker="o",
+for th in range(nthres+2):
+    ax.plot(lags,acs_final[klon,klat,kmonth,th,:],marker="o",
             color=colors[th],lw=2,
-            label="%s (n=%i)" % (thresname[th],count_final[klon,klat,kmonth,th]))
+            label="%s (n=%i)" % (threslabs[th],count_final[klon,klat,kmonth,th]))
     #ax.plot(lags,acs_final[klon,klat,kmonth,0,:,kmonth],label="Cold Anomalies (%i)" % (count_final[klon,klat,kmonth,0]),color='b')
     #ax.plot(lags,acs_final[klon,klat,kmonth,1,:,kmonth],label="Warm Anomalies (%i)" % (count_final[klon,klat,kmonth,th]),color='r')
     #ax.legend()
@@ -246,7 +275,7 @@ ax.legend()
 plt.savefig("%sAutocorrelation_WarmCold.png"%figpath,dpi=150)
 #%% load data for MLD
 
-ksel = 2#"max"
+ksel = 2 #"max"
 
 # Use the function used for sm_rewrite.py
 frcname    = "flxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0"
