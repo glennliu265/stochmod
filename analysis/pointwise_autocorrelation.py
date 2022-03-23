@@ -36,17 +36,17 @@ conf        = 0.95
 tails       = 2
 
 # Set Output Directory
-figpath = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220317/'
+figpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220317/'
 proc.makedir(figpath)
 
 
 # Postprocess Continuous SM  Run
 # ------------------------------
-datpath  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_output/"
-outpath  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_output/proc/"
-fnames   = ["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_dmp0"%i for i in range(10)]
-onames     = ["spectra_%s_Fprime_rolln0_ampq0_method5_dmp0_run2%02d.nc" % (lagname,i) for i in range(10)]
-mnames     = ["constant h","vary h","entraining"] 
+datpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_output/"
+outpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_output/proc/"
+fnames      = ["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_dmp0"%i for i in range(10)]
+onames      = ["spectra_%s_Fprime_rolln0_ampq0_method5_dmp0_run2%02d.nc" % (lagname,i) for i in range(10)]
+mnames      = ["constant h","vary h","entraining"] 
 
 # Postproess Continuous CESM Run
 # ------------------------------
@@ -63,7 +63,7 @@ mons3    = [viz.return_mon_label(m,nletters=3) for m in np.arange(1,13)]
 #%% Read in the data
 
 sst_fn = fnames[0]
-print("Processing: "+sst_fn)
+print("Processing: " + sst_fn)
 
 # Load in SST [model x lon x lat x time] Depending on the file format
 if 'npy' in sst_fn:
@@ -87,11 +87,27 @@ elif 'nc' in sst_fn:
     lat = ds.lat.values
     sst = ds.SST.values
 
-#%% Now we have sst [lon x lat x time]
 
+#%% Set some more things...
+
+thresholds = [0,]
+thresname  = "thres" + "to".join(["%i" % i for i in thresholds])
+
+varname = "SST"
+mconfig = "PIC-FULL"
+savename   = "%sCESM1_%s_%s_autocorrelation_%s.npz" %  (outpath,mconfig,varname,thresname)
+
+#%% Do the calculations
+"""
+Inputs are:
+    1) variable [lon x lat x time]
+    2) lon      [lon]
+    3) lat      [lat]
+    4) thresholds [Numeric] (Standard Deviations)
+    5) savename [str] Full path to output file
+    
+"""
 # First things first, combine lat/lon, remove nan points
-thresholds = [-1,0,1]
-
 # Get Dimensions
 nlon,nlat,ntime = sst.shape
 nyr             = int(ntime/12)
@@ -100,21 +116,22 @@ nlags           = len(lags)
 nthres          = len(thresholds)
 
 # Combine space, remove NaN points
-sst = sst.reshape(npts,ntime)
+sst                  = sst.reshape(npts,ntime)
 sst_valid,knan,okpts = proc.find_nan(sst,1) # [finepoints,time]
-npts_valid = sst_valid.shape[0] 
+npts_valid           = sst_valid.shape[0] 
 
 # Split to Year x Month
 sst_valid = sst_valid.reshape(npts_valid,nyr,12)
 
 # Preallocate
 class_count = np.zeros((npts_valid,12,nthres+1)) # [pt x eventmonth x threshold]
-sst_acs     = np.zeros((npts_valid,12,nthres+1,nlags,12))  # [pt x eventmonth x threshold x lag x basemonth]
-sst_cfs     = np.zeros((npts_valid,12,nthres+1,nlags,12,2))  # [pt x eventmonth x threshold x lag x basemonth x bounds]
+sst_acs     = np.zeros((npts_valid,12,nthres+1,nlags))  # [pt x eventmonth x threshold x lag]
+sst_cfs     = np.zeros((npts_valid,12,nthres+1,nlags,2))  # [pt x eventmonth x threshold x lag x bounds]
 
 # A pretty ugly loop....
 # Now loop for each month
 for im in range(12):
+    print(im)
     
     # For that month, determine which years fall into which thresholds [pts,years]
     sst_mon = sst_valid[:,:,im] # [pts x yr]
@@ -129,25 +146,24 @@ for im in range(12):
             sst_in      = sst_in.T
             class_count[pt,im,th] = len(yr_mask) # Record # of events 
             
-            for bm in range(12): # Loop for each base month
-                # Compute the lagcovariance
-                ac = proc.calc_lagcovar(sst_in,sst_in,lags,bm+1,1) # [lags]
-                cf = proc.calc_conflag(ac,conf,tails,len(yr_mask)) # [lags, cf]
-                
-                sst_acs[pt,im,th,:,bm] = ac.copy()
-                sst_cfs[pt,im,th,:,bm,:]  = cf.copy()
-                # End Loop Basemonth
+            # Compute the lagcovariance (with detrending)
+            ac = proc.calc_lagcovar(sst_in,sst_in,lags,im+1,1) # [lags]
+            cf = proc.calc_conflag(ac,conf,tails,len(yr_mask)) # [lags, cf]
+            
+            # Save to larger variable
+            sst_acs[pt,im,th,:] = ac.copy()
+            sst_cfs[pt,im,th,:,:]  = cf.copy()
             # End Loop Point
+            
         # End Loop Threshold
     # End Loop Event Month
 
-
-#%% Now Replace into original matrices
+# Now Replace into original matrices
 
 # Preallocate
 count_final = np.zeros((npts,12,nthres+1)) * np.nan
-acs_final   = np.zeros((npts,12,nthres+1,nlags,12)) * np.nan
-cfs_final   = np.zeros((npts,12,nthres+1,nlags,12,2)) * np.nan
+acs_final   = np.zeros((npts,12,nthres+1,nlags)) * np.nan
+cfs_final   = np.zeros((npts,12,nthres+1,nlags,2)) * np.nan
 
 # Replace
 count_final[okpts,...] = class_count
@@ -156,13 +172,10 @@ cfs_final[okpts,...]   = sst_cfs
 
 # Reshape output
 count_final = count_final.reshape(nlon,nlat,12,nthres+1)
-acs_final   = acs_final.reshape(nlon,nlat,12,nthres+1,nlags,12)
-cfs_final   = cfs_final.reshape(nlon,nlat,12,nthres+1,nlags,12,2)
-
+acs_final   = acs_final.reshape(nlon,nlat,12,nthres+1,nlags)
+cfs_final   = cfs_final.reshape(nlon,nlat,12,nthres+1,nlags,2)
 
 # Save Output
-savename = "%sCESM1_PIC-FULL_SST_autocorrelation_thres%i.npz" %  (outpath,nthres)
-
 np.savez(savename,**{
     'class_count' : count_final,
     'acs' : acs_final,
@@ -170,8 +183,9 @@ np.savez(savename,**{
     'thresholds' : thresholds,
     'lon' : lon,
     'lat' : lat,
-    'lags':lags
+    'lags': lags
     },allow_pickle=True)
+
 
 #%% Try to plot a point
 
@@ -232,7 +246,7 @@ ax.legend()
 plt.savefig("%sAutocorrelation_WarmCold.png"%figpath,dpi=150)
 #%% load data for MLD
 
-ksel = 1#"max"
+ksel = 2#"max"
 
 # Use the function used for sm_rewrite.py
 frcname    = "flxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0"
@@ -252,7 +266,6 @@ outputs,lonr2,latr2 = scm.cut_regions(inputs,long,latg,reg_sel,0)
 h,kprev,damping,dampingfull,alpha,alpha_full,hblt = outputs
 
 
-
 if ksel == 'max':
     
     # Get indices of kprev
@@ -266,6 +279,7 @@ if ksel == 'max':
             acmax[o,a,...] = acs_final[o,a,kpt,:,:,kpt]
 else:
     acmax = acs_final[:,:,ksel,:,:,ksel]
+
 #% Integrate
 integr_ac = np.trapz(acmax,x=lags,axis=-1)
 
