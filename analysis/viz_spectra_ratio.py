@@ -64,16 +64,16 @@ proc.makedir(figpath)
 
 # Postprocess Continuous SM  Run
 # ------------------------------
-fnames     = ["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_dmp0"%i for i in range(10)]
-snames     = ["spectra_%s_Fprime_rolln0_ampq0_method5_dmp0_run2%02d.nc" % (smoothname,i) for i in range(10)]
-mnames     = ["constant h","vary h","entraining"] 
+fnames      = ["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_dmp0"%i for i in range(10)]
+snames      = ["spectra_%s_Fprime_rolln0_ampq0_method5_dmp0_run2%02d.nc" % (smoothname,i) for i in range(10)]
+mnames      = ["constant h","vary h","entraining"] 
 snames_full = [outpath+sname for sname in snames]
 
 # Postproess CESM Run
 # ------------------------------
-cesm_fnames     = ["CESM1_FULL_postprocessed_NAtl.nc","CESM1_SLAB_postprocessed_NAtl.nc"]
-cesm_mnames     = ["FULL","SLAB"] 
-cesm_snames     = ["spectra_%s_PIC-%s.nc" % (smoothname,cesm_mnames[i]) for i in range(2)]
+cesm_fnames      = ["CESM1_FULL_postprocessed_NAtl.nc","CESM1_SLAB_postprocessed_NAtl.nc"]
+cesm_mnames      = ["FULL","SLAB"] 
+cesm_snames      = ["spectra_%s_PIC-%s.nc" % (smoothname,cesm_mnames[i]) for i in range(2)]
 cesm_snames_full = [outpath+sname for sname in cesm_snames]
 
 # Other Params
@@ -89,7 +89,6 @@ thresval   = 1/20 # 20 years (Multidecadal)
 lowerthres = 0 # 
 dtplot     = 3600*24*365
 
-
 # Load CESM
 # ---------
 cesm_dsall = []
@@ -97,7 +96,7 @@ for i in range(2):
     ds       = xr.open_mfdataset(cesm_snames_full[i])
     cesm_dsall.append(ds)
     
-    
+
 # Load Spectra
 st = time.time()
 cfreqs       = []
@@ -209,7 +208,7 @@ for t in range(3):
     ax = viz.add_coast_grid(ax,bbox=bboxplot,blabels=blabel,fill_color='gray')
     if use_contours:
         pcm = ax.contourf(ds.lon,ds.lat,ratiosel[:,:,t].T,levels=cints,extend='both',cmap='cmo.balance')
-        cl = ax.contour(ds.lon,ds.lat,ratiosel[:,:,t].T,levels=cl_ints,colors='k',linewidths=0.5)
+        cl  = ax.contour(ds.lon,ds.lat,ratiosel[:,:,t].T,levels=cl_ints,colors='k',linewidths=0.5)
         ax.clabel(cl,cl_ints[::2],fmt="%.1f")
     else:
         pcm = ax.pcolormesh(ds.lon,ds.lat,ratiosel[:,:,t].T,vmin=-1.5,vmax=1.5,cmap='cmo.balance')
