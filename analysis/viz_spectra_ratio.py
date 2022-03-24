@@ -54,7 +54,7 @@ nsmooth    = 30
 smoothname = "smooth%03i-taper%03i" % (nsmooth,pct*100)
 
 outpath  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_output/proc/"
-figpath = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220315/'
+figpath = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220325/'
 proc.makedir(figpath)
 
 #sst_fn = "stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run200_ampq3_method5_dmp0.npz"
@@ -107,7 +107,7 @@ for i in range(2):
     cfreqs.append(cesm_dsall[i].frequency.values)
     cmodelnames.append(cesm_dsall[i].models.values)
 
-    print("Loaded data in %.2fs" % (st-time.time()))
+    print("Loaded data in %.2fs" % (time.time()-st))
             
 # Load Stochastic Model
 # ---------------------------
@@ -183,9 +183,9 @@ ratiosel     = entrain_full
 rationame    = "log($\sigma^2_{entrain}$/$\sigma^2_{full}$)"
 rationame_fn = "log_entrain_full"
 
-ratiosel     = hconst_slab
-rationame    = "log($\sigma^2_{h const}$/$\sigma^2_{slab}$)"
-rationame_fn = "log_hconst_slab"
+# ratiosel     = hconst_slab
+# rationame    = "log($\sigma^2_{h const}$/$\sigma^2_{slab}$)"
+# rationame_fn = "log_hconst_slab"
 
 
 use_contours = True
@@ -222,17 +222,33 @@ plt.savefig("%sSpectra_Ratio_%s_%s.png"% (figpath,rationame_fn,smoothname),dpi=1
 
 #%% Randomly grab and plot barotropic streamfunction
 
-bsf_ds = xr.open_dataset(datpath+"../CESM_proc/BSF_PIC.nc")
+
+# BSF
+bsf_ds = xr.open_dataset(datpath+"../CESM_proc/BSF_FULL_PIC_bilinear.nc")
 ds_reg = bsf_ds.BSF.sel(lon=slice(bboxplot[0],bboxplot[1]),
-                    lat=slice(bboxplot[2],bboxplot[3]))
+                    lat=slice(bboxplot[2],lat[-1]))
 
-bsf = ds_reg.values
-bsf_mean = bsf.mean(-1)
+ds_reg   = ds_reg.mean('time')
+bsf      = ds_reg.values
+bsf_mean = bsf.T
+#bsf_mean = bsf.mean(-1)
 
+
+# Do the same with SSH
+ssh_ds = xr.open_dataset(datpath+"../CESM_proc/SSH_FULL_PIC_bilinear.nc")
+ssh_reg = ssh_ds.SSH.sel(lon=slice(bboxplot[0],bboxplot[1]),lat=slice(bboxplot[2],lat[-1]))
+
+ssh_reg   = ssh_reg.mean('time')
+ssh      = ssh_reg.values
+ssh_mean = ssh.T
 #%% PLot BSF
 ratiosel     = entrain_full
 rationame    = "log($\sigma^2_{entrain}$/$\sigma^2_{full}$)"
 rationame_fn = "log_entrain_full"
+
+
+
+plotcontour = "SSH"
 
 use_contours = True
 cints       = np.arange(-1.5,1.55,0.05)
@@ -261,14 +277,17 @@ for t in range(3):
     else:
         pcm = ax.pcolormesh(ds.lon,ds.lat,ratiosel[:,:,t].T,vmin=-1.5,vmax=1.5,cmap='cmo.balance')
         
-    cl = ax.contour(ds_reg.lon,ds_reg.lat,bsf_mean.T,colors='k',levels=bsfcint,linewidths=0.5)
+    if plotcontour=="BSF":
+        cl = ax.contour(ds_reg.lon,ds_reg.lat,bsf_mean.T,colors='k',levels=bsfcint,linewidths=0.5)
+    elif plotcontour=="SSH":
+        cl = ax.contour(ds_reg.lon,ds_reg.lat,ssh_mean.T,colors='k',levels=bsfcint,linewidths=0.5)
     ax.clabel(cl,bsfcint[::4])
     
 fig.colorbar(pcm,ax=axs.flatten(),fraction=0.025,pad=0.01)
 ax = axs[0]
 ax.text(-0.15, 0.55, rationame, va='bottom', ha='center',rotation='vertical',
         rotation_mode='anchor',transform=ax.transAxes)
-plt.savefig("%sSpectra_Ratio_%s_%sBSF.png"% (figpath,rationame_fn,smoothname),dpi=150)
+plt.savefig("%sSpectra_Ratio_%s_%s%s.png"% (figpath,rationame_fn,smoothname,plotcontour),dpi=150)
 
 
 #%% SM Draft Plot
