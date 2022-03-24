@@ -5,6 +5,9 @@
 Regrid MLD (or selected variable) to cartesian lat/lon grid
 and prepare seasonal means
 
+Uses xesmf environment. Files are large--need to figure out compression
+or datatype change.
+
 Created on Tue Feb  2 21:24:45 2021
 
 @author: gliu
@@ -16,13 +19,12 @@ import xarray as xr
 import glob
 from scipy.io import loadmat
 from tqdm import tqdm
-
 import xesmf as xe
 
 #%% User Edits
 
-varname       = "HMXL" # "HMXL"
-mconfig       = "FULL_PIC" # [FULL_PIC, SLAB_PIC, FULL_HTR]
+varname       = "BSF" # "HMXL"
+mconfig       = "FULL" # [FULL_PIC, SLAB_PIC, FULL_HTR]
 
 use_xesmf     = True # Use xESMF for regridding. False = box average
 method        = "bilinear" # regridding method
@@ -102,6 +104,7 @@ def getpt_pop_array(lonf,latf,invar,tlon,tlat,searchdeg=0.75,printfind=True,verb
         print("Warning, dimensions do not line up. Make sure invar is Lat x Lon x Otherdims")
         
     return invar[latid,lonid,:].mean(0) # Take mean along first dimension
+
 
 #%% Load in data
 

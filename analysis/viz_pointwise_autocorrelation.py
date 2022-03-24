@@ -9,7 +9,6 @@ Created on Thu Mar 24 15:23:20 2022
 @author: gliu
 """
 
-
 import numpy as np
 import matplotlib.pyplot as plt
 import sys
@@ -76,18 +75,23 @@ elif "HTR" in mconfig:
     mnames     = ["FULL",]
     
 
-#%% Try to plot a point
+#%% Load in the data
 
-#
-ld = np.load(savename,allow_pickle=True)
-
+ld          = np.load(savename,allow_pickle=True)
 count_final = ld['class_count']
 acs_final   = ld['acs'] # [lon x lat x (ens) x month x thres x lag]
 lon         = ld['lon']
 lat         = ld['lat']
-
 thresholds  = ld['thresholds']
 threslabs   = ld['threslabs']
+
+nthres      = len(thresholds)
+if "HTR" in mconfig:
+    lens=True
+    nlon,nlat,nens,nmon,_,nlags = acs_final.shape
+else:
+    lens=False
+    nlon,nlat,nmon,_,nlags = acs_final.shape
 #%% Plot autocorrelation at a point
 
 # Select a Point
@@ -122,53 +126,54 @@ else:
         
         ax.fill_between(lags,plotac.min(0),plotac.max(0),
                         color=colors[th],alpha=0.25,zorder=-1,label="")
-    
 
 ax.legend()
 plt.savefig("%sAutocorrelation_WarmCold_%s_%s_month%i.png"% (figpath,mconfig,locstr,kmonth+1),dpi=150)
 #%% load data for MLD
 
-ksel = 'max' #2 #"max"
 
 # Use the function used for sm_rewrite.py
 frcname    = "flxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0"
-input_path = datpath + "model_input/"
+input_path = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/"
 lagstr     = "lag1"
 method     = 5 # Damping Correction Method
-inputs = scm.load_inputs('SLAB_PIC',frcname,input_path,load_both=True,method=method,lagstr=lagstr)
+inputs     = scm.load_inputs('SLAB_PIC',frcname,input_path,load_both=True,method=method,lagstr=lagstr)
 long,latg,h,kprevall,dampingslab,dampingfull,alpha,alpha_full = inputs
-hblt   = np.load(input_path + "SLAB_PIC_hblt.npy") # Slab fixed MLD
-hblt   = np.ones(hblt.shape) * hblt.mean(2)[:,:,None]
+hblt       = np.load(input_path + "SLAB_PIC_hblt.npy") # Slab fixed MLD
+hblt       = np.ones(hblt.shape) * hblt.mean(2)[:,:,None]
 
 # Compute Specific Region
 reg_sel  = [lon[0],lon[-1],lat[0],lat[-1]]
-#reg_sel   = [-80,0,30,65]
-inputs = [h,kprevall,dampingslab,dampingfull,alpha,alpha_full,hblt]
+inputs   = [h,kprevall,dampingslab,dampingfull,alpha,alpha_full,hblt]
 outputs,lonr2,latr2 = scm.cut_regions(inputs,long,latg,reg_sel,0)
 h,kprev,damping,dampingfull,alpha,alpha_full,hblt = outputs
 
+#%% Select which basemonth to plot
+
+# Select which mixed layer depth setting to evaluate
+ksel = 'max' #2 #"max"
 
 if ksel == 'max':
-    
     # Get indices of kprev
     hmax = np.argmax(h,axis=2)
     
     # Select autocorrelation function of maximum month
-    acmax = np.zeros((nlon,nlat,nthres+1,nlags))*np.nan
+    newshape = [d for d in acs_final.shape if d != 12]
+    acmax = np.zeros(newshape)*np.nan
     for o in tqdm(range(nlon)):
         for a in range(nlat):
-            kpt = hmax[o,a,]
-            acmax[o,a,...] = acs_final[o,a,kpt,:,:,kpt]
+            kpt            = hmax[o,a,]
+            acmax[o,a,...] = acs_final[o,a,...,kpt,:,:]
 else:
-    acmax = acs_final[:,:,ksel,:,:,ksel]
+    acmax = acs_final[...,ksel,:,:]
 
 #% Integrate
-integr_ac = np.trapz(acmax,x=lags,axis=-1)
-
+integr_ac = np.trapz(acmax,x=lags,axis=-1) # [lon x lat x (ens) x thres]
+#%%
 #%% Visualize (Works for warm/cold)
 bboxplot = [-80,0,0,60]
 
-intitles = ("Cold","Warm")
+intitles = ("Cold","Warm","All")
 
 fig,axs = plt.subplots(1,3,subplot_kw={'projection':ccrs.PlateCarree()},
                       constrained_layout=True,figsize=(14,6))
@@ -176,12 +181,18 @@ for th in range(3):
     ax = axs[th]
     
     if th < nthres+1:
-        plotac = integr_ac[:,:,th].T
+        if lens:
+            plotac = integr_ac[:,:,:,th].mean(-1).T
+        else:
+            plotac = integr_ac[:,:,th].T
         title  = "%s Anomalies (%s K)" % (intitles[th],thresname[th])
         cmap   = "cmo.amp"
         vlm    = [0,10]
     else:
-        plotac = (integr_ac[:,:,1] - integr_ac[:,:,0]).T
+        if lens:
+            plotac = (integr_ac[:,:,:,1].mean(-1) - integr_ac[:,:,:,0].mean(-1)).T
+        else:
+            plotac = (integr_ac[:,:,1] - integr_ac[:,:,0]).T
         title  = "Warm - Cold Anomalies"
         cmap   = "cmo.balance"
         vlm    = [-3,3]
@@ -204,9 +215,33 @@ for th in range(3):
     elif th == 2:
         cb = fig.colorbar(pcm,ax=ax,orientation='horizontal',fraction=0.04,pad=0.01)
         cb.set_label("Difference (Months)")
-plt.suptitle("Integrated ACF (to 36 months) for CESM1-FULL PiC",fontsize=14,y=.88)
-plt.savefig("%sIntegratedACF_Cold_Warm_Anomalies_CESM_PiC_ksel%i.png"%(figpath,ksel),dpi=150)
-#%%
+
+plt.suptitle("Integrated %s ACF (to 36 months) for CESM1 (%s)" % (varname,mconfig),fontsize=14,y=.88)
+plt.savefig("%sIntegrated%sACF_Cold_Warm_Anomalies_CESM_%s_ksel%i.png"%(figpath,varname,mconfig,ksel),dpi=150)
+
+
+#%% Check how this looks like, separately for each ensemble member
+th      = 2
+fig,axs = plt.subplots(7,6,subplot_kw={'projection':ccrs.PlateCarree()},
+                      constrained_layout=True,figsize=(20,14))
+for e in tqdm(range(42)):
+    ax = axs.flatten()[e]
+    ax = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="gray",blabels=[0,0,0,0])
+    
+
+    plotac = integr_ac[:,:,e,th].T
+
+    title  = "%s Anomalies (%s K)" % (intitles[th],thresname[th])
+    cmap   = "cmo.amp"
+    vlm    = [0,10]
+    
+    pcm = ax.pcolormesh(lon,lat,plotac,cmap=cmap,
+                        vmin=vlm[0],vmax=vlm[1])
+    cl = ax.contour(lon,lat,plotac,levels=np.arange(0,14,2),colors="w",linewidths=.01)
+    ax.clabel(cl,)
+plt.savefig("%sIntegrated%sACF_Cold_Warm_Anomalies_CESM_%s_ksel%i_allens_%s.png"%(figpath,varname,mconfig,ksel,th),dpi=150)
+
+#%% Scrap from the old script....
 
 """
 Just realized it might not be possible to neatly vectorize this.
