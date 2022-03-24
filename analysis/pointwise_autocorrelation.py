@@ -150,10 +150,11 @@ elif "HTR" in mconfig:
     lon = ds.lon.values
     lat = ds.lat.values
     sst = ds[varname].values # [ENS x Time x Z x LAT x LON]
-    sst = sst[:,840:,...] # Select 1920 onwards
-    sst = sst.transpose(4,3,2,1,0).squeeze() # [LON x LAT x Time x ENS]
+    sst = sst[:,840:,...].squeeze() # Select 1920 onwards
+    sst = sst.transpose(3,2,1,0) # [LON x LAT x Time x ENS]
 
 print("Loaded data in %.2fs"% (time.time()-st))
+
 #%% Do the calculations
 """
 Inputs are:
