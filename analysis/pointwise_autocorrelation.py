@@ -36,10 +36,11 @@ thresholds  = [0,] # Standard Deviations
 conf        = 0.95
 tails       = 2
 
-mconfig    = "PIC-FULL"
+mconfig    = "HTR-FULL" # #"PIC-FULL"
+
 thresholds = [0,]
 thresname  = "thres" + "to".join(["%i" % i for i in thresholds])
-varname    = "SST"
+varname    = "SSS"
 
 
 
@@ -53,29 +54,32 @@ print("Output will save to %s" % savename)
 
 # Plotting Params
 # ---------------
-colors = ['b','r','k']
-
-#%%
-
-# Postprocess Continuous SM  Run
-# ------------------------------
-datpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_output/"
-fnames      = ["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_dmp0"%i for i in range(10)]
-onames      = ["spectra_%s_Fprime_rolln0_ampq0_method5_dmp0_run2%02d.nc" % (lagname,i) for i in range(10)]
-mnames      = ["constant h","vary h","entraining"] 
-
-# Postproess Continuous CESM Run
-# ------------------------------
-datpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/"
-fnames     = ["CESM1_FULL_postprocessed_NAtl.nc","CESM1_SLAB_postprocessed_NAtl.nc"]
-mnames     = ["FULL","SLAB"] 
-onames     = ["spectra_%s_PIC-%s.nc" % (lagname,mnames[i]) for i in range(2)]
-
-# Other Params
+colors   = ['b','r','k']
 bboxplot = [-80,0,0,60]
 mons3    = [viz.return_mon_label(m,nletters=3) for m in np.arange(1,13)]
 
-#%% Read in the data
+#%% Set Paths for Input (need to update to generalize for variable name)
+
+if mconfig == "SM": # Stochastic model
+    # Postprocess Continuous SM  Run
+    # ------------------------------
+    datpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_output/"
+    fnames      = ["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_dmp0"%i for i in range(10)]
+    mnames      = ["constant h","vary h","entraining"] 
+elif "PIC" in mconfig:
+    # Postproess Continuous CESM Run
+    # ------------------------------
+    datpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/"
+    fnames     = ["CESM1_FULL_postprocessed_NAtl.nc","CESM1_SLAB_postprocessed_NAtl.nc"]
+    mnames     = ["FULL","SLAB"] 
+elif "HTR" in mconfig:
+    # CESM1LE Historical Runs
+    # ------------------------------
+    datpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/CESM_proc/"
+    fnames     = ["%s_FULL_HTR_lon-80to0_lat0to65_DTEnsAvg.nc" % varname,]
+    mnames     = ["FULL",]
+
+#%% Read in the data (Need to update for variable name)
 
 if mconfig == "PIC_FULL":
     sst_fn = fnames[0]
@@ -83,31 +87,64 @@ elif mconfig == "PIC_SLAB":
     sst_fn = fnames[1]
 print("Processing: " + sst_fn)
 
-# Load in SST [model x lon x lat x time] Depending on the file format
-if 'npy' in sst_fn:
-    print("Loading .npy")
-    sst = np.load(datpath+sst_fn)
-    # NOTE: Need to write lat/lon loader
-elif 'npz' in sst_fn:
-    print("Loading .npz")
-    ld  = np.load(datpath+sst_fn,allow_pickle=True)
-    lon = ld['lon']
-    lat = ld['lat']
-    sst = ld['sst'] # [model x lon x lat x time]
-elif 'nc' in sst_fn:
-    print("Loading netCDF")
-    ds  = xr.open_dataset(datpath+sst_fn)
+if ("PIC" in mconfig) or ("SM" in mconfig):
+    # Load in SST [model x lon x lat x time] Depending on the file format
+    if 'npy' in sst_fn:
+        print("Loading .npy")
+        sst = np.load(datpath+sst_fn)
+        # NOTE: Need to write lat/lon loader
+    elif 'npz' in sst_fn:
+        print("Loading .npz")
+        ld  = np.load(datpath+sst_fn,allow_pickle=True)
+        lon = ld['lon']
+        lat = ld['lat']
+        sst = ld['sst'] # [model x lon x lat x time]
+    elif 'nc' in sst_fn:
+        print("Loading netCDF")
+        ds  = xr.open_dataset(datpath+sst_fn)
+        
+        ds  = ds.sel(lon=slice(-80,0),lat=slice(0,65))
+        
+        
+        lon = ds.lon.values
+        lat = ds.lat.values
+        sst = ds[varname].values # [lon x lat x time]
+        
+elif "HTR" in mconfig:
     
+    ds  = xr.open_dataset(datpath+fnames[0])
     ds  = ds.sel(lon=slice(-80,0),lat=slice(0,65))
-    
-    
     lon = ds.lon.values
     lat = ds.lat.values
-    sst = ds.SST.values
+    sst = ds[varname].values # [ENS x Time x Z x LAT x LON]
+    
+    sst = sst[:,840:,...] # Select 1920 onwards
+    
+    sst = sst.transpose(4,3,2,1,0).squeeze() # [LON x LAT x Time x ENS]
+    
+    # Limit to 1920 and onwards
+    #sst = 
+    
+    
 
 
 #%% Set some more things...
 
+# klon,klat = proc.find_latlon(-30,50,lon,lat)
+# sstpt     = sst[klon,klat,:]
+# sstpt     = sstpt.reshape(nyr,12) 
+# acq = scm.calc_autocorr([sstpt,],lags,1)
+
+# fig,ax = plt.subplots(1,1)
+# ax.plot(lags,acq[0])
+# ax.plot(lags,acs_final[klon,klat,1,-1,:])
+
+# for i in range(42):
+    
+#     print(np.where(np.isnan(sst[40,53,i,:]))) # Problem with time 219?
+    
+    #plt.pcolormesh(sst[:,:,i,0])
+    #plt.show()
 
 #%% Do the calculations
 """
@@ -119,17 +156,31 @@ Inputs are:
     5) savename [str] Full path to output file
     
 """
-# First things first, combine lat/lon, remove nan points
+# First things first, combine lat/lon/otherdims, remove nan points
+
 # Get Dimensions
-nlon,nlat,ntime = sst.shape
+if len(sst.shape) > 3:
+    
+    print("SST has more than 3 dimensions. Combining.")
+    nlon,nlat,ntime,notherdims = sst.shape
+    sst = sst.transpose(0,1,3,2) # [nlon,nlat,otherdims,time]
+    npts = nlon*nlat*notherdims # combine ensemble and points
+    
+else:
+    notherdims      = 0
+    nlon,nlat,ntime = sst.shape
+    npts            = nlon*nlat
+
 nyr             = int(ntime/12)
-npts            = nlon*nlat
 nlags           = len(lags)
 nthres          = len(thresholds)
 
 # Combine space, remove NaN points
-sst                  = sst.reshape(npts,ntime)
-sst_valid,knan,okpts = proc.find_nan(sst,1) # [finepoints,time]
+
+sstrs                = sst.reshape(npts,ntime)
+if varname == "SSS":
+    sstrs[:,219]     = 0 # There is something wrong with this timestep?
+sst_valid,knan,okpts = proc.find_nan(sstrs,1) # [finepoints,time]
 npts_valid           = sst_valid.shape[0] 
 
 # Split to Year x Month
@@ -169,22 +220,23 @@ for im in range(12):
                 sst_cfs[pt,im,th,:,:]  = cf.copy()
                 # End Loop Point -----------------------------
         
+        
         else: # Use all Data
             print("Now computing for all data on loop %i"%th)
             # Reshape to [month x yr x npts]
             sst_in    = sst_valid.transpose(2,1,0)
-            acs = proc.calc_lagcovar_nd(sst_in,sst_in,lags,im+1,1)
-            cfs = proc.calc_conflag(acs,conf,tails,nyr)
+            acs = proc.calc_lagcovar_nd(sst_in,sst_in,lags,im+1,1) # [lag, npts]
+            cfs = proc.calc_conflag(acs,conf,tails,nyr) # [lag x conf x npts]
             
             # Save to larger variable
-            sst_acs[:,im,th,:] = ac.copy()
-            sst_cfs[:,im,th,:,:]  = cf.copy()
+            sst_acs[:,im,th,:] = acs.T.copy()
+            sst_cfs[:,im,th,:,:]  = cfs.transpose(2,0,1).copy()
             class_count[:,im,th]   = nyr
         # End Loop Threshold -----------------------------
         
     # End Loop Event Month -----------------------------
 
-# Now Replace into original matrices
+#% Now Replace into original matrices
 # Preallocate
 count_final = np.zeros((npts,12,nthres+2)) * np.nan
 acs_final   = np.zeros((npts,12,nthres+2,nlags)) * np.nan
@@ -196,9 +248,14 @@ acs_final[okpts,...]   = sst_acs
 cfs_final[okpts,...]   = sst_cfs
 
 # Reshape output
-count_final = count_final.reshape(nlon,nlat,12,nthres+2)
-acs_final   = acs_final.reshape(nlon,nlat,12,nthres+2,nlags)
-cfs_final   = cfs_final.reshape(nlon,nlat,12,nthres+2,nlags,2)
+if notherdims == 0:
+    count_final = count_final.reshape(nlon,nlat,12,nthres+2)
+    acs_final   = acs_final.reshape(nlon,nlat,12,nthres+2,nlags)
+    cfs_final   = cfs_final.reshape(nlon,nlat,12,nthres+2,nlags,2)
+else:
+    count_final = count_final.reshape(nlon,nlat,notherdims,12,nthres+2)
+    acs_final   = acs_final.reshape(nlon,nlat,notherdims,12,nthres+2,nlags)
+    cfs_final   = cfs_final.reshape(nlon,nlat,notherdims,12,nthres+2,nlags,2)
 
 # Get Threshold Labels
 threslabs   = []
@@ -225,7 +282,7 @@ threslabs.append("ALL")
 
 
 
-#%Save Output
+#%% Save Output
 np.savez(savename,**{
     'class_count' : count_final,
     'acs' : acs_final,
@@ -257,7 +314,7 @@ lonf = -30
 latf = 50
 
 klon,klat = proc.find_latlon(lonf,latf,lon,lat)
-kmonth = 0
+kmonth = 1
 
 fig,ax = plt.subplots(1,1)
 
@@ -275,7 +332,7 @@ ax.legend()
 plt.savefig("%sAutocorrelation_WarmCold.png"%figpath,dpi=150)
 #%% load data for MLD
 
-ksel = 2 #"max"
+ksel = 'max' #2 #"max"
 
 # Use the function used for sm_rewrite.py
 frcname    = "flxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0"
