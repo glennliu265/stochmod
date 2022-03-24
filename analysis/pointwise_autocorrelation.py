@@ -38,6 +38,10 @@ thresholds = [0,]
 thresname  = "thres" + "to".join(["%i" % i for i in thresholds])
 varname    = "TS"
 
+# Set to False to not apply a mask (otherwise specify path to mask)
+loadmask   = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/model_input/limask180_FULL-HTR.npy"
+glonpath   = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/model_input/CESM1_lon180.npy"
+glatpath   = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/model_input/CESM1_lat.npy"
 
 
 # Plotting Params
@@ -154,6 +158,24 @@ elif "HTR" in mconfig:
     sst = sst.transpose(3,2,1,0) # [LON x LAT x Time x ENS]
 
 print("Loaded data in %.2fs"% (time.time()-st))
+
+# Apply land/ice mask if needed
+if loadmask:
+    print("Applying mask loaded from %s!"%loadmask)
+    # Load the mask
+    msk  = np.load(loadmask) # Lon x Lat (global)
+    glon = np.load(glonpath)
+    glat = np.load(glatpath)
+    
+    # Restrict to Region
+    bbox = [lon[0],lon[-1],lat[0],lat[-1]]
+    rmsk,_,_ = proc.sel_region(msk,glon,glat,bbox)
+        
+    # Apply to variable
+    if "HTR" in mconfig:
+        sst *= rmsk[:,:,None,None]
+    else:
+        sst *= rmsk[:,:,None]
 
 #%% Do the calculations
 """
