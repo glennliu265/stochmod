@@ -22,7 +22,7 @@ from tqdm import tqdm
 
 # Set Machine
 # -----------
-stormtrack = True # Set to True to run on stormtrack, False for local run
+stormtrack = False # Set to True to run on stormtrack, False for local run
 
 # Autocorrelation parameters
 # --------------------------
@@ -32,23 +32,22 @@ thresholds  = [0,] # Standard Deviations
 conf        = 0.95
 tails       = 2
 
-mconfig    = "HTR-FULL" # #"PIC-FULL"
+mconfig    = "ERSST" #["PIC-FULL","HTR-FULL","PIC_SLAB","HadISST","ERSST"]
 
 thresholds = [0,]
 thresname  = "thres" + "to".join(["%i" % i for i in thresholds])
-varname    = "TS"
+varname    = "SST" # ["TS","SSS","SST]
 
 # Set to False to not apply a mask (otherwise specify path to mask)
-loadmask   = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/model_input/limask180_FULL-HTR.npy"
+loadmask   = False#"/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/model_input/limask180_FULL-HTR.npy"
 glonpath   = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/model_input/CESM1_lon180.npy"
 glatpath   = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/model_input/CESM1_lat.npy"
-
 
 # Plotting Params
 # ---------------
 colors   = ['b','r','k']
 bboxplot = [-80,0,0,60]
-
+bboxlim  = [-80,0,0,65]
 #%% Set Paths for Input (need to update to generalize for variable name)
 
 
@@ -79,6 +78,10 @@ else:
         datpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/"
     elif "HTR" in mconfig:
         datpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/CESM_proc/"
+    elif mconfig in ["HadISST","ERSST"]:
+        datpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/"
+    
+    
     # Output Paths
     figpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220325/'
     outpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/'
@@ -106,11 +109,20 @@ elif "HTR" in mconfig:
     # ------------------------------
     fnames     = ["%s_FULL_HTR_lon-80to0_lat0to65_DTEnsAvg.nc" % varname,]
     mnames     = ["FULL",]
+elif mconfig == "HadISST":
+    # HadISST Data
+    # ------------
+    fnames = ["HadISST_detrend2_startyr1870.npz",]
+    mnames     = ["HadISST",]
+elif mconfig == "ERSST":
+    fnames = ["ERSST_detrend2_startyr1900_endyr2016.npz"]
+    
+    
 
 # Set Output Directory
 # --------------------
 proc.makedir(figpath)
-savename   = "%sCESM1_%s_%s_autocorrelation_%s.npz" %  (outpath,mconfig,varname,thresname)
+savename   = "%s%s_%s_autocorrelation_%s.npz" %  (outpath,mconfig,varname,thresname)
 print("Output will save to %s" % savename)
 
 #%% Read in the data (Need to update for variable name)
@@ -156,7 +168,27 @@ elif "HTR" in mconfig:
     sst = ds[varname].values # [ENS x Time x Z x LAT x LON]
     sst = sst[:,840:,...].squeeze() # Select 1920 onwards
     sst = sst.transpose(3,2,1,0) # [LON x LAT x Time x ENS]
-
+    
+elif mconfig == "HadISST":
+    
+    # Load the data
+    sst,lat,lon=scm.load_hadisst(datpath,startyr=1900) # [lon x lat x time]
+    
+    # Slice to region
+    sst,lon,lat = proc.sel_region(sst,lon,lat,bboxlim)
+    
+elif mconfig == "ERSST":
+    
+    # Load the data
+    sst,lat,lon=scm.load_ersst(datpath,startyr=1900)
+    
+    # Fliip the longitude
+    lon,sst = proc.lon360to180(lon,sst)
+    
+    # Slice to region
+    sst,lon,lat = proc.sel_region(sst,lon,lat,bboxlim)
+    
+    
 print("Loaded data in %.2fs"% (time.time()-st))
 
 # Apply land/ice mask if needed
@@ -324,3 +356,4 @@ np.savez(savename,**{
     },allow_pickle=True)
 
 print("Script ran in %.2fs!"%(time.time()-st))
+print("Output saved to %s."% (savename))
