@@ -16,13 +16,12 @@ sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons
 sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
 from amv import proc,viz
 import scm
-
 import numpy as np
 import xarray as xr
 from tqdm import tqdm 
 import time
-
 import cartopy.crs as ccrs
+
 #%% Select dataset to postprocess
 
 # Autocorrelation parameters
@@ -37,7 +36,7 @@ mconfig    = "HTR-FULL" # #"PIC-FULL"
 
 thresholds = [0,]
 thresname  = "thres" + "to".join(["%i" % i for i in thresholds])
-varname    = "TS"
+varname    = "SSS"
 
 # Set Output Directory
 # --------------------
@@ -102,7 +101,7 @@ kmonth = 1
 
 # Get Indices
 klon,klat = proc.find_latlon(lonf,latf,lon,lat)
-locstr,locfn = proc.make_locstring(lonf,latf)
+locfn,locstr = proc.make_locstring(lonf,latf)
 
 # Make the plot
 title    = "%s Autocorrelation @ Lon: %i, Lat : %i" % (varname,lonf,latf)
@@ -215,7 +214,7 @@ for th in range(3):
 cb = fig.colorbar(cf,ax=axs.flatten(),orientation='horizontal',fraction=0.065)
 cb.set_label("Correlation")
 plt.suptitle("%s Autocorrelation @ %s (%s)"% (varname,locstr,mconfig),fontsize=14,y=1.05)
-plt.savefig("%sAutocorrelation_Contours_WarmCold_%s_%s.png"% (figpath,mconfig,locstr),dpi=150,bbox_inches='tight')
+plt.savefig("%s%sAutocorrelation_Contours_WarmCold_%s_%s.png"% (figpath,varname,mconfig,locfn),dpi=150,bbox_inches='tight')
 
 #%% load data for MLD
 
