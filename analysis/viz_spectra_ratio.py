@@ -253,7 +253,7 @@ plotcontour = "SSH"
 use_contours = True
 cints       = np.arange(-1.5,1.55,0.05)
 cl_ints     = np.arange(-1.5,1.6,0.1)
-
+sshcint     = np.arange(-150,155,5)
 bsfcint     = np.arange(-30,32,2)
 fig,axs = plt.subplots(1,3,subplot_kw={'projection':ccrs.PlateCarree()},
                        constrained_layout=True,figsize=(12,4)) 
@@ -279,9 +279,10 @@ for t in range(3):
         
     if plotcontour=="BSF":
         cl = ax.contour(ds_reg.lon,ds_reg.lat,bsf_mean.T,colors='k',levels=bsfcint,linewidths=0.5)
+        
     elif plotcontour=="SSH":
-        cl = ax.contour(ds_reg.lon,ds_reg.lat,ssh_mean.T,colors='k',levels=bsfcint,linewidths=0.5)
-    ax.clabel(cl,bsfcint[::4])
+        cl = ax.contour(ds_reg.lon,ds_reg.lat,ssh_mean.T,colors='k',levels=sshcint,linewidths=0.5)
+    ax.clabel(cl,levels=sshcint)
     
 fig.colorbar(pcm,ax=axs.flatten(),fraction=0.025,pad=0.01)
 ax = axs[0]

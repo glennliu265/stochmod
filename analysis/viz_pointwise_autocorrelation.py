@@ -37,7 +37,7 @@ mconfig    = "HTR-FULL" # #"PIC-FULL"
 
 thresholds = [0,]
 thresname  = "thres" + "to".join(["%i" % i for i in thresholds])
-varname    = "SSS"
+varname    = "TS"
 
 # Set Output Directory
 # --------------------
@@ -45,7 +45,7 @@ figpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/
 proc.makedir(figpath)
 outpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/'
 savename   = "%sCESM1_%s_%s_autocorrelation_%s.npz" %  (outpath,mconfig,varname,thresname)
-print("Output will save to %s" % savename)
+print("Loading the following dataset: %s" % savename)
 
 # Plotting Params
 # ---------------
@@ -76,7 +76,7 @@ elif "HTR" in mconfig:
     
 
 #%% Load in the data
-
+st          = time.time()
 ld          = np.load(savename,allow_pickle=True)
 count_final = ld['class_count']
 acs_final   = ld['acs'] # [lon x lat x (ens) x month x thres x lag]
@@ -92,12 +92,13 @@ if "HTR" in mconfig:
 else:
     lens=False
     nlon,nlat,nmon,_,nlags = acs_final.shape
+print("Data loaded in %.2fs"% (time.time()-st))
 #%% Plot autocorrelation at a point
 
 # Select a Point
 lonf   = -30
 latf   = 50
-kmonth = 0
+kmonth = 1
 
 # Get Indices
 klon,klat = proc.find_latlon(lonf,latf,lon,lat)
@@ -129,6 +130,93 @@ else:
 
 ax.legend()
 plt.savefig("%sAutocorrelation_WarmCold_%s_%s_month%i.png"% (figpath,mconfig,locstr,kmonth+1),dpi=150)
+
+#%% Contour the Autocorrelation (Similar to in Park et al. 2006)
+# (Need to add significance levels)
+
+usecontourf = True
+clvls       = np.arange(-.1,1.05,0.05)
+cmap        = 'cmo.dense'
+appendjan   = True
+
+
+yvals       = np.arange(1,13,1)
+# Compute the significance
+
+
+fig,axs   = plt.subplots(1,3,figsize=(16,4),constrained_layout=True)
+
+for th in range(3):
+    
+    ax = axs.flatten()[th]
+    
+    plotac    = acs_final[klon,klat,:,:,th,:].mean(0)
+    plotcount = count_final[klon,klat,:,:,th].mean(0)
+    
+    rhocrit   = proc.ttest_rho(0.05,1,plotcount) # [month]
+    sigmask   = plotac > rhocrit[:,None]
+    
+    #sigmask2 = plotac.copy()
+    #sigmask2[~sigmask] = 0
+    
+    
+    if appendjan: # Add extra january
+        yvals       = np.arange(1,14,1)
+        mons3       = [viz.return_mon_label(m%12,nletters=3) for m in np.arange(1,14)]
+        
+        sigmask     = np.concatenate([sigmask,sigmask[[0],:]],axis=0)
+        plotac      = np.concatenate([plotac,plotac[[0],:]],axis=0)
+        
+        
+    else:
+        yvals       = np.arange(1,13,1)
+        mons3       = [viz.return_mon_label(m,nletters=3) for m in np.arange(1,13)]
+    
+        
+    
+    # # Plot it
+    if usecontourf:
+        cf = ax.contourf(lags,yvals,plotac,levels=clvls,cmap=cmap)
+    else:
+        cf = ax.pcolormesh(lags,yvals,plotac,vmin=clvls[0],vmax=clvls[-1],
+                            shading='auto',cmap=cmap)
+        
+    # Plot the mask
+    # Hatching mask
+    # ax.contourf(lags,yvals,sigmask,colors='gray',
+    #             hatches=["-",],levels=[-1,0],alpha=0,edgecolor='gray')
+    
+    # Masking Function with Stippling
+    msk = viz.plot_mask(lags,yvals,sigmask.T,
+                        ax=ax,markersize=1.0,color="gray",reverse=False)
+    
+    # Contour Line Plot
+    #cl = ax.contour(lags,yvals,sigmask2,colors="k",levels=clvls)
+    #ax.clabel(cl)
+    
+    #ax.pcolormesh(lags,mons3,sigmask,shading='auto')
+    
+    ax.grid(True,ls='dotted')
+    ax.set_xticks(np.arange(0,39,3))
+    ax.set_yticks(yvals)
+    ax.set_yticklabels(mons3)
+    
+    if th == 0:
+        ax.set_ylabel("Reference Month")
+    if th == 1:
+        ax.set_xlabel("Lag (Months)")
+        
+    ax.set_title(threslabs[th])
+    
+    ax.invert_yaxis()
+    
+
+
+cb = fig.colorbar(cf,ax=axs.flatten(),orientation='horizontal',fraction=0.065)
+cb.set_label("Correlation")
+plt.suptitle("%s Autocorrelation @ %s (%s)"% (varname,locstr,mconfig),fontsize=14,y=1.05)
+plt.savefig("%sAutocorrelation_Contours_WarmCold_%s_%s.png"% (figpath,mconfig,locstr),dpi=150,bbox_inches='tight')
+
 #%% load data for MLD
 
 
@@ -217,13 +305,13 @@ for th in range(3):
         cb.set_label("Difference (Months)")
 
 plt.suptitle("Integrated %s ACF (to 36 months) for CESM1 (%s)" % (varname,mconfig),fontsize=14,y=.88)
-plt.savefig("%sIntegrated%sACF_Cold_Warm_Anomalies_CESM_%s_ksel%i.png"%(figpath,varname,mconfig,ksel),dpi=150)
+plt.savefig("%sIntegrated%sACF_Cold_Warm_Anomalies_CESM_%s_ksel%s.png"%(figpath,varname,mconfig,str(ksel)),dpi=150)
 
 
 #%% Check how this looks like, separately for each ensemble member
-th      = 2
+th      = 1
 fig,axs = plt.subplots(7,6,subplot_kw={'projection':ccrs.PlateCarree()},
-                      constrained_layout=True,figsize=(20,14))
+                      constrained_layout=True,figsize=(20,16))
 for e in tqdm(range(42)):
     ax = axs.flatten()[e]
     ax = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="gray",blabels=[0,0,0,0])
@@ -237,43 +325,45 @@ for e in tqdm(range(42)):
     
     pcm = ax.pcolormesh(lon,lat,plotac,cmap=cmap,
                         vmin=vlm[0],vmax=vlm[1])
-    cl = ax.contour(lon,lat,plotac,levels=np.arange(0,14,2),colors="w",linewidths=.01)
-    ax.clabel(cl,)
-plt.savefig("%sIntegrated%sACF_Cold_Warm_Anomalies_CESM_%s_ksel%i_allens_%s.png"%(figpath,varname,mconfig,ksel,th),dpi=150)
+    cl = ax.contour(lon,lat,plotac,levels=np.arange(0,14,2),colors="w",linewidths=.20)
+    ax.clabel(cl,fontsize=12)
+    ax = viz.label_sp(e+1,case='lower',usenumber=True,ax=ax,labelstyle="%s",alpha=0.65,fontsize=14)
+    
+plt.savefig("%sIntegrated%sACF_Cold_Warm_Anomalies_CESM_%s_ksel%s_allens_%s.png"%(figpath,varname,mconfig,str(ksel),th),dpi=150)
 
 #%% Scrap from the old script....
 
-"""
-Just realized it might not be possible to neatly vectorize this.
+# """
+# Just realized it might not be possible to neatly vectorize this.
 
-This is because at each point, there will be a different # of points within
-each threshold, so it does not fit neatly into a 2d maxtrix...
+# This is because at each point, there will be a different # of points within
+# each threshold, so it does not fit neatly into a 2d maxtrix...
 
-"""
+# """
 
-# Split into negative or positive anomalies
+# # Split into negative or positive anomalies
 
 
-sst_classes = proc.make_classes_nd(sst_valid,thresholds,dim=1,debug=True)
+# sst_classes = proc.make_classes_nd(sst_valid,thresholds,dim=1,debug=True)
 
-# Now compute the autocorrelation for each lag, and for each case (positive/negative)
-sst_acs = np.zeros(npts_valid,12,nthres+1,nlags) # [point,basemonth,threshold,lag]
-for th in range(nthres+1): #Loop for each threshold
+# # Now compute the autocorrelation for each lag, and for each case (positive/negative)
+# sst_acs = np.zeros(npts_valid,12,nthres+1,nlags) # [point,basemonth,threshold,lag]
+# for th in range(nthres+1): #Loop for each threshold
 
-    sst_mask = (sst_classes == th)
-    sst_mask = np.where(sst_classes == th)
+#     sst_mask = (sst_classes == th)
+#     sst_mask = np.where(sst_classes == th)
     
-    for im in range(12):
+#     for im in range(12):
         
-        insst = np.take_along_axis(sst_valid,sst_mask,1)
+#         insst = np.take_along_axis(sst_valid,sst_mask,1)
         
-        #st_valid[np.where(sst_mask)]
+#         #st_valid[np.where(sst_mask)]
         
-        # [mon x time]
-        sst_acs[:,im,th,:] = proc.calc_lagcovar_nd(insst,insst,lags,im+1,0)
+#         # [mon x time]
+#         sst_acs[:,im,th,:] = proc.calc_lagcovar_nd(insst,insst,lags,im+1,0)
         
-        #autocorrm[m,:,:] = proc.calc_lagcovar_nd(oksst,oksst,lags,m+1,0)
-#%%
+#         #autocorrm[m,:,:] = proc.calc_lagcovar_nd(oksst,oksst,lags,m+1,0)
+# #%%
 
-thresholds = [-1,0,1]
-y = sst_valid
+# thresholds = [-1,0,1]
+# y = sst_valid
