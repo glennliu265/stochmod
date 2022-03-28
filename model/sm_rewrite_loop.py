@@ -109,8 +109,11 @@ startfile   = None
 #"/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_output/stoch_output_forcingforcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run011_ampq3_method5_dmp0_1000yr_run011_ampq3_method2_dmp0.npz"
 
 # ADD EKMAN FORCING (or other custom parameters)
-custom_params = {}
+custom_params         = {}
 custom_params['q_ek'] = "Qek_eof_090pct_FULL_PIC_eofcorr0_Fprime_rolln0.npy"
+
+# Save for Budget Analyses
+budget = True # Set to True to only run entrain, and save budget analyses separately
 
 # Additional Constants
 # --------------------
@@ -251,7 +254,9 @@ for f in range(len(frcnames)):
     for r,runid in enumerate(runids):
         
         
-        expname    = "%sstoch_output_forcing%s_%iyr_run%s_ampq%i_method%i_dmp0.npz" % (output_path,frcname,int(t_end/12),runid,ampq,method,) 
+        expname    = "%sstoch_output_forcing%s_%iyr_run%s_ampq%i_method%i_dmp0.npz" % (output_path,frcname,int(t_end/12),runid,ampq,method,)
+        if budget:
+            expname = proc.addstrtoext(expname,"_budget")
         # dmp0 indicates that points with insignificant lbd_a were set to zero.
         # previously, they were set to np.nan, or the whole damping term was set to zero
         if 'q_ek' in custom_params.keys():
@@ -286,7 +291,7 @@ for f in range(len(frcnames)):
                            dt=3600*24*30,
                            debug=False,check=False,useslab=useslab,savesep=savesep
                            ,method=method,lagstr=lagstr,hconfigs=hconfigs,
-                           custom_params=custom_params)
+                           custom_params=custom_params,budget=budget)
         expnames.append(expname)
     print("Completed in %.2fs" % (time.time()-st))
 

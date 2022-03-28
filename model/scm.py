@@ -2777,7 +2777,8 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
                    method=4,chk_damping=False,
                    custom_params = {},
                    hconfigs=[0,1,2],
-                   continue_run=False,Tdgrab=24,lagstr="lag1"
+                   continue_run=False,Tdgrab=24,lagstr="lag1",
+                   budget=False
                    ):
     
     """
@@ -2821,6 +2822,7 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
             2 : entraining , seasonal mld, full parameters
     22. continue_run [STR]: Full path+Name of output experiment to take T0 and Td' from.'
     23. Tdgrab [INT]: Number of previous months to take from previous run for Td' calculation'
+    24. budget [BOOL]: Set to true to save each term separately. Currently only available for entrain.
     """
     
     start = time.time()
@@ -2982,20 +2984,63 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
         # Add Ekman if needed after forcing correction
         # ---------------------------------------------
         if qek_flag:
-            Fek  = convert_Wm2(forcing_qekr,h_in,dt)
-            F = F + Fek
+            if budget:
+                F_noek = F.copy() # Save Forcing without Ekman
+            Fek    = convert_Wm2(forcing_qekr,h_in,dt)
+            F      = F + Fek
             
-        
         # Integrate Stochastic Model
         # --------------------------
         if exp < 2:
             T   = integrate_noentrain(lbd_a,F,T0=T0,multFAC=True,debug=False)
         else:
-            T   = integrate_entrain(h_in,kprev,lbd_a,F,T0=T0,multFAC=True,debug=False,Td0=Td0)
+            if budget:
+                print("Saving terms separately for budget analysis.")
+                # Calculate each term separately 
+                T,damping_term,forcing_term,entrain_term,Td   = integrate_entrain(h_in,kprev,lbd_a,F,
+                                                                                  T0=T0,multFAC=True,debug=True,Td0=Td0)
+                
+                # Compute some things that were in intergrate_entrain
+                beta = calc_beta(h_in)
+                lbd  = lbd_a + beta
+                FAC  = calc_FAC(lbd_a)
+                
+            else:
+                T   = integrate_entrain(h_in,kprev,lbd_a,F,
+                                        T0 = T0,multFAC=True,debug=False,Td0=Td0)
         
-        T_all.append(T)
+        if budget:
+            savedict = {
+                'sst' : [T,],
+                'lon' : lonr,
+                'lat' : latr,
+                'damping_term' : damping_term,
+                'entrain_term' : entrain_term,
+                'Td'           : Td,
+                'forcing_term' : forcing_term,
+                'FAC'          : FAC
+                }
+            if qek_flag:
+                savedict['ekman_term'] = Fek
+                savedict['forcing_term'] = F_noek
+            
+            
+            # Save Output (Budget)
+            # --------------------
+            print(savedict)
+            outname = "%s" % (expname)
+            np.savez(outname,**savedict,allow_pickle=True)
+            print("Saved output to %s in %.2fs" % (outname,time.time()-start))
+            
+            return
+        else:
+            T_all.append(T)
         
+        if budget:
+            print("Error, function has not ended....")
+            
         # Integrate Forcing, if the option is set
+        # ---------------------------------------
         if exp==0 and intgrQ:
             Q,q,lbdT = integrate_Q(lbd_a,F,T,h_in,debug=True)
             
@@ -3025,7 +3070,8 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
                 },allow_pickle=True)
             print("Saved results separately to %s"%(expstr))
     
-    if ~savesep:
+    if (savesep is False) and (budget is False):
+        print("Saving output now")
         # Save the results
         np.savez(expname,**{
             'sst': T_all,
@@ -3034,8 +3080,6 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
             },allow_pickle=True)
         print("Saved output to %s in %.2fs" % (expname,time.time()-start))
     print("Function completed in %.2fs" % (time.time()-start))
-
-
 #%% Loading limopt data
 
 def load_limopt_sst(datpath=None,vname="SSTRES"):
@@ -3145,6 +3189,7 @@ def load_pathdict(device,csvpath=None,csvname=None):
     
 
 #%% Silly Functions to Deal with sm data formats
+
 def unpack_smdict(indict):
     """
     Takes a dict of [run][region][models][OTHERDIMS] and unpacks it into
@@ -3170,5 +3215,3 @@ def unpack_smdict(indict):
             for mod in range(nmodels):
                 unpacked[run,reg,mod,:] = indict[run][reg][mod]
     return unpacked
-
-
