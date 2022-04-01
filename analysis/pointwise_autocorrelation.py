@@ -32,7 +32,7 @@ thresholds  = [0,] # Standard Deviations
 conf        = 0.95
 tails       = 2
 
-mconfig    = "ERSST" #["PIC-FULL","HTR-FULL","PIC_SLAB","HadISST","ERSST"]
+mconfig    = "HadISST" #["PIC-FULL","HTR-FULL","PIC_SLAB","HadISST","ERSST"]
 
 thresholds = [0,]
 thresname  = "thres" + "to".join(["%i" % i for i in thresholds])
@@ -269,16 +269,21 @@ for im in range(12):
             for pt in tqdm(range(npts_valid)): 
                 
                 # Get years which fulfill criteria
-                yr_mask     = np.where(sst_mon_classes[pt,:] == th)[0]
-                sst_in      = sst_valid[pt,yr_mask,:] # [year,month]
-                sst_in      = sst_in.T
-                class_count[pt,im,th] = len(yr_mask) # Record # of events 
+                yr_mask     = np.where(sst_mon_classes[pt,:] == th)[0] # Indices of valid years
+                
+                
+                #sst_in      = sst_valid[pt,yr_mask,:] # [year,month]
+                #sst_in      = sst_in.T
+                #class_count[pt,im,th] = len(yr_mask) # Record # of events 
+                #ac = proc.calc_lagcovar(sst_in,sst_in,lags,im+1,0) # [lags]
                 
                 # Compute the lagcovariance (with detrending)
-                ac = proc.calc_lagcovar(sst_in,sst_in,lags,im+1,1) # [lags]
+                sst_in = sst_valid[pt,:,:].T # transpose to [month x year]
+                ac,yr_count = proc.calc_lagcovar(sst_in,sst_in,lags,im+1,0,yr_mask=yr_mask,debug=False)
                 cf = proc.calc_conflag(ac,conf,tails,len(yr_mask)) # [lags, cf]
                 
                 # Save to larger variable
+                class_count[pt,im,th] = yr_count
                 sst_acs[pt,im,th,:] = ac.copy()
                 sst_cfs[pt,im,th,:,:]  = cf.copy()
                 # End Loop Point -----------------------------
