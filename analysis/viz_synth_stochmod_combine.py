@@ -35,7 +35,7 @@ projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 datpath     = projpath + '01_Data/'
 input_path  = datpath + 'model_input/'
 output_path = datpath + 'model_output/'
-outpath     = projpath + '02_Figures/20220311/'
+outpath     = projpath + '02_Figures/20220407/'
 proc.makedir(outpath)
 
 # Load in control data for 50N 30W
@@ -335,10 +335,13 @@ cssts = scm.load_cesm_pt(datpath,loadname='both',grabpoint=[-30,50])
 debug    = False
 notitle  = True
 
+# Some edits for Draft 4
+use_ann     = True # Option to take ann avg before calcualtion
+useC      = True # Swap to label as degree celsius
 
 # Smoothing Params
-nsmooth = 350
-cnsmooths = [100,100]
+nsmooth    = 350
+cnsmooths  = [100,100]
 pct        = 0.10
 
 smoothname = "smth-obs%03i-full%02i-slab%02i" % (nsmooth,cnsmooths[0],cnsmooths[1])
@@ -360,7 +363,11 @@ plotids = [[0,1,2,3,8],
 inssts   = [c_ssts[0][1],c_ssts[1][1],c_ssts[2][1],c_ssts[3][1],sst[1],sst[2],sst[3],cssts[0],cssts[1]]
 nsmooths = np.concatenate([np.ones(len(inssts)-2)*nsmooth,cnsmooths])
 labels   = np.concatenate([labels_lower,labels_upper[1:],['CESM-FULL','CESM-SLAB']])
-speclabels = ["%s (%.2f$ \, K^{2}$)" % (labels[i],np.var(inssts[i])) for i in range(len(inssts))]
+if useC:
+    speclabels = ["%s (%.2f$ \, \degree C^{2}$)" % (labels[i],np.var(inssts[i])) for i in range(len(inssts))]
+
+else:
+    speclabels = ["%s (%.2f$ \, K^{2}$)" % (labels[i],np.var(inssts[i])) for i in range(len(inssts))]
 allcols  = np.concatenate([ecol_lower,ecol_upper[1:],[dfcol,"gray"]])
 
 # Calculate Autocorrelation (?)
@@ -389,7 +396,14 @@ if debug: # Check if variables were properly concatenated using ACs
     ax.legend()
 
 # Do spectral Analysis
-specs,freqs,CCs,dofs,r1s = scm.quick_spectrum(inssts,nsmooths,pct)
+if use_ann:
+    inssts = [proc.ann_avg(sst,0) for sst in inssts]
+    inssts[-2] = inssts[-2][1:] # Drop 1st year for even yrs
+    inssts[-1] = inssts[-1][1:] # Drop 1st year for even yrs
+    dt = 3600*24*365
+else:
+    dt = None
+specs,freqs,CCs,dofs,r1s = scm.quick_spectrum(inssts,nsmooths,pct,dt=dt)
 #cspecs,cfreqs,cCCs,cdofs,cr1s = scm.quick_spectrum(cssts,cnsmooths,pct)
 
 # Convert to list for indexing NumPy style
@@ -403,7 +417,10 @@ sstvars     = [np.var(insst) for insst in inssts]
 sstvars_lp  = [np.var(proc.lp_butter(insst,120,6)) for insst in inssts]
 sststds = [np.std(insst) for insst in inssts]
 
-sstvars_str = ["%s (%.2f $K^2$)" % (labels[sv],sstvars[sv]) for sv in range(len(sstvars))]
+if useC:
+    sstvars_str = ["%s (%.2f $\degree C$)" % (labels[sv],sstvars[sv]) for sv in range(len(sstvars))]
+else:
+    sstvars_str = ["%s (%.2f $K^2$)" % (labels[sv],sstvars[sv]) for sv in range(len(sstvars))]
 
 #%% # Plot the spectra
 
@@ -416,7 +433,6 @@ periodx     = False # Set to true to have just 1 x-axis, with periods
 linearx     = 1 # Keep frequency axis linear, period axis marked 
 lw          = 3
 incl_legend = True 
-
 
 xtks = [0.01, 0.02, 0.05, 0.1 , 0.2 , 0.5 ]
 
@@ -466,13 +482,19 @@ for i in range(2):
     elif plottype == "freqlin":
         ax,ax2 = viz.plot_freqlin(specs[plotid],freqs[plotid],speclabels[plotid],allcols[plotid],
                              ax=ax,plottitle=titles[i],xtick=xtks,xlm=xlm,return_ax2=True,lw=lw,linearx=linearx)
-        ylabel = "Power ($K^2/cpy$)"
+        if useC:
+            ylabel = "Power ($\degree C^2/cpy$)"
+        else:
+            ylabel = "Power ($K^2/cpy$)"
     elif plottype == "freqlog":
         ax,ax2 = viz.plot_freqlog(specs[plotid],freqs[plotid],speclabels[plotid],allcols[plotid],
                              ax=ax,plottitle=titles[i],xtick=xtks,xlm=xlm,return_ax2=True,lw=lw,
                              semilogx=True)
         #ax.set_ylim([1e-1,1e1])
-        ylabel = "Variance ($K^2$)"
+        if useC:
+            ylabel="Variance ($\degree C^2$)"
+        else:
+            ylabel = "Variance ($K^2$)"
         
     #ax2.set_xlabel("Period (Years)")
     if i == 1:
@@ -494,20 +516,24 @@ for i in range(2):
     
     if incl_legend:
         lgd = viz.reorder_legend(ax)
-        #ax.legend()
     if sepfig is True: # Save separate figures
         if periodx:
             ax.set_xlabel('Period (Years)',fontsize=12)
         else:
             ax.set_xlabel('Frequency (cycles/year)',fontsize=12)
-        ax.set_ylabel("Power ($K^2/cpy$)")
-        
+        if useC:
+            ax.set_ylabel("Power ($\degree C^2/cpy$)")
+        else:
+            ax.set_ylabel("Power ($K^2/cpy$)")
         savename = "%sNASST_Spectra_Stochmod_%s_%s_pct%03i_part%i.png" % (outpath,plottype,smoothname,pct*100,i)
         plt.savefig(savename,dpi=200,bbox_inches='tight')
     else:
         if i == 0:
              ax.set_xlabel("")
-             ax.set_ylabel("Power ($K^2/cpy$)")
+             if useC:
+                 ax.set_ylabel("Power ($\degree C^2/cpy$)")
+             else:
+                 ax.set_ylabel("Power ($K^2/cpy$)")
         #if i == 1:
            # ax.set_xlabel("Period (Years)")
         ax = viz.label_sp(i,case='lower', ax=ax, fontsize=16, labelstyle="(%s)")
