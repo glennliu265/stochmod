@@ -28,7 +28,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20220315/"
+    figpath     = projpath + "02_Figures/20220407/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -51,8 +51,6 @@ proc.makedir(figpath)
 
 mconfig   = "SLAB_PIC"
 nyrs      = 1000        # Number of years to integrate over
-
-
 continuous = True # Set to True to Load a continuous run with the lines below
 
 
@@ -161,7 +159,7 @@ def unpack_smdict(indict):
     
     # For Autocorrelation
     otherdims = indict[0][0][0].shape
-    print("Found... Runs (%i) Regions (%i) ; Models (%i) ; Otherdims (%i)" % (nrun,nregion,nmodels,str(otherdims)))
+    print("Found... Runs (%i) Regions (%i) ; Models (%i) ; Otherdims (%s)" % (nrun,nregion,nmodels,str(otherdims)))
     
     # Preallocate
     newshape = np.concatenate([[nrun,nregion,nmodels],otherdims])
@@ -246,7 +244,7 @@ if ~calc_inplace:
     
     # Load data for CESM1-PIC
     # -----------------------
-    cesmacs= []
+    cesmacs    = []
     expid      = "CESM1-PIC"
     rsst_fn    = "%s/proc/SST_Region_Autocorrelation_%s_ensorem0.npz" % (datpath,expid)
     ldc        = np.load(rsst_fn,allow_pickle=True)
@@ -278,9 +276,6 @@ else:
     
     print("PLACEHOLDER: NEED TO WRITE CODE")
     
-    
-    
-
 """
 Key Outputs ----
 
@@ -414,6 +409,11 @@ sdof       = 1000       # Degrees of freedom
 cdofs      = [898,1798] #
 
 
+use_ann    = True # Set to true to use annual data
+
+smoothname = "smth-obs%03i-full%02i-slab%02i" % (ssmooth,cnsmooths[0],cnsmooths[1])
+
+
 if continuous:
 
     # Loop for each region
@@ -436,11 +436,17 @@ if continuous:
             # First, Compute SM Spectra for each RUN
             # ---------------------------------------
             # Setup
-            sst_sel = ssts_allrun[:,rid,mid,:] # [run x time]
+            sst_sel = ssts_allrun[:,rid,mid,:] # [run x time (mon)]
+            if use_ann:
+                sst_sel = proc.ann_avg(sst_sel,1) # [run x year]
+                dt = 3600*24*365 # Annual Data
+            else:
+                dt = None # Use Default
+                
             insst = [sst_sel[run,:] for run in range(nrun)]
             
             # Calculate Spectra for all runs of a selected rid/model
-            specs,freqs,CCs,dofs,r1s = scm.quick_spectrum(insst,ssmooth,pct)
+            specs,freqs,CCs,dofs,r1s = scm.quick_spectrum(insst,ssmooth,pct,dt=dt)
             
             # Assign to temporary variable # smspecs_all [run,region,nmodels,nreqs]
             if rid == 0:
@@ -457,11 +463,12 @@ if continuous:
             sm_avgvar.append(np.mean(np.var(sst_sel,1),0))
             
             
-        
         # Compute for CESM
         # ----------------
         insst_cesm                    =  [sstcesm[rid][0],sstcesm[rid][1]]
-        cspecs,cfreqs,cCCs,cdofs,cr1s = scm.quick_spectrum(insst_cesm,cnsmooths,pct)
+        if use_ann:
+            insst_cesm = [proc.ann_avg(sst,0)[1:] for sst in insst_cesm] # Ann avg, drop 1st year b/c odd
+        cspecs,cfreqs,cCCs,cdofs,cr1s = scm.quick_spectrum(insst_cesm,cnsmooths,pct,dt=dt)
         cvars = [np.var(csst) for csst in insst_cesm]
         
         
@@ -473,7 +480,7 @@ if continuous:
         dofs.append([dofs[0],dofs[0],dofs[0]] +cdofs)
         r1s.append(sm_avgr1 + cr1s)
         vv.append(sm_avgvar + cvars)
-            
+        
         # Calculate Confidence Inervals
         # -----------------------------
         bnds = []
@@ -503,6 +510,11 @@ else:
             insst.append(sstall[rid,mid,:])
         insst.append(sstcesm[rid][0])
         insst.append(sstcesm[rid][1])
+        if use_ann:
+            insst = [proc.ann_avg(sst,0)[1:] for sst in insst]
+            dt = 3600*24*365
+        else:
+            dt = None
         
         # Calculate the variance
         insstvars = []
@@ -510,7 +522,9 @@ else:
             insstvars.append(np.var(s))
         
         # Calculate Spectra and confidence Intervals
-        specs,freqs,CCs,dofs,r1s = scm.quick_spectrum(insst,nsmooth,pct)
+        specs,freqs,CCs,dofs,r1s = scm.quick_spectrum(insst,nsmooth,pct,dt=None)
+        
+        
         
         bnds = []
         for nu in dofs:
@@ -555,7 +569,7 @@ notitle        = True
 if continuous: # Number of spectra to plot
     nspecs = 5
 else:
-    nspec = len(insst)
+    nspec  = len(insst)
 
 
 if exclude_consth:
@@ -743,7 +757,7 @@ plt.savefig("%sSPG-NAT_Autocorrelation_Spectra%s.png"%(figpath,smoothname),
             dpi=200,transparent=False)
 
 
-#%% SM Draft 2, Plot all Regionals in 1 Plot
+#%% SM Draft 2, 3, Plot all Regionals in 1 Plot
 
 
 # Plotting Params
@@ -755,6 +769,7 @@ plotslab       = False # Set to True to plot the slab model simulation
 plotlog        = False # Set to True to Plot in Log Scale
 linearx        = 1 # Keep frequency axis linear, period axis marked (Works only with plotlog=False)
 periodx        = False
+useC           = True # Use Celsius in Labels
 
 if exclude_consth:
     plotid = [1,2]
@@ -878,7 +893,10 @@ for i in range(len(rids)):
         plt.setp(ax2.get_xticklabels(), rotation=rotation,fontsize=xfontsize)
     
     if i == 0:# Turn off y label except for leftmost plot
-        ax.set_ylabel("Power Spectrum ($K^2 /cpy$)")
+        if useC:
+            ax.set_ylabel("Power Spectrum ($\degree C^2 /cpy$)")
+        else:
+            ax.set_ylabel("Power Spectrum ($K^2 /cpy$)")
         ax.set_ylim(specylim_spg)
     else:
         ax.set_ylabel("")
