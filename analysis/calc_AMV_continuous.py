@@ -138,6 +138,15 @@ tails = 2
 proj  = ccrs.PlateCarree()
 dfcol = "k"
 
+# Linear-Power Spectra, < 2-yr
+xlm   = [1e-2,5e0]
+#xper = np.array([200,100,50,25,10,5,2,1,0.5]) # number of years
+xper  = np.array([100,50,20,10,5,2])
+xtks  = 1/xper
+xlm   = [xtks[0],xtks[-1]]
+
+ 
+
 #%% load some additional data
 
 # Load lat/lon regional
@@ -705,9 +714,78 @@ patup = scm.unpack_smdict(amvpats) #
 idxup = scm.unpack_smdict(amvids)
 
 
-#%% Based on Claude's Comment, calculate effect of including tropical points
+#%% Compare the NNAT Spectra (set-up)
 
-bb1 = 
-bb2 = 
+use_lp = False # Set to True to use LP
+
+# Prepare the SSTs
+insst = []
+for i in range(3): # Each of the Stochastic models
+    varr = proc.sel_region(sst_all[i,...],lon,lat,[-80,0,20,60],reg_avg=1,awgt=1)
+    print(varr.shape)
+    insst.append(varr)
+
+    
+# CESM [SLAB,FULL] --> [FULL,SLAB]
+for i in range(2):
+    varr = proc.sel_region(sst_cesm[i],lon,lat,[-80,0,20,60],reg_avg=1,awgt=1)
+    varr = proc.ann_avg(varr,0)[1:]
+    print(varr.shape)
+    insst.append(varr)
+    
+
+
+# Combined plots
+innames  = modelnames + tuple(np.flip(cesmname))
+incolors = tuple(mcolors) + tuple(np.flip(cesmcolor))
+
+# Pass Lowpass Filter
+if use_lp:
+    insst = [proc.lp_butter(sst,10,6) for sst in insst]
+
+#%% Compute the spectra
+
+pct        = 0.10
+ssmooth    = 500
+cnsmooths  = [100,100] # CESM1 Smoothing
+pct        = 0.10
+alpha      = 0.05      # For CI Calculatuions
+sdof       = 1000       # Degrees of freedom
+cdofs      = [900,1800] #
+dt         = 3600*24*365
+
+lw  = 3
+
+if use_lp:
+    xlm = [0,0.15]
+else:
+    
+    xlm = [0,0.5]
+
+
+# Additional Setup
+nsmooths = np.concatenate([np.ones(3)*ssmooth,np.ones(2)*cnsmooths])
+dofs     = np.concatenate([np.ones(3)*sdof,cdofs],)
+smoothname = "smth-obs%03i-full%02i-slab%02i" % (ssmooth,cnsmooths[0],cnsmooths[1])
+
+# Perform Computations
+specs,freqs,CCs,dofs,r1s = scm.quick_spectrum(insst,nsmooths,pct,dt=dt)
+
+
+# Plot Result
+fig,ax     = plt.subplots(1,1,figsize=(8,4))
+speclabels = ["%s (%.3f $^{\circ}C^2$)" % (innames[i],np.var(insst[i])) for i in range(len(innames)) ]
+ax,ax2 = viz.plot_freqlin(specs,freqs,speclabels,incolors,lw=lw,
+                     ax=ax,plottitle="Spectral Estimate for NASST Index",
+                     xlm=xlm,xtick=xtks,return_ax2=True)
+
+ax.set_ylim([0,0.25])
+ax2.set_xlim(xlm)
+ax.set_xlim(xlm)
+
+
+
+plt.savefig("%sNASST_Index_Spectra_lpfilter%i_%s.png" % (figpath,use_lp,smoothname),dpi=100)
+
 
 
