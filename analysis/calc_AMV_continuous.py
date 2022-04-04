@@ -26,7 +26,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20220315/"
+    figpath     = projpath + "02_Figures/20220407/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -67,6 +67,7 @@ exname   = "Fprime_amq0_method5_cont"
 # Plotting Params
 darkmode = False
 debug    = False
+
 
 #%% Functions
 def calc_conflag(ac,conf,tails,n):
@@ -249,7 +250,7 @@ for mid in range(3):
     if b == 0:
         blabel[0] = 1
     
-    ax  = axs.flatten()[b]
+    ax  = axs.flatten()[mid]
     ax  = viz.add_coast_grid(ax,bbox_plot,fill_color='gray',blabels=blabel)
     
     cf= ax.contourf(lonr,latr,amvpats[mid,:,:,b].T,levels=cint,cmap='cmo.balance')
@@ -289,6 +290,121 @@ cb = fig.colorbar(cf,ax=axs.flatten(),fraction=0.0156)
 cb.set_label("AMV Pattern ($K \sigma_{AMV}^{-1}$)")
 plt.savefig("%sAMV_Comparison_bboxes.png"%(figpath),dpi=150)
 
+#%% Compare/Quantify 2 bboxes
+
+bbd = 1  #d = denominator
+bbn = 3  #n = numerator
+print("Comparing bboxes %s / %s" % (amvbboxes[bbn],amvbboxes[bbd]))
+
+bbox_plot = [-85,5,0,60]
+
+fig,axs   = plt.subplots(1,3,figsize=(12,6),
+                       subplot_kw={'projection':ccrs.PlateCarree()},constrained_layout=True)
+#cint = np.arange(-.5,0.525,0.025)
+for i in range(3):
+    ax  = axs.flatten()[i]
+    blabel = [0,0,0,1]
+    if i == 0:
+        blabel[0] = 1
+        b = bbn
+    elif i == 1:
+        b = bbd
+        
+    if i <2:
+
+        plotamv = amvpats[mid,:,:,b].T
+        ptitle  = "%s" % amvbboxes[b]
+        ax = viz.plot_box(amvbboxes[b],ax=ax,linewidth=1.5,linestyle='dashed',)
+        cint_in = cint
+        cl_int_in = cl_int
+        
+    else:
+        plotamv = (amvpats[mid,:,:,bbn]/amvpats[mid,:,:,bbd]).T
+        ptitle  = "%s / %s" % (amvbboxes[bbn],amvbboxes[bbd])
+        cint_in   = np.arange(0,2.1,.1)
+        cl_int_in = cint_in
+        
+    ax  = viz.add_coast_grid(ax,bbox_plot,fill_color='gray',blabels=blabel)
+    
+    cf= ax.contourf(lonr,latr,plotamv,levels=cint_in,cmap='cmo.balance')
+    cl= ax.contour(lonr,latr,plotamv,levels=cl_int_in,colors='k',linewidths=0.55)
+    ax.clabel(cl)
+    ax.set_title(ptitle)
+    
+    
+    #plt.setp(axs[mopt, :], ylabel=maskopt[mopt])
+cb = fig.colorbar(cf,ax=axs.flatten(),fraction=0.0156)
+cb.set_label("AMV Pattern ($K \sigma_{AMV}^{-1}$)")
+plt.savefig("%sAMV_Comparison_2bboxes.png"%(figpath),dpi=150)
+
+#%% Focus comparison on the tropics
+
+
+tropbbox = [-80,0,0,20]
+
+
+
+plotamv  = np.log((amvpats[mid,:,:,bbn]/amvpats[mid,:,:,bbd]).T)
+
+
+
+#cint_in   = np.arange(0,2.1,.1)
+#cl_int_in = cint_in
+        
+
+# Select Region
+
+varr,lonrr,latrr = proc.sel_region(plotamv.T,lon,lat,tropbbox)
+
+xx,yy = np.meshgrid(lonrr,latrr,)
+idmax = np.nanargmax(varr)
+lonmax = xx.T.flatten()[idmax]
+latmax = yy.T.flatten()[idmax]
+
+klon,klat = proc.find_latlon(lonmax,latmax,lonr,latr)
+
+
+# Make the plot
+
+fig,ax   = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()})
+
+ptitle   = "%s / %s" % (amvbboxes[bbn],amvbboxes[bbd])
+blabel = [1,0,0,1]
+ax  = viz.add_coast_grid(ax,tropbbox,fill_color='gray',blabels=blabel)
+#cf  = ax.contourf(lonr,latr,plotamv,levels=cint_in,cmap='cmo.balance')
+cf  = ax.pcolormesh(lonr,latr,plotamv,vmin=-2.5,vmax=2.5,cmap="cmo.balance")
+cl  = ax.contour(lonr,latr,plotamv,levels=cl_int_in,colors='k',linewidths=0.55)
+
+ax.plot(lonmax,latmax,marker="x",markersize=20,color="yellow")
+cb  = fig.colorbar(cf,ax=axs.flatten(),fraction=0.0156)
+
+cb  = fig.colorbar(cf,ax=ax,fraction=0.0156)
+ax.set_title(ptitle)
+cb.set_label("Log Ratio")
+
+# Ok so largest value is not reliable because some values are near-zero
+print("Maximum log-ratio has value of %f"% (varr.flatten()[idmax]))
+print("AMV Amplitide is %f $K^2$ for the numerator" % (amvpats[mid,klon,klat,bbn]))
+print("AMV Amplitide is %f $K^2$ for the denominator" % (amvpats[mid,klon,klat,bbd]))
+
+#%% Let's instead find the max value in the tropics for each case
+locmax = []
+valmax = []
+for b in [bbn,bbd]:
+    
+    varr,lonrr,latrr = proc.sel_region(amvpats[mid,:,:,b].T,lon,lat,tropbbox)
+    
+    xx,yy = np.meshgrid(lonrr,latrr,)
+    idmax = np.nanargmax(varr)
+    lonmax = xx.T.flatten()[idmax]
+    latmax = yy.T.flatten()[idmax]
+    
+    locmax.append([lonmax,latmax])
+    valmax.append(varr.flatten()[idmax])
+    
+print("AMV Max in Tropics is %f in Numerator" % (valmax[0]))
+print("AMV Max in Tropics is %f in Denominator" % (valmax[1]))
+print("Thus, the ratio is %f"%(valmax[0]/valmax[1]))
 #%% Redo Stochastic Model Paper Plot
 # Copied from viz_AMV_comparison.py (03/11/2022)
 
@@ -306,12 +422,15 @@ cl_int=cint
 sel_rid   = 1
 
 plotbbox  = False
+useC      = True
+
 
 
 # Begin Plotting
 # ----------------
 rid   = sel_rid
 bbin  = amvbboxes[rid]
+print("Plotting AMV for bbox: %s" %(bbin))
 bbstr = "lon%ito%i_lat%ito%i" % (bbin[0],bbin[1],bbin[2],bbin[3])
 
 spid = 0
@@ -359,7 +478,11 @@ for aid,mid in enumerate([0,2]):
     cl = ax.contour(lon,lat,amvpats[mid,:,:,rid].T,levels=cl_int,colors="k",linewidths=0.5)
     ax.clabel(cl,levels=cl_int[::2],fontsize=8,fmt="%.02f")
     
-    ax.set_title("%s ($\sigma^2_{AMV}$ = %.04f $K^2$)"%(modelnames[mid],np.var(amvids[mid,:,rid])))
+    if useC:
+        ptitle = "%s ($\sigma^2_{AMV}$ = %.04f$\degree C^2$)"%(modelnames[mid],np.var(amvids[mid,:,rid]))
+    else:
+        ptitle = "%s ($\sigma^2_{AMV}$ = %.04f $K^2$)"%(modelnames[mid],np.var(amvids[mid,:,rid]))
+    ax.set_title(ptitle)
     if plotbbox:
         ax,ll = viz.plot_box(amvbboxes[rid],ax=ax,leglab="AMV",
                              color=dfcol,linestyle="dashed",linewidth=2,return_line=True)
@@ -394,7 +517,11 @@ for cid in range(2):
     ax.pcolormesh(lon,lat,camvpats[rid][cid].T,vmin=cint[0],vmax=cint[-1],cmap='cmo.balance',zorder=-1)
     cl = ax.contour(lon,lat,camvpats[rid][cid].T,levels=cl_int,colors="k",linewidths=0.5)
     ax.clabel(cl,levels=cl_int[::2],fontsize=8,fmt="%.02f")
-    ax.set_title("CESM-%s ($\sigma^2_{AMV}$ = %.04f $K^2$)"%(mconfigs[cid],np.var(camvids[rid][cid])))
+    if useC:
+        ptitle = "CESM-%s ($\sigma^2_{AMV}$ = %.04f$\degree C^2$)"%(mconfigs[cid],np.var(camvids[rid][cid]))
+    else:
+        ptitle = "CESM-%s ($\sigma^2_{AMV}$ = %.04f $K^2$)"%(mconfigs[cid],np.var(camvids[rid][cid]))
+    ax.set_title(ptitle)
     if plotbbox:
         ax,ll = viz.plot_box(amvbboxes[rid],ax=ax,leglab="",
                              color=dfcol,linestyle="dashed",linewidth=2,return_line=True)
@@ -577,5 +704,10 @@ for f in range(len(fnames)):
 patup = scm.unpack_smdict(amvpats) # 
 idxup = scm.unpack_smdict(amvids)
 
+
+#%% Based on Claude's Comment, calculate effect of including tropical points
+
+bb1 = 
+bb2 = 
 
 
