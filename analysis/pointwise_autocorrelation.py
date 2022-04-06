@@ -22,7 +22,7 @@ from tqdm import tqdm
 
 # Set Machine
 # -----------
-stormtrack = False # Set to True to run on stormtrack, False for local run
+stormtrack = True # Set to True to run on stormtrack, False for local run
 
 # Autocorrelation parameters
 # --------------------------
@@ -32,7 +32,7 @@ thresholds  = [0,] # Standard Deviations
 conf        = 0.95
 tails       = 2
 
-mconfig    = "HadISST" #["PIC-FULL","HTR-FULL","PIC_SLAB","HadISST","ERSST"]
+mconfig    = "HTR-FULL" #["PIC-FULL","HTR-FULL","PIC_SLAB","HadISST","ERSST"]
 
 thresholds = [0,]
 thresname  = "thres" + "to".join(["%i" % i for i in thresholds])
