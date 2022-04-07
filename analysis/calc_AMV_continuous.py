@@ -563,6 +563,7 @@ lon,lat,h,kprevall,dampingslab,dampingfull,alpha,alpha_full = inputs
 cid      = 1 # Set the CESM model
 bbin     = [-80,0,20,60]
 bboxplot = [-80,0,10,60] 
+useC     = True
 sst_in = sst_cesm[cid]
 amvid,amvpat = proc.calc_AMVquick(sst_in,lonr,latr,bbin,anndata=False,
                                   runmean=False,dropedge=5)
@@ -584,7 +585,10 @@ ax.clabel(cl,levels=cl_int,fontsize=8)
 
 # Add Colorbar, Reduce tick labels
 cb = fig.colorbar(pcm,ax=ax,orientation="horizontal",fraction=0.050,pad=0.1)
-cb.set_label("SST ($K \sigma_{AMV}^{-1}$)")
+if useC:
+    cb.set_label("SST ($\degree C \sigma_{AMV}^{-1}$)")
+else:
+    cb.set_label("SST ($K \sigma_{AMV}^{-1}$)")
 cb.set_ticks(cb_lab)
 
 plt.savefig("%sAMV_Patterns_Indv_%s.png"% (figpath,mconfigs[cid]),dpi=200,bbox_inches='tight')

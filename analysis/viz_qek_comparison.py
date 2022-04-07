@@ -30,7 +30,7 @@ import cartopy.crs as ccrs
 
 datpath = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_output/'
 fnames  = ["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_dmp0" %i for i in range(10)]
-figpath = datpath + "../../02_Figures/20220315/"
+figpath = datpath + "../../02_Figures/20220407/"
 proc.makedir(figpath)
 
 #%% From SM Stylesheet
@@ -185,8 +185,10 @@ freqsm   = freqs[0]
 
 dtplot     = 3600*24*365
 rid_sel    =[0,5,6,]
-specnames_ratio = ("log( With $Q_ek$ / Without $Q_{ek}$)","log( With $Q_ek$ / CESM-FULL)")
+specnames_ratio = ("log( With $Q_{ek}$ / Without $Q_{ek}$)","log( With $Q_{ek}$ / CESM-FULL)")
 notitle    = False
+useC       = True
+
 
 
 # Take Mean values for plotting
@@ -220,7 +222,12 @@ spid = 0
 #if notitle is False:
     #ax.set_title("%s ($\sigma^2_{AMV}$ = %.4f$K^2$)"%(expnames[mid],plotvar))
 #else:
-ax.set_title("Entraining with $Q_{ek}$ ($\sigma^2_{AMV}$ = %.4f$K^2$)"%(plotvar))
+if useC:
+    ptitle = "Entraining with $Q_{ek}$ ($\sigma^2_{AMV}$ = %.4f$\degree C^2$)"%(plotvar)
+else:
+    ptitle = "Entraining with $Q_{ek}$ ($\sigma^2_{AMV}$ = %.4f$K^2$)"%(plotvar)
+    
+ax.set_title(ptitle)
 
 # Make the Plot
 ax = viz.add_coast_grid(ax,bboxplot,line_color='k',

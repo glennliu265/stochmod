@@ -44,7 +44,7 @@ import cmocean
 projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath = projpath + '03_Scripts/stochmod/'
 datpath    = projpath + '01_Data/'
-outpath    = projpath + '02_Figures/20220309/'
+outpath    = projpath + '02_Figures/20220407/'
 input_path  = datpath + 'model_input/'
 proc.makedir(outpath)
 
@@ -213,6 +213,10 @@ ax.set_xlim([0,11])
 # This was taken from [synth_stochmod_spectra.py]
 # Also used in SM Paper Draft
 
+useC    = True
+notitle = True
+
+
 def make_patch_spines_invisible(ax):
     #Source: https://matplotlib.org/2.0.2/examples/pylab_examples/multiple_yaxis_with_spines.html
     ax.set_frame_on(True)
@@ -221,10 +225,17 @@ def make_patch_spines_invisible(ax):
         sp.set_visible(False)
 
 # plotting specs
-plotylab = ("Mixed-Layer Depth ($m$)",
-            "Forcing Amplitude $(Wm^{-2})$",
-            "Heat Flux Feedback $(Wm^{-2} \, K^{-1})$"
-            )
+if useC:
+    plotylab = ("Mixed-Layer Depth ($m$)",
+                "Forcing Amplitude $(Wm^{-2})$",
+                "Heat Flux Feedback $(Wm^{-2} \, \degree C^{-1})$"
+                )
+    
+else:
+    plotylab = ("Mixed-Layer Depth ($m$)",
+                "Forcing Amplitude $(Wm^{-2})$",
+                "Heat Flux Feedback $(Wm^{-2} \, K^{-1})$"
+                )
 plotlab  = ("h",r"$ F'$",r"$\lambda_a$")
 plotmarker =("o","d","x")
 plotcolor  = ("mediumblue","orangered","limegreen")
@@ -280,7 +291,8 @@ for m in range(2): # Loop for SLAB, and FULL
     ax1.set_xticklabels(mons3, rotation = 45, ha="right")
     ax1.grid(True,ls='dotted')
     ax1.legend(ls, [l.get_label() for l in ls],loc='upper center')
-    ax1.set_title(title)
+    if notitle is False:
+        ax1.set_title(title)
     plt.savefig(outpath+"Scycle_MLD_Forcing_%s_Triaxis_%s.png"% (flocstring,mcf),dpi=150,bbox_inches='tight')
 
 # ****************************************************************************

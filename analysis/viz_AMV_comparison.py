@@ -26,7 +26,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20220315/"
+    figpath     = projpath + "02_Figures/20220407/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -817,7 +817,7 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 ## SM DRAFT 2 Final
 
 notitle  = True
-darkmode = True
+darkmode = False
 
 cmax  = 0.5
 cstep = 0.025
@@ -1349,6 +1349,9 @@ rid = 4
 mid = 2
 tworow = False
 
+add_std = True
+useC    = True
+
 clmax  = 0.5
 cstep  = .025
 cint   = np.arange(-clmax,clmax+cstep,cstep) # Used this for 7/26/2021 Meeting
@@ -1380,6 +1383,10 @@ if exname == "NAO_EAP":
         
         if notitle is False:
             ax.set_title("%s"%(frcnamelong[f]))
+            
+        if add_std:
+            ptitle = "$\sigma_{AMV}^2$ = %.5f $\degree C^2$" % (np.var(amvids[f][rid][mid]))
+            ax.set_title(ptitle)
         
         viz.plot_mask(lon,lat,dmsks[mid],ax=ax,markersize=0.2)
         
@@ -1394,7 +1401,10 @@ if exname == "NAO_EAP":
         cb = fig.colorbar(pcm,ax=flatten_axis,orientation='vertical',fraction= 0.012,pad=0.05)
     else:
         cb = fig.colorbar(pcm,ax=flatten_axis,orientation='horizontal',fraction= 0.05,pad=0.04)
-    cb.set_label("SST ($K \, \sigma_{AMV}^{-1}$)")
+    if useC:
+        cb.set_label("SST ($\degree C \, \sigma_{AMV}^{-1}$)")
+    else:
+        cb.set_label("SST ($K \, \sigma_{AMV}^{-1}$)")
 plt.savefig("%sAMV_Patterns_NAO_EAP_model%i.png" % (figpath,mid),dpi=150,bbox_inches='tight')
 
 #%% Plot Bounding Boxes over CESM Slab Pattern

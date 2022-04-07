@@ -671,6 +671,7 @@ rid_L = 0 #  SPG
 rid_R = 4 #  NAT
 order = [rid_L,rid_R]
 
+nspecs = 2
 
 fig,axs =plt.subplots(2,2,figsize=(12,8))
 
@@ -758,7 +759,6 @@ plt.savefig("%sSPG-NAT_Autocorrelation_Spectra%s.png"%(figpath,smoothname),
 
 
 #%% SM Draft 2, 3, Plot all Regionals in 1 Plot
-
 
 # Plotting Params
 # ---------------
@@ -1213,6 +1213,12 @@ for a in range(2):
 
 
 plt.savefig("%sRegional_Spectra_Ratio_2-panel_%s.png"%(figpath,flab),dpi=150,bbox_inche='tight')
+
+#%% Plot AMV Index Plots
+
+
+
+
 
 #%%
 # #%% Remake using subplot grids (Note Working)
