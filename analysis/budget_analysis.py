@@ -401,8 +401,8 @@ for zero in range(len(zerocross)):
     
     # Find nearest pos/neg peaks
     if localmaxmin:
-        kpos   = idpos[np.abs(idpos_cull-idzero).argmin()]
-        kneg   = idneg[np.abs(idneg_cull-idzero).argmin()]
+        kpos   = idpos_cull[np.abs(idpos_cull-idzero).argmin()]
+        kneg   = idneg_cull[np.abs(idneg_cull-idzero).argmin()]
     else:
         kpos   = idpos[np.abs(idpos-idzero).argmin()]
         kneg   = idneg[np.abs(idneg-idzero).argmin()]
@@ -476,7 +476,6 @@ for v in tqdm(range(nvar)):
 #%% (04) Plot mean values
 # # ---------------------
 
-
 specify_vlims = True 
 
 # Label and vlim settings
@@ -530,6 +529,49 @@ for v in range(nvar):
             fig.colorbar(pcm,ax=ax,fraction=0.035)
         
 savename = "%sSM_Avg_Integrated_Terms.png" % (figpath)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+
+#%% Plot the mean sum of the terms 
+
+meansum = False # True to mean sum, False for sum of mean
+fig,axs = plt.subplots(1,2,figsize=(16,6),constrained_layout=True,
+                      subplot_kw={'projection':proj})
+for p in range(2):
+    
+    ax = axs[p]
+    blabel = [0,0,0,1]
+    if p ==0:
+        blabel[0]=1
+    
+    if meansum:
+        plotvar = plotvars[p].sum(-1).mean(-1).T
+        sptitle = "Mean Sum of Terms"
+    else:
+        plotvar = plotvars[p].mean(2).sum(-1).T
+        sptitle = "Sum of Mean Terms"
+    ptitle = "%s" % plotnames[p]
+    # Add Grid + Backdrop
+    ax = viz.add_coast_grid(ax,bbox=plotbbox,fill_color='gray',
+                            ignore_error=True,blabels=blabel)
+    
+    # Make Plot
+    if use_pcm:
+        pcm = ax.pcolormesh(lon,lat,plotvar,vmin=-vm,vmax=vm,cmap='cmo.balance')
+    else:
+        pcm = ax.contourf(lon,lat,plotvar,levels=cint,cmap='cmo.balance',extend="both")
+    
+    cl  = ax.contour(lon,lat,plotvar,levels=cint,colors="k",linewidths=0.75)
+    ax.clabel(cl)
+    
+    # Add colorbar
+    ax.set_title(ptitle)
+
+cb = fig.colorbar(pcm,ax=axs.flatten(),fraction=0.05,orientation='horizontal')
+cb.set_label("$\degree C \, year^{-1}$")
+plt.suptitle(sptitle,fontsize=14,y=1.1)
+#decr_sum = decr.sum(-1).mean(-1)
+savename = "%sSM_Avg_Integrated_Terms_meansum%i.png" % (figpath,meansum)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 #%% Check the differences
