@@ -28,7 +28,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20210315/"
+    figpath     = projpath + "02_Figures/20210401/"
    
     lipath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/landicemask_enssum.npy"
     
@@ -96,11 +96,11 @@ rho   = 1026      # kg/m3
 cp0   = 3996      # [J/(kg*C)]
 mons3 = ('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
 
-centered  = True # Set to True to load centered-difference temperature
-calc_dT   = False # Set to True to recalculate temperature gradients (Part 1)
-calc_dtau = True # Set to True to perform wind-stress regressions to PCs (Part 2)
-calc_qek  = True # set to True to calculate ekman forcing 
-debug     = True # Set to True to visualize for debugging
+centered   = True # Set to True to load centered-difference temperature
+calc_dT    = False # Set to True to recalculate temperature gradients (Part 1)
+calc_dtau  = True # Set to True to perform wind-stress regressions to PCs (Part 2)
+calc_qek   = True # set to True to calculate ekman forcing 
+debug      = True # Set to True to visualize for debugging
 
 # Fprime or Qnet
 correction     = True # Set to True to Use Fprime (T + lambda*T) instead of Qnet

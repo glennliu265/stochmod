@@ -336,7 +336,7 @@ debug    = False
 notitle  = True
 
 # Some edits for Draft 4
-use_ann     = True # Option to take ann avg before calcualtion
+use_ann     = False # Option to take ann avg before calcualtion
 useC      = True # Swap to label as degree celsius
 
 # Smoothing Params

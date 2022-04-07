@@ -79,6 +79,9 @@ tails       = 2 # Tails for Significance Calculation
 alw         = 3 # Autocorrelation Line Width
 
 
+# Combined plots
+innames  = modelnames + tuple(cesmname)
+incolors = tuple(mcolors) + tuple(cesmcolor)
 
 #%% Power Spectra Options
 speccolors = ["r","magenta","Orange","k","gray"]

@@ -1625,6 +1625,8 @@ def quick_spectrum(sst,nsmooth,pct,
     # -----------------------------------------------------------------
     if dt is None:
         dt = np.ones(len(sst)) * 3600*24*30
+    else:
+        dt = np.ones(len(sst)) * dt
     
     # -----------------------------------------------------------------
     # Calculate and make individual plots for stochastic model output
