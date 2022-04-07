@@ -12,8 +12,10 @@ Created on Thu Mar 24 15:23:20 2022
 import numpy as np
 import matplotlib.pyplot as plt
 import sys
+
 sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
 sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
+
 from amv import proc,viz
 import scm
 import numpy as np
@@ -32,15 +34,15 @@ thresholds  = [0,] # Standard Deviations
 conf        = 0.95
 tails       = 2
 
-mconfig    = "HTR-FULL" # #"PIC-FULL"
+mconfig    = "HadISST" # #"PIC-FULL"
 
 thresholds = [0,]
 thresname  = "thres" + "to".join(["%i" % i for i in thresholds])
-varname    = "SSS"
+varname    = "SST"
 
 # Set Output Directory
 # --------------------
-figpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220325/'
+figpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220407/'
 proc.makedir(figpath)
 outpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/'
 savename   = "%sCESM1_%s_%s_autocorrelation_%s.npz" %  (outpath,mconfig,varname,thresname)
@@ -72,6 +74,15 @@ elif "HTR" in mconfig:
     datpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/CESM_proc/"
     fnames     = ["%s_FULL_HTR_lon-80to0_lat0to65_DTEnsAvg.nc" % varname,]
     mnames     = ["FULL",]
+elif mconfig == "HadISST":
+    # HadISST Data
+    # ------------
+    datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/"
+    fnames  = ["HadISST_detrend2_startyr1870.npz",]
+    mnames     = ["HadISST",]
+elif mconfig == "ERSST":
+    fnames  = ["ERSST_detrend2_startyr1900_endyr2016.npz"]
+    
     
 
 #%% Load in the data
@@ -104,11 +115,11 @@ klon,klat = proc.find_latlon(lonf,latf,lon,lat)
 locfn,locstr = proc.make_locstring(lonf,latf)
 
 # Make the plot
-title    = "%s Autocorrelation @ Lon: %i, Lat : %i" % (varname,lonf,latf)
+title    = "%s Autocorrelation @ Lon: %i, Lat : %i (%s)" % (varname,lonf,latf,mconfig)
 fig,ax   = plt.subplots(1,1)
 ax,ax2   = viz.init_acplot(kmonth,np.arange(0,38,2),lags,ax=ax,title=title)
 
-if "PIC" in mconfig: # Just plot the one timeseries
+if "HTR" not in mconfig: # Just plot the one timeseries
     for th in range(nthres+2):
         ax.plot(lags,acs_final[klon,klat,kmonth,th,:],marker="o",
                 color=colors[th],lw=2,
@@ -149,8 +160,12 @@ for th in range(3):
     
     ax = axs.flatten()[th]
     
-    plotac    = acs_final[klon,klat,:,:,th,:].mean(0)
-    plotcount = count_final[klon,klat,:,:,th].mean(0)
+    if "HTR" in mconfig:
+        plotac    = acs_final[klon,klat,:,:,th,:].mean(0)
+        plotcount = count_final[klon,klat,:,:,th].mean(0)
+    else:
+        plotac    = acs_final[klon,klat,:,th,:]
+        plotcount = count_final[klon,klat,:,th]
     
     rhocrit   = proc.ttest_rho(0.05,1,plotcount) # [month]
     sigmask   = plotac > rhocrit[:,None]

@@ -23,8 +23,8 @@ import xesmf as xe
 
 #%% User Edits
 
-varname       = "BSF" # "HMXL"
-mconfig       = "FULL" # [FULL_PIC, SLAB_PIC, FULL_HTR]
+varname       = "SST" # "HMXL"
+mconfig       = "FULL_HTR" # [FULL_PIC, SLAB_PIC, FULL_HTR]
 
 use_xesmf     = True # Use xESMF for regridding. False = box average
 method        = "bilinear" # regridding method
@@ -116,6 +116,7 @@ savename = "%s%s_%s_%s.nc" % (outpath,varname,mconfig,method)
 # Get file names
 globby = datpath+ncsearch
 nclist =glob.glob(globby)
+nclist = [nc for nc in nclist if "OIC" not in nc]
 nclist.sort()
 print("Found %i items" % (len(nclist)))
 
