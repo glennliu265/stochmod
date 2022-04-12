@@ -34,18 +34,18 @@ thresholds  = [0,] # Standard Deviations
 conf        = 0.95
 tails       = 2
 
-mconfig    = "HadISST" # #"PIC-FULL"
+mconfig    = "HTR-FULL" # #"PIC-FULL"
 
 thresholds = [0,]
 thresname  = "thres" + "to".join(["%i" % i for i in thresholds])
-varname    = "SST"
+varname    = "TS" #"SST"
 
 # Set Output Directory
 # --------------------
 figpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220407/'
 proc.makedir(figpath)
 outpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/'
-savename   = "%sCESM1_%s_%s_autocorrelation_%s.npz" %  (outpath,mconfig,varname,thresname)
+savename   = "%s%s_%s_autocorrelation_%s.npz" %  (outpath,mconfig,varname,thresname)
 print("Loading the following dataset: %s" % savename)
 
 # Plotting Params
@@ -275,14 +275,18 @@ integr_ac = np.trapz(acmax,x=lags,axis=-1) # [lon x lat x (ens) x thres]
 #%% Visualize (Works for warm/cold)
 bboxplot = [-80,0,0,60]
 
-intitles = ("Cold","Warm","All")
-
+if varname in ["SST","TS"]:
+    intitles = ("Cold","Warm","All")
+elif varname == "SSS":
+    intitles = ("Fresh","Salty","All")
+    
+plotdiff = False # Set to True to plot differences/ Otherwise plots all 3
 fig,axs = plt.subplots(1,3,subplot_kw={'projection':ccrs.PlateCarree()},
                       constrained_layout=True,figsize=(14,6))
 for th in range(3):
     ax = axs[th]
     
-    if th < nthres+1:
+    if th < nthres+1 or not plotdiff:
         if lens:
             plotac = integr_ac[:,:,:,th].mean(-1).T
         else:
@@ -298,28 +302,84 @@ for th in range(3):
         title  = "Warm - Cold Anomalies"
         cmap   = "cmo.balance"
         vlm    = [-3,3]
+        
     
     ax = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="gray")
     ax.set_title(title)
     pcm = ax.pcolormesh(lon,lat,plotac,cmap=cmap,
                         vmin=vlm[0],vmax=vlm[1])
     
-    if th == 2:
+    if th == 2 and plotdiff:
         cl = ax.contour(lon,lat,plotac,levels=[0,],colors="k",linewidths=.75)
         
     else:
         cl = ax.contour(lon,lat,plotac,levels=np.arange(0,14,2),colors="w",linewidths=.75)
     ax.clabel(cl,)
     
-    if th == 0:
-        cb = fig.colorbar(pcm,ax=axs[:2].flatten(),orientation='horizontal',fraction=0.04)
-        cb.set_label("Integrated Timescale (Months)")
-    elif th == 2:
-        cb = fig.colorbar(pcm,ax=ax,orientation='horizontal',fraction=0.04,pad=0.01)
-        cb.set_label("Difference (Months)")
+    if plotdiff:
+        if th == 0:
+            cb = fig.colorbar(pcm,ax=axs[:2].flatten(),orientation='horizontal',fraction=0.04)
+            cb.set_label("Integrated Timescale (Months)")
+        elif th == 2:
+            cb = fig.colorbar(pcm,ax=ax,orientation='horizontal',fraction=0.04,pad=0.01)
+            cb.set_label("Difference (Months)")
+if not plotdiff:
+    cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction=0.04)
+    cb.set_label("Integrated Timescale (Months)")
 
 plt.suptitle("Integrated %s ACF (to 36 months) for CESM1 (%s)" % (varname,mconfig),fontsize=14,y=.88)
-plt.savefig("%sIntegrated%sACF_Cold_Warm_Anomalies_CESM_%s_ksel%s.png"%(figpath,varname,mconfig,str(ksel)),dpi=150)
+plt.savefig("%sIntegrated%sACF_Cold_Warm_Anomalies_CESM_%s_ksel%s_plotdiff%i.png"%(figpath,varname,mconfig,str(ksel),plotdiff)
+            ,dpi=150,bbox_inches='tight')
+
+#%% Visualize the standard deviation for large ensemble
+
+plotdiff = False # Set to True to plot differences/ Otherwise plots all 3
+fig,axs  = plt.subplots(1,3,subplot_kw={'projection':ccrs.PlateCarree()},
+                      constrained_layout=True,figsize=(14,6))
+vstep    = 1
+
+for th in range(3):
+    ax = axs[th]
+    
+    if th < nthres+1 or not plotdiff:
+        plotac = integr_ac[:,:,:,th].std(-1).T
+        title  = "%s Anomalies (%s K)" % (intitles[th],thresname[th])
+        cmap   = "cmo.amp"
+        vlm    = [0,5]
+    else:
+
+        plotac = (integr_ac[:,:,:,1].std(-1) - integr_ac[:,:,:,0].std(-1)).T
+        title  = "Warm - Cold Anomalies"
+        cmap   = "cmo.balance"
+        vlm    = [-3,3]
+        
+    
+    ax = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="gray")
+    ax.set_title(title)
+    pcm = ax.pcolormesh(lon,lat,plotac,cmap=cmap,
+                        vmin=vlm[0],vmax=vlm[1])
+    
+    if th == 2 and plotdiff:
+        cl = ax.contour(lon,lat,plotac,levels=[0,],colors="k",linewidths=.75)
+        
+    else:
+        cl = ax.contour(lon,lat,plotac,levels=np.arange(0,vlm[-1]+vstep,vstep),colors="w",linewidths=.75)
+    ax.clabel(cl,)
+    
+    if plotdiff:
+        if th == 0:
+            cb = fig.colorbar(pcm,ax=axs[:2].flatten(),orientation='horizontal',fraction=0.04)
+            cb.set_label("1$\sigma$ of Integrated Timescale (Months)")
+        elif th == 2:
+            cb = fig.colorbar(pcm,ax=ax,orientation='horizontal',fraction=0.04,pad=0.01)
+            cb.set_label("Difference (Months)")
+if not plotdiff:
+    cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction=0.04)
+    cb.set_label("1$\sigma$ Integrated Timescale (Months)")
+
+plt.suptitle("1$\sigma$ (Ensemble) Integrated %s ACF (to 36 months)" % (varname),fontsize=14,y=.88)
+plt.savefig("%sIntegrated%sACF_Cold_Warm_Anomalies_CESM_%s_ksel%s_plotdiff%i_stdev.png"%(figpath,varname,mconfig,str(ksel),plotdiff)
+            ,dpi=150,bbox_inches='tight')
 
 
 #%% Check how this looks like, separately for each ensemble member
