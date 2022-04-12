@@ -225,11 +225,19 @@ sm_vars_all = [lon x lat x year x run]
 # ----------------------------
 
 """
+
+For culling
+
+localmax = True   Use the local max/min before AMV state change
+           False  Use the last value before a state change
+
+
 5) awgt:  number to indicate weight type
             0 = no weighting
             1 = cos(lat)
             2 = sqrt(cos(lat))
 """
+localmax=True
 
 # Compute the AMV Index
 amvid,amvpat = proc.calc_AMVquick(T_all.squeeze(),lon,lat,amvbbox,dropedge=5,anndata=True)
@@ -250,13 +258,19 @@ chkneg     = checkpoint(zerocross,idneg,debug=True) # Indices of idneg
 idpos_cull = []
 for cp_group in chkpos: # For each group
     cids  = np.array(idpos)[cp_group] # Get relevant indices
-    vals  = amvid[cids] # Get corresponding valuesvalues
-    idpos_cull.append(cids[np.argmax(cids)]) # Save local maxima
+    if localmax: # Find maximum 
+        vals  = amvid[cids] # Get corresponding valuesvalues
+        idpos_cull.append(cids[np.argmax(vals)]) # Save local maxima
+    else: # Just use last value
+        idpos_cull.append(cids[-1])
 idneg_cull = []
 for cp_group in chkneg: # For each group
     cids  = np.array(idneg)[cp_group] # Get relevant indices
-    vals  = amvid[cids] # Get corresponding valuesvalues
-    idneg_cull.append(cids[np.argmin(cids)]) # Save local maxima
+    if localmax: # Find maximum
+        vals  = amvid[cids] # Get corresponding valuesvalues
+        idneg_cull.append(cids[np.argmin(vals)]) # Save local maxima
+    else: # Just append th elast value
+        idneg_cull.append(cids[-1])
 
 #%% Plot the AMV Index
 
@@ -282,7 +296,7 @@ ax.grid(True,ls='dotted')
 #%% Check culled values
 
 # Set some parameters
-chkmax = 500
+chkmax = 200
 xlm    = [0,chkmax]
 t      = np.arange(0,len(amvid))
 fig,ax = plt.subplots(1,1,figsize=(16,4))
@@ -293,7 +307,7 @@ cpos_plot = [c for c in chkpos if np.all(c < chkmax)]
 cneg_plot = [c for c in chkneg if np.all(c < chkmax)]
 
 # Plot timeseries, peaks, and zero-crossings
-ax     = cvd.plot_anomaly(t,amvid,ax=ax)
+ax     = cvd.plot_anomaly(t,amvid,ax=ax,xlabfreq=10)
 ax.set_xlim(xlm)
 
 # Plot all peaks
@@ -313,6 +327,8 @@ ax.set_xlabel("Years")
 ax.set_ylabel("AMV Index")
 ax.set_title("AMV Index for Years %i to %i" % (xlm[0],xlm[1]))
 ax.legend()
+
+#ax.set_xticks(np.linspace(0,chkmax,20))
 
 ax.grid(True,ls='dotted')
 
@@ -443,7 +459,7 @@ ax.set_ylabel("AMV Index")
 ax.set_title("AMV Index for Years %i to %i" % (xlm[0],xlm[1]))
 ax.set_xlim(xlm)
 ax.grid(True,ls='dotted')
-plt.savefig("%sAMV_Integr_Example_yr%ito%i.png"%(figpath,xlm[0],xlm[1]),bbox_inches='tight',dpi=150)
+plt.savefig("%sAMV_Integr_Example_yr%ito%i_localmax%i.png"%(figpath,xlm[0],xlm[1],localmax),bbox_inches='tight',dpi=150)
 
 # # --------------------------------
 #%% (03) Integrate for each variable
@@ -495,7 +511,6 @@ fig,axs = plt.subplots(nvar,2,figsize=(8,12),constrained_layout=True,
                       subplot_kw={'projection':proj})
 
 for v in range(nvar):
-    
     for i in range(2):
         
         ax      = axs[v,i]
@@ -528,7 +543,7 @@ for v in range(nvar):
         if i == 1:
             fig.colorbar(pcm,ax=ax,fraction=0.035)
         
-savename = "%sSM_Avg_Integrated_Terms.png" % (figpath)
+savename = "%sSM_Avg_Integrated_Terms_localmax%i.png" % (figpath,localmax)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 
