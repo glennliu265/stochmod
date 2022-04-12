@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+ #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 
@@ -26,7 +26,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20220305/"
+    figpath     = projpath + "02_Figures/20220407/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -127,7 +127,8 @@ print("Loaded data in %.2fs" % (time.time()-st))
 #%% Plot variance thresholds over specific regions
 
 
-threses = ([0,1/20],[1/20,1/10],[1/10,1/2]) # [lower freq, upper freq]
+#threses = ([0,1/20],[1/20,1/10],[1/10,1/2]) # [lower freq, upper freq]
+threses = ([0,1/10],[1/10,1/2])
 dtplot  = 3600*24*365
 
 inspecs = (specs[0,...],
@@ -144,6 +145,7 @@ nmods,nlon,nlat,nfreqsm = specs.shape
 
 sumvals = np.zeros((nlon,nlat,len(inspecs),len(threses))) # [lon, lat x model x threshold]
 
+sumvals_vp = sumvals.copy() # Variance preserving form
 for t in range(len(threses)):
     
     
@@ -152,19 +154,47 @@ for t in range(len(threses)):
     for mid in range(len(inspecs)):
         inspec = inspecs[mid]
         infreq = infreqs[mid]
-    
+        
+        # Non variance preserving
         outfreq = proc.calc_specvar(infreq,inspec,thresval,dtplot,
                                  return_thresids=False,lowerthres=lowerthres)
-        
         sumvals[:,:,mid,t] = outfreq.copy()
+        
+        # Variance-preserving
+        outfreq_vp = proc.calc_specvar(infreq,inspec*infreq,thresval,dtplot,
+                                 return_thresids=False,lowerthres=lowerthres)
+        sumvals_vp[:,:,mid,t] = outfreq_vp.copy()
+        
     
 #%% Now Lets Plot the Ratios
 
-full_slab     = np.log(sumvals[:,:,3,:]/sumvals[:,:,4,:])
-entrain_hvary = np.log(sumvals[:,:,2,:]/sumvals[:,:,1,:])
-hvary_hconst  = np.log(sumvals[:,:,1,:]/sumvals[:,:,0,:])
-entrain_full  = np.log(sumvals[:,:,2,:]/sumvals[:,:,3,:])
-hconst_slab   = np.log(sumvals[:,:,0,:]/sumvals[:,:,4,:])
+#sumvals_in = sumvals_vp
+
+
+"""
+vp = 0 Linear-Linear
+vp = 1 Frequency x Power (Now this is incorrect b/c we need log(freq))
+"""
+f_s   = [] # [vp][lon, lat x threshold]
+e_hv  = []
+hv_hc = []
+e_f   = []
+hc_s  = []
+for sumvals_in in [sumvals,sumvals_vp]:
+    full_slab     = np.log(sumvals_in[:,:,3,:]/sumvals_in[:,:,4,:])
+    entrain_hvary = np.log(sumvals_in[:,:,2,:]/sumvals_in[:,:,1,:])
+    hvary_hconst  = np.log(sumvals_in[:,:,1,:]/sumvals_in[:,:,0,:])
+    entrain_full  = np.log(sumvals_in[:,:,2,:]/sumvals_in[:,:,3,:])
+    hconst_slab   = np.log(sumvals_in[:,:,0,:]/sumvals_in[:,:,4,:])
+    
+    f_s.append(full_slab) 
+    e_hv.append(entrain_hvary)
+    hv_hc.append(hvary_hconst)
+    e_f.append(entrain_full)
+    hc_s.append(hconst_slab)
+    
+
+
 #%%
 
 # ratiosel  = entrain_hvary
@@ -179,7 +209,7 @@ ratiosel     = hvary_hconst
 rationame    = "log($\sigma^2_{h vary}$/$\sigma^2_{h const}$)"
 rationame_fn = "log_hvary_hconst"
 
-ratiosel     = entrain_full
+ratiosel     = e_f[0]#entrain_full
 rationame    = "log($\sigma^2_{entrain}$/$\sigma^2_{full}$)"
 rationame_fn = "log_entrain_full"
 
@@ -242,19 +272,19 @@ ssh_reg   = ssh_reg.mean('time')
 ssh      = ssh_reg.values
 ssh_mean = ssh.T
 #%% PLot BSF
-ratiosel     = entrain_full
+ratiosel     = e_f[1]
 rationame    = "log($\sigma^2_{entrain}$/$\sigma^2_{full}$)"
 rationame_fn = "log_entrain_full"
 
 
 
-plotcontour = "SSH"
+plotcontour = "BSF"
 
 use_contours = True
 cints       = np.arange(-1.5,1.55,0.05)
 cl_ints     = np.arange(-1.5,1.6,0.1)
 sshcint     = np.arange(-150,155,5)
-bsfcint     = np.arange(-30,32,2)
+bsfcint     = np.arange(-30,35,5)
 fig,axs = plt.subplots(1,3,subplot_kw={'projection':ccrs.PlateCarree()},
                        constrained_layout=True,figsize=(12,4)) 
 for t in range(3):
@@ -279,17 +309,64 @@ for t in range(3):
         
     if plotcontour=="BSF":
         cl = ax.contour(ds_reg.lon,ds_reg.lat,bsf_mean.T,colors='k',levels=bsfcint,linewidths=0.5)
-        
+        ax.clabel(cl,levels=bsfcint)
     elif plotcontour=="SSH":
         cl = ax.contour(ds_reg.lon,ds_reg.lat,ssh_mean.T,colors='k',levels=sshcint,linewidths=0.5)
-    ax.clabel(cl,levels=sshcint)
+        ax.clabel(cl,levels=sshcint)
     
 fig.colorbar(pcm,ax=axs.flatten(),fraction=0.025,pad=0.01)
 ax = axs[0]
 ax.text(-0.15, 0.55, rationame, va='bottom', ha='center',rotation='vertical',
         rotation_mode='anchor',transform=ax.transAxes)
 plt.savefig("%sSpectra_Ratio_%s_%s%s.png"% (figpath,rationame_fn,smoothname,plotcontour),dpi=150)
+#%% Updated version with just 2 plots
+ratiosel     = e_f[1]
+rationame    = "log($\sigma^2_{entrain}$/$\sigma^2_{full}$)"
+rationame_fn = "log_entrain_full"
 
+
+
+plotcontour = "BSF"
+
+use_contours = True
+cints       = np.arange(-1.5,1.55,0.05)
+cl_ints     = np.arange(-1.5,1.6,0.1)
+sshcint     = np.arange(-150,155,5)
+bsfcint     = np.arange(-30,35,5)
+fig,axs = plt.subplots(1,2,subplot_kw={'projection':ccrs.PlateCarree()},
+                       constrained_layout=True,figsize=(12,4)) 
+for t in range(2):
+    blabel = [0,0,0,1]
+    if t == 0:
+        blabel[0] = 1
+    
+    ax = axs.flatten()[t]
+    print(t)
+    if t == 0:
+        ptitle = r"> %03d Years" % (1/threses[t][1])
+    else:
+        ptitle = "%03d to %03d Years" % (1/threses[t][1],1/threses[t][0])
+    ax.set_title(ptitle)
+    ax = viz.add_coast_grid(ax,bbox=bboxplot,blabels=blabel,fill_color='gray')
+    if use_contours:
+        pcm = ax.contourf(ds.lon,ds.lat,ratiosel[:,:,t].T,levels=cints,extend='both',cmap='cmo.balance')
+        #cl = ax.contour(ds.lon,ds.lat,ratiosel[:,:,t].T,levels=cl_ints,colors='k',linewidths=0.5)
+        #ax.clabel(cl,cl_ints[::2],fmt="%.1f")
+    else:
+        pcm = ax.pcolormesh(ds.lon,ds.lat,ratiosel[:,:,t].T,vmin=-1.5,vmax=1.5,cmap='cmo.balance')
+        
+    if plotcontour=="BSF":
+        cl = ax.contour(ds_reg.lon,ds_reg.lat,bsf_mean.T,colors='k',levels=bsfcint,linewidths=0.5)
+        ax.clabel(cl,levels=bsfcint)
+    elif plotcontour=="SSH":
+        cl = ax.contour(ds_reg.lon,ds_reg.lat,ssh_mean.T,colors='k',levels=sshcint,linewidths=0.5)
+        ax.clabel(cl,levels=sshcint)
+    
+fig.colorbar(pcm,ax=axs.flatten(),fraction=0.025,pad=0.01)
+ax = axs[0]
+ax.text(-0.15, 0.55, rationame, va='bottom', ha='center',rotation='vertical',
+        rotation_mode='anchor',transform=ax.transAxes)
+plt.savefig("%sSpectra_Ratio_%s_%s%s_2only.png"% (figpath,rationame_fn,smoothname,plotcontour),dpi=150)
 
 #%% SM Draft Plot
 use_contours = False
@@ -347,3 +424,10 @@ cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction=0.035,p
 cb.set_label("SST Log Ratio")
 
 plt.savefig("%sSpectra_Ratio_combine_%sBSF.png"% (figpath,smoothname),dpi=150)
+
+
+#%% scrap to figure out some stuff
+
+klon,klat = proc.find_lon
+
+
