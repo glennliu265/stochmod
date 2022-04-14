@@ -28,7 +28,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20220407/"
+    figpath     = projpath + "02_Figures/20220413/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -102,7 +102,7 @@ regions     = ("SPG","STG","TRO","NAT","NNAT","STGe","STGw")        # Region Nam
 bboxes      = (bbox_SP,bbox_ST,bbox_TR,bbox_NA,bbox_NA_new,bbox_ST_e,bbox_ST_w) # Bounding Boxes
 regionlong  = ("Subpolar","Subtropical","Tropical","North Atlantic","North Atlantic","Subtropical (East)","Subtropical (West)",)
 bbcol       = ["Blue","Red","Yellow","Black","Black"]
-bbcol       = ["Blue","Red","Yellow","Black","Black","magenta","red"]
+bbcol       = ["cornflowerblue","Red","Yellow","Black","Black","limegreen","indigo"]
 bbsty       = ["solid","dashed","solid","dotted","dotted","dashed","dotted"]
 
 # AMV Contours
@@ -409,7 +409,7 @@ sdof       = 1000       # Degrees of freedom
 cdofs      = [898,1798] #
 
 
-use_ann    = True # Set to true to use annual data
+use_ann    = False # Set to true to use annual data
 
 smoothname = "smth-obs%03i-full%02i-slab%02i" % (ssmooth,cnsmooths[0],cnsmooths[1])
 
@@ -762,6 +762,7 @@ plt.savefig("%sSPG-NAT_Autocorrelation_Spectra%s.png"%(figpath,smoothname),
 
 # Plotting Params
 # ---------------
+
 alw            = 3
 exclude_consth = True # Set to true to NOT plot constant h model
 notitle        = True
@@ -770,7 +771,32 @@ plotlog        = False # Set to True to Plot in Log Scale
 linearx        = 1 # Keep frequency axis linear, period axis marked (Works only with plotlog=False)
 periodx        = False
 useC           = True # Use Celsius in Labels
+usegrid        = False
+xtk2           = np.arange(0,39,3)
+plotar1        = False
+plotlegend     = False # Plot autocorrelation legend
+yrticks        = [1/100,1/20,1/10,1/5]
 
+
+axisfs         = 14 # Axis Label Fontsize
+
+xtk2_labels = []
+kmonth_seen = []
+for t,tk in enumerate(xtk2):
+    if tk%6 == 0:
+        #print(tk)
+        monlbl = [(kmonth+tk)%12]
+        if monlbl in kmonth_seen:
+            lbl = tk
+        else:
+            lbl = "%i\n %s" % (tk,mons3[(kmonth+tk)%12])
+            #kmonth_seen.append(monlbl) # Uncomment this to only plot first feb/aug
+        #print(lbl)
+    else:
+        lbl = ""
+    xtk2_labels.append(lbl)
+
+# Select what lines to plot, based on above toggles
 if exclude_consth:
     plotid = [1,2]
     plotidspec = [1,2,3,4] # Exclude constant h
@@ -785,8 +811,7 @@ if plotslab is False: # Remove slab simulation
 else:
     specylim_spg = [0,0.8]
     specylim_stg = [0,0.3]
-
-rids = [0,6,5,]
+rids  = [0,6,5,]
 order = rids
 
 # Do Plotting
@@ -801,11 +826,14 @@ for i in range(len(rids)):
     rid    = order[i] 
     kmonth = kmonths[rid]
     #title  = "%s Autocorrelation (Lag 0 = %s)" % (regionlong[rid],mons3[kmonth])
-
-    title  = "%s" % (regionlong[rid]) # No Month
-    ax,ax2 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title="")
-    ax.set_title(title,color=bbcol[rid],fontsize=12)
     
+    title  = "%s" % (regionlong[rid]) # No Month
+    #ax,ax2 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title="",usegrid=usegrid)
+    ax.set_xlim([lags[0],lags[-1]])
+    ax.set_xticks(xtk2)
+    ax.set_xticklabels(xtk2_labels)
+    
+    ax.set_title(title,color=bbcol[rid],fontsize=16,fontweight="bold")
     # Plot Each Stochastic Model
     for mid in plotid:
         ax.plot(lags,sstac[rid][mid],color=mcolors[mid],label=modelnames[mid],lw=alw)
@@ -826,15 +854,20 @@ for i in range(len(rids)):
         ax.set_ylabel("")
         ax.yaxis.set_ticklabels([])
     else:
-        ax.set_ylabel("Autocorrelation")
+        ax.set_ylabel("Autocorrelation",fontsize=axisfs)
         
     if i == 1: # Add legend and x-label to middle plot
-        ax.legend(ncol=2,fontsize=12)
+        if plotlegend:
+            leg = ax.legend(ncol=3,fontsize=12,bbox_to_anchor=(0.7, -0.65, 0.5, 0.5),edgecolor="k")
+        #ax.legend(ncol=2,fontsize=12,)
+        ax.set_xlabel("Lags (Months)",fontsize=axisfs)
     else:
         ax.set_xlabel("")
-        
-    ax = viz.label_sp(sp_id,fontsize=20,fig=fig,labelstyle="(%s)",case='lower')
+    
+    # x =-0.4, y=1.13
+    ax = viz.label_sp(sp_id,ax=ax,fontsize=20,fig=fig,labelstyle="(%s)",case='lower',alpha=0)
     sp_id += 1
+    
 
 
 # Plot the power spectra (bottom row)
@@ -843,25 +876,25 @@ for i in range(len(rids)):
     ax  = axs[1,i]
     rid = order[i]
     
+    if plotar1:
+        conf_in = Cfsall[rid]
+    else:
+        conf_in = None
+    
     #speclabels = ["%s (%.3f $^{\circ}C^2$)" % (specnames[i],sstvarall[rid][i]) for i in range(len(insst)) ]
     speclabels=["" for i in range(nspecs)]
-    
     
     if plotlog:
         ax,ax2 = viz.plot_freqlog(specsall[rid],freqsall[rid],speclabels,speccolors,lw=alw,
                              ax=ax,plottitle=regionlong[rid],
-                             xlm=xlm,xtick=xtks,return_ax2=True,
-                             plotids=plotidspec,legend=False)
+                             xlm=xlm,xtick=yrticks,return_ax2=True,
+                             plotids=plotidspec,legend=False,usegrid=usegrid)
     else:
         ax,ax2 = viz.plot_freqlin(specsall[rid],freqsall[rid],speclabels,speccolors,lw=alw,
-                             ax=ax,plottitle=regionlong[rid],plotconf=Cfsall[rid],
-                             xlm=xlm,xtick=xtks,return_ax2=True,
-                             plotids=plotidspec,legend=False,linearx=linearx)
+                             ax=ax,plottitle=regionlong[rid],plotconf=conf_in,
+                             xlm=xlm,xtick=yrticks,return_ax2=True,
+                             plotids=plotidspec,legend=False,linearx=linearx,usegrid=usegrid)
         
-        
-        # Add confidence intervals
-        
-    
     # Turn off title and second axis labels
     if periodx: # Switch Frequency with Period for x-axis.
         ax2.set_xlabel("")
@@ -878,10 +911,11 @@ for i in range(len(rids)):
             ax2.set_xlabel("Period (Years)")
     
     
-    ax.grid(True,ls='dotted',alpha=0.5)
+    #ax.grid(False,ls='dotted',alpha=0.5)
     
+    # Set Rotation of Period Labels
     if plotlog is False:
-        rotation  =55
+        rotation  =0
         xfontsize =8
     else:
         rotation  =0
@@ -894,9 +928,9 @@ for i in range(len(rids)):
     
     if i == 0:# Turn off y label except for leftmost plot
         if useC:
-            ax.set_ylabel("Power Spectrum ($\degree C^2 /cpy$)")
+            ax.set_ylabel("Power Spectrum ($\degree C^2 /cpy$)",fontsize=axisfs)
         else:
-            ax.set_ylabel("Power Spectrum ($K^2 /cpy$)")
+            ax.set_ylabel("Power Spectrum ($K^2 /cpy$)",fontsize=axisfs)
         ax.set_ylim(specylim_spg)
     else:
         ax.set_ylabel("")
@@ -905,12 +939,15 @@ for i in range(len(rids)):
         
     if plotlog:
         ax.set_ylim([1e-2,1e0])
-        
         if i == 1: # Turn off ylabels for middle plot
             ax.yaxis.set_ticklabels([])
         
     if i != 1:
         ax.set_xlabel("")
+        ax2.set_xlabel("")
+    else:
+        ax.set_xlabel("Frequency (Cycles/Year)",fontsize=axisfs)
+        ax2.set_xlabel("Period (Years)",fontsize=axisfs)
         
     if i == 2: # Just turn off for last STG plot
         ax.yaxis.set_ticklabels([])
@@ -943,9 +980,12 @@ ax.legend(ncol=1,fontsize=8,loc=6,bbox_to_anchor=(0, .75))
 
 cid      = 0
 rids     = [0,6,5,]
-bboxtemp = [-85,-5,15,65]
+bboxtemp = [-85,-5,15,68]
 cint     = np.arange(-0.45,0.50,0.05)
 plotamv  = True # Add AMV Plot as backdrop (False=WhiteBackdrop)
+
+fix_lon  = [-80,-40,0]
+fix_lat  = [20,40,65]
 
 # Load the CESM1-FULL AMV Pattern
 # Load data for CESM1-PIC
@@ -960,7 +1000,7 @@ long,latg = scm.load_latlon()
 # Start the PLot
 
 fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(3,2))
-ax = viz.add_coast_grid(ax,bboxtemp,fill_color='gray',ignore_error=True)
+ax = viz.add_coast_grid(ax,bboxtemp,fill_color='gray',ignore_error=True,fix_lon=fix_lon,fix_lat=fix_lat)
 if plotamv:
     pcm = ax.contourf(long,latg,cesmpat[4][0].T,cmap='cmo.balance',levels=cint)
 
@@ -989,7 +1029,7 @@ ls = []
 for bb in rids:
     
     ax,ll = viz.plot_box(bboxes[bb],ax=ax,leglab=regions[bb],
-                          color=bbcol[bb],linestyle="dashed",linewidth=3,return_line=True)
+                          color=bbcol[bb],linestyle="dotted",linewidth=3,return_line=True)
     ls.append(ll)
 
 #BBox right below ttiel
