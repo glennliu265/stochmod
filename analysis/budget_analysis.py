@@ -186,7 +186,7 @@ dp            = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmo
 fns = ["stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02i_ampq0_method5_dmp0_budget_Qek.npz" % (s) for s in np.arange(0,10,1)]
 
 # Figure output path
-figpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220407/"
+figpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220414/"
 proc.makedir(figpath)
 
 # Plotting Parameters
@@ -334,6 +334,9 @@ ax.grid(True,ls='dotted')
 
 #%% Make AMV+ and AMV- Composites
 
+use_cull= False
+
+cull_ids = [idneg_cull,idpos_cull]
 thresholds = [0,]
 y_class = proc.make_classes_nd(amvid,thresholds,debug=True)
 in_str     = "AMV Index"
@@ -342,7 +345,12 @@ thpats = []
 thname = []
 for th in range(len(thresholds)+1):
     
-    id_sel = np.where(y_class == th)[0]
+    if use_cull:
+        id_sel = cull_ids[th]
+        
+    else:
+        id_sel = np.where(y_class == th)[0]
+        
     thpats.append(T_all[:,:,id_sel].mean(-1)) # lon x lat
     
     if th == 0:
@@ -354,8 +362,8 @@ for th in range(len(thresholds)+1):
     
     
 #%%
-use_pcm = False
-vm    = 0.2
+use_pcm = True
+vm    = 0.3
 vstep = 0.025
 cint = np.arange(-vm,vm+vstep,vstep)
 fig,axs = plt.subplots(1,3,subplot_kw={'projection':proj},figsize=(18,6))
@@ -398,7 +406,7 @@ cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction=0.05,pa
 cb.set_label("SST' ($\degree C$)")
 #plt.suptitle("AMV Composites")
 
-plt.savefig("%sAMV_Composites.png"%figpath,dpi=150,bbox_inches='tight')
+plt.savefig("%sAMV_Composites_cull%i.png"% (figpath,use_cull),dpi=150,bbox_inches='tight')
 
 # ------------------------------------------
 #%% (02) Find Increasing/Decreasing Segments
@@ -469,15 +477,18 @@ plt.savefig("%sAMV_Integr_Example_yr%ito%i_localmax%i.png"%(figpath,xlm[0],xlm[1
 decr = np.zeros((nlon,nlat,n_decr,nvar))*np.nan # Decrease
 incr = np.zeros((nlon,nlat,n_incr,nvar))*np.nan # Inrease
 
+
+
 # Loop (variable)
 for v in tqdm(range(nvar)):
     
     invar = sm_vars_all[:,:,:,v]
     
+    
     # Integrate Decreasing values, scaled by # of months
     for d in range(n_decr):
         
-        ids_in      = decr_ids[d]
+        ids_in        = decr_ids[d]
         decr[:,:,d,v] = invar[:,:,ids_in].sum(-1) / len(ids_in)
         
         
@@ -487,6 +498,79 @@ for v in tqdm(range(nvar)):
         incr[:,:,d,v] = invar[:,:,ids_in].sum(-1) / len(ids_in)
         
     # End Variable Loop
+
+# -----
+#%% Prepare AMV Composites for increasing/decreasing segments
+# -----
+
+amv_decr = np.zeros((nlon,nlat))
+amv_incr = np.zeros((nlon,nlat)) 
+
+decr_total = 0
+for d in range(n_decr):
+    ids_in = decr_ids[d]
+    decr_total += len(ids_in) # Number of maps
+    amv_decr += T_all[:,:,ids_in].sum(-1) # Sum all values
+print("Summed a total of %i points"% decr_total)
+amv_decr /= decr_total
+
+
+incr_total = 0
+for d in range(n_decr):
+    ids_in = incr_ids[d]
+    incr_total += len(ids_in) # Number of maps
+    amv_incr += T_all[:,:,ids_in].sum(-1) # Sum all values
+print("Summed a total of %i points"% incr_total)
+amv_incr /= incr_total
+
+#%% Plot the AMV Composite for increasing/decreasing intervals/segments
+
+use_pcm = True
+vm    = 0.04
+#vstep = 0.025
+cint = np.arange(-vm,vm+vstep,vstep)
+fig,axs = plt.subplots(1,2,subplot_kw={'projection':proj},figsize=(18,6))
+
+thpats_interval = [amv_decr,amv_incr]
+
+for th in range(2):
+    
+    ax = axs.flatten()[th]
+    blabel = [0,0,0,1]
+    if th == 0:
+        blabel[0] = 1
+    
+    # Add Grid + Backdrop
+    ax = viz.add_coast_grid(ax,bbox=plotbbox,fill_color='gray',
+                            ignore_error=True,blabels=blabel)
+    
+    plotpat = thpats_interval[th].T
+    ptitle = "Composite (%s)" % thname[th]
+
+        
+    
+    # Make Plot
+    if use_pcm:
+        pcm = ax.pcolormesh(lon,lat,plotpat,vmin=-vm,vmax=vm,cmap='cmo.balance')
+    else:
+        pcm = ax.contourf(lon,lat,plotpat,levels=cint,cmap='cmo.balance',extend="both")
+    
+    cl  = ax.contour(lon,lat,plotpat,levels=cint,colors="k",linewidths=0.75)
+    ax.clabel(cl)
+    
+    # Add colorbar
+    ax.set_title(ptitle)
+    
+    
+    
+    
+cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction=0.05,pad=0.05)
+cb.set_label("SST' ($\degree C$)")
+#plt.suptitle("AMV Composites")
+
+plt.savefig("%sAMV_Composites_intervals.png"% (figpath),dpi=150,bbox_inches='tight')
+
+
 
 # # ---------------------
 #%% (04) Plot mean values
