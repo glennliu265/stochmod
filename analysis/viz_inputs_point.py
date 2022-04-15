@@ -34,6 +34,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import xarray as xr
 import calendar as cal
+import colorcet as cc
 
 import scm
 import time
@@ -44,7 +45,7 @@ import cmocean
 projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath = projpath + '03_Scripts/stochmod/'
 datpath    = projpath + '01_Data/'
-outpath    = projpath + '02_Figures/20220407/'
+outpath    = projpath + '02_Figures/20220414/'
 input_path  = datpath + 'model_input/'
 proc.makedir(outpath)
 
@@ -130,6 +131,8 @@ bbsty       = ["solid","dashed","solid","dotted","dotted","dashed","dotted"]
 method = 5
 lagstr = 'lag1'
 
+brew_cat8 = ['#7fc97f','#beaed4','#fdc086','#ffff99','#386cb0','#f0027f','#bf5b17','#666666']
+
 #%% Load All Inputs (Basinwide)
 
 # Use the function used for sm_rewrite.py
@@ -174,13 +177,15 @@ beta = scm.calc_beta(h)
 monstr_kprv = np.append(mons3,'Jan')
 fig,ax = plt.subplots(1,1,figsize=(6,4),constrained_layout=True)
 viz.viz_kprev(hpt,kprev,locstring=locstring,
-              ax=ax,msize=50,mstyle="x",lw=2.5)
+              ax=ax,msize=10,mstyle="X",lw=2.5,txtalpha=.65,usetitle=False)
 ax.grid(True,ls='dotted')
-ax.set_xticklabels(monstr_kprv)
+ax.set_xticklabels(monstr_kprv) 
+ax.set_ylim([10,150])
+ax.set_yticks(np.arange(10,170,20))
+
+ax.minorticks_on()
+ax.xaxis.set_tick_params(which='minor', bottom=False)
 plt.savefig(outpath+"MLD_Detrainment_month_%s.png" % (flocstring),dpi=200)
-
-
-
 #%% manuallly load forcing for debugging
 load_forcing_manual=False
 
