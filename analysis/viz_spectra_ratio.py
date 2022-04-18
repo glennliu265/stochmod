@@ -255,8 +255,7 @@ plt.savefig("%sSpectra_Ratio_%s_%s.png"% (figpath,rationame_fn,smoothname),dpi=1
 
 # BSF
 bsf_ds = xr.open_dataset(datpath+"../CESM_proc/BSF_FULL_PIC_bilinear.nc")
-ds_reg = bsf_ds.BSF.sel(lon=slice(bboxplot[0],bboxplot[1]),
-                    lat=slice(bboxplot[2],lat[-1]))
+ds_reg = bsf_ds.BSF.sel(lon=slice(bboxplot[0],bboxplot[1]),lat=slice(bboxplot[2],bboxplot[-1]))
 
 ds_reg   = ds_reg.mean('time')
 bsf      = ds_reg.values
@@ -266,13 +265,13 @@ bsf_mean = bsf.T
 
 # Do the same with SSH
 ssh_ds = xr.open_dataset(datpath+"../CESM_proc/SSH_FULL_PIC_bilinear.nc")
-ssh_reg = ssh_ds.SSH.sel(lon=slice(bboxplot[0],bboxplot[1]),lat=slice(bboxplot[2],lat[-1]))
+ssh_reg = ssh_ds.SSH.sel(lon=slice(bboxplot[0],bboxplot[1]),lat=slice(bboxplot[2],bboxplot[-1]))
 
 ssh_reg   = ssh_reg.mean('time')
 ssh      = ssh_reg.values
 ssh_mean = ssh.T
 #%% PLot BSF
-ratiosel     = e_f[1]
+ratiosel     = e_f[0]
 rationame    = "log($\sigma^2_{entrain}$/$\sigma^2_{full}$)"
 rationame_fn = "log_entrain_full"
 
@@ -320,22 +319,30 @@ ax.text(-0.15, 0.55, rationame, va='bottom', ha='center',rotation='vertical',
         rotation_mode='anchor',transform=ax.transAxes)
 plt.savefig("%sSpectra_Ratio_%s_%s%s.png"% (figpath,rationame_fn,smoothname,plotcontour),dpi=150)
 #%% Updated version with just 2 plots
-ratiosel     = e_f[1]
+ratiosel     = e_f[0]
 rationame    = "log($\sigma^2_{entrain}$/$\sigma^2_{full}$)"
 rationame_fn = "log_entrain_full"
 
 
 
-plotcontour = "BSF"
+plotcontour = None # "BSF","SSH", or None
 
 use_contours = True
+
+# Full ersion
 cints       = np.arange(-1.5,1.55,0.05)
 cl_ints     = np.arange(-1.5,1.6,0.1)
+
+cints       = np.arange(-1.5,1.75,0.25)
+clints      = cints
+
 sshcint     = np.arange(-150,155,5)
 bsfcint     = np.arange(-30,35,5)
+
 fig,axs = plt.subplots(1,2,subplot_kw={'projection':ccrs.PlateCarree()},
                        constrained_layout=True,figsize=(12,4)) 
 for t in range(2):
+    
     blabel = [0,0,0,1]
     if t == 0:
         blabel[0] = 1
@@ -354,19 +361,81 @@ for t in range(2):
         #ax.clabel(cl,cl_ints[::2],fmt="%.1f")
     else:
         pcm = ax.pcolormesh(ds.lon,ds.lat,ratiosel[:,:,t].T,vmin=-1.5,vmax=1.5,cmap='cmo.balance')
-        
     if plotcontour=="BSF":
         cl = ax.contour(ds_reg.lon,ds_reg.lat,bsf_mean.T,colors='k',levels=bsfcint,linewidths=0.5)
         ax.clabel(cl,levels=bsfcint)
     elif plotcontour=="SSH":
         cl = ax.contour(ds_reg.lon,ds_reg.lat,ssh_mean.T,colors='k',levels=sshcint,linewidths=0.5)
         ax.clabel(cl,levels=sshcint)
+    else:
+        cl = ax.contour(ds.lon,ds.lat,ratiosel[:,:,t].T,levels=cl_ints,colors='k',linewidths=0.5)
+        ax.clabel(cl,cl_ints,fmt="%.1f")
     
 fig.colorbar(pcm,ax=axs.flatten(),fraction=0.025,pad=0.01)
 ax = axs[0]
 ax.text(-0.15, 0.55, rationame, va='bottom', ha='center',rotation='vertical',
         rotation_mode='anchor',transform=ax.transAxes)
 plt.savefig("%sSpectra_Ratio_%s_%s%s_2only.png"% (figpath,rationame_fn,smoothname,plotcontour),dpi=150)
+
+#%% Focus on a region (to answer Claude's question)
+
+ratiosel     = e_f[0] # select 0, gotta erase 1 because its incorrect (variance preserving already...)
+rationame    = "log($\sigma^2_{entrain}$/$\sigma^2_{full}$)"
+rationame_fn = "log_entrain_full"
+
+
+viz_bbox = [-60,-15,40,65]#[-80,-40,20,40]
+
+plotcontour  = None # "BSF","SSH", or None
+use_contours = True
+
+# Full ersion
+cints       = np.arange(-1.5,1.55,0.05)
+cl_ints     = np.arange(-1.5,1.6,0.1)
+
+cints       = np.arange(-1.5,1.6,0.1)
+clints      = cints
+
+sshcint     = np.arange(-150,155,5)
+bsfcint     = np.arange(-30,35,5)
+
+fig,axs = plt.subplots(1,2,subplot_kw={'projection':ccrs.PlateCarree()},
+                       constrained_layout=True,figsize=(12,4)) 
+for t in range(2):
+    
+    blabel = [0,0,0,1]
+    if t == 0:
+        blabel[0] = 1
+    
+    ax = axs.flatten()[t]
+    print(t)
+    if t == 0:
+        ptitle = r"> %03d Years" % (1/threses[t][1])
+    else:
+        ptitle = "%03d to %03d Years" % (1/threses[t][1],1/threses[t][0])
+    ax.set_title(ptitle)
+    ax = viz.add_coast_grid(ax,bbox=viz_bbox,blabels=blabel,fill_color='gray')
+    if use_contours:
+        pcm = ax.contourf(ds.lon,ds.lat,ratiosel[:,:,t].T,levels=cints,extend='both',cmap='cmo.balance')
+        #cl = ax.contour(ds.lon,ds.lat,ratiosel[:,:,t].T,levels=cl_ints,colors='k',linewidths=0.5)
+        #ax.clabel(cl,cl_ints[::2],fmt="%.1f")
+    else:
+        pcm = ax.pcolormesh(ds.lon,ds.lat,ratiosel[:,:,t].T,vmin=-1.5,vmax=1.5,cmap='cmo.balance')
+    if plotcontour=="BSF":
+        cl = ax.contour(ds_reg.lon,ds_reg.lat,bsf_mean.T,colors='k',levels=bsfcint,linewidths=0.5)
+        ax.clabel(cl,levels=bsfcint)
+    elif plotcontour=="SSH":
+        cl = ax.contour(ds_reg.lon,ds_reg.lat,ssh_mean.T,colors='k',levels=sshcint,linewidths=0.5)
+        ax.clabel(cl,levels=sshcint)
+    else:
+        cl = ax.contour(ds.lon,ds.lat,ratiosel[:,:,t].T,levels=cints,colors='k',linewidths=0.5)
+        ax.clabel(cl,clints,fmt="%.1f")
+    
+fig.colorbar(pcm,ax=axs.flatten(),fraction=0.025,pad=0.01)
+ax = axs[0]
+ax.text(-0.15, 0.55, rationame, va='bottom', ha='center',rotation='vertical',
+        rotation_mode='anchor',transform=ax.transAxes)
+plt.savefig("%sSpectra_Ratio_%s_%s%s_2only_region.png"% (figpath,rationame_fn,smoothname,plotcontour),dpi=150)
 
 #%% SM Draft Plot
 use_contours = False
@@ -429,5 +498,29 @@ plt.savefig("%sSpectra_Ratio_combine_%sBSF.png"% (figpath,smoothname),dpi=150)
 #%% scrap to figure out some stuff
 
 klon,klat = proc.find_lon
+
+#%% References for myself for log ratio (NTS: Make some interactive version)
+
+rawratio = np.arange(0,8,0.05)
+
+fig,ax = plt.subplots(1,1,figsize=(6,6))
+ax.plot(rawratio,np.log(rawratio),lw=1.5,color="yellowgreen",label="$log_{e}(r)$")
+ax.plot(rawratio,np.log10(rawratio),lw=1.5,color="mediumpurple",label="$log_{10}(r)$")
+ax.minorticks_on()
+ax.set_xlabel("Raw Ratio ($r$)")
+ax.set_ylabel("Log Ratio")
+
+ax.grid(True,ls='dashed',which='major',lw=1,alpha=0.5)
+ax.grid(True,ls='dotted',which='minor',lw=1,alpha=0.2)
+
+ax.axhline(0,color='k')
+ax.axvline(1,color='k')
+ax.legend()
+
+ax.set_xlim([0,8])
+ax.set_ylim([-2.5,2])
+ax.set_title("Log Ratio Reference (base $e$)")
+plt.savefig("%sLogRatioReference.png"%figpath,dpi=150)
+
 
 
