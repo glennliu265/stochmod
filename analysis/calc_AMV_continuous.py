@@ -106,8 +106,7 @@ bbox_NAextr = [-80,0,20,60]
 regions = ("SPG","STG","TRO","NAT","NNAT","STGe","STGw")        # Region Names
 bboxes = (bbox_SP,bbox_ST,bbox_TR,bbox_NA,bbox_NA_new,bbox_ST_e,bbox_ST_w) # Bounding Boxes
 regionlong = ("Subpolar","Subtropical","Tropical","North Atlantic","North Atlantic","Subtropical (East)","Subtropical (West)",)
-bbcol  = ["Blue","Red","Yellow","Black","Black"]
-bbcol      = ["Blue","Red","Yellow","Black","Black","magenta","red"]
+bbcol       = ["cornflowerblue","Red","Yellow","Black","Black","limegreen","indigo"]
 bbsty      = ["solid","dashed","solid","dotted","dotted","dashed","dotted"]
 
 
@@ -564,7 +563,7 @@ cid      = 1 # Set the CESM model
 bbin     = [-80,0,20,60]
 bboxplot = [-80,0,10,60] 
 useC     = True
-sst_in = sst_cesm[cid]
+sst_in   = sst_cesm[cid]
 amvid,amvpat = proc.calc_AMVquick(sst_in,lonr,latr,bbin,anndata=False,
                                   runmean=False,dropedge=5)
 
@@ -595,7 +594,6 @@ plt.savefig("%sAMV_Patterns_Indv_%s.png"% (figpath,mconfigs[cid]),dpi=200,bbox_i
 
 #%% Plot of regional AMV with bounding Boxes (moved from plot_temporal_region)
 
-
 """
 Old Param Combinations that worked...
 
@@ -604,22 +602,23 @@ bboxtemp = [-90,5,15,68]
 fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(4.5,3))
 ax.text(-69,69,"Bounding Boxes",ha='center',bbox=props,fontsize=12) # (works for SPG Only)
 ax.legend(ncol=1,fontsize=8,loc=6,bbox_to_anchor=(0, .75))
-
 """
 
-cid      = 0
-rids     = [0,6,5,]
-bboxtemp = [-85,-5,15,65]
-cint     = np.arange(-0.45,0.50,0.05)
-plotamv  = True # Add AMV Plot as backdrop (False=WhiteBackdrop)
 
+cid        = 0
+rids       = [0,6,5,]
+bboxtemp   = [-85,-5,15,68]
+cint       = np.arange(-0.45,0.50,0.05)
+plotamv    = True # Add AMV Plot as backdrop (False=WhiteBackdrop)
 plotamvpat = camvpats[1][0]
 
+# Select Which Lon/Lat to Plot
+fix_lon  = [-80,-40,0]
+fix_lat  = [20,40,65]
 
 # Start the PLot
-
 fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(3,2))
-ax = viz.add_coast_grid(ax,bboxtemp,fill_color='gray',ignore_error=True)
+ax = viz.add_coast_grid(ax,bboxtemp,fill_color='gray',ignore_error=True,fix_lon=fix_lon,fix_lat=fix_lat)
 if plotamv:
     pcm = ax.contourf(lon,lat,plotamvpat.T,cmap='cmo.balance',levels=cint)
 fig.patch.set_alpha(1)  # solution
@@ -627,14 +626,12 @@ fig.patch.set_alpha(1)  # solution
 # # Plot the amv pattern
 props = dict(boxstyle='square', facecolor='white', alpha=0.8)
 
-
 # Add text
 txtspg  = ax.text(-38,50,"SPG",ha='center',fontsize=15,weight='bold') 
 txtstgw = ax.text(-60,27,"STGw",ha='center',fontsize=15,weight='bold') 
 txtstge = ax.text(-25,27,"STGe",ha='center',fontsize=15,weight='bold') 
 for txt in [txtspg,txtstgw,txtstge]:
     txt.set_path_effects([PathEffects.withStroke(linewidth=2.5, foreground='w')])
-
 
 # First PLot Solid lines below
 for bb in rids:
@@ -646,12 +643,10 @@ ls = []
 for bb in rids:
     
     ax,ll = viz.plot_box(bboxes[bb],ax=ax,leglab=regions[bb],
-                          color=bbcol[bb],linestyle="dashed",linewidth=3,return_line=True)
+                          color=bbcol[bb],linestyle="dotted",linewidth=3,return_line=True)
     ls.append(ll)
 
 plt.savefig("%sRegional_BBOX_Locator_wamv.png"%figpath,dpi=100,bbox_inches='tight',transparent=True)
-
-
 #%% Compare averaged and non-averaged AMV Pattern
 
 bbin = [-80,0,20,60]

@@ -968,14 +968,9 @@ plt.savefig("%sRegional_Autocorrelation_Spectra%s.png"%(figpath,smoothname),
 
 
 """
-Old Param Combinations that worked...
-
-Having the bounding box and legend box right below it
-bboxtemp = [-90,5,15,68]
-fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(4.5,3))
-ax.text(-69,69,"Bounding Boxes",ha='center',bbox=props,fontsize=12) # (works for SPG Only)
-ax.legend(ncol=1,fontsize=8,loc=6,bbox_to_anchor=(0, .75))
-
+NOTE: This is now outdated. 
+See viz_inputs_point for the updated script, which uses the continuous AMV
+Pattern!
 """
 
 cid      = 0
@@ -996,30 +991,24 @@ cesmpat = ldc['amvpat_region'].item()
 cesmidx = ldc['amvidx_region'].item()
 long,latg = scm.load_latlon()
 
-
 # Start the PLot
-
 fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(3,2))
 ax = viz.add_coast_grid(ax,bboxtemp,fill_color='gray',ignore_error=True,fix_lon=fix_lon,fix_lat=fix_lat)
 if plotamv:
     pcm = ax.contourf(long,latg,cesmpat[4][0].T,cmap='cmo.balance',levels=cint)
-
 fig.patch.set_alpha(1)  # solution
+
 # # Plot the amv pattern
 props = dict(boxstyle='square', facecolor='white', alpha=0.8)
-#ax.text()
 
-#ax.text(-69,69,"Bounding Boxes",ha='center',bbox=props,fontsize=12) # (works for SPG Only)
+# Add text and background highlights
+txtspg  = ax.text(-38,50,"SPG",ha='center',fontsize=15,weight='bold') 
+txtstgw = ax.text(-60,27,"STGw",ha='center',fontsize=15,weight='bold') 
+txtstge = ax.text(-25,27,"STGe",ha='center',fontsize=15,weight='bold') 
+for txt in [txtspg,txtstgw,txtstge]:
+    txt.set_path_effects([PathEffects.withStroke(linewidth=2.5, foreground='w')])
 
-
-# Add text
-ax.text(-38,50,"SPG",ha='center',fontsize=15,weight='bold') 
-ax.text(-60,27,"STGw",ha='center',fontsize=15,weight='bold') 
-ax.text(-25,27,"STGe",ha='center',fontsize=15,weight='bold') 
-#ax.text()
-
-
-# First PLot Solid lines below
+# First Plot Solid lines below
 for bb in rids:
     ax,ll = viz.plot_box(bboxes[bb],ax=ax,leglab=regions[bb],
                           color=bbcol[bb],linestyle="solid",linewidth=3,return_line=True)
@@ -1031,11 +1020,6 @@ for bb in rids:
     ax,ll = viz.plot_box(bboxes[bb],ax=ax,leglab=regions[bb],
                           color=bbcol[bb],linestyle="dotted",linewidth=3,return_line=True)
     ls.append(ll)
-
-#BBox right below ttiel
-#ax.legend(ncol=1,fontsize=8,loc=6,bbox_to_anchor=(0, .75))
-
-#ax.text(-41,50,"SPG",ha='center',bbox=props,fontsize=25)
 
 plt.savefig("%sRegional_BBOX_Locator.png"%figpath,dpi=100,bbox_inches='tight',transparent=True)
 
