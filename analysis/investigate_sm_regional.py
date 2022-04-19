@@ -21,7 +21,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20220305/"
+    figpath     = projpath + "02_Figures/20220421/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -866,5 +866,55 @@ for i in range(3):
                         ,vmin=vlm[0],vmax=vlm[1],cmap=cmap)
     ax.set_title(title)
     fig.colorbar(pcm,ax=ax)
+
+
+#%% Responding to YO's comment, just plot the variance to see what is going on
+
+bboxinset = [-70,-12,10,18]
+
+t       = 2
+
+
+
+vlm       = [0,0.4]
+
+#vlms      = ([0,0.05],[0,0.10],[0,0.15])
+autocbar  = False
+fig,axs = plt.subplots(5,1,subplot_kw={'projection':ccrs.PlateCarree()},
+                       constrained_layout=True,figsize=(10,10))
+#vlm = vlms[t]
+
+
+for mid in range(5):
+    blabel = [1,0,0,0]
+    if mid == 4:
+        blabel[-1] = 1
+    
+    ax  = axs.flatten()[mid]
+    ax  = viz.add_coast_grid(ax,bbox=bboxinset,fill_color='gray',blabels=blabel)
+    
+    if mid < 3:
+        plotvar = np.var(sst_all[:,:,:,mid],-1)
+    else:
+        plotvar = np.var(sst_cesm[mid-3],-1)
+    
+    if autocbar:
+        pcm = ax.pcolormesh(lonr2,latr2,plotvar.T,cmap='cmo.thermal',shading='nearest')
+        fig.colorbar(pcm,ax=ax,orientation='vertical',fraction=0.008)
+    else:
+        pcm = ax.pcolormesh(lonr2,latr2,plotvar.T,
+                            cmap='cmo.thermal',vmin=vlm[0],vmax=vlm[1],shading='nearest')
+    ax.set_title(expnames[mid])
+    
+    # Plot Masks
+    if mid < 3:
+        viz.plot_mask(lonr2,latr2,dmsks[mid],ax=ax,markersize=2,color='k',marker="o")
+
+if autocbar is False:
+    fig.colorbar(pcm,ax=axs.flatten(),orientation='vertical',fraction=0.015)
+plt.suptitle("SST Variance ($K^2$)" )
+savename = "%sSST_Variance_%s.png" % (figpath,fnames[0][30:99])
+plt.savefig(savename,dpi=150)
+
 
 
