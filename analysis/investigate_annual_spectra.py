@@ -172,12 +172,19 @@ notitle  = True
 use_ann     = True # Option to take ann avg before calcualtion
 useC        = True # Swap to label as degree celsius
 
+use_syn     = False
+
+calc_ac     = False
+
 
 allspecs = []
 allfreqs = []
 allCCs   = []
 alldofs  = []
 allr1s   = []
+allsv    = []
+
+allacs   = []
 
 for i in range(2):
     
@@ -207,7 +214,14 @@ for i in range(2):
     
     
     # Combine lower and upper hierarchy
-    inssts   = [c_ssts[0][1],c_ssts[1][1],c_ssts[2][1],c_ssts[3][1],sst[1],sst[2],sst[3],cssts[0],cssts[1]]
+    if use_syn:
+        inssts   = [c_ssts[0][1],c_ssts[1][1],c_ssts[2][1],c_ssts[3][1],sst[1],sst[2],sst[3],cssts[0],cssts[1]]
+        inssts   = [proc.make_ar1(np.corrcoef(isst[:-1],isst[1:])[0,1],np.std(isst),len(isst)) for isst in inssts]
+        #inssts = [np.random.normal(0,np.std(sst),len(sst)) for sst in inssts]
+        
+    else:
+        
+        inssts   = [c_ssts[0][1],c_ssts[1][1],c_ssts[2][1],c_ssts[3][1],sst[1],sst[2],sst[3],cssts[0],cssts[1]]
     nsmooths = np.concatenate([np.ones(len(inssts)-2)*nsmooth,cnsmooths])
     labels   = np.concatenate([labels_lower,labels_upper[1:],['CESM-FULL','CESM-SLAB']])
     if useC:
@@ -268,59 +282,77 @@ for i in range(2):
         sstvars_str = ["%s (%.2f $\degree C$)" % (labels[sv],sstvars[sv]) for sv in range(len(sstvars))]
     else:
         sstvars_str = ["%s (%.2f $K^2$)" % (labels[sv],sstvars[sv]) for sv in range(len(sstvars))]
+    allsv.append(sstvars_str[0])
+    
+    
+    
+    # Calculate autocorrelation
+    
+    if calc_ac:
+        acs = scm.calc_autocorr(inssts,np.arange(0,61,1),0)
+        allacs.append(acs)
         
+    
         
     allspecs.append(specs)
     allfreqs.append(freqs)
     allCCs.append(CCs)
     alldofs.append(dofs)
     allr1s.append(r1s)
+    
+    
 
 #%% Ok, now plot it
 
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
+for imod in range(len(labels)):
 
-xtks = np.arange(0,1.1,0.1)
-tklbl = []
-for t,tk in enumerate(xtks):
+    xtks = np.arange(0,1,0.1)
     
-    if tk == 0:
-        lb = "%.1f \n (inf)" % (tk)
-    elif t%2 ==0:
+    tklbl = []
+    for t,tk in enumerate(xtks):
+        
+        if tk == 0:
+            lb = "%.1f \n (inf)" % (tk)
+        elif t%2 ==0:
+            
+            
+            lb = "%.1f \n (%.1fy)" %(tk,1/tk)
+        else:
+            lb = "%.1f" % (tk)
+        tklbl.append(lb)
         
         
-        lb = "%.1f \n (%.1fy)" %(tk,1/tk)
-    else:
-        lb = "%.1f" % (tk)
-    tklbl.append(lb)
+    names  = ["Monthly","Annual-Avg"]
+    cols   = ["orange","indigo"]
+    dts    = [3600*24*30,3600*24*365]
+    dtplot = 3600*24*365
     
+    fig,ax = plt.subplots(1,1)
+    for  i in range(2):
+        ax.plot(allfreqs[i][imod]*dtplot,allspecs[i][imod]/dtplot,label=names[i] + "(r1=%.3f)"%(allr1s[i][imod]),c=cols[i])
+        
+        # Calculate and plot theoretical spectra
+        freq = allfreqs[i][imod]*dts[i]
+        r1   = allr1s[i][0]
+        thcurve = 1/(1 + r1**2 - 2*r1*np.cos(2*np.pi*freq))
+        
+        thcurve *= np.sum(allspecs[i][imod])/np.sum(thcurve)
+        
+        ax.plot(allfreqs[i][imod]*dtplot,thcurve/dtplot,label="",c=cols[i],ls='dotted')
     
-names  = ["Monthly","Annual-Avg"]
-cols   = ["orange","indigo"]
-dtplot = 3600*24*365
-
-fig,ax = plt.subplots(1,1)
-for  i in range(2):
-    ax.plot(allfreqs[i][0]*dtplot,allspecs[i][0]/dtplot,label=names[i] + "(r1=%.3f)"%(allr1s[i][0]),c=cols[i])
+    ax.legend()
+    ax.set_xlim([0,xtks[-1]])
+    ax.set_xticks(xtks)
+    ax.set_xticklabels(tklbl)
+    ax.set_title("Comparison for model %s" % labels[imod])
     
-    # Calculate and plot theoretical spectra
-    freq = allfreqs[i][0]*dts[i]
-    r1   = allr1s[i][0]
-    thcurve = 1/(1 + r1**2 - 2*r1*np.cos(2*np.pi*freq))
-    
-    thcurve *= np.sum(allspecs[i][0])/np.sum(thcurve)
-    
-    ax.plot(allfreqs[i][0]*dtplot,thcurve/dtplot,label="",c=cols[i],ls='dotted')
-
-ax.legend()
-ax.set_xlim([0,1/1])
-ax.set_xticks(xtks)
-ax.set_xticklabels(tklbl)
-
-
-    
-ax.grid(True)
-
+    #axins = inset_axes(ax, width=1.3, height=0.9,)
+    #ax.indicate_inset_zoom(axins, edgecolor="black")
+        
+    ax.grid(True)
+    plt.savefig("%sAnn_v_Monthly_Spectra_modelnum%i.png"% (figpath,imod),dpi=150)
 
 #%% # Plot the spectra
 
