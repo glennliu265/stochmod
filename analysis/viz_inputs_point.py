@@ -128,7 +128,7 @@ bbcol       = ["Blue","Red","Yellow","Black","Black"]
 bbcol       = ["Blue","Red","Yellow","Black","Black","magenta","red"]
 bbsty       = ["solid","dashed","solid","dotted","dotted","dashed","dotted"]
 
-method = 5
+method = 4
 lagstr = 'lag1'
 
 brew_cat8 = ['#7fc97f','#beaed4','#fdc086','#ffff99','#386cb0','#f0027f','#bf5b17','#666666']
@@ -833,13 +833,19 @@ plt.savefig(outpath+"Seasonal_Inputs_CESM-SLAB.png",dpi=200,bbox_inches='tight')
 # %% Plot Differences in Heat Flux Feedback
 # ----------------------------------------
 
-notitle = True
+notitle   = True
+plot_mask = True
 
-fig,axs = plt.subplots(2,2,figsize=(7,7),constrained_layout=True,
+
+dmsks = scm.load_dmasks(bbox=[lon[0],lon[-1],lat[0],lat[-1]])
+dmsks_all = dmsks[0] * dmsks[1]
+
+
+fig,axs = plt.subplots(2,2,figsize=(9,7.5),constrained_layout=True,
                       subplot_kw={'projection':ccrs.PlateCarree()})
 
 sp_id = 0
-
+bboxplot    = [-80,0,5,60]
 cints = np.arange(-24,26,2)
 snamesl = ('Winter (DJF)','Spring (MAM)','Summer (JJA)','Fall (SON)')
 
@@ -854,19 +860,80 @@ for s,ax in enumerate(axs.flatten()):
     plotvar = dampingavg[s]-dampingavgslab[s]
     
     print(s)
-    pcm = ax.contourf(lon,lat,plotvar.T,levels=cints,cmap='cmo.balance')
+    pcm = ax.contourf(lon,lat,plotvar.T,levels=cints,cmap='cmo.balance',extend='both')
+    #cl  = ax.contour(lon,lat,plotvar.T,levels=cints,colors='k',linewidths=0.5)
+    #ax.clabel(cl,cints[::2],fontsize=8)
     
-    ax = viz.add_coast_grid(ax=ax,bbox=bbox,fill_color='gray',blabels=blabel)
-    ax.set_title(snamesl[s])
+    
+    if plot_mask:
+        viz.plot_mask(lon,lat,dmsks_all,ax=ax,markersize=0.3)
+    ax = viz.add_coast_grid(ax=ax,bbox=bboxplot,fill_color='gray',blabels=blabel)
+    ax.set_title(snamesl[s],fontweight='bold')
     #fig.colorbar(pcm,ax=ax)
     ax = viz.label_sp(sp_id,ax=ax,fontsize=14,fig=fig,labelstyle="(%s)",case='lower',alpha=.75)
     sp_id += 1
     
-cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction=0.035,pad=0.05)
+cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction=0.030,pad=0.02)
 cb.set_label("Atmospheric Heat Flux Feedback ($Wm^{-2}K^{-1}$)")
 if notitle is False:
     plt.suptitle("Seasonal Mean Mixed Layer Depth Differences in meters \n (CESM1 - WOA 1994)",fontsize=14,y=.94)
-plt.savefig("%sHFLX_Differences_FULL-SLAB_Savg.png" %(outpath),dpi=200,bbox_inches='tight')
+plt.savefig("%sHFLX_Differences_FULL-SLAB_Savg.png" %(outpath),dpi=150,bbox_inches='tight')
+
+
+# ----------------------------------
+# %% Plot seasonal HFF Over a Region
+# ----------------------------------
+
+#
+
+
+viz_bbox = [-80,-10,0,25] # Tropics
+
+fig,axs = plt.subplots(2,4,figsize=(16,6),constrained_layout=True,
+                      subplot_kw={'projection':ccrs.PlateCarree()})
+
+
+
+cints = np.arange(-40,42,2)
+dampings     = [dampingavgslab,dampingavg]
+imodel_label = ["SLAB","FULL"]
+
+sp_id = 0
+for imodel in range(2):
+    for s in range(4):
+        
+        ax = axs[imodel,s]
+        blabel = [0,0,0,0]
+        if s == 0:
+            blabel[0] = 1
+            
+        if imodel==1:
+            blabel[-1]=1    
+        
+        
+        plotvar = dampings[imodel][s]
+        print(s)
+        pcm = ax.contourf(lon,lat,plotvar.T,levels=cints,cmap='cmo.balance',extend='both')
+        cl  = ax.contour(lon,lat,plotvar.T,levels=cints,colors='k',linewidths=0.5)
+        ax.clabel(cl,cints[::4],fontsize=8)
+        
+        
+        if plot_mask:
+            viz.plot_mask(lon,lat,dmsks_all,ax=ax,markersize=0.3)
+        ax = viz.add_coast_grid(ax=ax,bbox=viz_bbox,fill_color='gray',blabels=blabel)
+        if imodel == 0:
+            ax.set_title(snamesl[s],fontweight='bold')
+        
+        #fig.colorbar(pcm,ax=ax)
+        ax = viz.label_sp(sp_id,ax=ax,fontsize=14,fig=fig,labelstyle="(%s)",case='lower',alpha=.75)
+        sp_id += 1
+        
+        
+cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction=0.030,pad=0.02)
+cb.set_label("Atmospheric Heat Flux Feedback ($Wm^{-2}K^{-1}$)")
+if notitle is False:
+    plt.suptitle("Seasonal Mean Mixed Layer Depth Differences in meters \n (CESM1 - WOA 1994)",fontsize=14,y=.94)
+plt.savefig("%sHFLX_values_FULL-SLAB_Savg_regional.png" %(outpath),dpi=150,bbox_inches='tight')
 
 
 
