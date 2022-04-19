@@ -30,7 +30,7 @@ import cartopy.crs as ccrs
 
 datpath = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_output/'
 fnames  = ["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_dmp0" %i for i in range(10)]
-figpath = datpath + "../../02_Figures/20220407/"
+figpath = datpath + "../../02_Figures/20220422/"
 proc.makedir(figpath)
 
 #%% From SM Stylesheet
@@ -47,7 +47,7 @@ regions     = ("SPG","STG","TRO","NAT","NNAT","STGe","STGw")        # Region Nam
 bboxes      = (bbox_SP,bbox_ST,bbox_TR,bbox_NA,bbox_NA_new,bbox_ST_e,bbox_ST_w) # Bounding Boxes
 regionlong  = ("Subpolar","Subtropical","Tropical","North Atlantic","North Atlantic","Subtropical (East)","Subtropical (West)",)
 bbcol       = ["Blue","Red","Yellow","Black","Black"]
-bbcol       = ["Blue","Red","Yellow","Black","Black","magenta","red"]
+bbcol       = ["cornflowerblue","Red","Yellow","Black","Black","limegreen","indigo"]
 bbsty       = ["solid","dashed","solid","dotted","dotted","dashed","dotted"]
 
 
@@ -318,11 +318,12 @@ for a,ax in enumerate([ax2,ax3]):
         ax.set_xticklabels(xper)
         ax.set_xlabel("Period (Years)")
     elif a ==0:
-        ax.legend()
+        ax.legend(ncol=3,loc='lower center')
         ax.set_xticklabels([])
     ax.set_xlim([xtks[0],xtks[-1]])
     ax.axhline(0,ls='dashed',color="k")
     ax.grid(True,ls='dotted')
+    
     ax.set_ylim([-1.5,1.5])
     
     

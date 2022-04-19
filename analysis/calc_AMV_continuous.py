@@ -220,7 +220,6 @@ camvpats  = [] # [bbox][cesm-config]
 camvids   = []
 for b,bbin in tqdm(enumerate(amvbboxes)):
     
-    
     # Do for Stochastic Models
     for mid in range(nmod):
         
@@ -245,7 +244,7 @@ for b,bbin in tqdm(enumerate(amvbboxes)):
         cids.append(amvid)
     camvpats.append(cpats)
     camvids.append(cids)
-
+    
 #%% Plot Traditional AMV Pattern (3 Panel) for each AMV bbox
 
 b         = 0
@@ -336,7 +335,7 @@ for i in range(3):
     
     cf= ax.contourf(lonr,latr,plotamv,levels=cint_in,cmap='cmo.balance')
     cl= ax.contour(lonr,latr,plotamv,levels=cl_int_in,colors='k',linewidths=0.55)
-    ax.clabel(cl)
+    #ax.clabel(cl)
     ax.set_title(ptitle)
     
     

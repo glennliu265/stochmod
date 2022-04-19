@@ -28,7 +28,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20220413/"
+    figpath     = projpath + "02_Figures/20220422/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -1214,11 +1214,11 @@ for a in range(2):
             
         if plotlog:
             specratio = np.log(specratio)
-            ax.set_ylabel("log(%s)" % ylab)
+            ax.set_ylabel("%s" % ylab)
         
         ln = ax.semilogx(reffreq*dtplot,specratio,label=regions[r],lw=4,color=bbcol[r])
     if a == 0:
-        ax.legend(ncol=2,loc="lower left")
+        ax.legend(ncol=3,loc="lower center")
         ax.set_xlabel("")
     else:
         ax.set_xlabel("Period (Years)")
@@ -1227,21 +1227,18 @@ for a in range(2):
     ax.set_xticklabels(xper)
     
     ax.axhline(0,ls='dashed',color="k")
-    ax.grid(True,ls='dotted')
+    ax.grid(True,ls='dotted',which='major',color='gray')
+    ax.grid(True,ls='dotted',which='minor',alpha=0.5,color='gray',lw=0.5)
     ax.set_ylim([-2.25,2.25])
     
     
     ax = viz.label_sp(spid,case='lower',ax=ax,labelstyle="(%s)",fontsize=16,alpha=0.7)
     spid += 1
-    
 
+fig.supylabel("Log Ratio")
+#txt = viz.add_ylabel("Log Ratio",ax=axs.flatten())
 
 plt.savefig("%sRegional_Spectra_Ratio_2-panel_%s.png"%(figpath,flab),dpi=150,bbox_inche='tight')
-
-#%% Plot AMV Index Plots
-
-
-
 
 
 #%%
