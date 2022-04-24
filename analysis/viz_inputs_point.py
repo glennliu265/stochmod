@@ -45,7 +45,7 @@ import cmocean
 projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath = projpath + '03_Scripts/stochmod/'
 datpath    = projpath + '01_Data/'
-outpath    = projpath + '02_Figures/20220414/'
+outpath    = projpath + '02_Figures/20220422/'
 input_path  = datpath + 'model_input/'
 proc.makedir(outpath)
 
@@ -150,6 +150,11 @@ locstring      = "lon%i_lat%i" % (lonf,latf)
 locstringtitle = "Lon: %.1f Lat: %.1f" % (lonf,latf)
 
 
+
+
+
+
+
 # -------------------------------------
 #%% Retrieve data for point comparisons
 # -------------------------------------
@@ -174,18 +179,44 @@ beta = scm.calc_beta(h)
 #%% Fancy Kprev Plot
 # -------------------
 
+import matplotlib as mpl
+#mpl.rcParams
+
+from matplotlib import rc
+rc('font', **{'family': 'serif', 'serif': ['DejaVu Sans']})
+
+from matplotlib import font_manager
+font_dirs = ['/Users/gliu/Downloads/Red_Hat_Display/static/']
+font_files = font_manager.findSystemFonts(fontpaths=font_dirs)
+for font_file in font_files:
+    font_manager.fontManager.addfont(font_file)
+
+plt.rcParams['font.family'] = "Red Hat Display"
+
+
+#rc('text', usetex=False)
+
+#mpl.rcParams['text.usetex'] = False
+#csfont = {'fontname':'Futura'}
+
+usegrid = False
+
 monstr_kprv = np.append(mons3,'Jan')
 fig,ax = plt.subplots(1,1,figsize=(6,4),constrained_layout=True)
 viz.viz_kprev(hpt,kprev,locstring=locstring,
               ax=ax,msize=10,mstyle="X",lw=2.5,txtalpha=.65,usetitle=False)
-ax.grid(True,ls='dotted')
+if usegrid:
+    ax.grid(True,ls='dotted')
+    
 ax.set_xticklabels(monstr_kprv) 
 ax.set_ylim([10,150])
 ax.set_yticks(np.arange(10,170,20))
 
 ax.minorticks_on()
 ax.xaxis.set_tick_params(which='minor', bottom=False)
+
 plt.savefig(outpath+"MLD_Detrainment_month_%s.png" % (flocstring),dpi=200)
+
 #%% manuallly load forcing for debugging
 load_forcing_manual=False
 
@@ -316,6 +347,19 @@ for i in range(2):
     alphasum.append(asum)
 
 
+# ------------------------------------
+#%%Save to netcdfs (for bokeh testing)
+# ------------------------------------
+invars      = (h,dampingslab,dampingfull,alphas2[0],alphas2[1]) #  # Lon x Lat x Months
+invars_name = ("h","lbd_slab","lbd_full","alpha2_slab","alpha2_full")
+bkpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/bokeh_test/"
+for v,varname in tqdm(enumerate(invars_name)):
+    
+    savename = "%s%s_sm_input.nc" % (bkpath,varname)
+    print(savename)
+    
+    invar = proc.flipdims(invars[v]) # Flip to mon x lat x lon
+    da    = proc.numpy_to_da(invar,np.arange(1,13,1),lat,lon,varname,savenetcdf=savename)
 
 #%% Annual Average Plot (Squared Sum)
 clvl=np.arange(0,75,2.5)
@@ -644,8 +688,6 @@ for row,subfig in enumerate(subfigs):
                 #ax.set_ylabel(vnames[s])
                 #ax.text(x = 0, y = 0, s = vnames[s], rotation = 90, va = "top",ha="left",fontsize=8)
                 
-            
-        
     cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='vertical',fraction=0.009,pad=.010)
     #cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction=0.075,pad=.1)
     if nocblabel is False:
