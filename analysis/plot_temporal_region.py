@@ -47,6 +47,7 @@ import scm
 import tbx
 
 proc.makedir(figpath)
+
 #%% Experimental Configurations
 
 mconfig   = "SLAB_PIC"

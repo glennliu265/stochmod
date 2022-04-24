@@ -6,6 +6,9 @@ Calculate AMV for a continuous simulation
 
 Upper section taken from viz_continuous.py
 
+- Includes Stochastic Model Paper Plots (Draft 4-5)
+- Includes US AMOC 2022 Meeting Poster Plots
+
 Created on Wed Mar  2 15:11:39 2022
 
 @author: gliu
@@ -26,7 +29,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20220407/"
+    figpath     = projpath + "02_Figures/20220421/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -353,8 +356,6 @@ tropbbox = [-80,0,0,20]
 
 plotamv  = np.log((amvpats[mid,:,:,bbn]/amvpats[mid,:,:,bbd]).T)
 
-
-
 #cint_in   = np.arange(0,2.1,.1)
 #cl_int_in = cint_in
         
@@ -537,7 +538,10 @@ for cid in range(2):
 cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction=0.030,pad=0.05)
 cb.set_ticks(cint[::4])
 cb.ax.set_xticklabels(clb,rotation=45)
-cb.set_label("SST ($K \, \sigma_{AMV}^{-1}$)")
+if useC:
+    cb.set_label("SST ($\degree C \, \sigma_{AMV}^{-1}$)")
+else:
+    cb.set_label("SST ($\degree C \, \sigma_{AMV}^{-1}$)")
 #cb.ax.set_xticklabels(cint[::2],rotation=90)
 #tick_start = np.argmin(abs(cint-cint[0]))
 #cb.ax.set_xticklabels(cint[tick_start::2],rotation=90)
@@ -546,7 +550,35 @@ if notitle is False:
 
 plt.savefig(savename,dpi=150,bbox_inches='tight')
 
+#%% Save the parameters needed for the plot
+"""
+This is used in make_US_AMOC_figs.py
+"""
 
+# Select a Region
+rid      = 1
+bbin     = amvbboxes[rid]
+print("Saving AMV for bbox: %s" %(bbin))
+
+# Make dict in preparation
+bbstr    = "lon%ito%i_lat%ito%i" % (bbin[0],bbin[1],bbin[2],bbin[3])
+savedict = {'bbox_in'       : amvbboxes[rid],
+            'bbox_str'      : bbstr,
+            'amv_pats_sm'   : amvpats[:,:,:,rid],  # [Model x Lon x Lat]
+            'amv_pats_cesm' : camvpats[rid],       # [Model][Lon x Lat]
+            'amv_ids_sm'    : amvids[:,:,rid],     # [Model x Time]
+            'amv_ids_cesm'  : camvids[rid],        # [Model][Time] 
+            'lon'           : lon,
+            'lat'           : lat,
+            'fnames'        : fnames,
+            'origin_script' : "calc_AMV_continuous.py",
+            'mask_insig_hf' : applymask,
+            }
+
+# Save it!
+savename = "%sUSAMOC_AMV_Patterns_bbox%s_mask%i.npz" % (figpath,bbstr,applymask)
+print("Saving output to %s" % savename)
+np.savez(savename,**savedict)
 
 #%% Lets analyze conditions at a particular point
 input_path = datpath+"model_input/"

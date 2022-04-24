@@ -19,7 +19,7 @@ Created on Wed Oct  6 22:17:26 2021
 @author: gliu
 
 """
-
+import matplotlib.ticker as tck
 import numpy as np
 import matplotlib.pyplot as plt
 import sys
@@ -35,7 +35,7 @@ projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 datpath     = projpath + '01_Data/'
 input_path  = datpath + 'model_input/'
 output_path = datpath + 'model_output/'
-outpath     = projpath + '02_Figures/20220407/'
+outpath     = projpath + '02_Figures/20220422/'
 proc.makedir(outpath)
 
 # Load in control data for 50N 30W
@@ -205,22 +205,15 @@ cffull = calc_conflag(cesmautofull,conf,tails,1798)
 notitle    = True  # Remove Title for publications
 sepfig     = False # Plot figures separately, for presentaiton, or together)
 sepentrain = False  # Separate entrain/non-entraining models
+usegrid    = True
+tickfreq   = 2
+#reducetick = 3  # Set to true to label ticks more sparsely
 
-# Figure Separation <1> Figure Creation
-if sepfig:
-    fig,ax = plt.subplots(1,1,figsize=(6,4))
-else:
-    fig,axs     = plt.subplots(1,2,figsize=(12,4),sharex=True,sharey=True,constrained_layout=False)
-    
-    # Plot Lower Hierarchy
-    ax = axs[0]
-if notitle:
-    title = ""
-else:
-    title = r"Adding Varying Damping ($\lambda_a$) and Forcing ($\alpha$)"
 
-# Indicate Plotting Options
-lw = 3
+
+# Indicate (more) Plotting Options
+lw         = 3
+markersize = 0
 plotacs = c_acs
 model   = 1
 
@@ -234,17 +227,33 @@ ylab    = "Forcing ($W/m^{2}$)"
 plotvar = damppt
 ylab =  "Atmospheric Damping ($W/m^{2}$)"
 
+# Figure Separation <1> Figure Creation
+if sepfig:
+    fig,ax = plt.subplots(1,1,figsize=(6,4))
+else:
+    fig,axs     = plt.subplots(1,2,figsize=(12,4),sharex=True,sharey=True,
+                               constrained_layout=False)
+    
+    # Plot Lower Hierarchy
+    ax = axs[0]
+if notitle:
+    title = ""
+else:
+    title = r"Adding Varying Damping ($\lambda_a$) and Forcing ($\alpha$)"
+
 # Initialize PLot
 xtk2       = np.arange(0,37,2)
 if addvar:
-    ax,ax2,ax3 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title,loopvar=plotvar)
+    ax,ax2,ax3 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title,
+                                 loopvar=plotvar,tickfreq=tickfreq,usegrid=usegrid)
     ax3.set_ylabel(ylab)
     ax3.yaxis.label.set_color('gray')
 else:
-    ax,ax2 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title)
+    ax,ax2 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title,usegrid=usegrid,
+                             tickfreq=tickfreq)
     
 # Plot CESM
-ax.plot(lags,cesmauto2[lags],label="CESM1 SLAB",color='gray',marker="o",markersize=4,lw=lw)
+ax.plot(lags,cesmauto2[lags],label="CESM1 SLAB",color='gray',marker="o",markersize=markersize,lw=lw)
 ax.fill_between(lags,cfslab[lags,0],cfslab[lags,1],color='gray',alpha=0.4)
 
 # Plot for each model in lower hierarchy
@@ -252,11 +261,12 @@ for i,e in enumerate([0,1,2,3]):
     title=""
     ax.set_ylabel("")
     cfs = confs[e,model,:,:]
-    ax.plot(lags,plotacs[e][model],label=labels_lower[i],color=ecol_lower[i],ls=els_lower[i],marker="o",markersize=4,lw=lw)
+    ax.plot(lags,plotacs[e][model],label=labels_lower[i],color=ecol_lower[i],ls=els_lower[i],marker="o",markersize=markersize,lw=lw)
     ax.fill_between(lags,cfs[:,0],cfs[:,1],color=ecol_lower[i],alpha=0.2)
+    
 if sepentrain:
     i = 2
-    ax.plot(lags,ac[i],label=labels_upper[i],color=ecol_upper[i],ls=els_upper[i],marker="o",markersize=3,lw=lw)
+    ax.plot(lags,ac[i],label=labels_upper[i],color=ecol_upper[i],ls=els_upper[i],marker="o",markersize=markersize,lw=lw)
     ax.fill_between(lags,cfstoch[i,:,0],cfstoch[i,:,1],color=ecol_upper[i],alpha=0.25)
 
 # Set labels, legend
@@ -271,7 +281,7 @@ if sepfig:
     plt.savefig(outpath+"Autocorrelation_lower-hierarchy_%s.png"%locstring,dpi=200,bbox_inches='tight')
     fig,ax = plt.subplots(1,1,figsize=(6,4))
 else:
-    ax = viz.label_sp(0,case='lower', ax=ax, fontsize=16, labelstyle="(%s)")
+    ax = viz.label_sp(0,case='lower', ax=ax, fontsize=16, labelstyle="(%s)",x=0.010,alpha=0.25)
     ax = axs[1]
 if notitle:
     title = ""
@@ -282,11 +292,12 @@ else:
 #ax,ax2,ax3 = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title,loopvar=damppt)
 
 # Plot CESM Data
-ax,ax2= viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title)
+ax,ax2= viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title,
+                        tickfreq=tickfreq,usegrid=usegrid)
 #ax.plot(lags,cesmauto2[lags],label="CESM1 SLAB",color='gray',marker="o",markersize=3)
 #ax.fill_between(lags,cfslab[lags,0],cfslab[lags,1],color='k',alpha=0.10)
 
-ax.plot(lags,cesmautofull,color='k',label='CESM1 Full',ls='dashdot',marker="o",markersize=3,lw=lw)
+ax.plot(lags,cesmautofull,color='k',label='CESM1 Full',ls='dashdot',marker="o",markersize=markersize,lw=lw)
 ax.fill_between(lags,cffull[lags,0],cffull[lags,1],color='k',alpha=0.10)
 
 if sepentrain:
@@ -295,7 +306,7 @@ else:
     plotrange = [2,3] # Entrain + Vary h
 
 for i in plotrange:
-    ax.plot(lags,ac[i],label=labels_upper[i],color=ecol_upper[i],ls=els_upper[i],marker="o",markersize=3,lw=lw)
+    ax.plot(lags,ac[i],label=labels_upper[i],color=ecol_upper[i],ls=els_upper[i],marker="o",markersize=markersize,lw=lw)
     ax.fill_between(lags,cfstoch[i,:,0],cfstoch[i,:,1],color=ecol_upper[i],alpha=0.25)
 
 ax.legend()
@@ -305,7 +316,7 @@ ax.legend(fontsize=10,ncol=3)
 plt.tight_layout()
 ax.set_ylabel("")
 
-
+ax.yaxis.set_minor_locator(tck.AutoMinorLocator())
 
 if notitle is False:
     plt.suptitle("Monthly SST Autocorrelation at 50N, 30W (Lag 0 = February)",fontsize=12,y=1.01)
@@ -320,12 +331,13 @@ if sepfig:
     ax.set_ylabel("Correlation")
     plt.savefig(outpath+"Autocorrelation_upper-hierarchy_%s.png"%locstring,dpi=200,bbox_inches='tight')
 else:
-    ax = viz.label_sp(1,case='lower', ax=ax, fontsize=16, labelstyle="(%s)")
+    ax = viz.label_sp(1,case='lower', ax=ax, fontsize=16, labelstyle="(%s)",x=0.010,alpha=0.25)
     plt.savefig(outpath+"Autocorrelation_2-PANEL_%s.png"%locstring,dpi=200,bbox_inches='tight')
 
-
-
-
+# Unified ylabel
+for ax in axs:
+    ax.set_xlabel("")
+fig.text(0.5, 0.01, 'Lag (Months)', ha='center',fontsize=12)
 #%% Load and calculate CESM Spectra
 
 cssts = scm.load_cesm_pt(datpath,loadname='both',grabpoint=[-30,50])
@@ -336,13 +348,13 @@ debug    = False
 notitle  = True
 
 # Some edits for Draft 4
-use_ann     = False # Option to take ann avg before calcualtion
-useC      = True # Swap to label as degree celsius
+use_ann     = True # Option to take ann avg before calcualtion
+useC        = True # Swap to label as degree celsius
 
 # Smoothing Params
 nsmooth    = 350
 cnsmooths  = [100,100]
-pct        = 0.10
+pct        = 0.00
 
 smoothname = "smth-obs%03i-full%02i-slab%02i" % (nsmooth,cnsmooths[0],cnsmooths[1])
 
@@ -434,7 +446,13 @@ linearx     = 1 # Keep frequency axis linear, period axis marked
 lw          = 3
 incl_legend = True 
 
-xtks = [0.01, 0.02, 0.05, 0.1 , 0.2 , 0.5 ]
+usegrid     = False
+
+axis_fsz    = 14
+tick_fsz    = 14
+legend_fsz  = 12
+
+xtks = [0.01, 0.05, 0.1 , 0.2 , 0.5 ]
 
 if sepentrain:
     plotids = [[0,1,2,3,8,5],
@@ -466,7 +484,6 @@ sharetitle = "SST Spectra (50$\degree$N, 30$\degree$W) \n" + \
 if sepfig is False:
     fig,axs = plt.subplots(1,2,figsize=(16,4))
 
-
 for i in range(2):
     
     if sepfig is True:
@@ -481,7 +498,8 @@ for i in range(2):
                              ax=ax,plottitle=titles[i],xtick=xtks,xlm=xlm,return_ax2=True)
     elif plottype == "freqlin":
         ax,ax2 = viz.plot_freqlin(specs[plotid],freqs[plotid],speclabels[plotid],allcols[plotid],
-                             ax=ax,plottitle=titles[i],xtick=xtks,xlm=xlm,return_ax2=True,lw=lw,linearx=linearx)
+                             ax=ax,plottitle=titles[i],xtick=xtks,xlm=xlm,return_ax2=True,
+                             lw=lw,linearx=linearx,usegrid=usegrid)
         if useC:
             ylabel = "Power ($\degree C^2/cpy$)"
         else:
@@ -501,8 +519,8 @@ for i in range(2):
         ax.set_ylabel("")
     ax.set_xlabel("")
         
-    plt.setp(ax2.get_xticklabels(), rotation=90,fontsize=12)
-    plt.setp(ax.get_xticklabels(), rotation=0,fontsize=12)
+    plt.setp(ax2.get_xticklabels(), rotation=0,fontsize=tick_fsz)
+    plt.setp(ax.get_xticklabels(), rotation=0,fontsize=tick_fsz)
     
     # if plottype is not 'freqlog':
     ax.set_ylim(ylm)
@@ -511,45 +529,52 @@ for i in range(2):
         ax2.set_xlabel("")
         xtk2 = ax2.get_xticklabels()
         xtk2new = np.repeat("",len(xtk2))
-        ax2.set_xticklabels(xtk2new)
-        ax.set_xticklabels(1/xtks)
+        ax2.set_xticklabels(xtk2new,fontsize=tick_fsz)
+        ax.set_xticklabels(1/xtks,fontsize=tick_fsz)
     
     if incl_legend:
         lgd = viz.reorder_legend(ax)
     if sepfig is True: # Save separate figures
         if periodx:
-            ax.set_xlabel('Period (Years)',fontsize=12)
+            ax.set_xlabel('Period (Years)',fontsize=axis_fsz)
         else:
-            ax.set_xlabel('Frequency (cycles/year)',fontsize=12)
+            ax.set_xlabel('Frequency (cycles/year)',fontsize=axis_fsz)
         if useC:
-            ax.set_ylabel("Power ($\degree C^2/cpy$)")
+            ax.set_ylabel("Power ($\degree C^2/cpy$)",fontsize=axis_fsz)
         else:
-            ax.set_ylabel("Power ($K^2/cpy$)")
+            ax.set_ylabel("Power ($K^2/cpy$)",fontsize=axis_fsz)
         savename = "%sNASST_Spectra_Stochmod_%s_%s_pct%03i_part%i.png" % (outpath,plottype,smoothname,pct*100,i)
         plt.savefig(savename,dpi=200,bbox_inches='tight')
     else:
         if i == 0:
              ax.set_xlabel("")
              if useC:
-                 ax.set_ylabel("Power ($\degree C^2/cpy$)")
+                 ax.set_ylabel("Power ($\degree C^2/cpy$)",fontsize=axis_fsz)
              else:
-                 ax.set_ylabel("Power ($K^2/cpy$)")
+                 ax.set_ylabel("Power ($K^2/cpy$)",fontsize=axis_fsz)
         #if i == 1:
            # ax.set_xlabel("Period (Years)")
         ax = viz.label_sp(i,case='lower', ax=ax, fontsize=16, labelstyle="(%s)")
-
+    
+    # Y-axis Adjust
+    plt.setp(ax.get_yticklabels(),fontsize=tick_fsz)
+    # Turn on minor label
+    ax.yaxis.set_minor_locator(tck.AutoMinorLocator())
+    
 if sepfig is False:
     #fig.text(0.5, -0.05, 'Frequency (cycles/year)', ha='center',fontsize=12)
     if periodx:
-        fig.text(0.5, -0.05, 'Period (Years)', ha='center',fontsize=12)
+        fig.text(0.5, -0.05, 'Period (Years)', ha='center',fontsize=axis_fsz)
     else:
-        fig.text(0.5, 1.05, 'Period (Years)', ha='center',fontsize=12)
-        fig.text(0.5, -0.05, 'Frequency (cycles/year)', ha='center',fontsize=12)
+        fig.text(0.5, 1.02, 'Period (Years)', ha='center',fontsize=axis_fsz)
+        fig.text(0.5, -0.05, 'Frequency (cycles/year)', ha='center',fontsize=axis_fsz)
     #plt.suptitle("SST Power Spectra at 50$\degree$N, 30$\degree$W",y=1.15,fontsize=14)
     if notitle is False:
         plt.suptitle(sharetitle,y=1.05,fontsize=14)
     savename = "%sNASST_Spectra_Stochmod_%s_%s_pct%03i.png" % (outpath,plottype,smoothname,pct*100)
     plt.savefig(savename,dpi=200,bbox_inches='tight')
+    
+    
 
 
 # plotid = 
@@ -586,6 +611,7 @@ if sepfig is False:
 # inssts.append(sst[2]) # Append hvary
 # inssts.append(sst[3]) # Append entrain
 # #np.hstack([c_ssts[:3],])
+
 
 #%% Barplots
 
@@ -928,7 +954,7 @@ plt.savefig(outpath+"Autocorrelation_2-PANEL_%s_vertical.png"%locstring,dpi=200,
 debug = False
 
 # Smoothing Params
-nsmooth = 500
+nsmooth    = 500
 cnsmooths = [120,100]
 pct        = 0.10
 
@@ -1160,3 +1186,20 @@ Incomplete Section (wip)
 # ----------------------------
 #%% Make a plot with an inset
 # ----------------------------
+
+"""
+# Run with useann=True
+yrfreq = freqs[0]
+yrspec = specs[0]
+# Run with useann=False
+monfreq = freqs[0]
+monspec = specs[0]
+"""
+
+
+fig,ax = plt.subplots(1,1)
+ax.plot(yrfreq*dtplot , yrspec/dtplot,label="yearly")
+ax.plot(monfreq*dtplot, monspec/dtplot,label="monthly")
+ax.set_xlim([0,1])
+ax.set_ylabel("Frequency (1/year)")
+#ax.plot(yrfreqs*dtplot,yrspec/dtplot)
