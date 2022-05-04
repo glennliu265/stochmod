@@ -6,7 +6,6 @@ Compare simple qcorrection vs. theoretical correction
 
 Created on Mon Feb 14 14:37:24 2022
 
-
 1) Maps of Variance for Fprime and Amplified Qnet (annual average)
 - Ratio Maps
 - Overall Variance
@@ -17,7 +16,6 @@ Created on Mon Feb 14 14:37:24 2022
 3) Impact on SST (after model run with new forcing)
 
 4) How does this impact our results, if at all?
-
 
 @author: gliu
 

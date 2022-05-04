@@ -6,6 +6,7 @@ Compute pointwise autocorrelation for CESM or stochastic model outputs
 Support separate calculation for warm and cold anomalies
 
 Based on postprocess_autocorrelation.py
+Uses data preprocessed by reemergence/preprocess_data.py
 
 Created on Thu Mar 17 17:09:18 2022
 

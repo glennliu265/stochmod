@@ -30,7 +30,7 @@ import cartopy.crs as ccrs
 
 datpath = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_output/'
 fnames  = ["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_dmp0" %i for i in range(10)]
-figpath = datpath + "../../02_Figures/20220422/"
+figpath = datpath + "../../02_Figures/20220502/"
 proc.makedir(figpath)
 
 #%% From SM Stylesheet
@@ -372,10 +372,6 @@ plt.savefig("%sEkmanForcing_Summary_Figure.png"%figpath,dpi=200,bbox_inches='tig
 # Compute Spectral Ratios
 
 # Load + Plot the AMV Pattern
-
-
-
-
 
 # Quick Comparison of SST from 2 experiments
 # Debug (Load 1 data and check quickly)

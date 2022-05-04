@@ -149,12 +149,6 @@ klon,klat = proc.find_latlon(lonf,latf,lon,lat)
 locstring      = "lon%i_lat%i" % (lonf,latf)
 locstringtitle = "Lon: %.1f Lat: %.1f" % (lonf,latf)
 
-
-
-
-
-
-
 # -------------------------------------
 #%% Retrieve data for point comparisons
 # -------------------------------------
@@ -171,10 +165,8 @@ for i in range(len(inputs)):
 
 hpt,kprev,lbd_a,lbd_af,Fpt,Fpt_f = inputs_pt
 
-
 # Calculate entrainment related damping
 beta = scm.calc_beta(h)
-
 # -------------------
 #%% Fancy Kprev Plot
 # -------------------
@@ -346,7 +338,6 @@ for i in range(2):
     alphas2.append(a2)
     alphasum.append(asum)
 
-
 # ------------------------------------
 #%%Save to netcdfs (for bokeh testing)
 # ------------------------------------
@@ -372,9 +363,9 @@ for i in range(2):
     
 fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal')
 plt.suptitle("Annual Mean Sqrt(Sum($EOF^2$))",y=1.05)
+
 #alpha2 = np.sqrt(np.nansum(alpha**2,2))
 #alphafull2 = 
-
 #%% Annual Average sums
 
 clvl=np.arange(-70,75,5)
