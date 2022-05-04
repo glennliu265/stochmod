@@ -4,6 +4,9 @@
 Script to visualize the output of pointwise_autocorrelation.py
 
 
+Includes:
+    Reference Month vs. Lag plots for a single point
+
 Created on Thu Mar 24 15:23:20 2022
 
 @author: gliu
@@ -38,11 +41,11 @@ mconfig    = "HTR-FULL" # #"PIC-FULL"
 
 thresholds = [0,]
 thresname  = "thres" + "to".join(["%i" % i for i in thresholds])
-varname    = "TS" #"SST"
+varname    = "SSS" #"SST"
 
 # Set Output Directory
 # --------------------
-figpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220407/'
+figpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220502/'
 proc.makedir(figpath)
 outpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/'
 savename   = "%s%s_%s_autocorrelation_%s.npz" %  (outpath,mconfig,varname,thresname)
@@ -84,7 +87,6 @@ elif mconfig == "ERSST":
     fnames  = ["ERSST_detrend2_startyr1900_endyr2016.npz"]
     
     
-
 #%% Load in the data
 st          = time.time()
 ld          = np.load(savename,allow_pickle=True)
@@ -144,11 +146,10 @@ plt.savefig("%sAutocorrelation_WarmCold_%s_%s_month%i.png"% (figpath,mconfig,loc
 #%% Contour the Autocorrelation (Similar to in Park et al. 2006)
 # (Need to add significance levels)
 
-usecontourf = True
+usecontourf = False
 clvls       = np.arange(-.1,1.05,0.05)
 cmap        = 'cmo.dense'
 appendjan   = True
-
 
 yvals       = np.arange(1,13,1)
 # Compute the significance
@@ -172,7 +173,6 @@ for th in range(3):
     
     #sigmask2 = plotac.copy()
     #sigmask2[~sigmask] = 0
-    
     
     if appendjan: # Add extra january
         yvals       = np.arange(1,14,1)
@@ -224,12 +224,105 @@ for th in range(3):
     
     ax.invert_yaxis()
     
-
-
 cb = fig.colorbar(cf,ax=axs.flatten(),orientation='horizontal',fraction=0.065)
 cb.set_label("Correlation")
 plt.suptitle("%s Autocorrelation @ %s (%s)"% (varname,locstr,mconfig),fontsize=14,y=1.05)
 plt.savefig("%s%sAutocorrelation_Contours_WarmCold_%s_%s.png"% (figpath,varname,mconfig,locfn),dpi=150,bbox_inches='tight')
+
+#%% Same plot as above, but flip the axes
+
+usecontourf = False
+clvls       = np.arange(-.1,1.05,0.05)
+cmap        = 'cmo.dense'
+appendjan   = True
+referencex  = True # Flip so that reference month is on the x-axis
+
+# Compute the significance
+p     = 0.05
+tails = 1 
+
+yvals       = np.arange(1,13,1)
+
+
+
+fig,axs   = plt.subplots(1,3,figsize=(10,10),constrained_layout=True)
+
+for th in range(3):
+    
+    ax = axs.flatten()[th]
+    
+    if "HTR" in mconfig:
+        plotac    = acs_final[klon,klat,:,:,th,:].mean(0)
+        plotcount = count_final[klon,klat,:,:,th].mean(0)
+    else:
+        plotac    = acs_final[klon,klat,:,th,:]
+        plotcount = count_final[klon,klat,:,th]
+    
+    rhocrit   = proc.ttest_rho(p,tails,plotcount) # [month]
+    sigstr    = "%i" % ((p)*100) + "%" + r" Sig. (%i-tail): $\rho$ > %.2f (n=%i)" % (tails,rhocrit.mean(),plotcount.mean()) 
+    sigmask   = plotac > rhocrit[:,None]
+    
+    #sigmask2 = plotac.copy()
+    #sigmask2[~sigmask] = 0
+    
+    if appendjan: # Add extra january
+        yvals       = np.arange(1,14,1)
+        mons3       = [viz.return_mon_label(m%12,nletters=3) for m in np.arange(1,14)]
+        
+        sigmask     = np.concatenate([sigmask,sigmask[[0],:]],axis=0)
+        plotac      = np.concatenate([plotac,plotac[[0],:]],axis=0)
+        
+    else:
+        yvals       = np.arange(1,13,1)
+        mons3       = [viz.return_mon_label(m,nletters=3) for m in np.arange(1,13)]
+    
+        
+    
+    # # Plot it
+    if usecontourf:
+        cf = ax.contourf(yvals,lags,plotac.T,levels=clvls,cmap=cmap)
+    else:
+        cf = ax.pcolormesh(yvals,lags,plotac.T,vmin=clvls[0],vmax=clvls[-1],
+                            shading='auto',cmap=cmap)
+        
+    # Plot the mask
+    # Hatching mask
+    # ax.contourf(lags,yvals,sigmask,colors='gray',
+    #             hatches=["-",],levels=[-1,0],alpha=0,edgecolor='gray')
+    
+    # Masking Function with Stippling
+    msk = viz.plot_mask(yvals,lags,sigmask,
+                        ax=ax,markersize=2.0,color="k",geoaxes=False)
+    
+    # Contour Line Plot
+    #cl = ax.contour(lags,yvals,sigmask2,colors="k",levels=clvls)
+    #ax.clabel(cl)
+    
+    #ax.pcolormesh(lags,mons3,sigmask,shading='auto')
+    
+    ax.grid(True,ls='dotted')
+    ax.set_yticks(np.arange(0,39,3))
+    ax.set_xticks(yvals)
+    ax.set_xticklabels(mons3,rotation=45)
+    
+    if th == 1:
+        ax.set_xlabel("Reference Month")
+    if th == 0:
+        ax.set_ylabel("Lag (Months)")
+        
+    ax.set_title(threslabs[th] + "\n" + sigstr)
+    
+    #ax.invert_xaxis()
+    
+cb = fig.colorbar(cf,ax=axs.flatten(),orientation='horizontal',fraction=0.045)
+cb.set_label("Correlation")
+plt.suptitle("%s Autocorrelation @ %s (%s), Ensemble Avg."% (varname,locstr,mconfig),fontsize=14,y=1.05)
+plt.savefig("%s%sAutocorrelation_Contours_WarmCold_%s_%s_flip.png"% (figpath,varname,mconfig,locfn),dpi=150,bbox_inches='tight')
+
+
+
+
+
 
 #%% load data for MLD
 
