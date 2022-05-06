@@ -1918,11 +1918,14 @@ def calc_HF(sst,flx,lags,monwin,verbose=True,posatm=True):
     """
     # Reshape variables [time x lat x lon] --> [yr x mon x space]
     nyr,nmon,nlat,nlon = sst.shape
+    
+    sst = sst.reshape(nyr,12,nlat*nlon)
+    flx = flx.reshape(sst.shape)
     #sst = sst.reshape(int(ntime/12),12,nlat*nlon)
     #flx = flx.reshape(sst.shape)
     
     # Preallocate
-    nlag = len(lags)
+    nlag      = len(lags)
     damping   = np.zeros((12,nlag,nlat*nlon)) # [month, lag, lat, lon]
     autocorr  = np.zeros(damping.shape)
     crosscorr = np.zeros(damping.shape)
@@ -1931,6 +1934,7 @@ def calc_HF(sst,flx,lags,monwin,verbose=True,posatm=True):
     for l in range(nlag):
         lag = lags[l]
         for m in range(12):
+            
             lm = m-lag # Get Lag Month
             
             # Restrict to time ----
@@ -1940,7 +1944,7 @@ def calc_HF(sst,flx,lags,monwin,verbose=True,posatm=True):
             
             # Compute Correlation Coefficients ----
             crosscorr[m,l,:] = proc.pearsonr_2d(flxmon,sstlag,0) # [space]
-            autocorr[m,l,:] = proc.pearsonr_2d(sstmon,sstlag,0) # [space]
+            autocorr[m,l,:]  = proc.pearsonr_2d(sstmon,sstlag,0) # [space]
             
             # Calculate covariance ----
             cov     = proc.covariance2d(flxmon,sstlag,0)
@@ -2067,6 +2071,249 @@ def postprocess_HF(dampingmasked,limask,sellags,lon,pos_upward=True):
         dampingw *= -1
     return dampingw
 
+def check_ENSO_sign(eofs,pcs,lon,lat,verbose=True):
+    """
+    checks sign of EOF for ENSO and flips sign by check the sum over
+    conventional ENSO boxes (see below for more information)
+    
+    checks to see if the sum within the region and flips if sum < 0
+    
+    inputs:
+        1) eofs [space (latxlon), PC] EOF spatial pattern from eof_simple
+        2) pcs  [time, PC] PC timeseries calculated from eof_simple
+        3) lat  [lat] Latitude values
+        4) lon  [lon] Longitude values
+    
+    outputs:
+        1) eofs [space, PC]
+        2) pcs  [time, PC]
+    
+    """   
+    # Set EOF boxes to check over (west,east,south,north)
+    eofbox1 = [190,240,-5,5] #EOF1 sign check Lat/Lon Box (Currently using nino3.4)
+    eofbox2 = [190,240,-5,5] #EOF2 (Frankignoul et al. 2011; extend of positive contours offshore S. Am > 0.1)
+    eofbox3 = [200,260,5,5] #EOF3 (Frankignoul et al. 2011; narrow band of positive value around equator)
+    chkboxes = [eofbox1,eofbox2,eofbox3]
+    
+    # Find dimensions and separate out space
+    nlon = lon.shape[0]
+    nlat = lat.shape[0]
+    npcs = eofs.shape[1] 
+    eofs = eofs.reshape(nlat,nlon,npcs)
+    eofs = eofs.transpose(1,0,2) # [lon x lat x npcs]
+        
+    for n in range(npcs):
+        chk = proc.sel_region(eofs,lon,lat,chkboxes[n],reg_sum=1)[n]
+        
+        if chk < 0:
+            if verbose:
+                print("Flipping EOF %i because sum is %.2f"%(n,chk))
+    
+            eofs[:,:,n] *= -1
+            pcs[:,n] *= -1
+    
+
+    eofs = eofs.transpose(1,0,2).reshape(nlat*nlon,npcs) # Switch back to lat x lon x pcs
+    
+    return eofs,pcs
+
+def calc_enso(invar,lon,lat,pcrem,bbox=None):
+    """
+    Calculate ENSO for input SST (use longitude 0-360)!
+    
+    Parameters
+    ----------
+    invar : ARRAY [time x lat x lon360]
+        monthly SST variable longitude is 0-360, lat -90 to 90
+    lon : [lon]
+        Longitude values
+    lat : [lat]
+        Latitude values
+    pcrem : Int
+        Number of PCs to alculate
+    bbox : List [lonW,lonE,latS,latN], optional
+        Bounding box for calculation.
+        Default is [120, 290, -20, 20]. The default is None.
+
+    Returns
+    -------
+    eofall : ARRAY [lat x lon x month x pc]
+        EOF Patterns.
+    pcall : ARRAY [time x month x pc]
+        Principle components.
+    varexpall : [month x pc]
+        Variance Explained.
+        
+    Custom dependencies: check_enso_sign, proc.eof_simple
+    """
+    if bbox is None:
+        bbox = [120, 290, -20, 20]
+    
+    #  Apply Area Weight
+    _,Y = np.meshgrid(lon,lat)
+    wgt = np.sqrt(np.cos(np.radians(Y))) # [lat x lon]
+    ts = invar * wgt[None,:,:]
+    
+    # Reshape for ENSO calculations
+    ntime,nlat,nlon = ts.shape 
+    ts = ts.reshape(ntime,nlat*nlon) # [time x space]
+    ts = ts.T #[space x time]
+    
+    # Remove NaN points
+    okdata,knan,okpts = proc.find_nan(ts,1) # Find Non-Nan Points
+    oksize = okdata.shape[0]
+
+    # Calcuate monthly anomalies
+    okdata = okdata.reshape(oksize,int(ntime/12),12) # [space x yr x mon]
+    manom  = okdata.mean(1)
+    tsanom = okdata - manom[:,None,:]
+    nyr    = tsanom.shape[1]
+    
+    # Preallocate
+    eofall = np.zeros((nlat*nlon,12,pcrem)) *np.nan# [space x month x pc]
+    pcall  = np.zeros((nyr,12,pcrem)) *np.nan# [year x month x pc]
+    varexpall  = np.zeros((12,pcrem)) * np.nan #[month x pc]
+
+    # Compute EOF!!
+    for m in range(12):
+        
+        # Perform EOF
+        st = time.time()
+        eofsok,pcs,varexp= proc.eof_simple(tsanom[:,:,m],pcrem,1)
+        #print("Performed EOF in %.2fs"%(time.time()-st))
+    
+        # Place back into full array
+        eofs = np.zeros((nlat*nlon,pcrem)) * np.nan
+        eofs[okpts,:] = eofsok   
+    
+        # Correct ENSO Signs
+        eofs,pcs = check_ENSO_sign(eofs,pcs,lon,lat,verbose=True)
+        
+        
+        # Save variables
+        eofall[:,m,:] = eofs.copy()
+        pcall[:,m,:] = pcs.copy()
+        varexpall[m,:] = varexp.copy()
+        
+        print("Completed month %i in %.2fs"%(m+1,time.time()-st))
+
+
+    # Reshape Data
+    eofall = eofall.reshape(nlat,nlon,12,pcrem) # [lat x lon x month x pc]
+    
+    return eofall,pcall,varexpall
+
+def remove_enso(invar,ensoid,ensolag,monwin,reduceyr=True,verbose=True,times=None):
+    """
+    Remove ENSO via regression of [ensoid] to [invar: time,lat,lon] for each month
+    and principle component.
+    
+    
+    Parameters
+    ----------
+    invar : ARRAY [time x lat x lon]
+        Input variable to remove ENSO from
+    ensoid : ARRAY [time x month x pc]
+        ENSO Index.
+    ensolag : INT
+        Lag to apply between ENSO Index and Input variable
+    monwin : INT
+        Size of centered moving window to calculate ENSO for
+    reduceyr : BOOL, optional
+        Reduce/drop time dimension to account for ensolag. The default is True.
+    times : ARRAY[time]
+        Array of times to work with
+    Returns
+    -------
+    vout : ARRAY [time x lat x lon]
+        Variable with ENSO removed
+    ensopattern : ARRAY [month x lat x lon x pc]
+        ENSO Component that was removed
+    
+    """
+    allstart = time.time()
+
+    # Standardize the index (stdev = 1)
+    ensoid = ensoid/np.std(ensoid,(0,1))
+
+    # Shift ENSO by the specified enso lag
+    ensoid = np.roll(ensoid,ensolag,axis=1) # (ex: Idx 0 (Jan) is now 11)
+
+    # Reduce years if needed
+    if reduceyr: # Since enso leads, drop years from end of period
+        dropyr = int(np.fix(ensolag/12) + 1)
+        ensoid=ensoid[:-dropyr,:,:]
+
+    # Reshape to combine spatial dimensions
+    ntime,nlat,nlon = invar.shape
+    nyr             = int(ntime/12)
+    vanom           = invar.reshape(nyr,12,nlat*nlon) # [year x mon x space]
+    
+    # Reduce years if option is set
+    if reduceyr:
+        vanom=vanom[dropyr:,:,:] # Drop year from beginning of period for lag
+        if times is not None:
+            times = times.reshape(nyr,12)[dropyr:,:]
+    vout            = vanom.copy()
+    
+    # Variable to save enso pattern
+    nyr,_,pcrem = ensoid.shape # Get reduced year, pcs length
+    ensopattern        = np.zeros((12,nlat,nlon,pcrem))
+    
+    # Looping by PC...
+    for pc in range(pcrem):
+        # Looping for each month
+        for m in range(12):
+            #print('m loop start, vout size is %s'% str(vout[winsize:-winsize,m,:].shape))
+            
+            # Set up indexing
+            if monwin > 1:  
+                winsize = int(np.floor((monwin-1)/2))
+                monid = [m-winsize,m,m+winsize]
+                if monid[2] > 11: # Reduce end month if needed
+                    monid[2] -= 12
+            else:
+                winsize = 0
+                monid = [m]
+                
+            if reduceyr:
+                ensoin = indexwindow(ensoid[:,:,[pc]],m,monwin,combinetime=True).squeeze()
+                varin  = indexwindow(vanom,m,monwin,combinetime=True)
+                nyr   = int(ensoin.shape[0]/monwin) # Get new year dimension
+            else:
+                # Index corresponding timeseries
+                ensoin = ensoid[:,monid,pc] # [yr * mon]  Lagged ENSO
+                varin = vanom[:,monid,:] # [yr * mon * space] Variable
+                
+                # Re-combine time dimensions
+                ensoin = ensoin.reshape(nyr*monwin)
+                varin = varin.reshape(nyr*monwin,nlat*nlon)
+            
+            # Regress to obtain coefficients [space]
+            varreg,_ = proc.regress_2d(ensoin.squeeze(),varin,nanwarn=1)
+            
+            # Write to enso pattern
+            ensopattern[m,:,:,pc] = varreg.reshape(nlat,nlon).copy()
+            
+            # Expand and multiply out and take mean for period [space,None]*[None,time] t0o [space x time]
+            ensocomp = (varreg[:,None] * ensoin[None,:]).squeeze()
+            
+            # Separate year and mon and take mean along months
+            ensocomp = ensocomp.reshape(nlat*nlon,nyr,monwin).mean(2)
+            
+            # Remove the enso component for the specified month
+            vout[winsize:-winsize,m,:] -= ensocomp.T
+            
+            if verbose:
+                print("Removed ENSO Component for PC %02i | Month %02i (t=%.2fs)" % (pc+1,m+1,time.time()-allstart))
+            # < End Mon Loop>
+        # < End PC Loop>
+        # Get the correct window size, and reshape it to [time x lat x lon]
+    vout = vout[winsize:-winsize,:,:].reshape(nyr*12,nlat,nlon)
+    if times is not None:
+        times = times[winsize:-winsize,:].flatten()
+        return vout,ensopattern,times
+    return vout,ensopattern
 
 #%% SCM rewritten.
 def convert_Wm2(invar,h,dt,cp0=3996,rho=1026,verbose=True,reverse=False):
@@ -3082,6 +3329,10 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
             },allow_pickle=True)
         print("Saved output to %s in %.2fs" % (expname,time.time()-start))
     print("Function completed in %.2fs" % (time.time()-start))
+    
+    
+
+
 #%% Loading limopt data
 
 def load_limopt_sst(datpath=None,vname="SSTRES"):
