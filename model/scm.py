@@ -2315,6 +2315,55 @@ def remove_enso(invar,ensoid,ensolag,monwin,reduceyr=True,verbose=True,times=Non
         return vout,ensopattern,times
     return vout,ensopattern
 
+def compute_qnet(datpath,dataset_name,vnames=None,downwards_positive=True,
+                 verbose=True):
+    """
+    Computes dataarray of Qnet (downwards positive) given shortwave, longwave,
+    sensible, and latent heat fluxes. Assumes inputs are positive into the ocean.
+    
+    Looks for files of the form <datpath><dataset name>_<flux name>.nc
+
+    Parameters
+    ----------
+    datpath : STR
+        Path to data
+    dataset_name : STR
+        Name of dataset
+    vnames : List of STR, optional
+        Name of shortwave,longwave,sensible, and latent fluxes. The default is:
+        ["fsns","flns","hfss","hfls"]
+    downwards_positive : BOOL, optional
+        Set to False to convert to upwards positive. The default is True.
+    verbose : BOOL, optional
+        Print debuggin messages. The default is True.
+    
+    Returns
+    -------
+    ds_new : TYPE
+        DESCRIPTION.
+
+    """
+    
+    if vnames is None:
+        vnames = ["fsns","flns","hfss","hfls"]
+    
+    flxes = []
+    for v in vnames:
+        loadname = "%s%s_%s.nc" % (datpath,dataset_name,v)
+        if verbose:
+            print("Loading %s!" % loadname)
+        ds = xr.open_dataset(loadname)
+        flxes.append(ds[v])
+        
+    # Compute Qnet = FSNS + (FLNS + SHFLX + LHFLX)
+    ds_new = flxes[0] + (flxes[1]+flxes[2]+flxes[3])
+    ds_new = ds_new.rename("qnet")
+    
+    if downwards_positive == False:
+        ds_new *= -1 # Convert to downwards positive
+        
+    return ds_new
+
 #%% SCM rewritten.
 def convert_Wm2(invar,h,dt,cp0=3996,rho=1026,verbose=True,reverse=False):
     """
