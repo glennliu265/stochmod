@@ -43,7 +43,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20220422/"
+    figpath     = projpath + "02_Figures/20220518/" # 0422
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -118,7 +118,7 @@ cl_int     = cint
 
 # Toggles
 notitle    = True
-darkmode   = False
+darkmode   = True
 plotbbox   = False
 useC       = True
 
@@ -138,9 +138,10 @@ fig,axs = plt.subplots(2,2,subplot_kw={'projection':proj},figsize=(12,8),
 if darkmode:
     plt.style.use('dark_background')
     savename = "%sSST_AMVPattern_Comparison_region%s_mask%i_dark.png" % (figpath,bbstr,applymask)
-    fig.patch.set_facecolor('#0B1D3F')
+    fig.patch.set_facecolor('k')#('#0B1D3F')
     dfcol = 'w'
     cset = "k"
+    spalpha = 0.4 # Subplot rectangle
 else:
     #plt.style.use('science')
     savename = "%sSST_AMVPattern_Comparison_region%s_mask%i.png" % (figpath,bbstr,applymask)
@@ -148,6 +149,7 @@ else:
     #fig.patch.set_facecolor("#C6F1FF")
     dfcol = 'k'
     cset = "w"#"#C6F1FF"
+    spalpha = 0.7 # Subplot rectangle
 
 # Plot Stochastic Model Output
 # ----------------------------
@@ -163,7 +165,7 @@ for aid,mid in enumerate([0,2]):
         blabel = [0,0,0,0]
     
     # Make the Plot
-    ax = viz.add_coast_grid(ax,bboxplot,blabels=blabel,line_color=dfcol,
+    ax = viz.add_coast_grid(ax,bboxplot,blabels=blabel,line_color='k',
                             fill_color='gray')
     
     pcm = ax.contourf(lon,lat,amvpats[mid,:,:].T,levels=cint,cmap='cmo.balance')
@@ -183,7 +185,7 @@ for aid,mid in enumerate([0,2]):
     viz.plot_mask(lon,lat,dmsks[mid],ax=ax,markersize=0.3)
     ax.set_facecolor = cset
     
-    ax = viz.label_sp(spid,case='lower',ax=ax,labelstyle="(%s)",fontsize=16,alpha=0.7,fontcolor=dfcol)
+    ax = viz.label_sp(spid,case='lower',ax=ax,labelstyle="(%s)",fontsize=16,alpha=spalpha,fontcolor='k')
     spid += 1
     
 # Plot CESM1
@@ -204,7 +206,7 @@ for cid in range(2):
         spid = 3
         
     # Make the Plot
-    ax = viz.add_coast_grid(ax,bboxplot,blabels=blabel,line_color=dfcol,
+    ax = viz.add_coast_grid(ax,bboxplot,blabels=blabel,line_color='k',
                             fill_color='gray')
     pcm = ax.contourf(lon,lat,camvpats[cid].T,levels=cint,cmap='cmo.balance')
     #ax.pcolormesh(lon,lat,camvpats[cid].T,vmin=cint[0],vmax=cint[-1],cmap='cmo.balance',zorder=-1)
@@ -218,7 +220,7 @@ for cid in range(2):
     if plotbbox:
         ax,ll = viz.plot_box(bbin,ax=ax,leglab="",
                              color=dfcol,linestyle="dashed",linewidth=2,return_line=True)
-    ax = viz.label_sp(spid,case='lower',ax=ax,labelstyle="(%s)",fontsize=16,alpha=0.7,fontcolor=dfcol)
+    ax = viz.label_sp(spid,case='lower',ax=ax,labelstyle="(%s)",fontsize=16,alpha=spalpha,fontcolor='k')
     
     ax.set_facecolor=cset
     
@@ -248,7 +250,6 @@ if notitle is False:
 fig.set_size_inches(9.95, 6.6)
 
 plt.savefig(savename,dpi=outdpi,bbox_inches='tight')
-
 
 # -----------------------------------------------
 #%% (02) Make HadiSST AMV Plot
@@ -784,3 +785,137 @@ ax.grid(True)
 ax.set_aspect('equal')
 
 
+#%% OSM Summary Figure, Updated
+
+notitle    = True
+darkmode   = True
+cbar_horiz = True
+
+cmax  = 0.5
+cstep = 0.025
+lstep = 0.05
+cint,cl_int=viz.return_clevels(cmax,cstep,lstep)
+clb = ["%.2f"%i for i in cint[::4]]
+cl_int  = cint
+
+f = 0
+rid = 4
+
+if cbar_horiz is True:
+    corient  = 'horizontal'
+    cfraction = 0.07
+    cpad      = 0.05
+    figsize   = (10,5)
+else:
+    corient  = 'horizontal'
+    cfraction = 0.018
+    cpad      = 0.02
+    figsize   = (8,3)
+    
+    
+if darkmode:
+    plt.style.use('dark_background')
+    savename = "%sSST_AMVPattern_Comparison_dark_summary.png" % (figpath)
+    fig.patch.set_facecolor('black')
+    dfcol = 'k'
+else:
+    plt.style.use('default')
+    savename = "%sSST_AMVPattern_Comparison_summary.png" % (figpath)
+    fig.patch.set_facecolor('white')
+    dfcol = 'k'
+
+spid = 0
+proj = ccrs.PlateCarree()
+fig,axs = plt.subplots(1,2,subplot_kw={'projection':proj},figsize=figsize,
+                       constrained_layout=True)
+
+
+aid = 0
+mid = 2
+ax = axs.flatten()[aid]
+
+# Set Labels, Axis, Coastline
+blabel = [1,0,0,1]
+
+# Make the Plot
+ax = viz.add_coast_grid(ax,bboxplot,blabels=blabel,line_color='k',
+                        fill_color='gray')
+
+pcm = ax.contourf(lon,lat,amvpats[mid,:,:].T,levels=cint,cmap='cmo.balance')
+cl = ax.contour(lon,lat,amvpats[mid,:,:].T,levels=cl_int,colors="k",linewidths=0.5)
+ax.clabel(cl,levels=cl_int[::2],fontsize=clabel_fsz,fmt="%.02f")
+
+ptitle = "%s" % (modelnames[mid])
+
+ax.set_title(ptitle,fontsize=title_fsz)
+if plotbbox:
+    ax,ll = viz.plot_box(bbin,ax=ax,leglab="AMV",
+                         color=dfcol,linestyle="dashed",linewidth=2,return_line=True)
+
+viz.plot_mask(lon,lat,dmsks[mid],ax=ax,markersize=0.3)
+ax.set_facecolor = cset
+
+ax = viz.label_sp(spid,case='lower',ax=ax,labelstyle="(%s)",fontsize=16,alpha=spalpha,fontcolor='k')
+spid += 1
+    
+# Plot CESM1
+# ----------
+cid = 1
+ax = axs[1]
+blabel = [0,0,0,1]
+    
+# Make the Plot
+ax = viz.add_coast_grid(ax,bboxplot,blabels=blabel,line_color='k',
+                        fill_color='gray')
+pcm = ax.contourf(lon,lat,camvpats[cid].T,levels=cint,cmap='cmo.balance')
+#ax.pcolormesh(lon,lat,camvpats[cid].T,vmin=cint[0],vmax=cint[-1],cmap='cmo.balance',zorder=-1)
+cl = ax.contour(lon,lat,camvpats[cid].T,levels=cl_int,colors="k",linewidths=0.5)
+ax.clabel(cl,levels=cl_int[::2],fontsize=clabel_fsz,fmt="%.02f")
+
+ptitle = "CESM-%s" % (mconfigs[cid])
+
+ax.set_title(ptitle,fontsize=title_fsz)
+if plotbbox:
+    ax,ll = viz.plot_box(bbin,ax=ax,leglab="",
+                         color=dfcol,linestyle="dashed",linewidth=2,return_line=True)
+ax = viz.label_sp(spid,case='lower',ax=ax,labelstyle="(%s)",fontsize=16,alpha=spalpha,fontcolor='k')
+
+ax.set_facecolor=cset
+    
+# Set Colorbar parameters
+if useC:
+    x = 1.16
+    y = .89
+
+    cbar_label = "SST ($\degree C \, \sigma_{AMV}^{-1}$)"
+else:
+    x   = 1.15
+    y   = .89
+
+    cbar_label = "SST ($K \, \sigma_{AMV}^{-1}$)"
+
+# Make Colorbar and Label
+cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='vertical',fraction=0.015,pad=0.01)
+# ax = axs[0] # Reference to first Colorbar
+# ax.text(x,y,cbar_label,horizontalalignment='center',verticalalignment='center',
+#         transform=ax.transAxes,fontsize=clabel_fsz)
+
+    
+
+if notitle is False:
+    plt.suptitle("%s AMV Pattern and Index Variance" % (bbfancy),fontsize=14)
+    
+fig.set_size_inches(9.95, 6.6)
+
+
+#cb = fig.colorbar(pcm,ax=axs.flatten(),orientation=corient,fraction=cfraction,pad=cpad)
+cb.set_ticks(cint[::4])
+#cb.ax.set_xticklabels(clb,rotation=45)
+#cb.set_label("SST ($K \, \sigma_{AMV}^{-1}$)")
+#cb.ax.set_xticklabels(cint[::2],rotation=90)
+#tick_start = np.argmin(abs(cint-cint[0]))
+#cb.ax.set_xticklabels(cint[tick_start::2],rotation=90)
+if notitle is False:
+    plt.suptitle("%s AMV Pattern and Index Variance [Forcing = %s]" % (regionlong[rid],frcnamelong[f]),fontsize=14)
+
+plt.savefig(savename,dpi=150,bbox_inches='tight')

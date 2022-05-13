@@ -39,17 +39,21 @@ import cmocean
 projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath = projpath + '03_Scripts/stochmod/'
 datpath    = projpath + '01_Data/'
-outpath    = projpath + '02_Figures/20220214/'
+outpath    = projpath + '02_Figures/20220518/'
 input_path  = datpath + 'model_input/'
 proc.makedir(outpath)
 
 # Put slab version first, then the load_load func. searches in the same
 # directory replace "SLAB_PIC" with "FULL_PIC"
-frcname = "flxeof_090pct_SLAB-PIC_eofcorr2"
+Fprimename = "_Fprime_rolln0" # Set to None to use Qnet forcing
+
+frcname    = "flxeof_090pct_SLAB-PIC_eofcorr2"
+if Fprimename is not None:
+    frcname += Fprimename
+    #frcame = proc.addstrtoext(frcname,Fprimename)
 
 
 #%% Some utilities
-
 
 #%% Load the damping
 
@@ -79,6 +83,7 @@ vthres  = 0.90
 bboxplot = [-85,5,5,60]
 bbox_NA  = [-80,0 ,10,65]
 
+# Load teh data
 ampfactors = []
 qcorrs     = []
 thresids = []
@@ -101,6 +106,8 @@ for model in tqdm(range(2)):
     # Load Data (EOFs)
     # ----------------
     savename  = "%sNHFLX_%s_%iEOFsPCs_%s.npz" % (input_path,mcname,N_mode,bboxtext)
+    if Fprimename is not None:
+        savename = proc.addstrtoext(savename,Fprimename)
     ld        = np.load(savename,allow_pickle=True)
     eofall    = ld['eofall']
     eofslp    = ld['eofslp']
@@ -112,6 +119,8 @@ for model in tqdm(range(2)):
     # Load Data (Variance Corrections)
     # --------------------------------
     savename1 = input_path + "../NHFLX_EOF_Ratios_%s.npz" % mcname
+    if Fprimename is not None:
+        savename1 = proc.addstrtoext(savename1,Fprimename)
     ld = np.load(savename1)
     varflx_ratio = ld['varflx_ratio']
     nlon,nlat,_,_ = varflx_ratio.shape
@@ -155,18 +164,27 @@ for model in tqdm(range(2)):
 debug = False
 
 # Amplification factor
-def plot_ampfactor(lon,lat,ampfactor,bboxplot,bbox_NA,clvls=np.arange(1,1.55,.05),ax=None,title=True,cbar=True):
+def plot_ampfactor(lon,lat,ampfactor,bboxplot,bbox_NA,clvls=np.arange(1,1.55,.05),
+                   ax=None,title=True,cbar=True,plotbbox=True,cpad=0.05,plotid=None,blabel=[1,0,0,1]):
     if ax is None:
         ax=plt.gca()
     # ampfactpr = [lon x lat x time]
-    ax       = viz.add_coast_grid(ax=ax,bbox=bboxplot)
-    pcm      = ax.contourf(lon,lat,ampfactor.mean(-1).squeeze().T,levels=clvls,cmap="Oranges",extend='both')
-    cl       = ax.contour(lon,lat,ampfactor.mean(-1).squeeze().T,levels=clvls,colors='k',linewidths=.2)
-    ax,ll = viz.plot_box(bbox_NA,ax=ax,leglab="AMV",
-                         color="k",linestyle="dashed",linewidth=2,return_line=True)
+    ax       = viz.add_coast_grid(ax=ax,bbox=bboxplot,fill_color='gray',blabels=blabel)
+    
+    if plotid is None:
+        plotvar = ampfactor.mean(-1).squeeze().T # Plot the mean
+    else:
+        plotvar = ampfactor[:,:,plotid].mean(-1).squeeze().T
+        
+    
+    pcm      = ax.contourf(lon,lat,plotvar,levels=clvls,cmap="Oranges",extend='both')
+    cl       = ax.contour(lon,lat,plotvar,levels=clvls,colors='k',linewidths=.2)
+    if plotbbox:
+        ax,ll = viz.plot_box(bbox_NA,ax=ax,leglab="AMV",
+                             color="k",linestyle="dashed",linewidth=2,return_line=True)
     ax.clabel(cl,levels=np.arange(1,1.5,.1),fontsize=8)
     if cbar:
-        cb       = fig.colorbar(pcm,ax=ax,orientation='horizontal',fraction=0.055)
+        cb       = fig.colorbar(pcm,ax=ax,orientation='horizontal',fraction=0.055,pad=cpad)
     if title:
         ax.set_title(r"Annual Mean Variance Correction ($Q_{net}/Q_{EOF}$)"+ "\nContour Interval = 0.05")
     return ax
@@ -190,19 +208,21 @@ def plot_eofbar(mons3,thresid,vthres,ax=None,title=True):
         ax.text(
             rect.get_x() + rect.get_width() / 2, height + -5, label, ha="center", va="bottom"
         )
-
+    return ax
 #% Plot the correction
-def plot_qcorr(lon,lat,qcorr,bboxplot,clvls=np.arange(1,1.55,.05),ax=None,title=True,cbar=True):
+def plot_qcorr(lon,lat,qcorr,bboxplot,clvls=np.arange(1,1.55,.05),ax=None,
+               title=True,cbar=True,plotbbox=True,cpad=0.05):
     if ax is None:
         ax = plt.gca()
-    ax       = viz.add_coast_grid(ax=ax,bbox=bboxplot)
+    ax       = viz.add_coast_grid(ax=ax,bbox=bboxplot,fill_color='gray')
     pcm      = ax.contourf(lon,lat,qcorr.T,levels=clvls,cmap="Blues",extend='both')
     cl       = ax.contour(lon,lat,qcorr.T,levels=clvls,colors="k",linewidths=0.2)
-    ax,ll = viz.plot_box(bbox_NA,ax=ax,leglab="AMV",
-                         color="k",linestyle="dashed",linewidth=2,return_line=True)
+    if plotbbox:
+        ax,ll = viz.plot_box(bbox_NA,ax=ax,leglab="AMV",
+                             color="k",linestyle="dashed",linewidth=2,return_line=True)
     ax.clabel(cl,levels=np.arange(1,1.5,.1),fontsize=8)
     if cbar:
-        cb       = fig.colorbar(pcm,ax=ax,orientation='horizontal',fraction=0.055)
+        cb       = fig.colorbar(pcm,ax=ax,orientation='horizontal',fraction=0.055,pad=cpad)
     if title:
         ax.set_title(r"Ratio of Stochastic Forcing to $Q_{net}$" + "\n Contour Interval = 0.05")
     return ax
@@ -235,10 +255,7 @@ for model in range(2):
     ax1 = plt.subplot(gs[model,0:1])
     ax1 = plot_eofbar(mons3,thresids[model],vthres,ax=ax1,title=tbool)
     
-    # Amp Factor
-    ax2 = plt.subplot(gs[model,1],projection=proj)
-    ax2 = plot_ampfactor(lon,lat,ampfactors[model],bboxplot,bbox_NA,ax=ax2,title=tbool,cbar=cbool)
-    
+
     # Q-corr
     ax3 = plt.subplot(gs[model,2],projection=proj)
     plot_qcorr(lon,lat,qcorrs[model].mean(-1),bboxplot,ax=ax3,title=tbool,cbar=cbool)
@@ -246,7 +263,85 @@ for model in range(2):
 # Add CESM Slab and FULL Labels
 fig.text(0.07, 0.70, 'SLAB', va='center', rotation='vertical',fontsize=16)
 fig.text(0.07, 0.30, 'FULL', va='center', rotation='vertical',fontsize=16)
-plt.savefig("%sFig04_Forcing_Corrections.png"% (outpath),dpi=150,bbox_inches='tight')
+figname = "%sFig04_Forcing_Corrections.png"% (outpath)
+if Fprimename is not None:
+    figname = proc.addstrtoext(figname,Fprimename)
+plt.savefig(figname,dpi=150,bbox_inches='tight')
+
+#%% For Fprime (no lambda-correction, just plot 2 things)
+
+proj = ccrs.PlateCarree()
+fig  = plt.figure(figsize=(14,10),constrained_layout=True)
+gs   = gridspec.GridSpec(2,2)
+
+for model in range(2):
+    
+    tbool = True if model == 0 else False
+    cbool = True if model == 1 else False
+    
+    # Bar Plot
+    title1 = "# of EOFs required \n to explain %i"%(vthres*100)+"% of $F'$ variance"
+    ax1 = plt.subplot(gs[model,0:1])
+    ax1 = plot_eofbar(mons3,thresids[model],vthres,ax=ax1,title=False)
+    
+    # Amp Factor
+    title2 = r"Local Variance Correction ($F' : F'_{EOF}$)" + "\n Contour Interval = 0.05"
+    ax2 = plt.subplot(gs[model,1],projection=proj)
+    ax2 = plot_ampfactor(lon,lat,ampfactors[model],bboxplot,
+                         bbox_NA,ax=ax2,title=False,cbar=cbool,plotbbox=False,cpad=0.08)
+    
+    if model == 0:
+        ax1.set_title(title1)
+        ax2.set_title(title2)
+    
+    # # Q-corr
+    # ax2 = plt.subplot(gs[model,2],projection=proj)
+    # plot_qcorr(lon,lat,qcorrs[model].mean(-1),bboxplot,ax=ax3,title=tbool,cbar=cbool)
+    
+# Add CESM Slab and FULL Labels
+fig.text(0.07, 0.70, 'CESM-SLAB', va='center', rotation='vertical',fontsize=16)
+fig.text(0.07, 0.30, 'CESM-FULL', va='center', rotation='vertical',fontsize=16)
+figname = "%sFig04_Forcing_Corrections_noampq.png"% (outpath)
+if Fprimename is not None:
+    figname = proc.addstrtoext(figname,Fprimename)
+plt.savefig(figname,dpi=150,bbox_inches='tight')
+
+#%% Quickly plot out the amplification factor for all months
+
+fig,axs = plt.subplots(4,3,figsize=(12,10),
+                       subplot_kw={'projection':proj},constrained_layout=True)
+
+mplot = np.roll(np.arange(0,12),1)
+
+sname = ["Winter","Spring","Summer","Fall"]
+for i in range(12):
+    
+    ax = axs.flatten()[i]
+    im = mplot[i]
+    
+    blabel = [0,0,0,0]
+    if i%3 == 0:
+        blabel[0] = 1
+        s = int(i/3)
+        ax.text(-0.24, 0.5, '%s'% (sname[s]), va='bottom', ha='center',
+            rotation='horizontal', rotation_mode='anchor',
+            transform=ax.transAxes)
+        
+    if i>8:
+        blabel[-1] = 1
+    #title2 = r"Local Variance Correction ($F' : F'_{EOF}$)" + "\n Contour Interval = 0.05"
+    
+    ax = plot_ampfactor(lon,lat,ampfactors[model],bboxplot,
+                         bbox_NA,ax=ax,title=False,cbar=False,plotbbox=False,
+                         cpad=False,plotid=[im,],blabel=blabel)
+    #ax.set_title(mons3[im])
+    viz.label_sp(mons3[im],ax=ax,labelstyle="%s",alpha=0.75,usenumber=True)
+    
+    
+figname = "%sFig04_Variance_Correction_amq.png"% (outpath)
+if Fprimename is not None:
+    figname = proc.addstrtoext(figname,Fprimename)
+plt.savefig(figname,dpi=150,bbox_inches='tight')
 
 #%% -- -- -- -- -- -- -- -- How does NAO/EOF look like after each correction?
 

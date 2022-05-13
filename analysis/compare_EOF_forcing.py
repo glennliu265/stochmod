@@ -585,7 +585,7 @@ specsort = np.sort(specsmc,axis=0) # Sort for each frequency
 conf     = int(0.05 * nmc)
 confs    = [specsort[:conf,:]/dt,specsort[-conf:,:]/dt]
 
-#%%
+#%% Plot spectra for a given EOF, all months
 
 nsmooth   = 200
 pct       = 0.10
