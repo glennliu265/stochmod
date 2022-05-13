@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-
 Compare simple qcorrection vs. theoretical correction
 
 Created on Mon Feb 14 14:37:24 2022
@@ -18,7 +17,6 @@ Created on Mon Feb 14 14:37:24 2022
 4) How does this impact our results, if at all?
 
 @author: gliu
-
 """
 
 import xarray as xr
@@ -49,7 +47,7 @@ elif stormtrack == 0:
     
     datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/"
     #datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/"
-    outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220222/"
+    outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220518/"
 
     lipath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/landicemask_enssum.npy"
     #llpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/"
@@ -61,10 +59,10 @@ import scm
 #%% User Edits
 
 projpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
-figpath     = projpath + "02_Figures/20220214/"
+figpath     = projpath + "02_Figures/20220518/"
 proc.makedir(figpath)
 
-mconfig = "FULL"
+mconfig      = "FULL"
 correct_qnet = True
 
 lonf = -30
@@ -113,15 +111,6 @@ def correct_forcing(F,lbd,h,dt=3600*24*30):
     Fnew = scm.convert_Wm2(Fnew,h,dt,reverse=True)
     return Fnew
 
-# Tile Lambda
-#lbd = np.tile(lbd,nyrs)
-#%% Load in forcing
-
-
-
-
-
-
 #%% Load in EOFs
 
 if summodes:
@@ -141,6 +130,7 @@ else:
 eofs    = []
 pcs     = []
 varexps = []
+eofslps = []
 for i,fname in tqdm(enumerate([Qnetname,Fprimename])):
     
     if summodes:
@@ -156,6 +146,7 @@ for i,fname in tqdm(enumerate([Qnetname,Fprimename])):
             lat = npz['lat']
         eofall = npz['eofall']
         pcall  = npz['pcall']
+        eofslp = npz['eofslp']
         
         #%Flip sign to match NAO+ (negative heat flux out of ocean/ -SLP over SPG) ----
         spgbox     = [-60,20,40,80]
@@ -175,10 +166,12 @@ for i,fname in tqdm(enumerate([Qnetname,Fprimename])):
                     print("Flipping sign for NHFLX, mode %i month %i" % (N+1,m+1))
                     eofall[:,:,m,N]*=-1
                     pcall[N,m,:] *= -1
+                    eofslp[:,:,m,N] *= -1
 
                     
         eofs.append(eofall) # [lon x lat x month x mode] (or mode x month for summodes)
         pcs.append(pcall)
+        eofslps.append(eofslp)
         varexps.append(npz['varexpall'])
 
 klon,klat = proc.find_latlon(lonf,latf,lon,lat)
@@ -433,7 +426,6 @@ for f in range(3):
 
 #%% Plot seasonal averages for a given mode
 
-
 N_modes = np.arange(0,10,1)
 
 # Plotting params
@@ -468,3 +460,190 @@ for N_mode in N_modes:
         cb.set_label("Forcing ($Wm^{-2}$)")
         plt.savefig("%s%s_Savg_EOF_Pattern_Differences_mode%i.png"% (figpath,vlabels_fn[f],N_mode+1),
                     dpi=150)
+        
+#%% Set up Plot of EOF
+
+nplot = 5
+iplot = 1 # 0=Qnet, 1=Fprime
+
+
+plotmodes = np.arange(10,15,1)#np.arange(5) # np.arange(5,10)  #
+
+fnt_title = 14
+
+if plotmodes[0] == 0:
+    cint_slp = np.arange(-500,550,50)
+    cint     = np.arange(-60,65,5)
+    slp_lbl  = cint_slp[::2]
+elif plotmodes[0] == 5:
+    cint_slp = np.arange(-200,220,20)
+    cint     = np.arange(-30,33,3)
+    slp_lbl  = cint_slp[::2]
+elif plotmodes[0] == 10:
+    cint_slp = np.arange(-100,110,10)
+    cint     = np.arange(-20,22,2)
+    slp_lbl  = cint_slp[::2]
+
+fig,axs = plt.subplots(5,4,figsize=(16,12),constrained_layout=True,
+                       subplot_kw={'projection':ccrs.PlateCarree()})
+
+for N in tqdm(range(len(plotmodes))):
+    iN = plotmodes[N]
+    
+    
+    flxin = eofs[iplot][...,iN]     # Lon x Lat x Month
+    slpin = eofslps[iplot][...,iN]
+    
+    flx_savg,snames = proc.calc_savg(flxin,return_str=True)
+    slp_savg        = proc.calc_savg(slpin)
+    var_savg        = proc.calc_savg(varexps[-1][iN,...]*100)
+    
+    for s,sname in enumerate(snames):
+        
+        ax = axs[N,s]
+        
+        # Labeling
+        if N == 0:
+            ax.set_title(snames[s],fontsize=fnt_title)
+        blabel=[0,0,0,0]
+        if s == 0:
+            blabel[0] = 1
+            
+            ax.text(-0.24, 0.5, 'EOF %i'% (iN+1), va='bottom', ha='center',
+                rotation='horizontal', rotation_mode='anchor',
+                transform=ax.transAxes,fontsize=fnt_title)
+        if N == (nplot-1):
+            blabel[-1] = 1
+        ax = viz.add_coast_grid(ax,bbox=bboxplot,ignore_error=True,
+                                blabels=blabel,fill_color='gray')
+        
+        pcm = ax.contourf(lon,lat,flx_savg[s].T,levels=cint,cmap='cmo.balance',extend='both')
+        cl  = ax.contour(lon,lat,slp_savg[s].T,levels=cint_slp,colors='k',linewidths=0.75)
+        ax.clabel(cl,slp_lbl)
+        
+        ax = viz.label_sp("%.2f" % var_savg[s]+"%",labelstyle="%s",alpha=0.7,usenumber=True,ax=ax)
+
+cb = fig.colorbar(pcm,ax=axs.flatten(),fraction=0.025,pad=0.01)
+cb.set_label("$Q_{net}$ ($W m^{-2}$), (+) downwards")
+plt.savefig("%sEOF_SLP_FLX_Fprime_mode%ito%i.png" %  (figpath,plotmodes[0]+1,plotmodes[-1]+1),dpi=200,bbox_inches='tight')
+
+#%% Compute the power spectra of each principle component
+
+
+nsmooth   = 500
+pct       = 0.10
+dt        = 3600*24*365
+
+xper      = np.array([100,20,10,5,2])
+xtks      = 1/xper
+xlm       = [xtks[0],xtks[-1]]
+
+plotmodes = np.arange(0,5,1)
+nplot     = len(plotmodes)
+
+fig,axs = plt.subplots(nplot,1,figsize=(8,8),sharey=True)
+
+for N in range(nplot):
+    ax   = axs[N]
+    iN   = plotmodes[N]
+    
+    pcin   = pcs[iplot][iN,:,:-1].T # Transpose to [Time x Month]
+    pclist = [pcin[:,m] for m in range(12)] # Separate into a list
+    
+    specs,freqs,CCs,dofs,r1s = scm.quick_spectrum(pclist,nsmooth,pct,dt=dt)
+    
+    for m in range(12):
+        if m > 0:
+            break
+        ax.plot(freqs[m]*dt,specs[m]/dt,label="m=%i"% (m+1),lw=3)
+        
+        nfreq  = len(freqs[m])
+        df     = (freqs[m][1]-freqs[m][0])*dt
+        sigmaf = np.var(pclist[m])/nfreq/df
+        ax.plot(freqs[m]*dt,np.ones(nfreq)*sigmaf,ls='dashed',color="k")
+        
+        
+    if N == 0:
+        ax.legend(ncol=4,fontsize=10)
+    
+    ax.set_xlim(xlm)
+    ax.set_xticks(xtks)
+    ax.set_xticklabels(xper)
+    
+    
+# DO montecarlo
+nmc   = 1000
+ntime = len(pclist[0])
+for n in tqdm(range(nmc)):
+    randts = np.random.normal(0,1,ntime)
+    specs,freqs,_,_,_ = scm.quick_spectrum(pclist,nsmooth,pct,dt=dt)
+    if n == 0:
+        specsmc = np.zeros((nmc,len(specs[0])))
+    specsmc[n,:] = specs[0]
+
+specsort = np.sort(specsmc,axis=0) # Sort for each frequency
+conf     = int(0.05 * nmc)
+confs    = [specsort[:conf,:]/dt,specsort[-conf:,:]/dt]
+
+#%%
+
+nsmooth   = 200
+pct       = 0.10
+dt        = 3600*24*365
+
+xper      = np.array([100,20,10,5,2])
+xtks      = 1/xper
+xlm       = [xtks[0],xtks[-1]]
+
+plotmodes = np.arange(0,5,1)
+nplot     = len(plotmodes)
+
+
+vlms      = [1.5,2.2]
+
+fig,axs = plt.subplots(nplot,1,figsize=(8,14),sharey=True)
+
+for N in range(nplot):
+    ax   = axs[N]
+    iN   = plotmodes[N]
+    
+    pcin   = pcs[iplot][iN,:,:-1].T # Transpose to [Time x Month]
+    pclist = [pcin[:,m] for m in range(12)] # Separate into a list
+    
+    specs,freqs,CCs,dofs,r1s = scm.quick_spectrum(pclist,nsmooth,pct,dt=dt)
+    
+    if vlms is None:
+        pcm=ax.pcolormesh(freqs[m]*dt,np.arange(1,13,1),np.array(specs)/dt,cmap="inferno",shading='nearest')
+        fig.colorbar(pcm,ax=ax,fraction=0.025,pad=0.01)
+    else:
+        pcm=ax.pcolormesh(freqs[m]*dt,np.arange(1,13,1),np.array(specs)/dt,
+                          vmin=vlms[0],vmax=vlms[-1],cmap="inferno",shading='nearest')
+        if N == nplot-1:
+            cb = fig.colorbar(pcm,ax=axs.flatten(),fraction=0.025,pad=0.01)
+            cb.set_label("Power $(W/m^{2})^2 cpy^{-1}$")
+        
+    ax.text(-0.15, 0.5, 'EOF %i'% (iN+1), va='bottom', ha='center',
+        rotation='horizontal', rotation_mode='anchor',
+        transform=ax.transAxes,fontsize=fnt_title)
+    
+    ax.set_xlim(xlm)
+    ax.set_xticks(xtks)
+    ax.set_xticklabels(xper)
+    
+    ax.grid(True,ls='dotted')
+    ax.set_yticks(np.arange(1,13))
+    ax.set_yticklabels(proc.get_monstr(3))
+
+#%%
+
+
+
+#fig,ax = plt.subplots(1,1)
+
+#freqs[0]
+    
+    
+
+#%%
+
+
