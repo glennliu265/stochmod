@@ -28,7 +28,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20220422/"
+    figpath     = projpath + "02_Figures/20220518/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -965,6 +965,41 @@ plt.tight_layout()
 plt.savefig("%sRegional_Autocorrelation_Spectra%s.png"%(figpath,smoothname),
             dpi=200,transparent=False)
 
+#%% Plot the North Atlantic Power Spectra
+
+rid = 3
+
+# Plotting params
+
+
+# Spectra
+dtplot = 3600*24*365
+#xlims  = [1/100,1/2]
+xper   = np.array([100,20,10,5,2])
+xtk2   = 1/xper
+xlm    = [xtk2[0],xtk2[-1]]
+
+
+
+inspec = specsall[rid]
+infreq = freqsall[rid]
+
+
+fig,axs = plt.subplots(2,1,figsize=(12,12))
+
+# Plot the autocorrelation
+ax = axs[0]
+
+
+ax = axs[1]
+
+for s in range(len(specnames)):
+    
+    ax.plot(infreq[s]*dtplot,inspec[s]/dtplot,color=speccolors[s])
+
+ax.set_xticks(xtk2)
+ax.set_xlim(xlm)
+
 #%% Make the Corresponding Bounding Box
 
 
@@ -1035,7 +1070,6 @@ plotlog  = True
 # Interpolate the data
 freqslab   = freqsall[0][-1]
 freqfull   = freqsall[0][-2]
-
 
 if debug:
     interpfull = np.interp(freqslab,freqfull,specsall[0][-2])
@@ -1310,3 +1344,8 @@ plt.savefig("%sRegional_Spectra_Ratio_2-panel_%s.png"%(figpath,flab),dpi=150,bbo
     
 
 # plt.show()
+
+#%% Appendix Plot: North Atlantic SST
+
+fig = plt.figure()
+
