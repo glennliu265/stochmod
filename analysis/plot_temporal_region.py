@@ -99,12 +99,15 @@ bbox_NA     = [-80,0 ,0,65]
 bbox_NA_new = [-80,0,10,65]
 bbox_ST_w   = [-80,-40,20,40]
 bbox_ST_e   = [-40,-10,20,40]
-regions     = ("SPG","STG","TRO","NAT","NNAT","STGe","STGw")        # Region Names
-bboxes      = (bbox_SP,bbox_ST,bbox_TR,bbox_NA,bbox_NA_new,bbox_ST_e,bbox_ST_w) # Bounding Boxes
-regionlong  = ("Subpolar","Subtropical","Tropical","North Atlantic","North Atlantic","Subtropical (East)","Subtropical (West)",)
+bbox_NA_et  = [-80,0,20,60]
+regions     = ("SPG","STG","TRO","NAT","NNAT","STGe","STGw","eNAT")        # Region Names
+bboxes      = (bbox_SP,bbox_ST,bbox_TR,bbox_NA,bbox_NA_new,bbox_ST_e,bbox_ST_w,bbox_NA_et) # Bounding Boxes
+regionlong  = ("Subpolar","Subtropical","Tropical","North Atlantic",
+               "North Atlantic","Subtropical (East)","Subtropical (West)",
+               "Extratropical North Atlantic")
 bbcol       = ["Blue","Red","Yellow","Black","Black"]
-bbcol       = ["cornflowerblue","Red","Yellow","Black","Black","limegreen","indigo"]
-bbsty       = ["solid","dashed","solid","dotted","dotted","dashed","dotted"]
+bbcol       = ["cornflowerblue","Red","Yellow","Black","Black","limegreen","indigo","Black"]
+bbsty       = ["solid","dashed","solid","dotted","dotted","dashed","dotted",'dashed']
 
 # AMV Contours
 cint        = np.arange(-0.45,0.50,0.05) # Used this for 7/26/2021 Meeting
@@ -391,7 +394,7 @@ cesmname   =  ["CESM-FULL","CESM-SLAB"]
 # Identify the variance for each region and load in numpy arrays
 sstvarscesm = np.zeros((len(regions),2)) # Forcing x Region x Model
 
-for rid in range(len(regions)-1):
+for rid in range(len(regions)):
     for model in range(len(cesmname)):
         sstin  = sstcesm[rid][model]
         sstvar = np.var(sstin)
@@ -967,38 +970,94 @@ plt.savefig("%sRegional_Autocorrelation_Spectra%s.png"%(figpath,smoothname),
 
 #%% Plot the North Atlantic Power Spectra
 
-rid = 3
+rid = 7
 
 # Plotting params
-
+# ---------------
+# Autocorrelation
+xtk1 = np.arange(0,38,2)
+xlm1 = [xtk1[0],xtk1[-1]]
+xtk1_lbl = viz.prep_monlag_labels(1,xtk1,3,useblank=False)
 
 # Spectra
 dtplot = 3600*24*365
-#xlims  = [1/100,1/2]
 xper   = np.array([100,20,10,5,2])
 xtk2   = 1/xper
-xlm    = [xtk2[0],xtk2[-1]]
+xlm2   = [xtk2[0],xtk2[-1]]
 
-
-
+# Select the Correct Spectra -------------------
 inspec = specsall[rid]
 infreq = freqsall[rid]
+kmonth = kmonths[rid]
+speclabels = ["%s (%.3f $^{\circ}C^2$)" % (specnames[i],sstvarall[rid][i]) for i in range(len(inspec)) ]
+mons   = proc.get_monstr()
+bbin    = bboxes[rid]
+bblabel = "Lon: %i to %i $\degree$E, Lat: %i to %i $\degree$N" %(bbin[0],bbin[1],bbin[2],bbin[3])
 
+fig,axs = plt.subplots(2,1,figsize=(10,8),constrained_layout=True)
 
-fig,axs = plt.subplots(2,1,figsize=(12,12))
-
+# ------------------------
 # Plot the autocorrelation
 ax = axs[0]
 
-
-ax = axs[1]
-
-for s in range(len(specnames)):
+for s in range(3):
+    ax.fill_between(lags,cfstoch[rid,s,lags,0],cfstoch[rid,s,lags,1],
+                                     color=mcolors[s],alpha=0.10,zorder=9)
+    ax.plot(sstac_avg[rid,s,:],color=mcolors[s],lw=3)
     
-    ax.plot(infreq[s]*dtplot,inspec[s]/dtplot,color=speccolors[s])
+for c in range(2):
+    ax.fill_between(lags,cfcesm[rid,c,lags,0],cfcesm[rid,c,lags,1],
+                                     color=cesmcolor[c],alpha=0.10,zorder=9)
+    ax.plot(cesmacs[rid][c],color=cesmcolor[c],lw=3)
 
-ax.set_xticks(xtk2)
-ax.set_xlim(xlm)
+ax.set_xlim(xlm1)
+ax.set_xticks(xtk1)
+ax.set_xlabel("Lag (Months)")
+ax.set_xticklabels(xtk1_lbl)
+ax.set_ylabel("Correlation")
+ptitle = "%s Area-Averaged SST Autocorrelation \n %s Avg. (%s)" % (mons[kmonth],regions[rid],bblabel)
+ax.set_title(ptitle)
+ax.grid(True,ls='dotted')
+
+
+# ----------------
+# Plot the spectra
+ax = axs[1]
+for s in range(len(specnames)):
+    ax.plot(infreq[s]*dtplot,inspec[s]/dtplot,color=speccolors[s],lw=3,label=speclabels[s])
+
+#ax.set_xticks(xtk2)
+ax.set_xlim(xlm2)
+#ax2 = viz.twin_freqaxis(ax,infreq[s],"Years",dtplot,mode='lin-lin',xtick=xtk2)
+ax2 = ax.twiny()
+ax2.set_xticks(xtk2)
+ax2.set_xticklabels(xper)
+ax2.set_xlim(xlm2)
+ax2.set_xlabel("Period (Years)")
+ax.set_xlabel("Frequency ($year^{-1}$)")
+ax.set_ylabel("Power ($\degree C^2 \, year^{-1}$)")
+ax2.grid(True,ls='dotted')
+
+ax.legend()
+
+# Add an inset
+# ------------
+zoomrng = 10
+
+bbplot = [bbin[0]-zoomrng,bbin[1]+zoomrng,bbin[2]-zoomrng,bbin[3]+zoomrng]
+left, bottom, width, height = [0.75, 0.66, 0.20, 0.35]
+axin = fig.add_axes([left, bottom, width, height],projection=ccrs.PlateCarree())
+axin = viz.add_coast_grid(axin,bbox=bbplot,fill_color='gray',
+                          fix_lon=[bbin[0],bbin[1]],
+                          fix_lat=[bbin[2],bbin[3]])
+axin.set_facecolor('lightblue')
+axin = viz.plot_box(bbin,ax=axin,color=bbcol[rid],proj=ccrs.PlateCarree(),
+                    linewidth=4,linestyle='dashed',)
+
+#pcm = ax2.contourf(lonr,latr,amvpats_avg.T,levels=cint,cmap='cmo.balance')
+#ax2.plot(lonr2[klon],latr2[klat],marker="x",color="k",markersize=10)
+
+plt.savefig("%sCESM_v_SM_ac_spectra_%s.png"% (figpath,regions[rid]),dpi=150)
 
 #%% Make the Corresponding Bounding Box
 
