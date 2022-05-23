@@ -1102,7 +1102,11 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
     # (Defaults to method 4) 0 = Failed test
     # Output indicates whicn regions to include
     # ------------------------------------------
-    moden   = proc.get_stringnum(expid,"method",nchars=1,verbose=verbose) # Get mode number from experiment name
+    if 'method' in expid:
+        moden   = proc.get_stringnum(expid,"method",nchars=1,verbose=verbose) # Get mode number from experiment name
+    else:
+        moden   = "5"# Use 5 as default
+    
     mskslab = np.load(rawpath+"SLAB_PIC_NHFLX_Damping_monwin3_sig005_dof893_mode%s_mask.npy" %  moden)
     mskfull = np.load(rawpath+"FULL_PIC_NHFLX_Damping_monwin3_sig005_dof1893_mode%s_mask.npy"% moden)
     dmskin = [mskslab,mskfull]
