@@ -23,18 +23,18 @@ from tqdm import tqdm
 
 # Set Machine
 # -----------
-stormtrack = True # Set to True to run on stormtrack, False for local run
+stormtrack = 0 # Set to True to run on stormtrack, False for local run
 
 # Autocorrelation parameters
 # --------------------------
-lags        = np.arange(0,37)
+lags        = np.arange(0,61)
 lagname     = "lag%02ito%02i" % (lags[0],lags[-1]) 
 thresholds  = [0,] # Standard Deviations
 conf        = 0.95
 tails       = 2
 
-mconfig    = "HTR-FULL" #["PIC-FULL","HTR-FULL","PIC_SLAB","HadISST","ERSST"]
-
+mconfig    = "SM" #["PIC-FULL","HTR-FULL","PIC_SLAB","HadISST","ERSST"]
+runid      = 6
 thresholds = [0,]
 thresname  = "thres" + "to".join(["%i" % i for i in thresholds])
 varname    = "SST" # ["TS","SSS","SST]
@@ -97,7 +97,7 @@ if mconfig == "SM": # Stochastic model
     # Postprocess Continuous SM  Run
     # ------------------------------
     print("WARNING! Not set up for stormtrack yet.")
-    fnames      = ["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_dmp0"%i for i in range(10)]
+    fnames      = ["stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_dmp0.npz" %i for i in range(10)]
     mnames      = ["constant h","vary h","entraining"] 
 elif "PIC" in mconfig:
     # Postproess Continuous CESM Run
@@ -123,18 +123,21 @@ elif mconfig == "ERSST":
 # Set Output Directory
 # --------------------
 proc.makedir(figpath)
-savename   = "%s%s_%s_autocorrelation_%s.npz" %  (outpath,mconfig,varname,thresname)
+savename   = "%s%s_%s_autocorrelation_%s_%s.npz" %  (outpath,mconfig,varname,thresname,lagname)
+if mconfig == "SM":
+    savename = proc.addstrtoext(savename,"_runid2%02i" % (runid))
+
 print("Output will save to %s" % savename)
 
 #%% Read in the data (Need to update for variable name)
 st = time.time()
 
-if mconfig == "PIC_FULL":
+if mconfig == "PIC-FULL":
     sst_fn = fnames[0]
-elif mconfig == "PIC_SLAB":
+elif mconfig == "PIC-SLAB":
     sst_fn = fnames[1]
 else:
-    sst_fn = fnames[0]
+    sst_fn = fnames[runid]
 print("Processing: " + sst_fn)
 
 if ("PIC" in mconfig) or ("SM" in mconfig):
@@ -149,13 +152,16 @@ if ("PIC" in mconfig) or ("SM" in mconfig):
         lon = ld['lon']
         lat = ld['lat']
         sst = ld['sst'] # [model x lon x lat x time]
+        
+        # Transpose to [lon x lat x time x otherdims]
+        sst = sst.transpose(1,2,3,0)
+        
     elif 'nc' in sst_fn:
         print("Loading netCDF")
         ds  = xr.open_dataset(datpath+sst_fn)
         
         ds  = ds.sel(lon=slice(-80,0),lat=slice(0,65))
-        
-        
+            
         lon = ds.lon.values
         lat = ds.lat.values
         sst = ds[varname].values # [lon x lat x time]
@@ -213,7 +219,7 @@ if loadmask:
 #%% Do the calculations
 """
 Inputs are:
-    1) variable [lon x lat x time]
+    1) variable [lon x lat x time x otherdims]
     2) lon      [lon]
     3) lat      [lat]
     4) thresholds [Numeric] (Standard Deviations)
