@@ -62,6 +62,7 @@ if ensorem: # Load full field with ENSO removed
     ld2 = np.load(datpath+"SLAB_PIC_ENSOREM_TS_lag1_pcs2_monwin3.npz" ,allow_pickle=True)
     sstslab = ld2['TS']
     remove_anom=True
+    
 else: # Load anomalies without ENSO removal (~82 sec)
     ssts     = []
     mconfigs = ["FULL","SLAB"]
@@ -81,8 +82,8 @@ print("Loaded PiC Data in %.2fs"%(time.time()-st))
 #%% Preprocessing
 # --------------
 st = time.time()
+
 def preproc_CESMPIC(sst,remove_anom=True,limask=None):
-    
     # Apply Land/Ice Mask
     if limask is None:
         mask = np.load(datpath+"landicemask_enssum.npy")

@@ -1168,9 +1168,6 @@ for m in range(12):
     ax.set_xlabel("Mode")
     ax.set_title("%s, Area Average of EOF)"% (mons3[m]))
     plt.savefig("%sEOF_NHFLX_Area_Avg_Mon%02d.png"%(outpath,m+1),dpi=200)
-    
-
-    
 # -------------------------
 #%% Plot Spectra of the PCs
 # -------------------------

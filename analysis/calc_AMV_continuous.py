@@ -188,7 +188,6 @@ if debug:
     f = 0
     fname = fnames[f]
 
-
 # Load in data and take annual average
 sst_all = []
 for f, fname in tqdm(enumerate(fnames)):
@@ -221,8 +220,8 @@ for mconfig in mconfigs:
 # %% Now Compute the AMV Pattern
 
 applymask = False
-amvbboxes = ([-80, 0, 10, 65], [-80, 0, 20, 60],
-             [-80, 0, 40, 60], [-80, 0, 0, 65])
+amvbboxes = ([-80, 0, 0, 65], [-80, 0, 20, 60],
+             [-80, 0, 40, 60], [-80, 0, 10, 65])
 nboxes = len(amvbboxes)
 nmod, nlon, nlat, nyr = sst_all.shape
 
@@ -236,7 +235,7 @@ for b, bbin in tqdm(enumerate(amvbboxes)):
 
     # Do for Stochastic Models
     for mid in range(nmod):
-
+        
         if applymask:
             inmask = dmsks[mid]
         else:
@@ -246,7 +245,7 @@ for b, bbin in tqdm(enumerate(amvbboxes)):
                                            runmean=False, dropedge=5, mask=inmask)
         amvpats[mid, ..., b] = amvpat.copy()
         amvids[mid, ..., b] = amvid.copy()
-
+        
     # Do for CESM
     cpats = []
     cids = []

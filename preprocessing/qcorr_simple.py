@@ -27,12 +27,13 @@ import xarray as xr
 
 #%% Set Paths, Import Custom Modules
 stormtrack = 0
+
 if stormtrack == 0:
     projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20220210/"
+    figpath     = projpath + "02_Figures/20220519/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -51,13 +52,12 @@ import scm
 import tbx
 
 proc.makedir(figpath)
-
 #%% Used Edits
 
-lonf    = -30
-latf    = 50
+lonf       = -30
+latf       = 50
 
-mconfig    = "SLAB"
+mconfig    = "FULL"
 frcname    = "flxeof_090pct_FULL-PIC_eofcorr2"
 input_path = rawpath
 
@@ -119,7 +119,6 @@ for mconfig in mconfigs:
     
     #%% Use the function used for sm_rewrite.py, load in lambda
     # [lon x lat x month]
-    
     inputs = scm.load_inputs('SLAB_PIC',frcname,input_path,load_both=True)
     lon,lat,h,kprevall,dampingslab,dampingfull,alpha,alpha_full = inputs
     if mconfig == 'SLAB':
