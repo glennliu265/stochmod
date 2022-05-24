@@ -23,7 +23,7 @@ from tqdm import tqdm
 
 # Set Machine
 # -----------
-stormtrack = 0 # Set to True to run on stormtrack, False for local run
+stormtrack = 1 # Set to True to run on stormtrack, False for local run
 
 # Autocorrelation parameters
 # --------------------------
@@ -33,14 +33,14 @@ thresholds  = [0,] # Standard Deviations
 conf        = 0.95
 tails       = 2
 
-mconfig    = "SM" #["PIC-FULL","HTR-FULL","PIC_SLAB","HadISST","ERSST"]
-runid      = 6
+mconfig    = "HTR-FULL" #["PIC-FULL","HTR-FULL","PIC_SLAB","HadISST","ERSST"]
+runid      = 9
 thresholds = [0,]
 thresname  = "thres" + "to".join(["%i" % i for i in thresholds])
 varname    = "SST" # ["TS","SSS","SST]
 
 # Set to False to not apply a mask (otherwise specify path to mask)
-loadmask   = False#"/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/model_input/limask180_FULL-HTR.npy"
+loadmask   = False #"/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/model_input/limask180_FULL-HTR.npy"
 glonpath   = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/model_input/CESM1_lon180.npy"
 glatpath   = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/model_input/CESM1_lat.npy"
 
