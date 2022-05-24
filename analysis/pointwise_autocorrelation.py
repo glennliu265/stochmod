@@ -136,8 +136,10 @@ if mconfig == "PIC-FULL":
     sst_fn = fnames[0]
 elif mconfig == "PIC-SLAB":
     sst_fn = fnames[1]
-else:
+elif "SM" in mconfig:
     sst_fn = fnames[runid]
+else:
+    sst_fn = fnames[0]
 print("Processing: " + sst_fn)
 
 if ("PIC" in mconfig) or ("SM" in mconfig):
