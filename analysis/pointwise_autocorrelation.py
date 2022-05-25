@@ -17,7 +17,7 @@ import time
 import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
-from tqdm import tqdm 
+from tqdm import tqdm
 
 #%% Select dataset to postprocess
 
@@ -37,7 +37,7 @@ mconfig    = "HTR-FULL" #["PIC-FULL","HTR-FULL","PIC_SLAB","HadISST","ERSST"]
 runid      = 9
 thresholds = [0,]
 thresname  = "thres" + "to".join(["%i" % i for i in thresholds])
-varname    = "SST" # ["TS","SSS","SST]
+varname    = "SSS" # ["TS","SSS","SST]
 
 # Set to False to not apply a mask (otherwise specify path to mask)
 loadmask   = False #"/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/model_input/limask180_FULL-HTR.npy"
