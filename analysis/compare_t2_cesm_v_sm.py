@@ -611,8 +611,8 @@ Some scrap to decide on the bounding box/region
 
 #%% Indicate Region of Analysis
 ithres = 2
-bbsel  = [-65,-43,42,47] #[-60,-40,35,45]# Indicate region section here
-
+bbsel    = [-65,-43,42,47]#[-43,-25,50,56] #[-60,-40,35,45]# Indicate region section here
+locfancy = "Transition Zone"#"SPG Center" 
 locfn,loctitle = proc.make_locstring_bbox(bbsel)
 
 # Selecting plotting variable for insets
@@ -832,6 +832,88 @@ axin.set_title("$T_2$ Difference (CESM-FULL - Entrain)")
 plt.suptitle("CESM-FULL vs. Entrain for %s" % loctitle,fontsize=16,y=0.92)
 
 plt.savefig("%sFULLvEntrain_SummaryFig_%s_k%s_thres%i.png" % (figpath,locfn,ksel,ithres),dpi=150,bbox_inches="tight")
+
+# -----------------------------------------------------------------------------
+#%% Same Plot as Above (but without the locator) [For AMV Teleconf]
+# -----------------------------------------------------------------------------
+
+cp0=3996
+rho=1026
+dt =3600*24*30
+imodels = [1,-1] # Models to plot ACF for 
+
+include_params = False
+
+xtks     = np.arange(0,66,6)
+fig = plt.figure(figsize=(16,8))
+
+
+if include_params:
+    fig,axs = plt.subplots(2,1,figsize=(8,8))
+
+
+
+    # (0) Plot Effective Parameters
+    # --------------------------
+    ax = axs[0]
+    veff_names = ["Effective Forcing","Effective Damping"]
+    vcoloreff  = ("","cornflowerblue","salmon")
+    for v in range(2):
+        
+        kvar    = v+1
+        plotvar = invars[kvar]/invars[0] / (rho*cp0) * dt
+        
+        for n in range(npts):
+            
+            ax.plot(mons3,plotvar[n,:],label="",alpha=0.1,color=vcoloreff[kvar])
+            
+        # Plot mean
+        ax.plot(mons3,np.nanmean(plotvar,0),label=veff_names[v],alpha=1,color=vcoloreff[kvar])
+        
+        # Plot stdev
+        #ax.plot(mons3,np.nanmean(plotvar,0)+np.nanstd(plotvar,0),ls='dashed',alpha=1,color=vcoloreff[kvar])
+        #ax.plot(mons3,np.nanmean(plotvar,0)-np.nanstd(plotvar,0),ls='dashed',alpha=1,color=vcoloreff[kvar])
+            
+        ax.grid(True,ls='dotted')
+        ax.set_xlim([0,11])
+    ax.set_ylabel("Effective Forcing/Damping ($\degree C$ $sec^{-1}$)")
+    ax.legend()
+
+    # (1) Plot Autocorrelations
+    # ---------------------
+    ax = axs[1]
+else:
+    fig,ax = plt.subplots(1,1,figsize=(8,4))
+    
+    
+acr_flatten = acr.reshape((npts,)+acr.shape[2:]) # [pt x model x thres xlag]
+
+for i in range(2):
+    imodel = imodels[i]
+    
+    for n in range(npts):
+        ax.plot(lags,acr_flatten[n,imodel,ithres,:],color=t2cols[imodel],label="",alpha=0.05)
+    ax.plot(lags,np.nanmean(acr_flatten[:,imodel,ithres,:],0),color=t2cols[imodel],label=t2names[imodel])
+    
+    
+ax.set_xlim([lags[0],lags[-1]])
+ax.grid(True,ls='dotted')
+ax.set_xticks(xtks)
+ax.set_ylabel("Autocorrelation (Lag 0 = %s)"% mons3[ksel])
+ax.set_xlabel("Lag (Months)")
+ax.legend()
+if isinstance(ksel,int):
+    xtk_lbls = viz.prep_monlag_labels(ksel,xtks,1,useblank=True)
+    ax.set_xticklabels(xtk_lbls)
+
+
+if include_params:
+    plt.suptitle("%s (%s)" % (locfancy,loctitle),fontsize=16,y=0.92)
+else:
+    ax.set_title("%s (%s)" % (locfancy,loctitle),fontsize=16)
+plt.savefig("%sFULLvEntrain_SummaryFig_%s_k%s_thres%i_nolocator_inclparams%i.png" % (figpath,locfn,ksel,ithres,include_params),dpi=150,bbox_inches="tight")
+
+
 
 # -----------------------------------------------------------------------------
 #%% SCRAP BELOW
