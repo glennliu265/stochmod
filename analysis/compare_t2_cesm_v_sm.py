@@ -48,10 +48,10 @@ varname    = "SST" #"SST"
 
 # Set Output Directory
 # --------------------
-figpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220526/'
+figpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220601/'
 proc.makedir(figpath)
 outpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/'
-savename   = "%s%s_%s_autocorrelation_%s.npz" %  (outpath,mconfig,varname,thresname)
+savename   = "%s%s_%s_autocorrelation_%s_%s.npz" %  (outpath,mconfig,varname,thresname,lagname)
 if "SM" in mconfig:
     savename = proc.addstrtoext(savename,"_runid2%02i" % (runid))
 print("Loading the following dataset: %s" % savename)
@@ -115,7 +115,7 @@ h,kprev,damping,dampingfull,alpha,alpha_full,hblt = outputs
 
 #%% Select which basemonth to plot and calculate T2 (SM)
 # Select which mixed layer depth setting to evaluate
-ksel = 'max' #2 #"max"
+ksel = 1 #2 #"max"
 
 if ksel == 'max':
     # Get indices of kprev
@@ -133,6 +133,23 @@ else:
 
 #% Integrate
 integr_ac = np.trapz(acmax,x=lags,axis=-1) # [lon x lat x (ens) x thres]
+
+#
+#%% Quickly visualize h-max
+#
+
+hmax = np.argmax(h,axis=2)
+
+fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},constrained_layout=True)
+ax     = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="gray")
+#cf     = ax.pcolormesh(lon,lat,hmax.T+1,cmap='twilight_shifted')
+cf = ax.contourf(lon,lat,hmax.T+1,levels=np.arange(0,13,1),cmap='twilight_shifted')
+cl = ax.contour(lon,lat,hmax.T+1,levels=np.arange(0,13,1),colors="w",linewidths=0.5)
+ax.clabel(cl)
+cb = fig.colorbar(cf,ax=ax)
+cb.set_label("Month")
+ax.set_title("Month of Max MLD in CESM1-PiC")
+plt.savefig("%sMax_MLD_Mon.png"%figpath,dpi=150)
 
 #%% Load  and compare with CESM-PiC
 
@@ -166,7 +183,9 @@ else:
     acmax_cesm = cesm_acs[...,ksel,:,:]
 
 #% Integrate
-integr_ac_cesm = np.trapz(acmax_cesm,x=lags,axis=-1) # [lon x lat x (model) x thres]
+integr_ac_cesm = 1 + 2*np.trapz(acmax_cesm**2,x=lags,axis=-1) # [lon x lat x (model) x thres]
+
+
 
 #%% Rename variables for ease
 
@@ -177,6 +196,54 @@ acmaxall = np.concatenate([acmax_cesm,acmax],axis=2) # [lon x lat x model x thre
 
 acall    = np.concatenate([cesm_acs,acs_final],axis=2)
 
+# ----------------------------------
+# %% Quick Check how ksel impacts T2
+# ----------------------------------
+bboxplot = [-80,0,5,67]
+ithres   = -1
+t2seas   = 1 + 2*np.trapz(acall[:,:,:,:,ithres,:]**2,x=lags,axis=-1) # [lon x lat x (model) x month]
+
+imodel   = 0
+
+clm      = [0,24]
+clvl     = [6,12,18]
+cextras  = [24,30,36,]
+plotmons = np.roll(np.arange(0,12),1)
+
+# Make plot for each model
+for imodel in range(5):
+    fig,axs  = plt.subplots(4,3,figsize=(10,10),
+                           subplot_kw={'projection':ccrs.PlateCarree()},constrained_layout=True)
+    for ia in tqdm(range(12)):
+        ax = axs.flatten()[ia]
+        im = plotmons[ia]
+        blabel=[0,0,0,0]
+        if ia%3 == 0:
+            blabel[0] = 1
+        if ia > 8:
+            blabel[-1] = 1
+        ax = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="gray",blabels=blabel)
+        ax = viz.label_sp(mons3[im],usenumber=True,ax=ax,labelstyle="%s",fontsize=16,alpha=0.75)
+        
+        pcm = ax.pcolormesh(lon,lat,t2seas[:,:,imodel,im].T,vmin=clm[0],vmax=clm[-1],cmap='cmo.deep')
+        
+        cl = ax.contour(lon,lat,t2seas[:,:,imodel,im].T,levels=cextras,colors='w',lw=.55)
+        ax.clabel(cl)
+        
+        clint = ax.contour(lon,lat,t2seas[:,:,imodel,im].T,levels=clvl,colors='k',lw=.55)
+        ax.clabel(clint)
+        
+        
+        
+    cb = fig.colorbar(pcm,ax=axs.flatten(),fraction=0.035,pad=0.01)
+    cb.set_label("$T_2$ (Months)")
+    plt.suptitle("$T_2$ by Reference Month (%i Lags) for %s"%(lags[-1],t2names[imodel]))
+        
+    savename = "%sT2bymon_%ilags_%s.png" % (figpath,lags[-1],t2names[imodel])
+    plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+
+
 
 #%% Visualize avg correlation at last N lags
 ithres  = 2
@@ -186,7 +253,7 @@ maxcorr = np.nanmax(acmaxall[...,[-1]],axis=-1)[...,ithres] # [lon x lat x model
 axsorder = [3,4,0,1,2]
 vmin = -.2
 vmax = .2
-fig,axs = viz.init_2rowodd(3,proj=ccrs.PlateCarree(),figsize=(12,8))
+fig,axs = viz.init_2rowodd(3,proj=ccrs.PlateCarree(),figsize=(14,8))
 
 for mc in range(5):
     
@@ -220,6 +287,79 @@ for mc in range(len(t2names)):
             label="%s" % (t2names[mc]))
 ax.legend()
 #ax.set_xlim([0,60])
+
+
+#%% Visualize the pcolor lag autocorrelation
+ithres = 2
+
+p = 0.05
+tails = 1
+
+def plot_ac_monvlag(plotac,plotcount,clvls,lags,ax=None,
+                    p=0.05,tails=1,appendjan=True,usecontourf=False,
+                    cmap='cmo.dense'):
+    
+    
+    # Calculate Critical Rho Value
+    rhocrit   = proc.ttest_rho(p,tails,plotcount) # [month]
+    sigmask   = plotac > rhocrit[:,None]
+    
+    # Add extra january
+    if appendjan: # Add extra january
+        yvals       = np.arange(1,14,1)
+        mons3       = [viz.return_mon_label(m%12,nletters=3) for m in np.arange(1,14)]
+        
+        sigmask     = np.concatenate([sigmask,sigmask[[0],:]],axis=0)
+        plotac      = np.concatenate([plotac,plotac[[0],:]],axis=0)
+        
+    else:
+        yvals       = np.arange(1,13,1)
+        mons3       = [viz.return_mon_label(m,nletters=3) for m in np.arange(1,13)]
+        
+    # # Plot it
+    if usecontourf:
+        cf = ax.contourf(yvals,lags,plotac.T,levels=clvls,cmap=cmap)
+    else:
+        cf = ax.pcolormesh(yvals,lags,plotac.T,vmin=clvls[0],vmax=clvls[-1],
+                            shading='auto',cmap=cmap)
+        
+    # Masking Function with Stippling
+    msk = viz.plot_mask(yvals,lags,sigmask,
+                        ax=ax,markersize=2.0,color="k",geoaxes=False)
+    
+    ax.grid(True,ls='dotted')
+    ax.set_yticks(np.arange(lags[0],lags[-1],3))
+    ax.set_xticks(yvals)
+    ax.set_xticklabels(mons3,rotation=45)
+    return ax,rhocrit
+
+
+clvls = np.arange(-.1,1.05,0.05)
+fig,axs = plt.subplots(1,5,figsize=(18,8))
+for a in range(5):
+    
+    ax =axs.flatten()[a]
+    
+    
+    plotac = acall[klon,klat,a,:,ithres,:]
+    if a == 0:
+        plotcount = np.ones(12) * 901
+    elif a == 1:
+        plotcount = np.ones(12) * 1801
+    else:
+        plotcount = np.ones(12) * 1000
+        
+    
+    ax,rhocrit = plot_ac_monvlag(plotac,plotcount,clvls,lags,ax=ax,
+                        p=p,tails=tails,appendjan=True,usecontourf=False,
+                        cmap='cmo.dense')
+    
+    sigstr    = "%i" % ((p)*100) + "%" + r" (%i-tail): $\rho$ > %.2f (n=%i)" % (tails,rhocrit.mean(),plotcount.mean())
+    title = "%s \n %s" % (t2names[a],sigstr)
+    ax.set_title(title)
+    
+    #$pcm = ax.pcolormesh(lags,)
+plt.savefig("%sACF_LagvMon_%s,png"% (figpath,locfn),dpi=150,bbox_inches='tight')
 
 #%% Plot autocorrelation at a point
 
@@ -263,8 +403,9 @@ ax.legend()
 plt.savefig("%sAutocorrelation_WarmCold_%s_%s_month%i.png"% (figpath,mconfig,locstr,kmonth+1),dpi=150)
 
 
-
-#%%
+# ----------------------------------------------------------------
+#%% Visualize the T2 Differences to isolate role of Ocean dynamics
+# ----------------------------------------------------------------
 
 ithres = 2
 
@@ -281,6 +422,9 @@ diffocean_ml   = t2all[:,:,1,:] - t2all[:,:,3,:]
 
 # FULL - entrain
 diffentrain    = t2all[:,:,1,:] - t2all[:,:,4,:]
+
+# entrain - varyh
+effentrain     = t2all[:,:,4,:] - t2all[:,:,3,:]
 
 diffs     = [diffocean_slab,diffocean_h0,diffocean_ml,diffentrain]
 diffsname = ("FULL - SLAB","FULL - h const","FULL - h vary","FULL - entrain") 
@@ -302,74 +446,13 @@ for d in range(4):
 cb=fig.colorbar(pcm,ax=axs.flatten(),fraction=0.045)
 cb.set_label("$T_2$ Difference")
 
-plt.savefig("%sT2_Difference_SM_vs_CESMFULL_kmax_thres%i.png"%(figpath,ithres),dpi=150,bbox_inches='tight')
-#%% Do some regional analysis
+plt.savefig("%sT2_Difference_SM_vs_CESMFULL_k%s_thres%i.png"%(figpath,ksel,ithres),dpi=150,bbox_inches='tight')
 
+# ----------------------------------------------------------------
+#%% Visualize the MSE Differences to see fit to stochastic model
+# ----------------------------------------------------------------
 
-
-
-#%%  Plot autocorrelation for a given region
-# Use acmax (for selected month) # [lon x lat x model x thres x lag]
-
-ithres = 2
-
-xlim = [0,36]
-
-bbsel = [-35,-15,38,48] #[-60,-40,35,45]#
-
-locfn,loctitle = proc.make_locstring_bbox(bbsel)
-acr,lonr,latr  = proc.sel_region(acmaxall,lon,lat,bbsel,autoreshape=True)
-
-nlonr,nlatr,_,_,nlag = acr.shape
-npts                 = nlonr*nlatr
-
-# fig,axs = plt.subplots(2,3,constrained_layout=True,figsize=(16,4),
-#                        sharex=True,sharey=True)
-
-fig,axs = viz.init_2rowodd(3,figsize=(16,6))
-
-for i in range(5):
-    
-    ax = axs[i]
-    
-    acplot = acr[:,:,i,ithres,:].reshape(npts,nlag)
-    
-    for p in range(npts):
-        ax.plot(lags,acplot[p,:],color=t2cols[i],alpha=0.05)
-        
-    ax.plot(lags,acplot.mean(0),color=t2cols[i])
-    
-    ax.set_xlim(xlim)
-    ax.grid(True,ls='dotted')
-    ax.set_title(t2names[i],color=t2cols[i])
-    if i >2:
-        ax.set_xlabel("Lag (Months)")
-    if i == 0 or i == 3:
-        ax.set_ylabel("Lagged SST Autocorrelation")
-
-
-zoomrng = 5
-bbin    = bbsel
-bbplot = bbplot = [-80,0,0,65]#[bbin[0]-zoomrng,bbin[1]+zoomrng,bbin[2]-zoomrng,bbin[3]+zoomrng]
-left, bottom, width, height = [0.75, 0.12, 0.18, 0.25]
-axin = fig.add_axes([left, bottom, width, height],projection=ccrs.PlateCarree())
-axin = viz.add_coast_grid(axin,bbox=bbplot,fill_color='gray',
-                          fix_lon=[bbin[0],bbin[1]],
-                          fix_lat=[bbin[2],bbin[3]])
-axin.set_facecolor('lightblue')
-axin = viz.plot_box(bbin,ax=axin,color="red",proj=ccrs.PlateCarree(),
-                    linewidth=3,linestyle='solid',)
-
-
-plt.suptitle("Stochastic Model Autocorrelation for %s" % (loctitle),fontsize=14,y=.95)
-savename = "%sIntegrated_ACF_SM_comparison_thres%i_%s.png" % (figpath,ithres,locfn)
-plt.savefig(savename,dpi=150,bbox_inches='tight')
-
-#%% # Visulize lag to lag differences (mse)
-
-
-
-lagrange = np.arange(0,61,1)
+lagrange    = np.arange(0,61,1)
 
 lagrngstr   = "lags%02ito%02i" % (lagrange[0],lagrange[-1])
 
@@ -387,9 +470,12 @@ diffocean_ml   = acmaxall[:,:,1,ithres,lagrange] - acmaxall[:,:,3,ithres,lagrang
 # FULL - entrain
 diffentrain    = acmaxall[:,:,1,ithres,lagrange] - acmaxall[:,:,4,ithres,lagrange]
 
-diffs     = [diffocean_slab,diffocean_h0,diffocean_ml,diffentrain]
+
+# entrain - varyh
+#effentrain    = acmaxall[:,:,4,ithres,lagrange] - acmaxall[:,:,3,ithres,lagrange]
 
 
+diffs_mse     = [diffocean_slab,diffocean_h0,diffocean_ml,diffentrain]
 
 fig,axs = plt.subplots(2,2,constrained_layout=True,figsize=(12,8),
                        subplot_kw={'projection':ccrs.PlateCarree()})
@@ -399,7 +485,7 @@ for d in range(4):
     ax = axs.flatten()[d]
     ax.set_title(diffsname[d])
     
-    plotmse = ((diffs[d])**2).mean(-1)
+    plotmse = ((diffs_mse[d])**2).mean(-1)
     
     ax = viz.add_coast_grid(ax,bbox=bboxplot,fill_color='gray')
     
@@ -412,16 +498,340 @@ for d in range(4):
 cb=fig.colorbar(pcm,ax=axs.flatten(),fraction=0.045)
 cb.set_label("$ACF$ MSE (Lags %i to %i)" % (lagrange[0],lagrange[-1]))
 
-plt.savefig("%sACF_DifferenceMSE_SM_vs_CESMFULL_kmax_thres%i_%s.png"%(figpath,ithres,lagrngstr),dpi=150,bbox_inches='tight')
-
-#%% Find top N points
+plt.savefig("%sACF_DifferenceMSE_SM_vs_CESMFULL_k%s_thres%i_%s.png"%(figpath,ksel,ithres,lagrngstr),dpi=150,bbox_inches='tight')
 
 
-d       = -1
-plotmse = ((diffs[d])**2).mean(-1)
+# -----------------------------------
+# %% AMV Teleconf Plot: T2 Comparison
+# -----------------------------------
 
-proc
 
+clbls_T2 = np.arange(-12,36,6) #np.arange(0,27,3)
+clbls_dT = np.arange(-12,30,6)
+
+fig,axs = plt.subplots(2,2,constrained_layout=True,figsize=(8,8),
+                       subplot_kw={'projection':ccrs.PlateCarree()})
+
+for ia in range(4):
+    
+    if ia == 0:
+        title   = "Entrain"
+        plotvar = t2all[:,:,4,ithres]
+        clbl = clbls_T2
+    elif ia == 1:
+        title   = "Entrain - h vary"
+        plotvar = effentrain[...,ithres]
+        clbl = clbls_dT
+    elif ia == 2:
+        title   = "CESM-FULL"
+        plotvar = t2all[:,:,1,ithres]
+        cblabel = "$T_2$ (Months)"
+        clbl = clbls_T2
+    elif ia == 3:
+        title = "FULL - Entrain"
+        plotvar = diffentrain[...,ithres]
+        cblabel = "$T_2$ Difference (Months)"
+        clbl = clbls_dT
+    
+    ax = axs.flatten()[ia]
+    blabel = [0,0,0,0]
+    if ia%2==0:
+        blabel[0]=1
+        cmap   = 'cmo.deep'
+        levels = np.arange(0,27,3)
+        
+    else:
+        cmap = 'cmo.balance'
+        levels = np.arange(-18,20,2)
+    
+    if ia>1:
+        blabel[-1]=1
+    
+    ax = viz.add_coast_grid(ax,bbox=bboxplot,fill_color='gray',blabels=blabel)
+    ax.set_title(title)
+    pcm = ax.contourf(lon,lat,plotvar.T,levels=levels,cmap=cmap,extend='both')
+    cl  = ax.contour(lon,lat,plotvar.T,levels=clbl,colors='w',linewidths=0.45)
+    ax.clabel(cl)
+    
+    if ia>1:
+        cb = fig.colorbar(pcm,ax=axs[:,ia%2].flatten(),orientation='horizontal',fraction=0.025)
+        cb.set_label(cblabel)
+plt.suptitle("$T_2$ Comparisons, Reference Month = %s"%(mons3[ksel]))
+plt.savefig("%sT2Comparisons_AMVTeleconf_ksel%s.png"%(figpath,str(ksel)),dpi=150,bbox_inches="tight")
+
+#%% Draw the locator
+
+bboxes  = [[-65,-43,42,47],[-43,-25,50,56]]
+bbcol   = ['k','darkviolet']
+
+bboxis  = [-75,-5,30,66]
+plotvar = diffentrain[...,ithres]
+title   = "FULL - Entrain"
+cblabel = "$T_2$ Difference (Months)"
+clbl    = clbls_dT
+
+
+fig,ax = plt.subplots(1,1,figsize=(8,4,),subplot_kw={'projection':ccrs.PlateCarree()},constrained_layout=True)
+ax     = viz.add_coast_grid(ax,bbox=bboxis,fill_color="gray")
+
+pcm = ax.contourf(lon,lat,plotvar.T,levels=levels,cmap=cmap,extend='both')
+cl  = ax.contour(lon,lat,plotvar.T,levels=clbl,colors='w',linewidths=0.45)
+ax.clabel(cl)
+
+
+for b,bb in enumerate(bboxes):
+    viz.plot_box(bb,ax=ax,linewidth=4,color=bbcol[b])
+
+cb = fig.colorbar(pcm,ax=ax,fraction=0.024)
+cb.set_label(cblabel)
+ax.set_title(title)
+plt.savefig("%sAMVconf_Locator_T2diff.png"%figpath,dpi=150,bbox_inches='tight')
+
+
+
+#%% Do some regional analysis
+
+"""
+Some scrap to decide on the bounding box/region
+
+[-43,-32,48,60] --> [-41,-35,52,58] # SPGw
+[-30,-20,49,55] --> [-30,-22,49,55] # SPGe
+[-22,-12,42,60] --> [-20,-12,45,65] # NE Atlantic (horiz)
+
+--> [-62,-42,40,48] # S. Grand Banks
+
+--> [-70,-40,28,35] # STG Centre
+
+--> [-75,-65,25,35] # Sargasso Sea Patch
+"""
+
+# Scrap for identifying regions
+
+
+
+#%% Indicate Region of Analysis
+ithres = 2
+bbsel  = [-65,-43,42,47] #[-60,-40,35,45]# Indicate region section here
+
+locfn,loctitle = proc.make_locstring_bbox(bbsel)
+
+# Selecting plotting variable for insets
+# Use acmax (for selected month) # [lon x lat x model x thres x lag]
+plotdiff = diffs[-1][...,ithres].T
+
+#%% Load in regional variables (copied block from  investigate_sm_regional.py)
+
+method  = 5
+lagstr  = 'lag1'
+reg_sel = bbsel
+
+frcname     = "flxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0"
+input_path = datpath + "../model_input/"
+
+# Use the function used for sm_rewrite.py,
+inputs = scm.load_inputs('SLAB_PIC',frcname,input_path,load_both=True,method=method,lagstr=lagstr)
+long,latg,h,kprevall,dampingslab,dampingfull,alpha,alpha_full = inputs
+hblt = np.load(input_path + "SLAB_PIC_hblt.npy") # Slab fixed MLD
+hblt = np.ones(hblt.shape) * hblt.mean(2)[:,:,None]
+#klonf,klatf = proc.find_latlon(lonf,latf,lon,lat)
+
+inputs       = [h,kprevall,dampingslab,dampingfull,alpha,alpha_full,hblt]
+outputs,_,_  = scm.cut_regions(inputs,long,latg,reg_sel,0)
+h,kprev,damping,dampingfull,alpha,alpha_full,hblt = outputs
+
+# Sqrt(Sum(EOF Coeffs)))
+alpha_full2 = np.sqrt((alpha_full**2).sum(2))
+alpha2      = np.sqrt((alpha**2).sum(2))
+
+
+#%% Plot stochastic model inputs for that region
+
+mcinput = "FULL"
+
+if mcinput == "FULL":
+    invars = [h,alpha_full2,dampingfull,]
+else:
+    invars = [hblt,alpha2,damping,]
+    
+
+# Combine spatial dims
+npts   = np.prod(invars[0].shape[:2])
+invars = [v.reshape(npts,nmon) for v in invars]
+
+# Taken from viz_inputs_pt.py)
+ylabs = ("MLD (m)",
+         "Forcing ($Wm^{-2}$)",
+        "Damping ($Wm^{-2}K^{-1}$)",
+         )
+vcolor  = ("mediumblue","orangered","limegreen")
+
+fig,axs = plt.subplots(3,1,constrained_layout=True,sharex=True,figsize=(6,8))
+
+for a in range(3):
+    ax = axs[a]
+    for n in range(npts):
+        ax.plot(mons3,invars[a][n,:],label="",alpha=0.2,color=vcolor[a])
+        
+    # Plot mean
+    ax.plot(mons3,np.nanmean(invars[a],0),label="Mean",alpha=1,color='k')
+    
+    # Plot 1 Std
+    std1 = np.nanstd(invars[a],0)
+    
+    ax.plot(mons3,np.nanmean(invars[a],0)+std1,label="1$\sigma$",alpha=1,color='k',ls='dotted')
+    ax.plot(mons3,np.nanmean(invars[a],0)-std1,label="",alpha=1,color='k',ls='dotted')
+    
+    if a == 0:
+        ax.legend()
+    ax.set_ylabel(ylabs[a])
+    ax.grid(True,ls='dotted')
+    
+    
+ax.set_xlim([0,11])
+plt.suptitle("Parameter Values for %s (CESM-%s)"% (loctitle,mcinput))
+
+plt.savefig("%sSM_ParameterValues_%s_%s.png"%(figpath,mcinput,locfn),dpi=150,bbox_inches='tight')
+
+#%%  Plot autocorrelation for a given region for all models
+xlim = [0,36]
+
+acr,lonr,latr  = proc.sel_region(acmaxall,lon,lat,bbsel,autoreshape=True)
+
+nlonr,nlatr,_,_,nlag = acr.shape
+npts                 = nlonr*nlatr
+
+
+# Plot Autocorrelations
+# fig,axs = plt.subplots(2,3,constrained_layout=True,figsize=(16,4),
+#                        sharex=True,sharey=True)
+
+fig,axs = viz.init_2rowodd(3,figsize=(16,6))
+for i in range(5):
+    
+    ax = axs[i]
+    
+    acplot = acr[:,:,i,ithres,:].reshape(npts,nlag)
+    
+    for p in range(npts):
+        ax.plot(lags,acplot[p,:],color=t2cols[i],alpha=0.05)
+        
+    ax.plot(lags,np.nanmean(acplot,0),c="k",alpha=1)
+    
+    ax.set_xlim(xlim)
+    ax.grid(True,ls='dotted')
+    ax.set_title(t2names[i],color=t2cols[i])
+    if i >2:
+        ax.set_xlabel("Lag (Months)")
+    if i == 0 or i == 3:
+        ax.set_ylabel("Lagged SST Autocorrelation")
+
+
+# Plot Inset
+zoomrng = 5
+bbin    = bbsel
+bbplot = bbplot = [-80,0,0,65]#[bbin[0]-zoomrng,bbin[1]+zoomrng,bbin[2]-zoomrng,bbin[3]+zoomrng]
+left, bottom, width, height = [0.75, 0.12, 0.18, 0.25]
+axin = fig.add_axes([left, bottom, width, height],projection=ccrs.PlateCarree())
+axin = viz.add_coast_grid(axin,bbox=bbplot,fill_color='gray',
+                          fix_lon=[bbin[0],bbin[1]],
+                          fix_lat=[bbin[2],bbin[3]])
+#axin.set_facecolor('lightblue')
+axin.contourf(lon,lat,plotdiff,levels=np.arange(-16,18,2),cmap='cmo.balance',extend='both')
+axin = viz.plot_box(bbin,ax=axin,color="red",proj=ccrs.PlateCarree(),
+                    linewidth=3,linestyle='solid',)
+
+
+plt.suptitle("Stochastic Model Autocorrelation for %s" % (loctitle),fontsize=14,y=.95)
+savename = "%sIntegrated_ACF_SM_comparison_k%s_thres%i_%s.png" % (figpath,ksel,ithres,locfn)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+
+# ------------------------------------------------------------
+#%% More condensed/summary plot with effective damping/forcing
+# ------------------------------------------------------------
+cp0=3996
+rho=1026
+dt =3600*24*30
+imodels = [1,-1] # Models to plot ACF for 
+
+xtks     = np.arange(0,66,6)
+fig = plt.figure(figsize=(16,8))
+
+gs = fig.add_gridspec(nrows=6, ncols=6, left=0.1, right=1,
+                      hspace=.5, wspace=0.5)
+
+
+# (0) Plot Effective Parameters
+# --------------------------
+ax0 = fig.add_subplot(gs[0:3, 0:3])
+
+ax = ax0
+veff_names = ["Effective Forcing","Effective Damping"]
+for v in range(2):
+    
+    kvar    = v+1
+    plotvar = invars[kvar]/invars[0] / (rho*cp0) * dt
+    
+    for n in range(npts):
+        
+        ax.plot(mons3,plotvar[n,:],label="",alpha=0.1,color=vcolor[kvar])
+        
+    # Plot mean
+    ax.plot(mons3,np.nanmean(plotvar,0),label=veff_names[v],alpha=1,color=vcolor[kvar])
+        
+        
+    ax.grid(True,ls='dotted')
+    ax.set_xlim([0,11])
+ax.set_ylabel("Effective Forcing/Damping ($\degree C$ $sec^{-1}$)")
+ax.legend()
+
+# (1) Plot Autocorrelations
+# ---------------------
+ax1 = fig.add_subplot(gs[3:, 0:3])
+ax = ax1
+acr_flatten = acr.reshape((npts,)+acr.shape[2:]) # [pt x model x thres xlag]
+
+for i in range(2):
+    imodel = imodels[i]
+    
+    for n in range(npts):
+        ax.plot(lags,acr_flatten[n,imodel,ithres,:],color=t2cols[imodel],label="",alpha=0.05)
+    ax.plot(lags,np.nanmean(acr_flatten[:,imodel,ithres,:],0),color=t2cols[imodel],label=t2names[imodel])
+    
+    
+ax.set_xlim([lags[0],lags[-1]])
+ax.grid(True,ls='dotted')
+ax.set_xticks(xtks)
+ax.set_ylabel("Autocorrelation (Lag 0 = $t_{h max}$)")
+ax.set_xlabel("Lag (Months)")
+ax.legend()
+if isinstance(ksel,int):
+    xtk_lbls = viz.prep_monlag_labels(ksel,xtks,1,useblank=True)
+    ax.set_xticklabels(xtk_lbls)
+
+# (2) Plot the Inset
+# ------------------
+axin = fig.add_subplot(gs[0:-1,3:5],projection=ccrs.PlateCarree())
+bbin   = bbsel
+bbplot = [-80,0,0,65] 
+cint   = np.arange(-10,11,1)
+
+axin = viz.add_coast_grid(axin,bbox=bbplot,fill_color='gray',
+                          fix_lon=[bbin[0],bbin[1]],
+                          fix_lat=[bbin[2],bbin[3]])
+
+cf = axin.contourf(lon,lat,plotdiff,levels=cint,cmap='cmo.balance',extend='both')
+cl = axin.contour(lon,lat,plotdiff,levels=cint[::2],colors="k",extend='both',linewidths=.55)
+axin.clabel(cl)
+axin = viz.plot_box(bbin,ax=axin,color="black",proj=ccrs.PlateCarree(),
+                    linewidth=3,linestyle='solid',)
+cb = fig.colorbar(cf,ax=axin,fraction=0.045,orientation='horizontal',pad=0.1)
+cb.set_label("Months")
+axin.set_title("$T_2$ Difference (CESM-FULL - Entrain)")
+
+plt.suptitle("CESM-FULL vs. Entrain for %s" % loctitle,fontsize=16,y=0.92)
+
+plt.savefig("%sFULLvEntrain_SummaryFig_%s_k%s_thres%i.png" % (figpath,locfn,ksel,ithres),dpi=150,bbox_inches="tight")
 
 # -----------------------------------------------------------------------------
 #%% SCRAP BELOW
@@ -458,11 +868,15 @@ viz.plot_box([-60,-40,35,45],ax=ax,linewidth=2)
 viz.plot_box([-35,-15,38,48],ax=ax,linewidth=2,color='green')
 viz.plot_box([-38,-20,56,62],ax=ax,linewidth=2,color='purple')
 
-#
-#Some figures specific to analysis of stochastic model output
+# ------------------------------------------------------------
+# Some figures specific to analysis of stochastic model output
+# ------------------------------------------------------------
 
 
 
+
+
+#%% Plot the regional variables
 
 
 #%% Rename variables for processing below
