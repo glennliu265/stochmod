@@ -39,7 +39,8 @@ thresholds  = [0,] # Standard Deviations
 conf        = 0.95
 tails       = 2
 mconfig     = "SM"
-runid       = 3
+runid       = 3 
+allruns     = True # Set to True to load all runs, then avg.
 thresholds = [0,]
 thresname  = "thres" + "to".join(["%i" % i for i in thresholds])
 varname    = "SST" #"SST"
@@ -76,10 +77,38 @@ mnames      = ["constant h","vary h","entraining"]
     
     
 #%% Load in the stochastic model data
+
 st          = time.time()
-ld          = np.load(savename,allow_pickle=True)
-count_final = ld['class_count']
-acs_final   = ld['acs'] # [lon x lat x (ens) x month x thres x lag]
+
+if "SM" in mconfig and allruns:
+    
+    print("Loading all runs!")
+    count_final = []
+    acs_final   = []
+    for i in range(10):
+        
+        # Get Name
+        savename   = "%s%s_%s_autocorrelation_%s_%s.npz" %  (outpath,mconfig,varname,thresname,lagname)
+        savename = proc.addstrtoext(savename,"_runid2%02i" % (i))
+            
+        # Load Data
+        ld          = np.load(savename,allow_pickle=True)
+        count = ld['class_count']
+        acs   = ld['acs'] # [lon x lat x (ens) x month x thres x lag]
+        
+        acs_final.append(acs)
+        count_final.append(count)
+    
+    acs_final = np.array(acs_final).mean(0)
+    count_final = np.array(count_final).mean(0)
+        
+else:
+    
+    ld          = np.load(savename,allow_pickle=True)
+    count_final = ld['class_count']
+    acs_final   = ld['acs'] # [lon x lat x (ens) x month x thres x lag]
+
+# Load Labels
 lon         = ld['lon']
 lat         = ld['lat']
 thresholds  = ld['thresholds']
@@ -132,7 +161,9 @@ else:
     acmax = acs_final[...,ksel,:,:]
 
 #% Integrate
-integr_ac = np.trapz(acmax,x=lags,axis=-1) # [lon x lat x (ens) x thres]
+integr_ac = 1 + 2*np.trapz(acmax**2,x=lags,axis=-1)
+
+#np.trapz(acmax,x=lags,axis=-1) # [lon x lat x (ens) x thres]
 
 #
 #%% Quickly visualize h-max
@@ -159,7 +190,7 @@ cesm_acs = []
 for mc in range(2):
     
     mc_in  = mconfigs[mc]
-    ncname = "%sPIC-%s_SST_autocorrelation_thres0_lag60.npz" % (outpath,mc_in)
+    ncname = "%sPIC-%s_SST_autocorrelation_thres0_lag00to60.npz" % (outpath,mc_in)
     ld     = np.load(ncname)
     
     c_ac   = ld['acs'] # [lon x lat x mon x thres x lag]
@@ -183,9 +214,7 @@ else:
     acmax_cesm = cesm_acs[...,ksel,:,:]
 
 #% Integrate
-integr_ac_cesm = 1 + 2*np.trapz(acmax_cesm**2,x=lags,axis=-1) # [lon x lat x (model) x thres]
-
-
+integr_ac_cesm = 1 + 2 * np.trapz(acmax_cesm**2,x=lags,axis=-1) # [lon x lat x (model) x thres]
 
 #%% Rename variables for ease
 
@@ -248,7 +277,6 @@ for imodel in range(5):
 #%% Visualize avg correlation at last N lags
 ithres  = 2
 maxcorr = np.nanmax(acmaxall[...,[-1]],axis=-1)[...,ithres] # [lon x lat x model]
-
 
 axsorder = [3,4,0,1,2]
 vmin = -.2
@@ -542,7 +570,7 @@ for ia in range(4):
         
     else:
         cmap = 'cmo.balance'
-        levels = np.arange(-18,20,2)
+        levels = np.arange(-16,18,2)
     
     if ia>1:
         blabel[-1]=1
@@ -611,8 +639,8 @@ Some scrap to decide on the bounding box/region
 
 #%% Indicate Region of Analysis
 ithres = 2
-bbsel    = [-65,-43,42,47]#[-43,-25,50,56] #[-60,-40,35,45]# Indicate region section here
-locfancy = "Transition Zone"#"SPG Center" 
+bbsel    = [-43,-25,50,56] #[-65,-43,42,47]#[-60,-40,35,45]# Indicate region section here
+locfancy = "SPG Center" #"Transition Zone"
 locfn,loctitle = proc.make_locstring_bbox(bbsel)
 
 # Selecting plotting variable for insets
