@@ -3,10 +3,10 @@
 """
 Script to visualize the output of pointwise_autocorrelation.py
 
-
 Includes:
     Reference Month vs. Lag plots for a single point
-
+    
+    
 Created on Thu Mar 24 15:23:20 2022
 
 @author: gliu
@@ -37,8 +37,9 @@ thresholds  = [0,] # Standard Deviations
 conf        = 0.95
 tails       = 2
 
-mconfig    = "SM"#"HTR-FULL" # #"PIC-FULL"
+mconfig    = "PIC-FULL"#"HTR-FULL" # #"PIC-FULL"
 runid      = 0
+#allrun     = True
 
 thresholds = [0,]
 thresname  = "thres" + "to".join(["%i" % i for i in thresholds])
@@ -48,10 +49,10 @@ varname    = "SST" #"SST"
 
 # Set Output Directory
 # --------------------
-figpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220526/'
+figpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220609/'
 proc.makedir(figpath)
 outpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/'
-savename   = "%s%s_%s_autocorrelation_%s.npz" %  (outpath,mconfig,varname,thresname)
+savename   = "%s%s_%s_autocorrelation_%s_%s.npz" %  (outpath,mconfig,varname,thresname,lagname)
 if "SM" in mconfig:
     savename = proc.addstrtoext(savename,"_runid2%02i" % (runid))
 print("Loading the following dataset: %s" % savename)
@@ -115,12 +116,15 @@ else:
 print("Data loaded in %.2fs"% (time.time()-st))
 #%% Plot autocorrelation at a point
 
+# Modified for AMV Teleconf (5.31.2022)
 # Select a Point
 lonf   = -30
 latf   = 50
-kmonth = 1
-
+kmonth = 6
 imodel = 2
+
+# Set xticks
+xtk2 = np.arange(0,66,6)
 
 # Get Indices
 klon,klat = proc.find_latlon(lonf,latf,lon,lat)
@@ -128,10 +132,12 @@ locfn,locstr = proc.make_locstring(lonf,latf)
 
 # Make the plot
 title    = "%s Autocorrelation @ Lon: %i, Lat : %i (%s)" % (varname,lonf,latf,mconfig)
-fig,ax   = plt.subplots(1,1)
-ax,ax2   = viz.init_acplot(kmonth,np.arange(0,38,2),lags,ax=ax,title=title)
+fig,ax   = plt.subplots(1,1,figsize=(8,4))
+ax.set_title(title)
+ax.grid(True,ls='dotted')
+#ax,ax2   = viz.init_acplot(kmonth,np.arange(0,38,2),lags,ax=ax,title=title)
 
-
+xtk_lbl = viz.prep_monlag_labels(kmonth,xtk2,2)
 
 if "HTR" in mconfig: 
     for th in range(nthres+2): # Just plot the one timeseries
@@ -150,15 +156,25 @@ elif "SM" in mconfig:
                 label="%s (n=%i)" % (threslabs[th],count_final[klon,klat,imodel,kmonth,th]))
 else: 
     for th in range(nthres+2):
+        
         ax.plot(lags,acs_final[klon,klat,kmonth,th,:],marker="o",
                 color=colors[th],lw=2,
                 label="%s (n=%i)" % (threslabs[th],count_final[klon,klat,kmonth,th]))
+        
+        # Get and plot the confidence interval
+        # ---------------------------
+        cnt = count_final[klon,klat,kmonth,th]
+        ac_conf = proc.calc_conflag(acs_final[klon,klat,kmonth,th,:],conf,tails,cnt)
+        ax.fill_between(lags,ac_conf[:,0],ac_conf[:,1],color=colors[th],alpha=0.25,zorder=1)
+        
         #ax.plot(lags,acs_final[klon,klat,kmonth,0,:,kmonth],label="Cold Anomalies (%i)" % (count_final[klon,klat,kmonth,0]),color='b')
         #ax.plot(lags,acs_final[klon,klat,kmonth,1,:,kmonth],label="Warm Anomalies (%i)" % (count_final[klon,klat,kmonth,th]),color='r')
         #ax.legend()
     
-
-ax.legend()
+ax.set_xticks(xtk2,labels=xtk_lbl)
+ax.set_xlim([xtk2[0],xtk2[-1]])
+ax.set_ylabel()
+ax.legend("Correlation")
 plt.savefig("%sAutocorrelation_WarmCold_%s_%s_month%i.png"% (figpath,mconfig,locstr,kmonth+1),dpi=150)
 
 #%% Contour the Autocorrelation (Similar to in Park et al. 2006)
@@ -171,7 +187,6 @@ appendjan   = True
 
 yvals       = np.arange(1,13,1)
 # Compute the significance
-
 
 fig,axs   = plt.subplots(1,3,figsize=(16,4),constrained_layout=True)
 
@@ -241,12 +256,11 @@ for th in range(3):
     ax.set_title(threslabs[th])
     
     ax.invert_yaxis()
-    
+
 cb = fig.colorbar(cf,ax=axs.flatten(),orientation='horizontal',fraction=0.065)
 cb.set_label("Correlation")
 plt.suptitle("%s Autocorrelation @ %s (%s)"% (varname,locstr,mconfig),fontsize=14,y=1.05)
 plt.savefig("%s%sAutocorrelation_Contours_WarmCold_%s_%s.png"% (figpath,varname,mconfig,locfn),dpi=150,bbox_inches='tight')
-
 #%% Same plot as above, but flip the axes
 
 usecontourf = False
@@ -260,8 +274,6 @@ p           = 0.05
 tails       = 1 
 
 yvals       = np.arange(1,13,1)
-
-
 
 fig,axs   = plt.subplots(1,3,figsize=(10,10),constrained_layout=True)
 
@@ -337,8 +349,9 @@ cb.set_label("Correlation")
 plt.suptitle("%s Autocorrelation @ %s (%s), Ensemble Avg."% (varname,locstr,mconfig),fontsize=14,y=1.05)
 plt.savefig("%s%sAutocorrelation_Contours_WarmCold_%s_%s_flip.png"% (figpath,varname,mconfig,locfn),dpi=150,bbox_inches='tight')
 
+# --------------------
 #%% load data for MLD
-
+# --------------------
 
 # Use the function used for sm_rewrite.py
 frcname    = "flxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0"
@@ -356,10 +369,12 @@ inputs   = [h,kprevall,dampingslab,dampingfull,alpha,alpha_full,hblt]
 outputs,lonr2,latr2 = scm.cut_regions(inputs,long,latg,reg_sel,0)
 h,kprev,damping,dampingfull,alpha,alpha_full,hblt = outputs
 
+# ----------------------------------
 #%% Select which basemonth to plot
+# ----------------------------------
 
 # Select which mixed layer depth setting to evaluate
-ksel = 'max' #2 #"max"
+ksel = 1#'max' #2 #"max"
 
 if ksel == 'max':
     # Get indices of kprev
@@ -376,17 +391,23 @@ else:
     acmax = acs_final[...,ksel,:,:]
 
 #% Integrate
-integr_ac = np.trapz(acmax,x=lags,axis=-1) # [lon x lat x (ens) x thres]
-#%%
-#%% Visualize (Works for warm/cold)
-bboxplot = [-80,0,0,60]
+integr_ac  = 1 + 2*np.trapz(acmax**2,x=lags,axis=-1) # [lon x lat x (ens) x thres]
+# -------------------------------------
+#%% Visualize T2 (Works for warm/cold)
+# -------------------------------------
+# Modified for AMV Teleconf (5.31.2022)
+
+bboxplot   = [-80,0,5,65]
+T2vlm      = [0,12]
+plotdiff   = True # Set to True to plot differences/ Otherwise plots all 3
+cl_lbls    = np.arange(0,27,3)
 
 if varname in ["SST","TS"]:
     intitles = ("Cold","Warm","All")
 elif varname == "SSS":
     intitles = ("Fresh","Salty","All")
     
-plotdiff = False # Set to True to plot differences/ Otherwise plots all 3
+
 fig,axs = plt.subplots(1,3,subplot_kw={'projection':ccrs.PlateCarree()},
                       constrained_layout=True,figsize=(14,6))
 for th in range(3):
@@ -397,9 +418,9 @@ for th in range(3):
             plotac = integr_ac[:,:,:,th].mean(-1).T
         else:
             plotac = integr_ac[:,:,th].T
-        title  = "%s Anomalies (%s K)" % (intitles[th],thresname[th])
-        cmap   = "cmo.amp"
-        vlm    = [0,10]
+        title  = "%s Anomalies (%s K)" % (intitles[th],threslabs[th])
+        cmap   = "cmo.deep"
+        vlm    = T2vlm
     else:
         if lens:
             plotac = (integr_ac[:,:,:,1].mean(-1) - integr_ac[:,:,:,0].mean(-1)).T
@@ -410,7 +431,10 @@ for th in range(3):
         vlm    = [-3,3]
         
     
-    ax = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="gray")
+    blabel = [0,0,0,1]
+    if th == 0:
+        blabel[0] = 1
+    ax = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="gray",blabels=blabel)
     ax.set_title(title)
     pcm = ax.pcolormesh(lon,lat,plotac,cmap=cmap,
                         vmin=vlm[0],vmax=vlm[1])
@@ -419,7 +443,7 @@ for th in range(3):
         cl = ax.contour(lon,lat,plotac,levels=[0,],colors="k",linewidths=.75)
         
     else:
-        cl = ax.contour(lon,lat,plotac,levels=np.arange(0,14,2),colors="w",linewidths=.75)
+        cl = ax.contour(lon,lat,plotac,levels=cl_lbls,colors="w",linewidths=.75)
     ax.clabel(cl,)
     
     if plotdiff:
@@ -428,12 +452,12 @@ for th in range(3):
             cb.set_label("Integrated Timescale (Months)")
         elif th == 2:
             cb = fig.colorbar(pcm,ax=ax,orientation='horizontal',fraction=0.04,pad=0.01)
-            cb.set_label("Difference (Months)")
+            cb.set_label("$T_2$ Difference (Warm - Cold; Months)")
 if not plotdiff:
     cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction=0.04)
-    cb.set_label("Integrated Timescale (Months)")
+    cb.set_label("$T_2$ (Months)")
 
-plt.suptitle("Integrated %s ACF (to 36 months) for CESM1 (%s)" % (varname,mconfig),fontsize=14,y=.88)
+plt.suptitle("Integrated %s ACF (to %i months) for CESM1 (%s)" % (varname,lags[-1],mconfig),fontsize=14,y=.83)
 plt.savefig("%sIntegrated%sACF_Cold_Warm_Anomalies_CESM_%s_ksel%s_plotdiff%i.png"%(figpath,varname,mconfig,str(ksel),plotdiff)
             ,dpi=150,bbox_inches='tight')
 
@@ -672,10 +696,8 @@ viz.plot_box([-38,-20,56,62],ax=ax,linewidth=2,color='purple')
 # Use acmax (for selected month) # [lon x lat x model x thres x lag]
 
 ithres = 2
-
-xlim = [0,36]
-
-bbsel =[-38,-20,56,62]
+xlim   = [0,36]
+bbsel  [-38,-20,56,62]
 
 locfn,loctitle = proc.make_locstring_bbox(bbsel)
 acr,lonr,latr = proc.sel_region(acmax,lon,lat,bbsel,autoreshape=True)
@@ -710,53 +732,6 @@ for i in range(3):
 plt.suptitle("Stochastic Model Autocorrelation for %s" % (loctitle),fontsize=14,y=1.05)
 savename = "%sIntegrated_ACF_SM_comparison_thres%i_%s.png" % (figpath,ithres,locfn)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
-
-
-#%% Load and compare with CESM-PiC
-
-mconfigs = ("SLAB","FULL")
-
-
-
-
-cesm_acs = []
-for mc in range(2):
-    
-    mc_in  = mconfigs[mc]
-    ncname = "%sPIC-%s_SST_autocorrelation_thres0_lag60.npz" % (outpath,mc_in)
-    ld     = np.load(ncname)
-    
-    c_ac   = ld['acs'] # [lon x lat x mon x thres x lag]
-    cesm_acs.append(c_ac)
-    
-cesm_acs = np.array(cesm_acs) # [model x ...]
-cesm_acs = cesm_acs.transpose(1,2,0,3,4,5) # [lon x lat x (model) x month x thres x lag]
-
-
-
-if ksel == 'max':
-    # Get indices of kprev
-    hmax = np.argmax(h,axis=2)
-    
-    # Select autocorrelation function of maximum month
-    newshape = [d for d in cesm_acs.shape if d != 12]
-    acmax_cesm = np.zeros(newshape)*np.nan
-    for o in tqdm(range(nlon)):
-        for a in range(nlat):
-            kpt            = hmax[o,a,]
-            acmax_cesm[o,a,...] = cesm_acs[o,a,...,kpt,:,:]
-else:
-    acmax_cesm = cesm_acs[...,ksel,:,:]
-
-#% Integrate
-integr_ac_cesm = np.trapz(acmax_cesm,x=lags,axis=-1) # [lon x lat x (ens) x thres]
-
-#%% Rename variables for processing below
-
-t2_sm = integr_ac
-t2_cesm = integr_
-
-
 
 #%% Scrap from the old script....
 
