@@ -23,7 +23,7 @@ from tqdm import tqdm
 
 # Set Machine
 # -----------
-stormtrack = 1 # Set to True to run on stormtrack, False for local run
+stormtrack = 0 # Set to True to run on stormtrack, False for local run
 
 # Autocorrelation parameters
 # --------------------------
@@ -33,11 +33,11 @@ thresholds  = [0,] # Standard Deviations
 conf        = 0.95
 tails       = 2
 
-mconfig    = "HTR-FULL" #["PIC-FULL","HTR-FULL","PIC_SLAB","HadISST","ERSST"]
+mconfig    = "HadISST" #["PIC-FULL","HTR-FULL","PIC_SLAB","HadISST","ERSST"]
 runid      = 9
 thresholds = [0,]
 thresname  = "thres" + "to".join(["%i" % i for i in thresholds])
-varname    = "SSS" # ["TS","SSS","SST]
+varname    = "SST" # ["TS","SSS","SST]
 
 # Set to False to not apply a mask (otherwise specify path to mask)
 loadmask   = False #"/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/model_input/limask180_FULL-HTR.npy"
@@ -233,7 +233,7 @@ Inputs are:
 # Get Dimensions
 if len(sst.shape) > 3:
     
-    print("SST has more than 3 dimensions. Combining.")
+    print("%s has more than 3 dimensions. Combining." % varname)
     nlon,nlat,ntime,notherdims = sst.shape
     sst = sst.transpose(0,1,3,2) # [nlon,nlat,otherdims,time]
     npts = nlon*nlat*notherdims # combine ensemble and points

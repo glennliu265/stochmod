@@ -5,7 +5,6 @@ Compare T2 for CESM and Stochastic Model
 
 First section is copied from viz_pointiwse_autocorrelation
 
-
 Includes:
     Reference Month vs. Lag plots for a single point
 
@@ -875,11 +874,8 @@ include_params = False
 xtks     = np.arange(0,66,6)
 fig = plt.figure(figsize=(16,8))
 
-
 if include_params:
     fig,axs = plt.subplots(2,1,figsize=(8,8))
-
-
 
     # (0) Plot Effective Parameters
     # --------------------------

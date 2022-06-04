@@ -23,17 +23,13 @@ import scm
 import yo_box as ybx
 
 #%%
-
 datpath  = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/'
 fnames   = "Fprime_PIC_%s_rolln0.nc"
 mconfigs = ["FULL","SLAB"]
-
-figpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220526/"
+figpath  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220526/"
 proc.makedir(figpath)
 
-fnames2 = "CESM_proc/NHFLX_PIC_%s.nc"
-
-
+fnames2  = "CESM_proc/NHFLX_PIC_%s.nc"
 #%% Load whole Dataset
 
 i      = 1
@@ -153,12 +149,12 @@ qspecs,qfreqs,qCCs,qdofs,qr1s = scm.quick_spectrum(qnets,nsmooth,pct)
 
 #%% Compute White Noise confidence
 nsamples = 1000
+
 pcts     = [0.025,0.05,0.5]
 cfspecs = []
 for i in tqdm(range(2)):
     cfspec,freq = mc_wn_spectra(fprimes[i],nsamples,nsmooth,pct,return_pcts=pcts,tails="both")
     cfspecs.append(cfspec)
-    
     
 qcfspecs = []
 for i in tqdm(range(2)):
@@ -177,17 +173,23 @@ xlm     = (xtk[0],xtk[-1])
 
 pctid   = 0
 
+pcolors  = ["red","orange",]
+pcolors2 = ["blue","violet"]
 
-
-pcolors  = ["red","blue",]
-pcolors2 = ["orange","violet"]
+twosp = True
 
 # Plot Results
-fig,ax = plt.subplots(1,1)
+if twosp:
+    fig,axs = plt.subplots(1,2,figsize=(16,4),constrained_layout=True,sharey=True)
+else:
+    fig,ax = plt.subplots(1,1)
+    
 for mc in range(2):
     
+    if twosp:
+        ax = axs[mc]
+    
     ax.plot(freqs[mc]*dtplot,specs[mc]/dtplot,label="F' " + mconfigs[mc],color=pcolors[mc],zorder=1)
-
     ax.plot(qfreqs[mc]*dtplot,qspecs[mc]/dtplot,label="$Q'_{net}$ "+mconfigs[mc],color=pcolors2[mc],zorder=1)
     
     
@@ -213,21 +215,35 @@ for mc in range(2):
                 
             if i < 2:
                 ax.fill_between(infreqs[mc]*dtplot,incfspecs[mc][0,i,:]/dtplot,
-                                incfspecs[mc][1,i,:]/dtplot,alpha=0.15,color=incolors[mc],zorder=9)
+                                incfspecs[mc][1,i,:]/dtplot,alpha=0.05,color=incolors[mc],zorder=9)
             
             ax.plot(infreqs[mc]*dtplot,incfspecs[mc][0,i,:]/dtplot,color=incolors[mc],ls=ls,alpha=0.3)
             ax.plot(infreqs[mc]*dtplot,incfspecs[mc][1,i,:]/dtplot,color=incolors[mc],ls=ls,alpha=0.3)
 
-ax.legend()
-ax.set_xticks(xtk)
-ax.set_xlim(xlm)
-ax2 = ax.twiny()
-ax2.set_xticks(xtk)
-ax2.set_xlim(xlm)
-ax.set_xticklabels(xper)
 
-ax.grid(True,ls='dotted')
-plt.savefig("%sFprime_Qnet_Spectra_Comparison.png" % (figpath),dpi=150)
+if twosp:
+    loopax = axs
+else:
+    loopax = [ax,]
+for a,ax in enumerate(loopax):
+    ax.legend()
+    #ax.set_xticks(xtk)
+    ax.set_xlim(xlm)
+    ax2 = ax.twiny()
+    ax2.set_xticks(xtk)
+    ax2.set_xlim(xlm)
+    ax2.set_xticklabels(xper)
+    ax2.grid(True,ls='dotted')
+    if a == 0:
+        ax.set_ylabel("Power ($Wm^{-1}cpy^{-1}$)")
+    ax2.set_xlabel("Period (Years)")
+    ax.set_xlabel("Frequency ($Years^{-1}$)")
+    
+    
+    
+plt.savefig("%sFprime_Qnet_Spectra_Comparison_twosp%i.png" % (figpath,twosp),dpi=150)
+
+#%% Make two subplots to be ore comparable
 
 
 #%%

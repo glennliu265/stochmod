@@ -35,7 +35,7 @@ projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 datpath     = projpath + '01_Data/'
 input_path  = datpath + 'model_input/'
 output_path = datpath + 'model_output/'
-outpath     = projpath + '02_Figures/20220422/'
+outpath     = projpath + '02_Figures/20220601/'
 proc.makedir(outpath)
 
 # Load in control data for 50N 30W
@@ -203,7 +203,7 @@ cffull = calc_conflag(cesmautofull,conf,tails,1798)
 #%% Plot SST Autocorrelation at the test point (SM Paper)
 
 notitle    = True  # Remove Title for publications
-sepfig     = False # Plot figures separately, for presentaiton, or together)
+sepfig     = True # Plot figures separately, for presentaiton, or together)
 sepentrain = False  # Separate entrain/non-entraining models
 usegrid    = True
 tickfreq   = 2
@@ -338,10 +338,9 @@ else:
 for ax in axs:
     ax.set_xlabel("")
 fig.text(0.5, 0.01, 'Lag (Months)', ha='center',fontsize=12)
+
 #%% Load and calculate CESM Spectra
-
 cssts = scm.load_cesm_pt(datpath,loadname='both',grabpoint=[-30,50])
-
 #%% Calculate Spectra
 
 debug    = False
