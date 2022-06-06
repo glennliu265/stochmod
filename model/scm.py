@@ -1886,7 +1886,7 @@ def indexwindow(invar,m,monwin,combinetime=False,verbose=False):
     return varout
 
 
-def calc_HF(sst,flx,lags,monwin,verbose=True,posatm=True):
+def calc_HF(sst,flx,lags,monwin,verbose=True,posatm=True,return_cov=False):
     """
     damping,autocorr,crosscorr=calc_HF(sst,flx,lags,monwin,verbose=True)
     Calculates the heat flux damping given SST and FLX anomalies using the
@@ -1934,6 +1934,9 @@ def calc_HF(sst,flx,lags,monwin,verbose=True,posatm=True):
     autocorr  = np.zeros(damping.shape)
     crosscorr = np.zeros(damping.shape)
     
+    covall    = np.zeros(damping.shape)
+    autocovall    = np.zeros(damping.shape)
+    
     st = time.time()
     for l in range(nlag):
         lag = lags[l]
@@ -1957,19 +1960,28 @@ def calc_HF(sst,flx,lags,monwin,verbose=True,posatm=True):
             # Compute damping
             damping[m,l,:] = cov/autocov
             
+            # Save covariances
+            covall[m,l,:]     = cov
+            autocovall[m,l,:] = autocov
+            
             print("Completed Month %02i for Lag %s (t = %.2fs)" % (m+1,lag,time.time()-st))
             
     # Reshape output variables
     damping = damping.reshape(12,nlag,nlat,nlon)  
     autocorr = autocorr.reshape(damping.shape)
     crosscorr = crosscorr.reshape(damping.shape)
+    covall = covall.reshape(damping.shape)
+    autocovall.reshape(damping.shape)
     
     # Check sign
     if posatm:
         if np.nansum(np.sign(crosscorr)) < 0:
             print("WARNING! sst-flx correlation is mostly negative, sign will be flipped")
             crosscorr*=-1
-            
+            covall*=-1
+    
+    if return_cov:
+        return damping,autocorr,crosscorr,autocovall,covall
     return damping,autocorr,crosscorr
 
 def prep_HF(damping,rsst,rflx,p,tails,dof,mode,
