@@ -1971,7 +1971,7 @@ def calc_HF(sst,flx,lags,monwin,verbose=True,posatm=True,return_cov=False):
     autocorr = autocorr.reshape(damping.shape)
     crosscorr = crosscorr.reshape(damping.shape)
     covall = covall.reshape(damping.shape)
-    autocovall.reshape(damping.shape)
+    autocovall = autocovall.reshape(damping.shape)
     
     # Check sign
     if posatm:
