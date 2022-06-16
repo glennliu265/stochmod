@@ -46,7 +46,7 @@ varname    = "SST" #"SST"
 
 # Set Output Directory
 # --------------------
-figpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220609/'
+figpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220622/'
 proc.makedir(figpath)
 outpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/'
 savename   = "%s%s_%s_autocorrelation_%s_%s.npz" %  (outpath,mconfig,varname,thresname,lagname)
@@ -163,15 +163,15 @@ integr_ac = 1 + 2*np.trapz(acmax**2,x=lags,axis=-1)
 
 rkmonth = 1
 maxmincorr,maxids,minids = proc.calc_remidx_simple(acs_final,rkmonth,monthdim=3,lagdim=-1,debug=True)
-
-remidx = maxmincorr[1,...] - maxmincorr[0,...]
+remidx                   = maxmincorr[1,...] - maxmincorr[0,...]
 
 #%% Debugging plot for testing the re-emergence detection
 
 imodel = 2
 ithres = -1
-klon = 30
+klon = 44
 klat = 12
+locfn,loctitle = proc.make_locstring(lon[klon],lat[klat])
 
 xtks2 = np.arange(0,63,3)
 monlabs = viz.prep_monlag_labels(rkmonth,xtks2,label_interval=2,useblank=True)
@@ -204,8 +204,49 @@ ax.grid(True,ls='dotted')
 ax.set_xlim([lags[0],lags[-1]])
 ax.set_ylabel("Correlation")
 ax.set_xlabel("Lag (Months) from %s" % mons3[rkmonth])
-ax.set_title("Lagged Autocorrelation for Model %i, Threshold %i, Lon %i, Lat %i" % 
-             (imodel,ithres,lon[klon],lat[klat]))
+ax.set_title("Lagged Autocorrelation for %s, Threshold %s @ %s" % 
+             (modelnames[imodel],threslabs[ithres],loctitle))
+
+
+savename = "%sStochasticModel_Idx_%s_mon%02i_thres%i_%s.png" % (figpath,locfn,rkmonth+1,ithres)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+#%% Quick visualization of computed re-emergence patterns
+
+ithres = 2
+
+clvls = np.arange(-.5,.55,.05)
+fig,axs = plt.subplots(3,5,subplot_kw={'projection':ccrs.PlateCarree()},
+                       constrained_layout=True,figsize=(16,8))
+for imodel in range(3):
+    
+    for y in range(5):
+        
+        ax = axs[imodel,y]
+        
+        blabel = [0,0,0,0]
+        if imodel == 2:
+            blabel[-1] = 1
+        if y == 0:
+            blabel[1] = 1
+            
+            ax.text(-0.15, 0.50, modelnames[imodel], va='bottom', ha='center',rotation='horizontal',
+                    rotation_mode='anchor',transform=ax.transAxes)
+        
+        if imodel == 0:
+            ax.set_title("Year %i" % (y+1))
+        ax = viz.add_coast_grid(ax,bbox=bboxplot,blabels=blabel,
+                                fill_color="gray",ignore_error=True)
+        
+        plotac = remidx[y,:,:,imodel,ithres]
+        
+        cf = ax.pcolormesh(lon,lat,plotac.T,cmap='cmo.balance',vmin=-.5,vmax=.5)
+        cl = ax.contour(lon,lat,plotac.T,levels=clvls,colors="k",linewidths=0.5)
+        ax.clabel(cl,fontsize=10)
+cb = fig.colorbar(cf,ax=axs.flatten(),orientation='horizontal',fraction=0.045)
+cb.set_label("Re-emergence Index (Max - Min Correlation)")
+plt.suptitle("%s Re-emergence Index, Stochastic Model, Threshold: %s" % (mons3[rkmonth],threslabs[ithres]))
+savename = "%sStochasticModel_REMIdx_mon%02i_thres%i.png" % (figpath,rkmonth+1,ithres)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 #%% Quickly visualize h-max
 #
@@ -257,14 +298,23 @@ else:
 #% Integrate
 integr_ac_cesm = 1 + 2 * np.trapz(acmax_cesm**2,x=lags,axis=-1) # [lon x lat x (model) x thres]
 
+
+#%% Compute REM-Index for CESM
+
+cesm_maxmincorr,maxids,minids = proc.calc_remidx_simple(cesm_acs,rkmonth,monthdim=3,lagdim=-1,debug=True)
+cesm_remidx                   = cesm_maxmincorr[1,...] - cesm_maxmincorr[0,...]
+
+
 #%% Rename variables for ease
 
-t2all    = np.concatenate([integr_ac_cesm,integr_ac],axis=2) # [lon x lat x model x thres]
-t2names  = np.concatenate([mconfigs,mnames])
-t2cols   = np.concatenate([['gray','k'],mcolors]) 
-acmaxall = np.concatenate([acmax_cesm,acmax],axis=2) # [lon x lat x model x thres x lag]
+t2all     = np.concatenate([integr_ac_cesm,integr_ac],axis=2) # [lon x lat x model x thres]
+t2names   = np.concatenate([mconfigs,mnames])
+t2cols    = np.concatenate([['gray','k'],mcolors]) 
+acmaxall  = np.concatenate([acmax_cesm,acmax],axis=2) # [lon x lat x model x thres x lag]
 
-acall    = np.concatenate([cesm_acs,acs_final],axis=2)
+acall     = np.concatenate([cesm_acs,acs_final],axis=2)
+
+remidxall = np.concatenate([cesm_remidx,remidx],axis=3) # [yr x lat x lon x model x thres]
 
 # ----------------------------------
 # %% Quick Check how ksel impacts T2
@@ -1040,8 +1090,48 @@ for mc in range(5):
     
     plt.savefig("%sT2_Difference_%s.png"%(figpath,t2names[mc]),dpi=150,bbox_inches='tight')
 
+#%% Do intercomparison of REM Index for CESM1 and Entraining SM
 
 
+modelsel = [0,1,4]
+ithres   = 2
+
+clvls = np.arange(-.5,.55,.05)
+fig,axs = plt.subplots(3,5,subplot_kw={'projection':ccrs.PlateCarree()},
+                       constrained_layout=True,figsize=(16,6))
+
+for im in range(len(modelsel)):
+    
+    imodel = modelsel[im]
+    
+    for y in range(5):
+        
+        ax = axs[im,y]
+        
+        blabel = [0,0,0,0]
+        if im == 2:
+            blabel[-1] = 1
+        if y == 0:
+            blabel[1] = 1
+            
+            ax.text(-0.15, 0.50, t2names[imodel], va='bottom', ha='center',rotation='horizontal',
+                    rotation_mode='anchor',transform=ax.transAxes)
+        
+        if im == 0:
+            ax.set_title("Year %i" % (y+1))
+        ax = viz.add_coast_grid(ax,bbox=bboxplot,blabels=blabel,
+                                fill_color="gray",ignore_error=True)
+        
+        plotac = remidxall[y,:,:,imodel,ithres]
+        
+        cf = ax.pcolormesh(lon,lat,plotac.T,cmap='cmo.balance',vmin=-.5,vmax=.5)
+        cl = ax.contour(lon,lat,plotac.T,levels=clvls,colors="k",linewidths=0.5)
+        ax.clabel(cl,fontsize=10)
+cb = fig.colorbar(cf,ax=axs.flatten(),orientation='horizontal',fraction=0.045)
+cb.set_label("Re-emergence Index (Max - Min Correlation)")
+plt.suptitle("%s Re-emergence Index Threshold: %s" % (mons3[rkmonth],threslabs[ithres]))
+savename = "%sREMIdx_Intercomparison_mon%02i_thres%i.png" % (figpath,rkmonth+1,ithres)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 # ----------------------------------------------------------------------------
 #%% SCRAP BELOW
