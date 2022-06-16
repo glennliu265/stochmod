@@ -2306,7 +2306,7 @@ def remove_enso(invar,ensoid,ensolag,monwin,reduceyr=True,verbose=True,times=Non
                 varin = varin.reshape(nyr*monwin,nlat*nlon)
             
             # Regress to obtain coefficients [space]
-            varreg,_ = proc.regress_2d(ensoin.squeeze(),varin,nanwarn=1)
+            varreg,_ = proc.regress_2d(ensoin.squeeze(),varin,nanwarn=0)
             
             # Write to enso pattern
             ensopattern[m,:,:,pc] = varreg.reshape(nlat,nlon).copy()
