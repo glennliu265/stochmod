@@ -44,18 +44,15 @@ thresholds = [0,]
 thresname  = "thres" + "to".join(["%i" % i for i in thresholds])
 varname    = "SST" #"SST"
 
-
-
 # Set Output Directory
 # --------------------
-figpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220601/'
+figpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220609/'
 proc.makedir(figpath)
 outpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/'
 savename   = "%s%s_%s_autocorrelation_%s_%s.npz" %  (outpath,mconfig,varname,thresname,lagname)
 if "SM" in mconfig:
     savename = proc.addstrtoext(savename,"_runid2%02i" % (runid))
 print("Loading the following dataset: %s" % savename)
-
 
 # Plotting Params
 # ---------------
@@ -73,8 +70,6 @@ datpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/
 fnames      = ["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_dmp0"%i for i in range(10)]
 mnames      = ["constant h","vary h","entraining"] 
 
-    
-    
 #%% Load in the stochastic model data
 
 st          = time.time()
@@ -164,7 +159,54 @@ integr_ac = 1 + 2*np.trapz(acmax**2,x=lags,axis=-1)
 
 #np.trapz(acmax,x=lags,axis=-1) # [lon x lat x (ens) x thres]
 
-#
+#%% Also calculate the re-emergence index
+
+rkmonth = 1
+maxmincorr,maxids,minids = proc.calc_remidx_simple(acs_final,rkmonth,monthdim=3,lagdim=-1,debug=True)
+
+remidx = maxmincorr[1,...] - maxmincorr[0,...]
+
+#%% Debugging plot for testing the re-emergence detection
+
+imodel = 2
+ithres = -1
+klon = 30
+klat = 12
+
+xtks2 = np.arange(0,63,3)
+monlabs = viz.prep_monlag_labels(rkmonth,xtks2,label_interval=2,useblank=True)
+
+plotac     = acs_final[klon,klat,imodel,rkmonth,ithres,:]
+plotremidx = remidx[:,klon,klat,imodel,ithres]
+plotmaxmin = maxmincorr[:,:,klon,klat,imodel,ithres]
+
+fig,ax = plt.subplots(1,1,figsize=(10,4),constrained_layout=True)
+ax.plot(lags,plotac,color="k",marker=".",markersize=5,zorder=-1)
+
+for y in range(remidx.shape[0]):
+    
+    # Plot the search points
+    ax.scatter(maxids[y],plotac[maxids[y]],marker="x",color="r")
+    ax.scatter(minids[y],plotac[minids[y]],marker="+",color="b")
+    
+    
+    ilagmax = np.where(plotac == plotmaxmin[1,y])[0][0]
+    ilagmin = np.where(plotac == plotmaxmin[0,y])[0][0]
+    
+    ax.scatter(ilagmax,plotmaxmin[1,y],marker="d",color="cyan")
+    ax.scatter(ilagmin,plotmaxmin[0,y],marker="o",color="cyan")
+    ax.axvline(ilagmax,color="r",ls="solid",lw=0.5)
+    ax.axvline(ilagmin,color="b",ls='dashed',lw=0.5)
+
+ax.set_xticks(xtks2)
+ax.set_xticklabels(monlabs)
+ax.grid(True,ls='dotted')
+ax.set_xlim([lags[0],lags[-1]])
+ax.set_ylabel("Correlation")
+ax.set_xlabel("Lag (Months) from %s" % mons3[rkmonth])
+ax.set_title("Lagged Autocorrelation for Model %i, Threshold %i, Lon %i, Lat %i" % 
+             (imodel,ithres,lon[klon],lat[klat]))
+
 #%% Quickly visualize h-max
 #
 
@@ -294,12 +336,12 @@ for mc in range(5):
 
 # Select a Point
 ithres  = 2
-lonf    = -30
-latf    = 50
+lonf    = -15
+latf    = 61
 kmonth  = 2
 
 # Get Indices
-klon,klat = proc.find_latlon(lonf,latf,lon,lat)
+klon,klat    = proc.find_latlon(lonf,latf,lon,lat)
 locfn,locstr = proc.make_locstring(lonf,latf)
 
 # Make the plot
@@ -315,6 +357,38 @@ for mc in range(len(t2names)):
 ax.legend()
 #ax.set_xlim([0,60])
 
+#%% Compare WARM/COLD for each Model to examine asymmetry/symmetry
+
+kmonth = 1
+
+threscols = ("b","r","k")
+plotorder = [2,3,4,0,1]
+
+
+fig,axs = plt.subplots(2,3,constrained_layout=True,figsize=(14,6))
+
+# Make the plot
+for mc in range(5):
+    imc = plotorder[mc]
+    
+    title    = "%s" % (t2names[imc])
+    if mc == 4:
+        ax = axs.flatten()[-1]
+    else:
+        ax = axs.flatten()[mc]
+    ax,ax2   = viz.init_acplot(kmonth,np.arange(0,66,6),lags,ax=ax,title=title)
+    
+    for ithres in range(3):
+        
+        ax.plot(lags,acall[klon,klat,imc,kmonth,ithres,:],marker="o",markersize=2,
+                color=threscols[ithres],lw=2,
+                label="%s" % (threslabs[ithres]))
+        ax.legend()
+        
+plt.suptitle("%s Autocorrelation @ Lon: %i, Lat : %i" % (varname,lonf,latf),y=1.01)
+
+axs[1,1].axis('off')
+plt.savefig("%sHotColdACDifferences_%s.png"%(figpath,locfn),dpi=150,bbox_inches="tight")
 
 #%% Visualize the pcolor lag autocorrelation
 ithres = 2
@@ -937,9 +1011,39 @@ else:
     ax.set_title("%s (%s)" % (locfancy,loctitle),fontsize=16)
 plt.savefig("%sFULLvEntrain_SummaryFig_%s_k%s_thres%i_nolocator_inclparams%i.png" % (figpath,locfn,ksel,ithres,include_params),dpi=150,bbox_inches="tight")
 
+# --------------------------------------------------
+#%% Visualize Warm/Cold T2 Differences in each model
+# --------------------------------------------------
+mc    = 0
 
 
-# -----------------------------------------------------------------------------
+for mc in range(5):
+    cmap  = 'cmo.balance'
+    cints = np.arange(-5,5.5,0.5)
+    
+    
+    fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},
+                          constrained_layout=True,figsize=(12,8))
+    
+    ax     = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="gray")
+    ax.set_title("$T_2$ Difference (Warm - Cold, %s)" % t2names[mc],
+                 fontsize=24,color=t2cols[mc])
+    
+    
+    plotvar = t2all[:,:,mc,1] - t2all[:,:,mc,0]
+    
+    cf = ax.contourf(lon,lat,plotvar.T,levels=cints,cmap=cmap,extend='both')
+    cl = ax.contour(lon,lat,plotvar.T,levels=cints,colors="k",linewidths=0.5)
+    ax.clabel(cl,cints[::2])
+    cb = fig.colorbar(cf,ax=ax)
+    cb.set_label("$T_2$ Difference (Warm - Cold)",fontsize=14)
+    
+    plt.savefig("%sT2_Difference_%s.png"%(figpath,t2names[mc]),dpi=150,bbox_inches='tight')
+
+
+
+
+# ----------------------------------------------------------------------------
 #%% SCRAP BELOW
 
 #%% Examine a specific region
