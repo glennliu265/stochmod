@@ -1072,7 +1072,7 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
                 for modelnum in range(3):
                     # Set load name with model
                     ldname = datpath+"stoch_output_%s_model%i.npz"%(expid,modelnum)
-                    if (~useslab) and (modelnum>0): # Load different forcing for h-vary, entrain
+                    if (useslab==0) and (modelnum>0): # Load different forcing for h-vary, entrain
                         ldname = ldname.replace("SLAB","FULL")
                     ld = np.load(ldname)
                     sst.append(ld['sst'])
@@ -1106,8 +1106,7 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
         moden   = proc.get_stringnum(expid,"method",nchars=1,verbose=verbose) # Get mode number from experiment name
     else:
         moden   = "5"# Use 5 as default
-    
-    mskslab = np.load(rawpath+"SLAB_PIC_NHFLX_Damping_monwin3_sig005_dof893_mode%s_mask.npy" %  moden)
+    mskslab = np.load(rawpath+"SLAB_PIC_NHFLX_Damping_monwin3_sig005_dof893_mode%s_mask.npy" % moden)
     mskfull = np.load(rawpath+"FULL_PIC_NHFLX_Damping_monwin3_sig005_dof1893_mode%s_mask.npy"% moden)
     dmskin = [mskslab,mskfull]
     dmsks  = []
@@ -3116,7 +3115,11 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
     12. dt [INT]       : Simulation step (default is monthly)
     13. debug [BOOL   ]: Set to true to just run 10-year simulation
     14. check [BOOL]   :
-    15. useslab [BOOL] :
+    15. useslab [BOOL] : Use only slab parameters
+        0 : Use parameters for respective configuration
+        1 : Use SLAB Forcing and Damping
+        2 : Use SLAB Damping
+        3 : Use SLAB Forcing
     16. savesep [BOOL] :
     17. intgrQ [BOOL]  :
     18. method [INT]   : Heat Flux Significance Testing Method
@@ -3264,11 +3267,16 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
             T0  = np.zeros((len(lonr),len(latr)))
             Td0 = False
             
-        
-        if useslab: # In special cases, use slab for forcing and damping
+        if useslab == 1:
             print("Warning! Using CESM-SLAB Parameters for all cases!")
             f_in = forcing.copy()
             d_in = damping.copy()
+        elif useslab == 2:
+            print("Warning! Using CESM-SLAB Damping!")
+            d_in = damping.copy()
+        elif useslab == 3:
+            print("Warning! Using CESM-SLAB Forcing!")
+            f_in = forcing.copy()
         
         # Convert to w/m2
         # ---------------

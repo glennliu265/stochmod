@@ -15,7 +15,7 @@ import time
 
 #%% Set the location
 
-stormtrack = 0
+stormtrack = 1
 
 if stormtrack == 0:
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -96,10 +96,12 @@ runids      = ["2%02d"%i for i in range(10)]#"011"
 pointmode   = 0 
 points      = [-30,50]
 bboxsim     = [-80,0,0,65] # Simulation Box
-hconfigs    = [2,] # Which MLD configuration to use
+hconfigs    = [0,1,2,] # Which MLD configuration to use
+
+# Other Parameters
+useslab     = 2 #0=Default; 1=SLAB HFF/forcing; 2=SLAB HFF; 3=SLAB forcing
 
 # Toggles
-useslab     = False # Set to True to use SLAB_CESM parameters for all...
 savesep     = False # Set to True to save the outputs differently
 
 # Continuous Run Options
@@ -110,7 +112,8 @@ startfile   = None
 
 # ADD EKMAN FORCING (or other custom parameters)
 custom_params         = {}
-custom_params['q_ek'] = "Qek_eof_090pct_FULL_PIC_eofcorr0_Fprime_rolln0.npy"
+# Uncomment to add q_ek of your choosing...
+#custom_params['q_ek'] = "Qek_eof_090pct_FULL_PIC_eofcorr0_Fprime_rolln0.npy"
 
 # Save for Budget Analyses
 budget = True # Set to True to only run entrain, and save budget analyses separately
@@ -254,7 +257,7 @@ for f in range(len(frcnames)):
     for r,runid in enumerate(runids):
         
         
-        expname    = "%sstoch_output_forcing%s_%iyr_run%s_ampq%i_method%i_dmp0.npz" % (output_path,frcname,int(t_end/12),runid,ampq,method,)
+        expname    = "%sstoch_output_forcing%s_%iyr_run%s_ampq%i_method%i_useslab%i.npz" % (output_path,frcname,int(t_end/12),runid,ampq,method,useslab)
         if budget:
             expname = proc.addstrtoext(expname,"_budget")
         # dmp0 indicates that points with insignificant lbd_a were set to zero.
