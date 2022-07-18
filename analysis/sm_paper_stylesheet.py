@@ -38,7 +38,7 @@ cl_int      = np.arange(-0.45,0.50,0.05)
 cmax  = 0.5
 cstep = 0.025
 lstep = 0.05
-cint,cl_int=viz.return_clevels(cmax,cstep,lstep)
+cint,cl_int = viz.return_clevels(cmax,cstep,lstep)
 clb = ["%.2f"%i for i in cint[::4]]
 bboxplot    = [-80,0,5,60]
 
@@ -114,4 +114,15 @@ else:
     plt.style.use("default")
     dfcol = "k"
 
+#%% Flux Dictionary
+namedict = {
+    "LHFLX": "Latent Heat Flux",
+    "SHFLX": "Sensible Heat Flux",
+    "FSNS" : "Shortwave Flux",
+    "FLNS" : "Longwave Flux",
+    "qnet" : "Net Heat Flux",
+    "NHFLX": "Net Heat Flux",
+    "RHFLX": "Radiative Heat Flux",
+    "THFLX": "Turbulent Heat Flux"
+    }
 
