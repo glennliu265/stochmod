@@ -161,7 +161,7 @@ integr_ac = 1 + 2*np.trapz(acmax**2,x=lags,axis=-1)
 
 #%% Also calculate the re-emergence index
 
-rkmonth = 1
+rkmonth                  = 1
 maxmincorr,maxids,minids = proc.calc_remidx_simple(acs_final,rkmonth,monthdim=3,lagdim=-1,debug=True)
 remidx                   = maxmincorr[1,...] - maxmincorr[0,...]
 
@@ -169,8 +169,10 @@ remidx                   = maxmincorr[1,...] - maxmincorr[0,...]
 
 imodel = 2
 ithres = -1
-klon = 44
-klat = 12
+
+lonf = -50
+latf = 30
+klon,klat = proc.find_latlon(lonf,latf,lon,lat)
 locfn,loctitle = proc.make_locstring(lon[klon],lat[klat])
 
 xtks2 = np.arange(0,63,3)
@@ -207,16 +209,16 @@ ax.set_xlabel("Lag (Months) from %s" % mons3[rkmonth])
 ax.set_title("Lagged Autocorrelation for %s, Threshold %s @ %s" % 
              (modelnames[imodel],threslabs[ithres],loctitle))
 
-
-savename = "%sStochasticModel_Idx_%s_mon%02i_thres%i_%s.png" % (figpath,locfn,rkmonth+1,ithres)
+savename = "%sStochasticModel_Idx_%s_mon%02i_thres%i_%s.png" % (figpath,locfn,rkmonth+1,ithres,modelnames[imodel])
 plt.savefig(savename,dpi=150,bbox_inches='tight')
 #%% Quick visualization of computed re-emergence patterns
 
 ithres = 2
+bboxplot = [-80,0,0,65]
 
 clvls = np.arange(-.5,.55,.05)
 fig,axs = plt.subplots(3,5,subplot_kw={'projection':ccrs.PlateCarree()},
-                       constrained_layout=True,figsize=(16,8))
+                       constrained_layout=True,figsize=(16,9))
 for imodel in range(3):
     
     for y in range(5):
@@ -227,9 +229,9 @@ for imodel in range(3):
         if imodel == 2:
             blabel[-1] = 1
         if y == 0:
-            blabel[1] = 1
+            blabel[0] = 1
             
-            ax.text(-0.15, 0.50, modelnames[imodel], va='bottom', ha='center',rotation='horizontal',
+            ax.text(-0.25, 0.50, modelnames[imodel], va='bottom', ha='center',rotation='horizontal',
                     rotation_mode='anchor',transform=ax.transAxes)
         
         if imodel == 0:
@@ -248,8 +250,9 @@ plt.suptitle("%s Re-emergence Index, Stochastic Model, Threshold: %s" % (mons3[r
 savename = "%sStochasticModel_REMIdx_mon%02i_thres%i.png" % (figpath,rkmonth+1,ithres)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
 
+# -------------------------
 #%% Quickly visualize h-max
-#
+# -------------------------
 
 hmax = np.argmax(h,axis=2)
 
@@ -263,6 +266,46 @@ cb = fig.colorbar(cf,ax=ax)
 cb.set_label("Month")
 ax.set_title("Month of Max MLD in CESM1-PiC")
 plt.savefig("%sMax_MLD_Mon.png"%figpath,dpi=150)
+
+#%% Trying to predict where REM will be largest
+
+dhdt  = (np.roll(h,-1,axis=2) - h).max(2)
+hdiff = h.max(2) - h.min(2) 
+
+bboxplot = [-80,0,20,65]
+
+
+fig,axs = plt.subplots(1,2,figsize=(16,6),
+                       subplot_kw={'projection':ccrs.PlateCarree()},constrained_layout=True)
+
+for a in range(2):
+    ax     = axs.flatten()[a]
+    ax     = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="gray")
+    
+    if a == 0:
+        plotvar = hdiff
+        cblbl   = "MLD (m)"
+        cmap    = 'cmo.dense'
+        clvls   = np.arange(0,850,50)
+        cl_lvls = np.arange(500,1400,200)
+        lcol    = "w"
+        title   = "Max Climatological MLD"
+    else:
+        plotvar = dhdt
+        cblbl   = r"$w_e=\frac{dh}{dt}$ (m/mon)"
+        cmap    = 'cmo.deep'
+        clvls   = np.arange(0,325,25)
+        cl_lvls = np.arange(300,800,100)
+        lcol    = "w"
+        title   = "Max Entrainment Velocity"
+    
+    pcm = ax.pcolormesh(lon,lat,plotvar.T,cmap=cmap,vmin=clvls[0],vmax=clvls[-1])
+    cl  = ax.contour(lon,lat,plotvar.T,colors=lcol,levels=cl_lvls,linewidths=0.5)
+    ax.clabel(cl,fontsize=12)
+    cb = fig.colorbar(pcm,ax=ax,fraction=0.044,orientation='horizontal')
+    cb.set_label(cblbl)
+    ax.set_title(title)
+plt.savefig("%sMLD_we_maxclim.png"%figpath,dpi=150,bbox_inches='tight')
 
 #%% Load  and compare with CESM-PiC
 
@@ -362,9 +405,6 @@ for imodel in range(5):
     savename = "%sT2bymon_%ilags_%s.png" % (figpath,lags[-1],t2names[imodel])
     plt.savefig(savename,dpi=150,bbox_inches='tight')
 
-
-
-
 #%% Visualize avg correlation at last N lags
 ithres  = 2
 maxcorr = np.nanmax(acmaxall[...,[-1]],axis=-1)[...,ithres] # [lon x lat x model]
@@ -386,8 +426,8 @@ for mc in range(5):
 
 # Select a Point
 ithres  = 2
-lonf    = -15
-latf    = 61
+lonf    = -30#-15
+latf    = 50 #61
 kmonth  = 2
 
 # Get Indices
@@ -443,9 +483,53 @@ plt.savefig("%sHotColdACDifferences_%s.png"%(figpath,locfn),dpi=150,bbox_inches=
 #%% Visualize the pcolor lag autocorrelation
 ithres = 2
 
-p = 0.05
+p     = 0.01
 tails = 1
 
+def add_refline_monvlag(refmon,nlags,appendjan=True,c='k',lw=.75,
+                        ls='solid',ax=ax,adj=0):
+    if ax is None:
+        ax = plt.gca()
+    if appendjan:
+        refmons = np.arange(1,14,1)
+    else:
+        refmons = np.arange(1,13,1)
+    
+    lags = np.arange(0,nlags)
+    
+    # Row is lags, col is reference month
+    ref_col,lag_row = np.meshgrid(refmons,lags)
+    monmatrix       = lag_row + ref_col 
+    
+    # Select multiples of remon
+    maxyr = np.floor(monmatrix.flatten().max()/12)
+    # findvalues = np.arange(refmon,maxyr*12+12,12,)
+    # maskmatrix = np.isin(monmatrix,findvalues)
+    # xx,yy = np.where(maskmatrix)
+    
+    # Get left and right y indices
+    lagval_left  = np.arange(refmon,maxyr*12+12,12,)
+    lagval_right = lagval_left - 12
+    
+    #fig,ax = plt.subplots(1,1)
+    #pcm = ax.pcolormesh(refmons,lags,monmatrix,vmin=0,vmax=12,shading='nearest')
+    for i in range(len(lagval_left)):
+        ax.plot([1,13+adj],[lagval_left[i],lagval_right[i]-adj],
+                color=c,lw=lw,ls=ls)
+    #ax.plot(np.zeros(len(lagval_left)),lagval_left)
+    # for i in range(int(maxyr)):
+    #     ax.plot(yy[i*12:(i+1)*12]+1,xx[i*12:(i+1)*12]+1)
+    #ax.set_xlim([1,14])
+    #ax.set_ylim([0,36])
+    #fig.colorbar(pcm,ax=ax)
+    #ax.set_yticks(np.arange(0,37,1))
+    #ax.set_xticks(np.arange(1,14,1))
+    return ax
+    
+    
+    
+    
+    
 def plot_ac_monvlag(plotac,plotcount,clvls,lags,ax=None,
                     p=0.05,tails=1,appendjan=True,usecontourf=False,
                     cmap='cmo.dense'):
@@ -484,6 +568,7 @@ def plot_ac_monvlag(plotac,plotcount,clvls,lags,ax=None,
     ax.set_xticklabels(mons3,rotation=45)
     return ax,rhocrit
 
+#%% Plot all models
 
 clvls = np.arange(-.1,1.05,0.05)
 fig,axs = plt.subplots(1,5,figsize=(18,8))
@@ -505,12 +590,63 @@ for a in range(5):
                         p=p,tails=tails,appendjan=True,usecontourf=False,
                         cmap='cmo.dense')
     
+    ax = add_refline_monvlag(12,plotac.shape[1],ax=ax,adj=1)
+    
     sigstr    = "%i" % ((p)*100) + "%" + r" (%i-tail): $\rho$ > %.2f (n=%i)" % (tails,rhocrit.mean(),plotcount.mean())
     title = "%s \n %s" % (t2names[a],sigstr)
     ax.set_title(title)
     
+    ax.set_ylim([lags[0],lags[-1]])
+    ax.set_xlim([0,14])
+    
     #$pcm = ax.pcolormesh(lags,)
-plt.savefig("%sACF_LagvMon_%s,png"% (figpath,locfn),dpi=150,bbox_inches='tight')
+plt.savefig("%sACF_LagvMon_%s.png"% (figpath,locfn),dpi=150,bbox_inches='tight')
+
+#%% Focus on just 2 models
+
+lonf    = -40 #-15
+latf    = 0   #61
+
+# Get Indices
+klon,klat    = proc.find_latlon(lonf,latf,lon,lat)
+locfn,locstr = proc.make_locstring(lonf,latf)
+
+modelsel   = [1,4]
+ithres     = 2
+linerefmon = 12
+
+
+clvls = np.arange(-.1,1.05,0.05)
+fig,axs = plt.subplots(1,2,figsize=(10,8))
+for a in range(2):
+    
+    ax     = axs.flatten()[a]
+    imodel = modelsel[a]
+    
+    plotac = acall[klon,klat,imodel,:,ithres,:]
+    if a == 0:
+        plotcount = np.ones(12) * 901
+    elif a == 1:
+        plotcount = np.ones(12) * 1801
+    else:
+        plotcount = np.ones(12) * 1000
+    
+    ax,rhocrit = plot_ac_monvlag(plotac,plotcount,clvls,lags,ax=ax,
+                        p=p,tails=tails,appendjan=True,usecontourf=False,
+                        cmap='cmo.dense')
+    
+    ax = add_refline_monvlag(linerefmon,plotac.shape[1],ax=ax,adj=0)
+    
+    sigstr    = "%i" % ((p)*100) + "%" + r" (%i-tail): $\rho$ > %.2f (n=%i)" % (tails,rhocrit.mean(),plotcount.mean())
+    title = "%s \n %s" % (t2names[imodel],sigstr)
+    ax.set_title(title)
+    
+    ax.set_ylim([lags[0],lags[-1]])
+    ax.set_xlim([0,14])
+    
+    #$pcm = ax.pcolormesh(lags,)
+plt.savefig("%sACF_LagvMon_%s_%sv%s.png"% (figpath,locfn,t2names[modelsel[0]],t2names[modelsel[1]]),dpi=150,bbox_inches='tight')
+
 
 #%% Plot autocorrelation at a point
 
@@ -651,11 +787,9 @@ cb.set_label("$ACF$ MSE (Lags %i to %i)" % (lagrange[0],lagrange[-1]))
 
 plt.savefig("%sACF_DifferenceMSE_SM_vs_CESMFULL_k%s_thres%i_%s.png"%(figpath,ksel,ithres,lagrngstr),dpi=150,bbox_inches='tight')
 
-
 # -----------------------------------
 # %% AMV Teleconf Plot: T2 Comparison
 # -----------------------------------
-
 
 clbls_T2 = np.arange(-12,36,6) #np.arange(0,27,3)
 clbls_dT = np.arange(-12,30,6)
@@ -896,13 +1030,12 @@ plt.suptitle("Stochastic Model Autocorrelation for %s" % (loctitle),fontsize=14,
 savename = "%sIntegrated_ACF_SM_comparison_k%s_thres%i_%s.png" % (figpath,ksel,ithres,locfn)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
 
-
 # ------------------------------------------------------------
 #%% More condensed/summary plot with effective damping/forcing
 # ------------------------------------------------------------
-cp0=3996
-rho=1026
-dt =3600*24*30
+cp0     = 3996
+rho     = 1026
+dt      = 3600*24*30
 imodels = [1,-1] # Models to plot ACF for 
 
 xtks     = np.arange(0,66,6)
@@ -1092,13 +1225,13 @@ for mc in range(5):
 
 #%% Do intercomparison of REM Index for CESM1 and Entraining SM
 
-
+bboxplot = [-80,0,0,65]
 modelsel = [0,1,4]
 ithres   = 2
 
 clvls = np.arange(-.5,.55,.05)
 fig,axs = plt.subplots(3,5,subplot_kw={'projection':ccrs.PlateCarree()},
-                       constrained_layout=True,figsize=(16,6))
+                       constrained_layout=True,figsize=(18,10))
 
 for im in range(len(modelsel)):
     
@@ -1111,10 +1244,10 @@ for im in range(len(modelsel)):
         blabel = [0,0,0,0]
         if im == 2:
             blabel[-1] = 1
-        if y == 0:
-            blabel[1] = 1
+        if (y == 0):
+            blabel[0] = 1
             
-            ax.text(-0.15, 0.50, t2names[imodel], va='bottom', ha='center',rotation='horizontal',
+            ax.text(-0.25, 0.50, t2names[imodel], va='bottom', ha='center',rotation='horizontal',
                     rotation_mode='anchor',transform=ax.transAxes)
         
         if im == 0:
@@ -1127,11 +1260,76 @@ for im in range(len(modelsel)):
         cf = ax.pcolormesh(lon,lat,plotac.T,cmap='cmo.balance',vmin=-.5,vmax=.5)
         cl = ax.contour(lon,lat,plotac.T,levels=clvls,colors="k",linewidths=0.5)
         ax.clabel(cl,fontsize=10)
-cb = fig.colorbar(cf,ax=axs.flatten(),orientation='horizontal',fraction=0.045)
+cb = fig.colorbar(cf,ax=axs.flatten(),orientation='horizontal',fraction=0.035,pad=0.01)
 cb.set_label("Re-emergence Index (Max - Min Correlation)")
 plt.suptitle("%s Re-emergence Index Threshold: %s" % (mons3[rkmonth],threslabs[ithres]))
 savename = "%sREMIdx_Intercomparison_mon%02i_thres%i.png" % (figpath,rkmonth+1,ithres)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+
+#%% Just plot for 2 models and difference (Entrain, CESM-FULL)
+
+bboxplot = [-80,0,0,65]
+modelsel = [1,4]
+ithres   = 2
+imon     = 1
+yr       = 0
+
+for yr in range(5):
+    clvls = np.arange(-.5,.55,.05)
+    fig,axs = plt.subplots(1,3,subplot_kw={'projection':ccrs.PlateCarree()},
+                           constrained_layout=True,figsize=(16,6))
+    
+    
+    
+    for a in range(3):
+        
+        ax = axs.flatten()[a]
+        
+        blabel = [0,0,0,1]
+        if (a == 0):
+            blabel[0] = 1
+        ax = viz.add_coast_grid(ax,bbox=bboxplot,blabels=blabel,
+                                fill_color="gray",ignore_error=True)
+        
+        
+        if a <2:
+            imodel = modelsel[a]
+            plotvar = remidxall[yr,:,:,imodel,ithres]
+            cmap    = 'inferno'
+            clvls   = np.arange(0,0.55,0.05)
+            cblbl   = "RE Index (Max - Min Correlation)"
+            title   = "%s" % t2names[imodel]
+        elif a == 2:
+            plotvar = remidxall[yr,:,:,modelsel[0],ithres] - remidxall[yr,:,:,modelsel[1],ithres]
+            cmap    = 'cmo.balance'
+            clvls   = np.arange(-.4,.45,.05)
+            cblbl   = "Difference In RE Index"
+            title   = "%s - %s" % (t2names[modelsel[0]], t2names[modelsel[1]])
+        
+        cf = ax.pcolormesh(lon,lat,plotvar.T,cmap=cmap,vmin=clvls[0],vmax=clvls[-1])
+        cl = ax.contour(lon,lat,plotvar.T,levels=clvls,colors="k",linewidths=0.5)
+        ax.clabel(cl,fontsize=10)
+        ax.set_title(title)
+        
+        if a == 1:
+            cb = fig.colorbar(cf,ax=axs[:2].flatten(),orientation='horizontal',fraction=0.035,pad=0.01)
+            cb.set_label(cblbl)
+        elif a == 2:
+            cb = fig.colorbar(cf,ax=ax,orientation='horizontal',fraction=0.035,pad=0.01)
+            cb.set_label(cblbl)
+    
+    plt.suptitle("%s Year %i Re-emergence Index, Threshold: %s" % (mons3[rkmonth],yr,threslabs[ithres]),y=.95)
+    savename = "%sREMIdx_Intercomparison_mon%02i_thres%i_%sv%s_Y%i.png" % (figpath,rkmonth+1,ithres,
+                                                                       t2names[modelsel[0]],
+                                                                       t2names[modelsel[1]],yr)
+    plt.savefig(savename,dpi=150,bbox_inches='tight')
+    
+    
+#%% Try to figure out the year of the last re-emergence
+
+
+
 
 # ----------------------------------------------------------------------------
 #%% SCRAP BELOW
@@ -1171,6 +1369,9 @@ viz.plot_box([-38,-20,56,62],ax=ax,linewidth=2,color='purple')
 # ------------------------------------------------------------
 # Some figures specific to analysis of stochastic model output
 # ------------------------------------------------------------
+
+
+#%% Visualize amplitude of the seasonal re-emergence
 
 
 

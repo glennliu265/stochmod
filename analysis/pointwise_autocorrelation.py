@@ -33,7 +33,7 @@ thresholds  = [0,] # Standard Deviations
 conf        = 0.95
 tails       = 2
 
-mconfig    = "HadISST" #["PIC-FULL","HTR-FULL","PIC_SLAB","HadISST","ERSST"]
+mconfig    = "SM_Qek"#"HadISST" #["PIC-FULL","HTR-FULL","PIC_SLAB","HadISST","ERSST"]
 runid      = 9
 thresholds = [0,]
 thresname  = "thres" + "to".join(["%i" % i for i in thresholds])
@@ -51,20 +51,19 @@ bboxplot = [-80,0,0,60]
 bboxlim  = [-80,0,0,65]
 #%% Set Paths for Input (need to update to generalize for variable name)
 
-
 if stormtrack:
     # Module Paths
     sys.path.append("/home/glliu/00_Scripts/01_Projects/00_Commons/")
     sys.path.append("/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model/")
     
     # Input Paths 
-    if mconfig == "SM":
+    if "SM" in mconfig:
         datpath     = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/model_output/"
     else:
         datpath     = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/%s/" % varname
         
     # Output Paths
-    figpath = "/stormtrack/data3/glliu/02_Figures/20220324/"
+    figpath = "/stormtrack/data3/glliu/02_Figures/20220622/"
     outpath = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/"
     
 else:
@@ -73,7 +72,7 @@ else:
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
 
     # Input Paths 
-    if mconfig == "SM":
+    if "SM" in mconfig:
         datpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_output/"
     elif "PIC" in mconfig:
         datpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/"
@@ -93,12 +92,16 @@ import scm
 
 # Set Input Names
 # ---------------
-if mconfig == "SM": # Stochastic model
+if "SM" in mconfig: # Stochastic model
     # Postprocess Continuous SM  Run
     # ------------------------------
     print("WARNING! Not set up for stormtrack yet.")
-    fnames      = ["stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_dmp0.npz" %i for i in range(10)]
-    mnames      = ["constant h","vary h","entraining"] 
+    if "Qek" in mconfig:
+        fnames      = ["stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_dmp0_Qek.npz" %i for i in range(10)]
+        mnames      = ["entraining"] 
+    else:
+        fnames      = ["stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_dmp0.npz" %i for i in range(10)]
+        mnames      = ["constant h","vary h","entraining"]
 elif "PIC" in mconfig:
     # Postproess Continuous CESM Run
     # ------------------------------
@@ -124,7 +127,7 @@ elif mconfig == "ERSST":
 # --------------------
 proc.makedir(figpath)
 savename   = "%s%s_%s_autocorrelation_%s_%s.npz" %  (outpath,mconfig,varname,thresname,lagname)
-if mconfig == "SM":
+if "SM" in mconfig:
     savename = proc.addstrtoext(savename,"_runid2%02i" % (runid))
 
 print("Output will save to %s" % savename)
@@ -248,7 +251,6 @@ nlags           = len(lags)
 nthres          = len(thresholds)
 
 # Combine space, remove NaN points
-
 sstrs                = sst.reshape(npts,ntime)
 if varname == "SSS":
     sstrs[:,219]     = 0 # There is something wrong with this timestep?
