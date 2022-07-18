@@ -25,7 +25,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20220201/"
+    figpath     = projpath + "02_Figures/20220711/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -51,7 +51,7 @@ proc.makedir(figpath)
 #%% User Edits
 
 # CESM1 Data Loading Options
-bbox = [-100,20,-20,90] 
+bbox = [-180,180,-90,90] 
 mconfigs = ("SLAB","FULL")
 cdatpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/"
 
@@ -211,7 +211,7 @@ import cmocean as cmo
 
 plotm          = 1 # 0=SLAB, 1=FULL
 refm           = 0
-bboxplot       = [-85,0,0,65]
+bboxplot       = =[-85,0,0,65]
 slims          = (2,1,1.5)
 slims_ratio    = (2,4,4)
 statnames_lb   = ["Variance","Skewness","Excess Kurtosis (K-3)"]
@@ -435,11 +435,67 @@ for stat in range(3):
                                                bbox_inches='tight')
             
             
+#%% Global Plot of Selected Variable
+
+#bbox_global = 
         
+plotm          = 0 # 0=SLAB, 1=FULL
+refm           = 1
+bboxplot       = [-180,180,-90,90]
+slims          = (2,1,1.5)
+slims_ratio    = (2,4,4)
+statnames_lb   = ["Variance","Skewness","Excess Kurtosis (K-3)"]
+statnames_fn   = ["var","skew","kurt"]
+s              = 1
+cmaps          = ['cmo.thermal','cmo.balance','cmo.balance']
+
+cf        = False
+plotlog   = True
+invarplot = sumvars#[lon x lat x model x stat]
+
+fig,axs = plt.subplots(2,1,constrained_layout=True,
+                       subplot_kw={'projection':ccrs.PlateCarree()},
+                       figsize=(12,6))
+
+
+cmap = cmo.cm.balance.copy()
+cmap.set_bad(color="w")
+
+for plotm in range(2):
+        
+    #for s in range(3):
+    ax   = axs[plotm]
+    blabel = [0,0,0,0]
+    
+    # Label
+    blabel = [1,0,0,0]
+    ylab = "CESM1-%s" % mconfigs[plotm] 
+    ax.text(-0.10, 0.55, ylab, va='bottom', ha='center',rotation='vertical',
+            rotation_mode='anchor',transform=ax.transAxes)
+        
+    ax   = viz.add_coast_grid(ax,bbox=bboxplot,blabels=blabel,
+                              fill_color='gray')
+    slim = slims[s]
+    
+    if cf:
+        cint = np.arange(-slim,slim+0.05,0.05)#np.linspace(-slim,slim,30)
+        pcm = ax.contourf(lon,lat,invarplot[:,:,plotm,s].T,
+                            levels=cint,cmap=cmaps[s])
+    else:
+        if s == 0:
+            
+            pcm = ax.pcolormesh(lon,lat,invarplot[:,:,plotm,s].T,
+                                vmin=0,vmax=slim,cmap=cmaps[s])
+        else:
+            pcm = ax.pcolormesh(lon,lat,invarplot[:,:,plotm,s].T,
+                                vmin=-slim,vmax=slim,cmap=cmaps[s])
+        
+    fig.colorbar(pcm,ax=ax,fraction=0.042,pad=0.01)
+    if plotm == 0:
+        ax.set_title("Monthly SST %s" % statnames_lb[s])
         
     
-    
-    
+plt.savefig("%sMonthly%s_SLAB_FULL.png"% (figpath,statnames_fn[s]),dpi=200,bbox_inches='tight')
     
 
 
