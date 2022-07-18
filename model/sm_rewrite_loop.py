@@ -116,7 +116,7 @@ custom_params         = {}
 #custom_params['q_ek'] = "Qek_eof_090pct_FULL_PIC_eofcorr0_Fprime_rolln0.npy"
 
 # Save for Budget Analyses
-budget = True # Set to True to only run entrain, and save budget analyses separately
+budget = False # Set to True to only run entrain, and save budget analyses separately
 
 # Additional Constants
 # --------------------

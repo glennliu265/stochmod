@@ -2570,7 +2570,6 @@ def make_forcing(alpha,runid,frcname,t_end,input_path,check=True,alpha_full=None
         flag=True
     else:
         flag=False
-    
     # Get the dimensions
     nlon,nlat,N_mode,nmon = alpha.shape
     
@@ -3317,7 +3316,7 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
             T   = integrate_noentrain(lbd_a,F,T0=T0,multFAC=True,debug=False)
         else:
             if budget:
-                print("Saving terms separately for budget analysis.")
+                print("Saving terms separately for budget analysis. Only the entrain model will run.")
                 # Calculate each term separately 
                 T,damping_term,forcing_term,entrain_term,Td   = integrate_entrain(h_in,kprev,lbd_a,F,
                                                                                   T0=T0,multFAC=True,debug=True,Td0=Td0)
