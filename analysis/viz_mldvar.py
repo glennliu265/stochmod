@@ -32,8 +32,8 @@ importlib.reload(viz)
 
 # Paths
 datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/CESM_proc/"
-figpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220609/"
-
+figpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220629/"
+proc.makedir(figpath)
 ncname = "HMXL_FULL_PIC_bilinear.nc"
 
 
@@ -91,6 +91,63 @@ for im in range(12):
     ax.set_title("%s Interannual MLD Variability" % months[im],fontsize=22)
     savename = "%sInterannMLDVar_mon%02i.png" % (figpath,im+1)
     plt.savefig(savename,dpi=150,bbox_inches="tight")
+
+
+#%% Get h' and make a histogram for a  point
+
+nbins     = 20
+lonf      = -30
+latf      = 50
+selmons   = [11,0,1]
+klon,klat = proc.find_latlon(lonf,latf,lonr,latr)
+locfn,loctitle = proc.make_locstring(lonf,latf)
+
+monstr = "mons"
+for m in selmons:
+    monstr += "%s-" % (m+1)
+monstr = monstr[:-1]
+print(monstr)
+
+varpt    = varr[klon,klat,:,selmons]
+varprime = (varpt - varpt.mean(0)[None,:])/100
+
+fig,ax   = plt.subplots(1,1)
+ax.hist(varprime.flatten(),bins=nbins,alpha=0.5,edgecolor='k')
+ax.set_xlim([-1e2,1e2])
+ax.set_xlabel("$h'$ (meters)")
+ax.set_ylabel("Count")
+ax.grid(True,ls='dotted')
+ax.set_title("Histogram of MLD Anomalies in CESM1-PiC (%i bins) \n @ %s Months=%s"% (nbins,loctitle,str(np.array(selmons)+1)))
+savename = "%sHistogram_hprime_CESM1-PiC_%s_nbins%i_%s.png" % (figpath,locfn,nbins,monstr)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+#%% Plot entrainment velocity
+
+nbins = 30
+
+selmons = [11,0,1,6]
+
+varpt    = varr[klon,klat,:,:]
+we       = (varpt.flatten() - np.roll(varpt.flatten(),1))/100
+we       = we.reshape(nyr,12)
+we_bar   = we.mean(0)
+
+id_detrain = np.where(we_bar<0)[0]
+
+we_prime = we - we_bar[None,:]
+we_prime[:,id_detrain] = np.nan
+we_prime = we_prime[:,selmons]
+
+fig,ax = plt.subplots(1,1)
+ax.hist(we_prime.flatten(),bins=nbins,alpha=0.5,edgecolor='k',color='green')
+ax.set_xlim([-1.5e2,1.5e2])
+ax.set_xlabel("$w_e' \frac{dh}{dt}'$ (meters/month)")
+ax.set_ylabel("Count")
+ax.grid(True,ls='dotted')
+
+ax.set_title("Histogram of Entrainment Velocity Anomalies in CESM1-PiC (%i bins) \n @ %s Months=%s"% (nbins,loctitle,str(np.array(selmons)+1)))
+savename = "%sHistogram_we_CESM1-PiC_%s_nbins%i_%s.png" % (figpath,locfn,nbins,monstr)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 #%%
 
