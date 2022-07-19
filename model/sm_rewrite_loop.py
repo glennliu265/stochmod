@@ -92,7 +92,7 @@ mconfig    = "SLAB_PIC"
 #flxeof_qek_50eofs_SLAB-PIC
 
 # Running Parameters
-runids      = ["2%02d"%i for i in np.arange(4,10)]#"011"
+runids      = ["2%02d"%i for i in np.arange(0,4)]#"011"
 pointmode   = 0 
 points      = [-30,50]
 bboxsim     = [-80,0,0,65] # Simulation Box

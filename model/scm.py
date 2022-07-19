@@ -3084,7 +3084,7 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
                    bboxsim,pointmode,points=[-30,50],
                    dt=3600*24*30,
                    debug=False,check=True,
-                   useslab=False,savesep=False,
+                   useslab=0,savesep=False,
                    intgrQ=False,
                    method=4,chk_damping=False,
                    custom_params = {},
@@ -3388,7 +3388,7 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
         if savesep:
             expstr = expname[:-4] + "_model%i"%(exp) # Get string without extension, add modelnumber
             if exp > 0:
-                if ~useslab: # Only replace if we actually used the separate forcings
+                if useslab == 0: # Only replace if we actually used the separate forcings
                     expstr = expstr.replace("SLAB","FULL") # Replace Slab  with FULL in forcing name
                 # Save the results (Not including Q)
             
