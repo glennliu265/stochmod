@@ -3119,6 +3119,8 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
         1 : Use SLAB Forcing and Damping
         2 : Use SLAB Damping
         3 : Use SLAB Forcing
+        4 : Use FULL Damping
+        5 : Use FULL Forcing
     16. savesep [BOOL] :
     17. intgrQ [BOOL]  :
     18. method [INT]   : Heat Flux Significance Testing Method
@@ -3276,6 +3278,12 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
         elif useslab == 3:
             print("Warning! Using CESM-SLAB Forcing!")
             f_in = forcing.copy()
+        elif useslab == 4:
+            print("Warning! Using CESM-FULL Damping!")
+            d_in = dampingfull.copy()
+        elif useslab == 5:
+            print("Warning! Using CESM-FULL Forcing!")
+            f_in = forcing_full.copy()
         
         # Convert to w/m2
         # ---------------

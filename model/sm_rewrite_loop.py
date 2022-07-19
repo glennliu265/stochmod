@@ -96,10 +96,11 @@ runids      = ["2%02d"%i for i in np.arange(4,10)]#"011"
 pointmode   = 0 
 points      = [-30,50]
 bboxsim     = [-80,0,0,65] # Simulation Box
-hconfigs    = [0,1,2,] # Which MLD configuration to use
+hconfigs    = [0,] # Which MLD configuration to use
 
 # Other Parameters
-useslab     = 2 #0=Default; 1=SLAB HFF/forcing; 2=SLAB HFF; 3=SLAB forcing
+useslab     = 4 #0=Default; 1=SLAB HFF/forcing; 2=SLAB HFF; 3=SLAB forcing;
+                # 4=FULL HFF; 5=FULL forcing.
 
 # Toggles
 savesep     = False # Set to True to save the outputs differently
