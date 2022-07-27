@@ -32,7 +32,7 @@ if stormtrack == 0:
     datpath = projpath + '01_Data/model_output/'
     rawpath = projpath + '01_Data/model_input/'
     outpathdat = datpath + '/proc/'
-    figpath = projpath + "02_Figures/20220518/"
+    figpath = projpath + "02_Figures/20220720/"
 
     sys.path.append(
         "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
@@ -68,13 +68,11 @@ exname = "Fprime_amq0_method5_cont"
 # # Visualize Continuous run 200, Qnet
 # fnames =["forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run2%02d_ampq3_method5_dmp0"%i for i in range(10)]
 # frcnamelong = ["$F'$ run 2%02d" % (i) for i in range(10)]
-# exname ="Qnet_amq3_method5_cont"
+# exname ="Qnet_amq3_method5_cont
 
 # Plotting Params
 darkmode = False
 debug = False
-
-
 # %% Functions
 def calc_conflag(ac, conf, tails, n):
     cflags = np.zeros((len(ac), 2))

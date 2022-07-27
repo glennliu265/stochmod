@@ -10,7 +10,6 @@ Created on Fri Jul 15 16:22:39 2022
 @author: gliu
 """
 
-
 import numpy as np
 import matplotlib.pyplot as plt
 import sys
@@ -31,6 +30,8 @@ import cartopy.crs as ccrs
 datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/Spectra_Comparison/"
 fns     = ("NHFLX_spectra_smooth030-taper010_PIC-FULL.nc",
            "NHFLX_spectra_smooth030-taper010_PIC-SLAB.nc")
+
+figpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220720/"
 
 mconfigs = ("FULL","SLAB")
 mcolors  = ('k','gray')
@@ -81,7 +82,7 @@ klon,klat = proc.find_latlon(-30,50,lon,lat)
 fig,ax = plt.subplots(1,1,figsize=(10,4))
 
 for mc in range(2):
-    ax.plot(freqs[mc]*dtplot,specs[mc][0,klat,klon,:]/dtplot,color=mcolors[mc])
+    ax.plot(freqs[mc]*dtplot,specs[mc][0,klon,klat,:]/dtplot,color=mcolors[mc])
 ax.legend()
 ax.set_xticks(xtks)
 ax.set_xlim(xlms)
@@ -91,7 +92,7 @@ ax.grid(True,ls="dotted")
 
 #%% Plot power at a specific frequency
 
-sel_per = 100
+sel_per = 5
 _,nlat,nlon,_=specs[mc].shape
 
 sel_power = np.zeros((2,nlat,nlon)) # [model x lat x lon]
@@ -103,41 +104,36 @@ for mc in range(2):
     sel_power[mc,:,:] = specs[mc][0,:,:,kper]
 
 
-#%% Visualize it
+#%\
 
-use_pcm = True
+use_pcm = False
 
-fig,axs = plt.subplots(1,2,figsize=(10,4),
+fig,axs = plt.subplots(1,2,figsize=(12,4),
                        subplot_kw={'projection':ccrs.PlateCarree()})
 
 
-clvl = np.arange(0,1005,5)
+clvl = np.arange(0,1050,50)
 
 for mc in range(2):
     
     ax = axs[mc]
     ax = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="k")
     if use_pcm:
-        pcm = ax.pcolormesh(lon,lat,sel_power[mc,:,:].T/dtplot,vmin=clvl[0],vmax=clvl[-1],)
+        pcm = ax.pcolormesh(lon,lat,sel_power[mc,:,:].T/dtplot,vmin=clvl[0],vmax=clvl[-1],cmap='cmo.thermal')
     else:
-        pcm = ax.contourf(lon,lat,sel_power[mc,:,:].T/dtplot,levels=clvl,extend='both')
+        pcm = ax.contourf(lon,lat,sel_power[mc,:,:].T/dtplot,levels=clvl,extend='both',cmap='cmo.thermal')
     ax.set_title(mconfigs[mc])
 
 
 fig.colorbar(pcm,ax=axs.flatten(),fraction=0.05)
 plt.suptitle("$Q_{net}$ Spectra Power @ %i yrs" % (sel_per))
-
+plt.savefig("%sQnet_Variance_Lessthan_%03iYears.png"% (figpath,sel_per),dpi=200)
 
 #%% Calculate Slope between two points
 
 
 lowper = 100
 hiper  = 5
-
-
-
-
-
 
 
 # Endpoint Approach (can also try to fit a line)

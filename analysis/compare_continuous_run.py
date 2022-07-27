@@ -1,0 +1,324 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+
+Compare multiple continuous runs from the stochastic model.
+
+This includes
+(1) Load in SST, Ann. Avg, then compute AMV
+
+
+
+Copies sections from the following script:
+    - calc_AMV_continuous.py
+    - Analyze_SM_Output.ipynb
+
+Created on Tue Jul 19 09:14:20 2022
+
+@author: gliu
+"""
+
+
+
+import numpy as np
+import cartopy.crs as ccrs
+import matplotlib.pyplot as plt
+import sys
+import cmocean
+from tqdm import tqdm
+import xarray as xr
+import sys
+import glob
+import matplotlib.patheffects as PathEffects
+
+# %% Set Paths, Import Custom Modules
+stormtrack = 0
+if stormtrack == 0:
+    projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
+    datpath = projpath + '01_Data/model_output/'
+    rawpath = projpath + '01_Data/model_input/'
+    outpathdat = datpath + '/proc/'
+    figpath = projpath + "02_Figures/20220720/"
+
+    sys.path.append(
+        "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
+    sys.path.append(
+        "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
+
+elif stormtrack == 1:
+    datpath = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/model_output/"
+    rawpath = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/model_input/"
+    outpathdat = datpath + '/proc/'
+
+    sys.path.append("/home/glliu/00_Scripts/01_Projects/00_Commons/")
+    sys.path.append(
+        "/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model/")
+
+from amv import proc, viz
+import tbx
+import scm
+#%% User Edits
+
+# Indicate Experiment Information
+# -------------------------------
+
+# Name of experiments (for plotting, counting)
+expnames = ("BOTH_HFF","SLAB_HFF","FULL_HFF")
+# Search Strings for the experiment files
+expstrs  = (
+            "stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2*_ampq0_method5_dmp0.npz",
+            "stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2*_ampq0_method5_useslab2.npz",
+            "stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2*_ampq0_method5_useslab4.npz"
+            )
+
+# Indicate AMV Calculation Settings
+amvbbox   = [-80, 0, 20, 60] # AMV Index Bounding Area
+applymask = False # Set to True to Mask out Insignificant Points
+
+# Other Plotting Settings
+modelnames = ("Constant h","Vary h","Entraining")
+
+# -------------------------
+#%% First, build file names
+# -------------------------
+# Script searches datpath for: datpath + expstrs, where expstrs has wildcards.
+nexp = len(expnames)
+
+f_exps   = []
+sst_exps = [] 
+
+for e in range(nexp):
+    
+    # Get List of Files
+    # -----------------
+    searchstring = "%s%s" % (datpath,expstrs[e])
+    fnames       = glob.glob(searchstring)
+    print("Found %i files for Experiment %i!" % (len(fnames),e))
+    #print(*nclist,sep="\n") # Uncomment to print all found files
+    f_exps.append(fnames)
+    
+    # Load in data and take annual average
+    # ------------------------------------
+    #fnames = f_exps[e]
+    sst_all = []
+    for f, fname in tqdm(enumerate(fnames)):
+        ld = np.load(fname, allow_pickle=True)
+        ssts = ld['sst']
+        if f == 0:
+            lonr = ld['lon']
+            latr = ld['lat']
+        ssts_ann = proc.ann_avg(ssts, 3)
+        sst_all.append(ssts_ann)
+    sst_all = np.concatenate(sst_all, axis=3)  # [model x lon x lat x year]
+    sst_exps.append(sst_all)
+    
+# Load Lat/Lon
+lonr = ld['lon']
+latr = ld['lat']
+
+#%% Load Data for CESM
+
+# Copied from calc_AMV_continuous.py (2022.07.19)
+mconfigs = ("SLAB", "FULL")
+cdatpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/"
+bbox = [np.floor(lonr[0]), np.ceil(lonr[-1]),
+        np.floor(latr[0]), np.ceil(latr[-1])]
+print("Simulation bounding Box is %s " % (str(bbox)))
+
+sst_cesm = []
+for mconfig in mconfigs:
+    fname = "%sCESM1_%s_postprocessed_NAtl.nc" % (cdatpath, mconfig)
+    ds = xr.open_dataset(fname)
+    dsreg = ds.sel(lon=slice(bbox[0], bbox[1]), lat=slice(bbox[2], bbox[3]))
+    sst_cesm.append(dsreg.SST.values)
+
+    
+#%%
+
+# Load dmsks
+dmsks = scm.load_dmasks(bbox=[lonr[0], lonr[-1], latr[0], latr[-1]])
+dmsks.append(dmsks[-1])
+
+
+
+# Preallo ate
+amvpats = [] # [exp][model x lon x lat]
+amvids  = [] # [exp][model x time]
+
+for e in tqdm(range(nexp)):
+    sst_all = sst_exps[e]
+    
+    # Preallocate and loop
+    nmod,nlon,nlat,nyr = sst_all.shape
+    
+    pats = np.zeros((nmod, nlon, nlat)) * \
+        np.nan  # [model x lon x lat]
+    ids = np.zeros((nmod, nyr)) * np.nan #[model x time]
+    
+    
+    # Compute AMV
+    # -----------
+    # Loop for each stochastic model
+    for mid in range(nmod):
+        
+        if applymask:
+            inmask = dmsks[mid]
+        else:
+            inmask = None
+        sst_in = sst_all[mid, ...]
+        amvid, amvpat = proc.calc_AMVquick(sst_in, lonr, latr, amvbbox, anndata=True,
+                                           runmean=False, dropedge=5, mask=inmask)
+        pats[mid, ...] = amvpat.copy()
+        ids[mid, ...] = amvid.copy()
+    
+    amvpats.append(pats)
+    amvids.append(ids)
+    
+# Do for CESM
+cpats = []
+cids = []
+for i in range(2):
+    sst_in = sst_cesm[i]
+    amvid, amvpat = proc.calc_AMVquick(sst_in, lonr, latr, amvbbox, anndata=False,
+                                       runmean=False, dropedge=5, mask=None)
+    cpats.append(amvpat)
+    cids.append(amvid)
+        
+#%% Observe Differences in the AMV Pattern
+# Compare Non-entraining and entraining
+
+# Copied/adapted from calc_AMV_continuous.py
+
+# Plot settings
+# -------------
+notitle      = True
+darkmode     = False
+cmax         = 0.5
+cstep        = 0.025
+lstep        = 0.05
+cint, cl_int = viz.return_clevels(cmax, cstep, lstep)
+clb          = ["%.2f" % i for i in cint[::4]]
+cl_int       = cint
+sel_rid      = 1
+plotbbox     = False
+useC         = True
+bbin         = amvbbox
+bbplot       = [-80,0,10,60]
+
+# Set AMVs to Plot
+plotamvs = (
+            amvpats[0][0,:,:],
+            amvpats[2][0,:,:],
+            amvpats[1][2,:,:],
+            amvpats[0][2,:,:]
+            )
+
+plotnames = ("Non-entraining (SLAB HFF)","Non-entraining(FULL HFF)",
+             "Entraining (SLAB HFF)","Entraining (FULL HFF)")
+
+plotids  = (
+            amvids[0][0,:],
+            amvids[2][0,:],
+            amvids[1][2,:],
+            amvids[0][2,:]
+            )
+
+
+mids     = (0,2,0,2) # Heat Flux Feedback mask model id
+hffs     = ("SLAB","FULL","SLAB","FULL")
+mids_lab = (0,0,2,2) # Model Id Label
+
+
+print("Plotting AMV for bbox: %s" % (bbin))
+bbstr = "lon%ito%i_lat%ito%i" % (bbin[0], bbin[1], bbin[2], bbin[3])
+
+spid = 0
+proj = ccrs.PlateCarree()
+fig, axs = plt.subplots(2, 2, subplot_kw={'projection': proj}, figsize=(11, 9),
+                        constrained_layout=True)
+
+if darkmode:
+    plt.style.use('dark_background')
+
+    savename = "%sSST_AMVPattern_Comparison_%s_region%s_mask%i_dark.png" % (
+        figpath, fnames[f], bbstr, applymask)
+    fig.patch.set_facecolor('black')
+    dfcol = 'k'
+else:
+    plt.style.use('default')
+    savename = "%sSST_AMVPattern_Comparison_%s_region%s_mask%i.png" % (
+        figpath, fnames[f], bbstr, applymask)
+    fig.patch.set_facecolor('white')
+    dfcol = 'k'
+
+
+for aid in range(4):
+    ax = axs.flatten()[aid]
+    
+    # Set Labels, Axis, Coastline
+    blabel = [0,0,0,0]
+    
+    if aid%2==0:
+        blabel[0] = 1
+        ax.text(-0.23, 0.45, '%s'% (modelnames[mids_lab[aid]]), va='bottom', ha='center',
+            rotation='horizontal', rotation_mode='anchor',
+            transform=ax.transAxes,fontsize=14)
+    
+    if aid > 1:
+        blabel[-1] = 1
+    else:
+        ax.text(0.5, 1.1, '%s HFF'% (hffs[aid]), va='bottom', ha='center',
+            rotation='horizontal', rotation_mode='anchor',
+            transform=ax.transAxes,fontsize=14)
+
+    # Make the Plot
+    ax = viz.add_coast_grid(ax, bbplot, blabels=blabel, line_color=dfcol,
+                            fill_color='gray')
+    pcm = ax.contourf(
+        lonr, latr, plotamvs[aid].T, levels=cint, cmap='cmo.balance')
+    # ax.pcolormesh(lon,lat,amvpats[mid,:,:,rid].T,vmin=cint[0],vmax=cint[-1],cmap='cmo.balance',zorder=-1)
+    cl = ax.contour(
+        lonr, latr, plotamvs[aid].T, levels=cl_int, colors="k", linewidths=0.5)
+    
+    ax.clabel(cl, levels=cl_int[::2], fontsize=8, fmt="%.02f")
+
+    if useC:
+        ptitle = "%s ($\sigma^2_{AMV}$ = %.04f$\degree C^2$)" % (
+            plotnames[aid], np.var(plotids[aid]))
+    else:
+        ptitle = "%s ($\sigma^2_{AMV}$ = %.04f $K^2$)" % (
+            plotnames[aid], np.var(plotids[aid]))
+    ax.set_title(ptitle)
+    if plotbbox:
+        ax, ll = viz.plot_box(bbin, ax=ax, leglab="AMV",
+                              color=dfcol, linestyle="dashed", linewidth=2, return_line=True)
+    
+    viz.plot_mask(lonr, latr, dmsks[mids[aid]], ax=ax, markersize=0.3)
+    
+    if mids[aid] == 2:
+        # Not sure why logical or works///
+        viz.plot_mask(lonr, latr, np.logical_or(dmsks[0],dmsks[-1]), ax=ax, markersize=2,marker="x")
+    
+    ax.set_facecolor = dfcol
+    ax = viz.label_sp(spid, case='lower', ax=ax, labelstyle="(%s)",
+                      fontsize=16, alpha=0.7, fontcolor=dfcol)
+    spid += 1
+    
+cb=fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction=0.045)
+cb.set_label("AMV Pattern ($\degree C \, \sigma_{AMV}^{-1}$)")
+
+savename = "%sAMV_Patterns_HFF_Ablation.png" % (figpath)
+plt.savefig(savename, dpi=150, bbox_inches='tight')
+
+
+
+#%%
+
+
+
+
+
+
+
+
+

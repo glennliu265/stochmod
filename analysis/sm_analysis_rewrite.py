@@ -22,7 +22,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20220222/"
+    figpath     = projpath + "02_Figures/20220720/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -286,6 +286,10 @@ fnames   = ('forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run011_
 # Qekman runs (continuous run 200)
 fnames = ["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_dmp0_Qek" %i for i in range(10)]
 
+
+# 90% Variance (F') with SLAB HFF (continuous run 200)
+#stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run209_ampq0_method5_useslab2.npz
+fnames = ["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02i_ampq0_method5_useslab2" %i for i in range(10)]
 
 print("Now processing the following files: \n ")
 print(*fnames, sep='\n')

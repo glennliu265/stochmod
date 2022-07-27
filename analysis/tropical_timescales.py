@@ -25,7 +25,7 @@ if stormtrack == 0:
     datpath = projpath + '01_Data/model_output/'
     rawpath = projpath + '01_Data/model_input/'
     outpathdat = datpath + '/proc/'
-    figpath = projpath + "02_Figures/20210901/"
+    figpath = projpath + "02_Figures/20220720/"
 
     lipath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/landicemask_enssum.npy"
 
@@ -146,15 +146,16 @@ tauy_anom = tauy - tauy_monmean[None,...]
 taux_anom = taux_anom.reshape(ts_anom.shape)
 tauy_anom = tauy_anom.reshape(ts_anom.shape)
 #%% Now compute the correlation coefficients
+lagmax = 37
 
-lags = np.arange(1,4,1)
+lags = np.arange(1,lagmax,1)
 
 corrcs = np.zeros((3,len(lags),nlat*nlon))
 invars = [ts_anom,taux_anom,tauy_anom]
-for v in tqdm(range(len(invars))):
+for v in range(len(invars)):
     invar = invars[v]
     
-    for i in range(len(lags)):
+    for i in tqdm(range(len(lags))):
         l = lags[i]
         test = proc.pearsonr_2d(invar[l:,:],invar[:-l,:],dim=0)
         corrcs[v,i,:] = test
@@ -163,7 +164,7 @@ corrcs = corrcs.reshape(3,len(lags),nlat,nlon)
 
 vnames = ["SST","TAUX","TAUY"]
 
-savename = "%s../CESM_FULL-PIC_1-3lag_correlation_SST_TAU.npz" % (datpath)
+savename = "%s../CESM_FULL-PIC_1-%ilag_correlation_SST_TAU.npz" % (datpath,lagmax)
 np.savez(savename,**{
     "lag_corr":corrcs,
     "lags":lags,
@@ -173,7 +174,7 @@ np.savez(savename,**{
     })
     
 
-#%% Load the PLots
+#%% Load the Data
 
 ldname = "%s../CESM_FULL-PIC_1-3lag_correlation_SST_TAU.npz" % (datpath)
 ld     = np.load(ldname,allow_pickle=True)
@@ -303,6 +304,9 @@ plt.savefig("%sRatioMaps_%s.png"%(figpath,rname),dpi=150,bbox_inches='tight')
 # test = tqdm(test.reshape(nlat,nlon))
     
 #test = np.corrcoef(ts_anom[l:,...],ts_anom[:-l,...])
+
+#%% Find e-folding timescale
+
 
 
 
