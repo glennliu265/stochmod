@@ -22,7 +22,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20220601/"
+    figpath     = projpath + "02_Figures/20220726/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -863,15 +863,17 @@ for i in range(3):
     ax.set_title(title)
     fig.colorbar(pcm,ax=ax)
 
+#%% Similar to Laifang's paper, plot the Effective Forcing vs Damping
+
+
+fig,ax = plt.subplots()
+
 
 #%% Responding to YO's comment, just plot the variance to see what is going on
 
 bboxinset = [-70,-12,10,18]
 
-t       = 2
-
-
-
+t         = 2
 vlm       = [0,0.4]
 
 #vlms      = ([0,0.05],[0,0.10],[0,0.15])

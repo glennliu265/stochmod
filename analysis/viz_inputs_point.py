@@ -45,7 +45,7 @@ import cmocean
 projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath = projpath + '03_Scripts/stochmod/'
 datpath    = projpath + '01_Data/'
-outpath    = projpath + '02_Figures/20220422/'
+outpath    = projpath + '02_Figures/20220726/'
 input_path  = datpath + 'model_input/'
 proc.makedir(outpath)
 
@@ -624,7 +624,6 @@ cblabs2 = ("Total Forcing Amplitude \n Contour = 5 $W/m^2$",
 # cblabs2 = (u"Contours: 5 $Wm^{-2}$",
 #            u"Contours: 5 $Wm^{-2} \degree C^{-1}$",
 #            u"Contours = 10-250 $m$")
-
 
 fig = plt.figure(constrained_layout=True,figsize=(14,8))
 #fig.set_constrained_layout_pads(w_pad=4 / 72, h_pad=0, hspace=0, wspace=0)
@@ -1303,12 +1302,11 @@ plt.tight_layout()
 
 #%% Make a Scatterplot of the different space
 
-rho = 1026
-cp0 = 3996
-dt  = 3600*24*30
+rho        = 1026
+cp0        = 3996
+dt         = 3600*24*30
 reciprocal = True
 samelims   = True
-
 
 if reciprocal is not True:
     xlim = [0,1]
@@ -1316,8 +1314,8 @@ if reciprocal is not True:
     #xlim = [0,2]
     #ylim = [0,2]
 else:
-    xlim = [0,35]
-    ylim = [0,1]
+    xlim = [0,50]
+    ylim = [0,1.25]
     
 
 fig,axs = plt.subplots(4,3,figsize=(12,12),constrained_layout=True)
@@ -1334,11 +1332,11 @@ for m in range(12):
         
         if reciprocal:
             
-            ax.scatter(1/(dreg/hreg),freg/hreg,5,color=bbcol[rid],alpha=0.3,label=regions[rid])
+            ax.scatter(1/(dreg/hreg),freg/hreg,10,color=bbcol[rid],alpha=0.3,label=regions[rid])
         else:
-            ax.scatter(dreg/hreg,freg/hreg,5,color=bbcol[rid],alpha=0.3,label=regions[rid])
+            ax.scatter(dreg/hreg,freg/hreg,10,color=bbcol[rid],alpha=0.3,label=regions[rid])
         
-        ax.set_title(mons3[m])
+        #ax.set_title(mons3[m])
         
     if m == 0:
         ax.legend(ncol=1)
@@ -1347,14 +1345,15 @@ for m in range(12):
     if samelims:
         ax.set_xlim(xlim)
         ax.set_ylim(ylim)
-
+    viz.label_sp(mons3[m],ax=ax,fig=fig,fontsize=14,labelstyle="%s",usenumber=True,x=0.41,y=0.95)
+    ax.minorticks_on()
 #fig.text(-.02,0.39,"Forcing/MLD ($F'/ h$)",fontsize=22,rotation='vertical')
-fig.text(-.02,0.30,"Atmospheric Forcing" + r" ($\frac{F'}{\rho \, c_p \, h}$" + ": K/month)",fontsize=22,rotation='vertical')
+fig.text(-.035,0.30,"Atmospheric Forcing" + r" ($\frac{F'}{\rho \, c_p \, h}$" + ": K/month)",fontsize=22,rotation='vertical')
 if reciprocal:
     #fig.text(0.39,-0.02,"Damping/MLD$^{-1}$ ($h/ \lambda$)",fontsize=22)
     #fig.text(0.39,-0.02,"Damping$^{-1}$ (months)",fontsize=22)
     
-    fig.text(0.30,-0.02, "Damping$^{-1}$ " + r" ($\frac{\rho \, c_p \, h}{\lambda}$" + ": months)",fontsize=22)
+    fig.text(0.30,-0.025, "Damping$^{-1}$ " + r" ($\frac{\rho \, c_p \, h}{\lambda}$" + ": months)",fontsize=22)
 else:
     
     #fig.text(0.39,-0.02,"Damping/MLD ($\lambda$ \h)",fontsize=22)
