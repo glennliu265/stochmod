@@ -26,7 +26,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20220407/"
+    figpath     = projpath + "02_Figures/20220726/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -54,7 +54,7 @@ nsmooth    = 30
 smoothname = "smooth%03i-taper%03i" % (nsmooth,pct*100)
 
 outpath  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_output/proc/"
-figpath = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220325/'
+#figpath = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220325/'
 proc.makedir(figpath)
 
 #sst_fn = "stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr2_1000yr_run200_ampq3_method5_dmp0.npz"
@@ -77,7 +77,7 @@ cesm_snames      = ["spectra_%s_PIC-%s.nc" % (smoothname,cesm_mnames[i]) for i i
 cesm_snames_full = [outpath+sname for sname in cesm_snames]
 
 # Other Params
-bboxplot = [-80,0,0,60]
+bboxplot = [-80,0,0,65]
 mons3    = [viz.return_mon_label(m,nletters=3) for m in np.arange(1,13)]
 
 #%% Load in the spectra for each
@@ -123,9 +123,7 @@ modelnames  = dsmean.models.values
 #specsds     = dsmean.spectra
 print("Loaded data in %.2fs" % (time.time()-st))
 
-
 #%% Plot variance thresholds over specific regions
-
 
 #threses = ([0,1/20],[1/20,1/10],[1/10,1/2]) # [lower freq, upper freq]
 threses = ([0,1/10],[1/10,1/2])
@@ -270,6 +268,7 @@ ssh_reg = ssh_ds.SSH.sel(lon=slice(bboxplot[0],bboxplot[1]),lat=slice(bboxplot[2
 ssh_reg   = ssh_reg.mean('time')
 ssh      = ssh_reg.values
 ssh_mean = ssh.T
+
 #%% PLot BSF
 ratiosel     = e_f[0]
 rationame    = "log($\sigma^2_{entrain}$/$\sigma^2_{full}$)"
@@ -318,11 +317,18 @@ ax = axs[0]
 ax.text(-0.15, 0.55, rationame, va='bottom', ha='center',rotation='vertical',
         rotation_mode='anchor',transform=ax.transAxes)
 plt.savefig("%sSpectra_Ratio_%s_%s%s.png"% (figpath,rationame_fn,smoothname,plotcontour),dpi=150)
-#%% Updated version with just 2 plots
+# ------------------------------------
+# %% Updated version with just 2 plots
+# ------------------------------------
+# Entrain vs. FULL
 ratiosel     = e_f[0]
 rationame    = "log($\sigma^2_{entrain}$/$\sigma^2_{full}$)"
 rationame_fn = "log_entrain_full"
 
+# Entrain vs. h-vary
+# ratiosel     = e_hv[0]
+# rationame    = "log($\sigma^2_{entrain}$/$\sigma^2_{h-vary}$)"
+# rationame_fn = "log_entrain_hvary"
 
 
 plotcontour = None # "BSF","SSH", or None
@@ -336,11 +342,13 @@ cl_ints     = np.arange(-1.5,1.6,0.1)
 cints       = np.arange(-1.5,1.75,0.25)
 clints      = cints
 
+
+
 sshcint     = np.arange(-150,155,5)
 bsfcint     = np.arange(-30,35,5)
 
 fig,axs = plt.subplots(1,2,subplot_kw={'projection':ccrs.PlateCarree()},
-                       constrained_layout=True,figsize=(12,4)) 
+                       constrained_layout=True,figsize=(12,6)) 
 for t in range(2):
     
     blabel = [0,0,0,1]
@@ -354,7 +362,7 @@ for t in range(2):
     else:
         ptitle = "%03d to %03d Years" % (1/threses[t][1],1/threses[t][0])
     ax.set_title(ptitle)
-    ax = viz.add_coast_grid(ax,bbox=bboxplot,blabels=blabel,fill_color='gray')
+    ax = viz.add_coast_grid(ax,bbox=bboxplot,blabels=blabel,fill_color='k')
     if use_contours:
         pcm = ax.contourf(ds.lon,ds.lat,ratiosel[:,:,t].T,levels=cints,extend='both',cmap='cmo.balance')
         #cl = ax.contour(ds.lon,ds.lat,ratiosel[:,:,t].T,levels=cl_ints,colors='k',linewidths=0.5)
@@ -369,13 +377,16 @@ for t in range(2):
         ax.clabel(cl,levels=sshcint)
     else:
         cl = ax.contour(ds.lon,ds.lat,ratiosel[:,:,t].T,levels=cl_ints,colors='k',linewidths=0.5)
-        ax.clabel(cl,cl_ints,fmt="%.1f")
+        ax.clabel(cl,cl_ints,fmt="%.1f",fontsize=8)
     
-fig.colorbar(pcm,ax=axs.flatten(),fraction=0.025,pad=0.01)
+fig.colorbar(pcm,ax=axs.flatten(),fraction=0.020,pad=0.01)
 ax = axs[0]
-ax.text(-0.15, 0.55, rationame, va='bottom', ha='center',rotation='vertical',
+ax.text(-0.10, 0.55, rationame, va='bottom', ha='center',rotation='vertical',
         rotation_mode='anchor',transform=ax.transAxes)
 plt.savefig("%sSpectra_Ratio_%s_%s%s_2only.png"% (figpath,rationame_fn,smoothname,plotcontour),dpi=150)
+
+# Old Values
+## For bbox to 60N, colorbar fraction 0.025, figsize = (12,4),ax.text(-0.15,0.55)
 
 #%% Focus on a region (to answer Claude's question)
 
@@ -494,11 +505,8 @@ cb.set_label("SST Log Ratio")
 
 plt.savefig("%sSpectra_Ratio_combine_%sBSF.png"% (figpath,smoothname),dpi=150)
 
-
 #%% scrap to figure out some stuff
-
 klon,klat = proc.find_lon
-
 #%% References for myself for log ratio (NTS: Make some interactive version)
 
 rawratio = np.arange(0,8,0.05)
