@@ -92,15 +92,16 @@ mconfig    = "SLAB_PIC"
 #flxeof_qek_50eofs_SLAB-PIC
 
 # Running Parameters
-runids      = ["2%02d"%i for i in np.arange(0,4)]#"011"
+runids      = ["2%02d"%i for i in np.arange(0,10)]#"011"
 pointmode   = 0 
 points      = [-30,50]
 bboxsim     = [-80,0,0,65] # Simulation Box
-hconfigs    = [0,] # Which MLD configuration to use
+hconfigs    = [0,1,2,] # Which MLD configuration to use
 
 # Other Parameters
-useslab     = 4 #0=Default; 1=SLAB HFF/forcing; 2=SLAB HFF; 3=SLAB forcing;
+useslab     = 0 #0=Default; 1=SLAB HFF/forcing; 2=SLAB HFF; 3=SLAB forcing;
                 # 4=FULL HFF; 5=FULL forcing.
+ensorem     = False # <True> : Use HFF with ENSO removed
 
 # Toggles
 savesep     = False # Set to True to save the outputs differently
@@ -252,13 +253,18 @@ print(*frcnames, sep='\n')
 #%%
 st = time.time()
 
+if ensorem:
+    ensostr = ""
+else:
+    ensostr = "_ensorem0"
+
 for f in range(len(frcnames)):
     frcname    = frcnames[f]
     expnames = []
     for r,runid in enumerate(runids):
         
         
-        expname    = "%sstoch_output_forcing%s_%iyr_run%s_ampq%i_method%i_useslab%i.npz" % (output_path,frcname,int(t_end/12),runid,ampq,method,useslab)
+        expname    = "%sstoch_output_forcing%s_%iyr_run%s_ampq%i_method%i_useslab%i%s%s.npz" % (output_path,frcname,int(t_end/12),runid,ampq,method,useslab,ensostr)
         if budget:
             expname = proc.addstrtoext(expname,"_budget")
         # dmp0 indicates that points with insignificant lbd_a were set to zero.
@@ -295,7 +301,7 @@ for f in range(len(frcnames)):
                            dt=3600*24*30,
                            debug=False,check=False,useslab=useslab,savesep=savesep
                            ,method=method,lagstr=lagstr,hconfigs=hconfigs,
-                           custom_params=custom_params,budget=budget)
+                           custom_params=custom_params,budget=budget,ensorem=ensorem)
         expnames.append(expname)
     print("Completed in %.2fs" % (time.time()-st))
 

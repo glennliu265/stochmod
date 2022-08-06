@@ -2438,7 +2438,7 @@ def convert_Wm2(invar,h,dt,cp0=3996,rho=1026,verbose=True,reverse=False):
     return outvar.squeeze()
 
 def load_inputs(mconfig,frcname,input_path,load_both=False,method=4,lagstr="lag1",
-                loadpoint=False):
+                loadpoint=False,ensorem=True):
     """
     lon,lat,mld,kprevall,damping,alpha = load_inputs(mconfig,frcname,input_path)
     
@@ -2464,6 +2464,8 @@ def load_inputs(mconfig,frcname,input_path,load_both=False,method=4,lagstr="lag1
         4 - Both 2 and 3 (Default)
     lagstr : STR
         Lags included (lag1,lag12, or lag123)
+    ensorem : BOOL
+        Set to True to use damping with ENSO removed (default)
     
     Returns
     -------
@@ -2499,19 +2501,24 @@ def load_inputs(mconfig,frcname,input_path,load_both=False,method=4,lagstr="lag1
         kprevall  = np.load(input_path+"FULL_PIC_HMXL_kprev.npy") # Entraining Month
     
     # Load Atmospheric Damping [lon180 x lat x mon]
+    if ensorem:
+        ensostr = ""
+    else:
+        print("Loading damping with ENSO present!")
+        ensostr = "_ensorem0"
     if mconfig == "SLAB_PIC": # Note older versions used dof894.... why?
-        damping   = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig005_dof893_mode%i_%s.npy" % (method,lagstr))
+        damping   = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig005_dof893_mode%i_%s%s.npy" % (method,lagstr,ensostr))
     elif mconfig == "FULL_PIC":
-        damping   = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig005_dof1893_mode%i_%s.npy" % (method,lagstr))
+        damping   = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig005_dof1893_mode%i_%s%s.npy" % (method,lagstr,ensostr))
     elif mconfig =="FULL_HTR":
-        damping   = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig020_dof082_mode%i_%s.npy" % (method,lagstr))
+        damping   = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig020_dof082_mode%i_%s%s.npy" % (method,lagstr,ensostr))
     else:
         print("Currently supported damping mconfig are [SLAB_PIC,FULL_PIC,FULL_HTR]")
-        
+    
     # Load both damping
     if load_both:  # Note older versions used dof894.... why?
-        dampingslab   = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig005_dof893_mode%i_%s.npy" % (method,lagstr))
-        dampingfull   = np.load(input_path+"FULL_PIC"+"_NHFLX_Damping_monwin3_sig005_dof1893_mode%i_%s.npy" % (method,lagstr))
+        dampingslab   = np.load(input_path+mconfig+"_NHFLX_Damping_monwin3_sig005_dof893_mode%i_%s%s.npy" % (method,lagstr,ensostr))
+        dampingfull   = np.load(input_path+"FULL_PIC"+"_NHFLX_Damping_monwin3_sig005_dof1893_mode%i_%s%s.npy" % (method,lagstr,ensostr))
         
     # Load Alpha (Forcing Amplitudes) [lon180 x lat x pc x mon], easier for tiling
     if frcname == "allrandom":
@@ -2532,9 +2539,6 @@ def load_inputs(mconfig,frcname,input_path,load_both=False,method=4,lagstr="lag1
     if loadpoint:
         return lon,lat,h[klon,klat,:],kprevall[klon,klat,:],damping[klon,klat,:],alpha[klon,klat,...],alpha_full[klon,klat,...]
     return lon,lat,h,kprevall,damping,alpha,alpha_full
-
-
-    
 
 def make_forcing(alpha,runid,frcname,t_end,input_path,check=True,alpha_full=None):
     """
@@ -3090,7 +3094,8 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
                    custom_params = {},
                    hconfigs=[0,1,2],
                    continue_run=False,Tdgrab=24,lagstr="lag1",
-                   budget=False
+                   budget=False,
+                   ensorem=True
                    ):
     
     """
@@ -3141,6 +3146,7 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
     22. continue_run [STR]: Full path+Name of output experiment to take T0 and Td' from.'
     23. Tdgrab [INT]: Number of previous months to take from previous run for Td' calculation'
     24. budget [BOOL]: Set to true to save each term separately. Currently only available for entrain.
+    25. ensorem [BOOL]: Set to false to use damping without enso removed
     """
     
     start = time.time()
@@ -3152,7 +3158,8 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
     # Load data in
     # ------------
     lon,lat,h,kprevall,damping,dampingfull,alpha,alpha_full = load_inputs(mconfig,frcname,input_path,
-                                                                          load_both=True,method=method,lagstr=lagstr)
+                                                                          load_both=True,method=method,
+                                                                          lagstr=lagstr,ensorem=ensorem)
     hblt = np.load(input_path + "SLAB_PIC_hblt.npy") # Slab fixed MLD
     hblt = np.ones(hblt.shape) * hblt.mean(2)[:,:,None]
     
