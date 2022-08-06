@@ -264,7 +264,7 @@ for f in range(len(frcnames)):
     for r,runid in enumerate(runids):
         
         
-        expname    = "%sstoch_output_forcing%s_%iyr_run%s_ampq%i_method%i_useslab%i%s%s.npz" % (output_path,frcname,int(t_end/12),runid,ampq,method,useslab,ensostr)
+        expname    = "%sstoch_output_forcing%s_%iyr_run%s_ampq%i_method%i_useslab%i%s.npz" % (output_path,frcname,int(t_end/12),runid,ampq,method,useslab,ensostr)
         if budget:
             expname = proc.addstrtoext(expname,"_budget")
         # dmp0 indicates that points with insignificant lbd_a were set to zero.
