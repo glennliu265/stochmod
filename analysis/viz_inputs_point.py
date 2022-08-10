@@ -45,7 +45,7 @@ import cmocean
 projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath = projpath + '03_Scripts/stochmod/'
 datpath    = projpath + '01_Data/'
-outpath    = projpath + '02_Figures/20220726/'
+outpath    = projpath + '02_Figures/20220808/'
 input_path  = datpath + 'model_input/'
 proc.makedir(outpath)
 
@@ -63,7 +63,7 @@ flocstring = "lon%i_lat%i" % (lonf,latf)
 locstring = "%i$\degree$N, %i$\degree$W" % (latf,np.abs(lonf))
 
 # Additional Plotting Parameters
-bbox = [-80,0,10,65]
+bbox = [-80,0,9,62]
 #mconfig = "FULL_PIC"
 #if mconfig == "FULL_PIC":
 #    configname = "Fully-Coupled PiC"
@@ -691,9 +691,9 @@ import matplotlib as mpl
 
 # Set Inputs
 #cintmld = np.concatenate([np.arange(0,105,5)np.arange(125,225,25),np.arange()])
-cintmld = [0,10,20,30,40,50,60,70,80,90,100,125,150,175,200,300,400,500,600,700,750,1000,1250]
+cintmld  = [0,10,20,30,40,50,60,70,80,90,100,125,150,175,200,300,400,500,600,700,750,1000,1250]
 #cmapmld = colors.LinearSegmentedColormap.from_list('mldmap',['w','indigo','k'],gamma=0.37)
-cmapmld = colors.LinearSegmentedColormap.from_list('mldmap',['w','indigo','k'],gamma=1)
+cmapmld  = colors.LinearSegmentedColormap.from_list('mldmap',['w','indigo','k'],gamma=1)
 cmapdamp = colors.LinearSegmentedColormap.from_list('mldmap',['darkgreen','mintcream'],gamma=1)
 
 invars = (alphaavg,dampingavg,havg)
@@ -707,7 +707,6 @@ vnames = (r"Total Forcing Amplitude ($F'$)",
 
 cints  = (np.arange(0,105,5),np.arange(0,45,5),cintmld
           )
-
 
 cmaps  = ('gist_heat_r','cmo.algae',cmapmld) 
 
@@ -761,10 +760,10 @@ for row in range(3):
         
         if v == 2:
             pcm = ax.pcolormesh(lon,lat,plotvar,vmin=0,vmax=200,cmap=cmap,
-                                norm=plt.Normalize(vmin=0, vmax=200))
+                                ) #norm=plt.Normalize(vmin=0, vmax=200)
             #pcm = ax.pcolormesh(lon,lat,plotvar,vmin=0,vmax=200,cmap=cmap)
             cf = ax.contour(lon,lat,plotvar,levels=np.arange(300,1050,150),colors='w',linewidths=0.75)
-            ax.clabel(cf,levels=[300,600,900],fontsize=10,inline_spacing=2)
+            ax.clabel(cf,levels=[300,600,900],fontsize=10,inline_spacing=2,colors='w')
         else:
             
             pcm = ax.pcolormesh(lon,lat,plotvar,vmin=cint[0],vmax=cint[-1],cmap=cmap)
@@ -802,8 +801,6 @@ cblabs2 = ("Total Forcing Amplitude \n Contour = 5 $W/m^2$",
           "Atmospheric Damping \n Contour = 5 $W/m^2 / \degree C$",
           "Mixed-Layer Depth \n Contours = 10-250 $m$"
           )
-
-
 
 # Draft 1
 # cints  = (np.arange(0,105,5),np.arange(0,65,5),np.arange(0,1050,50)
@@ -1189,8 +1186,9 @@ mm_savg,monstrs = proc.calc_savg(mm_mld,return_str=True,debug=True)
 
 notitle = True
 plotmld = False # Tur to just plot mimoc seasonal avg
+bboxplot = [-80,0,9,62]
 
-fig,axs = plt.subplots(2,2,figsize=(7,7),constrained_layout=True,
+fig,axs = plt.subplots(2,2,figsize=(10,8.25),constrained_layout=True,
                       subplot_kw={'projection':ccrs.PlateCarree()})
 
 sp_id = 0
@@ -1211,7 +1209,7 @@ for s,ax in enumerate(axs.flatten()):
     
     
     ax = viz.add_coast_grid(ax=ax,bbox=bbox,fill_color='gray',blabels=blabel)
-    ax.set_title(monstrs[s])
+    ax.set_title(monstrs[s],fontsize=18)
     
     ax = viz.label_sp(sp_id,ax=ax,fontsize=14,fig=fig,labelstyle="(%s)",case='lower',alpha=.75)
     sp_id += 1

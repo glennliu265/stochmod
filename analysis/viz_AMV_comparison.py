@@ -26,7 +26,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20220407/"
+    figpath     = projpath + "02_Figures/20220808/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -550,7 +550,7 @@ if exname == 'seasonal':
 sel_rid = 4
 
 #bboxplot = [-85, 5 ,5,60]
-bboxplot = [-80,0,5,60]
+bboxplot = [-80,0,9,62]
 plotbbox = False
 def plot_amvpat(lon,lat,amvpat,ax,add_bbox=False,bbox_NNA=[-80, 0, 10, 65],blabel=[1,0,0,1],clab_interval=1):
     ax = viz.add_coast_grid(ax,bboxplot,blabels=blabel,ignore_error=True)
@@ -1348,7 +1348,7 @@ cbvert  = False
 rid = 4
 mid = 2
 tworow = False
-
+bboxplot = [-80,0,9,62]
 add_std = True
 useC    = True
 

@@ -35,7 +35,7 @@ projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 datpath     = projpath + '01_Data/'
 input_path  = datpath + 'model_input/'
 output_path = datpath + 'model_output/'
-outpath     = projpath + '02_Figures/20220601/'
+outpath     = projpath + '02_Figures/20220808/'
 proc.makedir(outpath)
 
 # Load in control data for 50N 30W
@@ -50,16 +50,16 @@ mons3    = ('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','D
 # SM Lower Hierarchy (05/25/2021)
 ecol_lower       = ["blue",'cyan','gold','red']
 els_lower        = ["dotted","dashdot","dashed","solid"]
-labels_lower     = ["All Constant",
-                     r"Vary $F'$",
-                     r"Vary $\lambda_a$",
-                     "Vary $F'$ and $\lambda_a$"] 
+labels_lower     = ["All Constant (Level 1)",
+                     r"Vary $F'$ (Level 2b)",
+                     r"Vary $\lambda_a$ (Level 2a)",
+                     "Vary $F'$ and $\lambda_a$ (Level 3)"] 
 
 # SM Upper Hierarchy (05/25/2021)
 labels_upper = ["h=50m",
-                 "Vary $F'$ and $\lambda_a$",
-                 "Vary $F'$, $h$, and $\lambda_a$",
-                 "Entraining"]
+                 "Vary $F'$ and $\lambda_a$ (Level 3)",
+                 "Vary $F'$, $h$, and $\lambda_a$ (Level 4)",
+                 "Entraining (Level 5)"]
 ecol_upper = ('mediumorchid','red','magenta','orange')
 els_upper = ["dashdot","solid","dotted","dashed"]
 
@@ -201,12 +201,15 @@ cfslab = calc_conflag(cesmauto2,conf,tails,898)
 cffull = calc_conflag(cesmautofull,conf,tails,1798)
 
 #%% Plot SST Autocorrelation at the test point (SM Paper)
+# Updated 20220808 For Revision 01
 
 notitle    = True  # Remove Title for publications
-sepfig     = True # Plot figures separately, for presentaiton, or together)
+sepfig     = False # Plot figures separately, for presentaiton, or together)
 sepentrain = False  # Separate entrain/non-entraining models
 usegrid    = True
 tickfreq   = 2
+custom_order = np.flip([1,3,2,4,0]) # Set custom order
+custom_order_upper = [0,2,1]
 #reducetick = 3  # Set to true to label ticks more sparsely
 
 
@@ -270,7 +273,16 @@ if sepentrain:
     ax.fill_between(lags,cfstoch[i,:,0],cfstoch[i,:,1],color=ecol_upper[i],alpha=0.25)
 
 # Set labels, legend
-ax.legend(fontsize=10,ncol=3)
+
+if custom_order is not None:
+    #get handles and labels
+    handles, labels = ax.get_legend_handles_labels()
+    order = custom_order
+    #add legend to plot
+    ax.legend([handles[idx] for idx in order],[labels[idx] for idx in order])
+else:
+    ax.legend(fontsize=12,ncol=1) # fontsize 10, ncol=3 was the old one
+
 ax.set_ylabel("Correlation")
 
 # --------------------------------------------
@@ -309,10 +321,14 @@ for i in plotrange:
     ax.plot(lags,ac[i],label=labels_upper[i],color=ecol_upper[i],ls=els_upper[i],marker="o",markersize=markersize,lw=lw)
     ax.fill_between(lags,cfstoch[i,:,0],cfstoch[i,:,1],color=ecol_upper[i],alpha=0.25)
 
-ax.legend()
-#ax3.set_ylabel("Heat Flux Feedback ($W/m^{2}$)")
-#ax3.yaxis.label.set_color('gray')
-ax.legend(fontsize=10,ncol=3)
+if custom_order is not None:
+    #get handles and labels
+    handles, labels = ax.get_legend_handles_labels()
+    order = custom_order_upper
+    #add legend to plot
+    ax.legend([handles[idx] for idx in order],[labels[idx] for idx in order])
+else:
+    ax.legend(fontsize=12,ncol=1) # fontsize 10, ncol=3 was the old one
 plt.tight_layout()
 ax.set_ylabel("")
 
@@ -466,7 +482,7 @@ else:
                    [3,5,6,7]
                    ]
     else:
-        plotids = [[0,1,2,3,8],
+        plotids = [[0,2,1,3,8],
                    [5,6,7]
                    ]
 

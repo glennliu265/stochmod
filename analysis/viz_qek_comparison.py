@@ -30,7 +30,7 @@ import cartopy.crs as ccrs
 
 datpath = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_output/'
 fnames  = ["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_dmp0" %i for i in range(10)]
-figpath = datpath + "../../02_Figures/20220502/"
+figpath = datpath + "../../02_Figures/20220808/"
 proc.makedir(figpath)
 
 #%% From SM Stylesheet
@@ -56,7 +56,7 @@ lstep = 0.05
 cmax  = 0.5
 cint,cl_int=viz.return_clevels(cmax,cstep,lstep)
 clb = ["%.2f"%i for i in cint[::4]]
-bboxplot    = [-80,0,5,60]
+bboxplot    = [-80,0,9,62]
 
 # Linear-Power Spectra, < 2-yr (Current SM Draft Choice)
 xlm = [1e-2,5e0]
@@ -223,9 +223,9 @@ spid = 0
     #ax.set_title("%s ($\sigma^2_{AMV}$ = %.4f$K^2$)"%(expnames[mid],plotvar))
 #else:
 if useC:
-    ptitle = "Entraining with $Q_{ek}$ ($\sigma^2_{AMV}$ = %.4f$\degree C^2$)"%(plotvar)
+    ptitle = "Entraining with $Q_{ek}$ (Level 5+) ($\sigma^2_{AMV}$ = %.4f$\degree C^2$)"%(plotvar)
 else:
-    ptitle = "Entraining with $Q_{ek}$ ($\sigma^2_{AMV}$ = %.4f$K^2$)"%(plotvar)
+    ptitle = "Entraining with $Q_{ek}$ (Level 5+) ($\sigma^2_{AMV}$ = %.4f$K^2$)"%(plotvar)
     
 ax.set_title(ptitle)
 

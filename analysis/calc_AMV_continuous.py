@@ -32,7 +32,7 @@ if stormtrack == 0:
     datpath = projpath + '01_Data/model_output/'
     rawpath = projpath + '01_Data/model_input/'
     outpathdat = datpath + '/proc/'
-    figpath = projpath + "02_Figures/20220720/"
+    figpath = projpath + "02_Figures/20220808/"
 
     sys.path.append(
         "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
@@ -128,9 +128,9 @@ cstep = 0.025
 lstep = 0.05
 cint, cl_int = viz.return_clevels(cmax, cstep, lstep)
 clb = ["%.2f" % i for i in cint[::4]]
-bboxplot = [-80, 0, 5, 60]
+bboxplot = [-80, 0, 9, 62]
 
-modelnames = ("Constant h", "Vary h", "Entraining")
+modelnames = ("Constant h (Level 3)", "Vary h (Level 4)", "Entraining (Level 5)")
 mcolors = ["red", "magenta", "orange"]
 
 # CESM Names
@@ -432,22 +432,22 @@ print("AMV Max in Tropics is %f in Denominator" % (valmax[1]))
 print("Thus, the ratio is %f" % (valmax[0]/valmax[1]))
 # %% Redo Stochastic Model Paper Plot
 # Copied from viz_AMV_comparison.py (03/11/2022)
+# Updated 08/08/2022 for Revision1
 
 # Plot settings
-notitle = True
-darkmode = False
-cmax = 0.5
-cstep = 0.025
-lstep = 0.05
+notitle      = True
+darkmode     = False
+cmax         = 0.5
+cstep        = 0.025
+lstep        = 0.05
 cint, cl_int = viz.return_clevels(cmax, cstep, lstep)
-clb = ["%.2f" % i for i in cint[::4]]
+clb          = ["%.2f" % i for i in cint[::4]]
 
-cl_int = cint
-
-sel_rid = 1
-
+bboxplot = [-80,0,9,62]
+cl_int   = cint
+sel_rid  = 1
 plotbbox = False
-useC = True
+useC     = True
 
 
 # Begin Plotting
@@ -459,7 +459,7 @@ bbstr = "lon%ito%i_lat%ito%i" % (bbin[0], bbin[1], bbin[2], bbin[3])
 
 spid = 0
 proj = ccrs.PlateCarree()
-fig, axs = plt.subplots(2, 2, subplot_kw={'projection': proj}, figsize=(9, 9),
+fig, axs = plt.subplots(2, 2, subplot_kw={'projection': proj}, figsize=(10, 8.5),
                         constrained_layout=True)
 
 if darkmode:
