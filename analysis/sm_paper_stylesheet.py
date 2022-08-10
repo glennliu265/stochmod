@@ -40,7 +40,7 @@ cstep = 0.025
 lstep = 0.05
 cint,cl_int = viz.return_clevels(cmax,cstep,lstep)
 clb = ["%.2f"%i for i in cint[::4]]
-bboxplot    = [-80,0,5,60]
+bboxplot    = [-80,0,9,65]#[-80,0,5,60] # Updated 8/8/2022 for AMV
 
 # SM Names and colors
 modelnames  = ("Constant h","Vary h","Entraining")
@@ -50,16 +50,28 @@ mcolors     = ["red","magenta","orange"]
 # SM Lower Hierarchy (05/25/2021)
 ecol_lower       = ["blue",'cyan','gold','red']
 els_lower        = ["dotted","dashdot","dashed","solid"]
-labels_lower     = ["All Constant",
-                     r"Vary $F'$",
-                     r"Vary $\lambda_a$",
-                     "Vary $F'$ and $\lambda_a$"] 
+# labels_lower     = ["All Constant",
+#                      r"Vary $F'$",
+#                      r"Vary $\lambda_a$",
+#                      "Vary $F'$ and $\lambda_a$"] 
+labels_lower     = ["All Constant (Level 1)",
+                     r"Vary $F'$ (Level 2b)",
+                     r"Vary $\lambda_a$ (Level 2a)",
+                     "Vary $F'$ and $\lambda_a$ (Level 3)"]  # Added Level Labels
 
 # SM Upper Hierarchy (05/25/2021)
+
+
+
+# SM Upper Hierarchy (05/25/2021)
+# labels_upper = ["h=50m",
+#                  "Vary $F'$ and $\lambda_a$",
+#                  "Vary $F'$, $h$, and $\lambda_a$",
+#                  "Entraining"]
 labels_upper = ["h=50m",
-                 "Vary $F'$ and $\lambda_a$",
-                 "Vary $F'$, $h$, and $\lambda_a$",
-                 "Entraining"]
+                 "Vary $F'$ and $\lambda_a$ (Level 3)",
+                 "Vary $F'$, $h$, and $\lambda_a$ (Level 4)",
+                 "Entraining (Level 5)"] # Added Level Labels
 ecol_upper = ('mediumorchid','red','magenta','orange')
 els_upper = ["dashdot","solid","dotted","dashed"]
 
