@@ -35,8 +35,10 @@ projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 datpath     = projpath + '01_Data/'
 input_path  = datpath + 'model_input/'
 output_path = datpath + 'model_output/'
-outpath     = projpath + '02_Figures/20220808/'
+outpath     = projpath + '02_Figures/20220824/'
 proc.makedir(outpath)
+
+pubready   = True
 
 # Load in control data for 50N 30W
 #fullauto =np.load(datpath+"Autocorrelation_30W50N_FULL_PIC_12805.npy",allow_pickle=True)
@@ -201,8 +203,9 @@ cfslab = calc_conflag(cesmauto2,conf,tails,898)
 cffull = calc_conflag(cesmautofull,conf,tails,1798)
 
 #%% Plot SST Autocorrelation at the test point (SM Paper)
-# Updated 20220808 For Revision 01
-
+"""
+Updated for Revision 01 08/24/2022
+"""
 notitle    = True  # Remove Title for publications
 sepfig     = False # Plot figures separately, for presentaiton, or together)
 sepentrain = False  # Separate entrain/non-entraining models
@@ -343,12 +346,16 @@ mlddef = mldpt.copy()
 Fptdef = Fpt.copy()
 
 # Figure Separation <3> Figure 2 Save
-if sepfig:
-    ax.set_ylabel("Correlation")
-    plt.savefig(outpath+"Autocorrelation_upper-hierarchy_%s.png"%locstring,dpi=200,bbox_inches='tight')
-else:
+if pubready:
     ax = viz.label_sp(1,case='lower', ax=ax, fontsize=16, labelstyle="(%s)",x=0.010,alpha=0.25)
-    plt.savefig(outpath+"Autocorrelation_2-PANEL_%s.png"%locstring,dpi=200,bbox_inches='tight')
+    plt.savefig(outpath+"Fig05_SPG_Autocorrelation.png",dpi=1200,bbox_inches='tight',format='png')
+else:
+    if sepfig:
+        ax.set_ylabel("Correlation")
+        plt.savefig(outpath+"Autocorrelation_upper-hierarchy_%s.png"%locstring,dpi=200,bbox_inches='tight')
+    else:
+        ax = viz.label_sp(1,case='lower', ax=ax, fontsize=16, labelstyle="(%s)",x=0.010,alpha=0.25)
+        plt.savefig(outpath+"Autocorrelation_2-PANEL_%s.png"%locstring,dpi=200,bbox_inches='tight')
 
 # Unified ylabel
 for ax in axs:
@@ -358,6 +365,7 @@ fig.text(0.5, 0.01, 'Lag (Months)', ha='center',fontsize=12)
 #%% Load and calculate CESM Spectra
 cssts = scm.load_cesm_pt(datpath,loadname='both',grabpoint=[-30,50])
 #%% Calculate Spectra
+
 
 debug    = False
 notitle  = True
@@ -450,6 +458,10 @@ else:
     sstvars_str = ["%s (%.2f $K^2$)" % (labels[sv],sstvars[sv]) for sv in range(len(sstvars))]
 
 #%% # Plot the spectra
+
+"""
+Updated for Revision 01 08/24/2022
+"""
 
 plottype    = 'freqlin'#'freqlin'
 sepentrain  = False  # Separate entrain/non-entraining models
@@ -575,7 +587,10 @@ for i in range(2):
     plt.setp(ax.get_yticklabels(),fontsize=tick_fsz)
     # Turn on minor label
     ax.yaxis.set_minor_locator(tck.AutoMinorLocator())
+
+
     
+
 if sepfig is False:
     #fig.text(0.5, -0.05, 'Frequency (cycles/year)', ha='center',fontsize=12)
     if periodx:
@@ -587,7 +602,11 @@ if sepfig is False:
     if notitle is False:
         plt.suptitle(sharetitle,y=1.05,fontsize=14)
     savename = "%sNASST_Spectra_Stochmod_%s_%s_pct%03i.png" % (outpath,plottype,smoothname,pct*100)
-    plt.savefig(savename,dpi=200,bbox_inches='tight')
+    
+    if pubready:
+        plt.savefig("%sFig06_SPG_Spectra.eps"% (outpath),dpi=1200,bbox_inches='tight',format='eps')
+    else:
+        plt.savefig(savename,dpi=200,bbox_inches='tight')
     
     
 

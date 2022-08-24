@@ -30,9 +30,10 @@ import cartopy.crs as ccrs
 
 datpath = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_output/'
 fnames  = ["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_dmp0" %i for i in range(10)]
-figpath = datpath + "../../02_Figures/20220808/"
+figpath = datpath + "../../02_Figures/20220824/"
 proc.makedir(figpath)
 
+pubready = True
 #%% From SM Stylesheet
 
 # Regional Analysis Settings
@@ -334,8 +335,10 @@ for a,ax in enumerate([ax2,ax3]):
     spid += 1
 
 
-
-plt.savefig("%sEkmanForcing_Summary_Figure.png"%figpath,dpi=200,bbox_inches='tight')
+if pubready:
+    plt.savefig("%sFig13_EkmanForcing.png"%figpath,dpi=1200,bbox_inches='tight')
+else:
+    plt.savefig("%sEkmanForcing_Summary_Figure.png"%figpath,dpi=200,bbox_inches='tight')
 
 #%%
 

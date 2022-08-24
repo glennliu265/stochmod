@@ -26,7 +26,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20220808/"
+    figpath     = projpath + "02_Figures/20220824/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -348,6 +348,7 @@ mons3      = ('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov',
 conf       = 0.95
 tails      = 2
 
+pubready = True
 
 #%% load some additional data
 
@@ -1345,9 +1346,9 @@ if exname == "seasonal":
 #%% Plot NAO-EAP Plots (Updated for Stochastic Model Draft 2)
 notitle = True
 cbvert  = False
-rid = 4
-mid = 2
-tworow = False
+rid     = 4
+mid     = 2
+tworow  = False
 bboxplot = [-80,0,9,62]
 add_std = True
 useC    = True
@@ -1405,7 +1406,11 @@ if exname == "NAO_EAP":
         cb.set_label("SST ($\degree C \, \sigma_{AMV}^{-1}$)")
     else:
         cb.set_label("SST ($K \, \sigma_{AMV}^{-1}$)")
-plt.savefig("%sAMV_Patterns_NAO_EAP_model%i.png" % (figpath,mid),dpi=150,bbox_inches='tight')
+
+if pubready:
+    plt.savefig("%sFig09_AMV_Patterns_EOF.png" % (figpath),dpi=900,bbox_inches='tight')
+else:
+    plt.savefig("%sAMV_Patterns_NAO_EAP_model%i.png" % (figpath,mid),dpi=150,bbox_inches='tight')
 
 #%% Plot Bounding Boxes over CESM Slab Pattern
 
@@ -1715,7 +1720,6 @@ savename = "%sNASST_Spectra_Stochmod_%s_%s_pct%03i.png" % (outpath,plottype,smoo
 plt.savefig(savename,dpi=200,bbox_inches='tight')
 
 #%% PLot SST Variance to show regiosns that belw up
-
 
 sstplot = sstdicts[0][4][2]
 

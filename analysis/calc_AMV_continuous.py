@@ -32,7 +32,7 @@ if stormtrack == 0:
     datpath = projpath + '01_Data/model_output/'
     rawpath = projpath + '01_Data/model_input/'
     outpathdat = datpath + '/proc/'
-    figpath = projpath + "02_Figures/20220808/"
+    figpath = projpath + "02_Figures/20220824/"
 
     sys.path.append(
         "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
@@ -70,9 +70,12 @@ exname = "Fprime_amq0_method5_cont"
 # frcnamelong = ["$F'$ run 2%02d" % (i) for i in range(10)]
 # exname ="Qnet_amq3_method5_cont
 
+
+
 # Plotting Params
 darkmode = False
-debug = False
+debug    = False
+pubready = True
 # %% Functions
 def calc_conflag(ac, conf, tails, n):
     cflags = np.zeros((len(ac), 2))
@@ -431,8 +434,10 @@ print("AMV Max in Tropics is %f in Numerator" % (valmax[0]))
 print("AMV Max in Tropics is %f in Denominator" % (valmax[1]))
 print("Thus, the ratio is %f" % (valmax[0]/valmax[1]))
 # %% Redo Stochastic Model Paper Plot
+"""
 # Copied from viz_AMV_comparison.py (03/11/2022)
-# Updated 08/08/2022 for Revision1
+# Updated 08/24/2022 for Revision 1
+"""
 
 # Plot settings
 notitle      = True
@@ -576,7 +581,10 @@ if notitle is False:
     plt.suptitle("%s AMV Pattern and Index Variance [Forcing = %s]" % (
         regionlong[rid], frcnamelong[f]), fontsize=14)
 
-plt.savefig(savename, dpi=150, bbox_inches='tight')
+if pubready:
+    plt.savefig("%sFig08_AMV_Pattern_Comparison.png" % (figpath), dpi=900, bbox_inches='tight')
+else:
+    plt.savefig(savename, dpi=150, bbox_inches='tight')
 
 # %% Save the parameters needed for the plot
 """
@@ -615,7 +623,6 @@ frcname = "flxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0"
 inputs = scm.load_inputs('SLAB_PIC', frcname, input_path, load_both=True)
 lon, lat, h, kprevall, dampingslab, dampingfull, alpha, alpha_full = inputs
 
-
 # %% SM Paper Draft 3 (CESM AMV Inset for Seasonal Cycle Figure)
 
 # Calculate the AMV over bounding box bbin
@@ -634,7 +641,7 @@ cb_lab = np.arange(-.5, .6, .1)
 # Make the Plot
 fig, ax = plt.subplots(
     1, 1, subplot_kw={'projection': ccrs.PlateCarree()}, figsize=(6, 4))
-ax = viz.add_coast_grid(ax, bbox=bboxplot)
+#ax = viz.add_coast_grid(ax, bbox=bboxplot)
 ax = viz.add_coast_grid(ax, bboxplot, blabels=[1, 0, 0, 1], line_color=dfcol,
                         fill_color='gray')
 pcm = ax.contourf(lon, lat, amvpat.T, levels=cint,
@@ -654,8 +661,8 @@ else:
     cb.set_label("SST ($K \sigma_{AMV}^{-1}$)")
 cb.set_ticks(cb_lab)
 
-plt.savefig("%sAMV_Patterns_Indv_%s.png" %
-            (figpath, mconfigs[cid]), dpi=200, bbox_inches='tight')
+plt.savefig("%sFig04b_SPG_Locator_%s.png" %
+            (figpath, mconfigs[cid]), dpi=900, bbox_inches='tight')
 
 # %% Plot of regional AMV with bounding Boxes (moved from plot_temporal_region)
 
@@ -669,12 +676,11 @@ ax.text(-69,69,"Bounding Boxes",ha='center',bbox=props,fontsize=12) # (works for
 ax.legend(ncol=1,fontsize=8,loc=6,bbox_to_anchor=(0, .75))
 """
 
-
-cid = 0
-rids = [0, 6, 5, ]
+cid      = 0
+rids     = [0, 6, 5, ]
 bboxtemp = [-85, -5, 15, 68]
-cint = np.arange(-0.45, 0.50, 0.05)
-plotamv = True  # Add AMV Plot as backdrop (False=WhiteBackdrop)
+cint     = np.arange(-0.45, 0.50, 0.05)
+plotamv  = True  # Add AMV Plot as backdrop (False=WhiteBackdrop)
 plotamvpat = camvpats[1][0]
 
 # Select Which Lon/Lat to Plot
@@ -714,8 +720,12 @@ for bb in rids:
                           color=bbcol[bb], linestyle="dotted", linewidth=3, return_line=True)
     ls.append(ll)
 
-plt.savefig("%sRegional_BBOX_Locator_wamv.png" %
-            figpath, dpi=100, bbox_inches='tight', transparent=True)
+if pubready:
+    plt.savefig("%sFig7b_Regional_BBOX_Locator_wamv.png" %
+                figpath, dpi=900, bbox_inches='tight', transparent=True)
+else:
+    plt.savefig("%sRegional_BBOX_Locator_wamv.png" %
+                figpath, dpi=100, bbox_inches='tight', transparent=True)
 # %% Compare averaged and non-averaged AMV Pattern
 
 bbin = [-80, 0, 20, 60]
@@ -752,10 +762,8 @@ for c in range(10):
                     colors="k", linewidths=0.5)
     ax.clabel(cl, levels=cl_int, fontsize=8)
 
-
 # %% Load the weird stuff and compare
 # Unpack and load AMV Patterns
-
 
 amvpats = []
 amvids = []

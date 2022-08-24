@@ -21,6 +21,8 @@ import cmocean
 from tqdm import tqdm
 from time import time
 
+import matplotlib.patheffects as PathEffects
+
 #%% Set Paths, Import Custom Modules
 stormtrack = 0
 if stormtrack == 0:
@@ -28,7 +30,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20220518/"
+    figpath     = projpath + "02_Figures/20220824/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -50,8 +52,8 @@ proc.makedir(figpath)
 
 #%% Experimental Configurations
 
-mconfig   = "SLAB_PIC"
-nyrs      = 1000        # Number of years to integrate over
+mconfig    = "SLAB_PIC"
+nyrs       = 1000        # Number of years to integrate over
 continuous = True # Set to True to Load a continuous run with the lines below
 
 
@@ -87,6 +89,8 @@ else:
 
 # Calculate in place (or load output from sm_postprocess_output)
 calc_inplace=False
+
+pubready = True
 
 #%% Labels and Plotting
 
@@ -147,8 +151,6 @@ xlm   = [xtks[0],xtks[-1]]
 
 
 #%% Silly functions to repackage postprocessed output (need to stop using dicts)
-
-
 
 def unpack_smdict(indict):
     """
@@ -764,9 +766,12 @@ plt.savefig("%sSPG-NAT_Autocorrelation_Spectra%s.png"%(figpath,smoothname),
 
 #%% SM Draft 2, 3, Plot all Regionals in 1 Plot
 
+"""
+Updated for Revision 01 08/24/2022
+"""
+
 # Plotting Params
 # ---------------
-
 alw            = 3
 exclude_consth = True # Set to true to NOT plot constant h model
 notitle        = True
@@ -778,7 +783,7 @@ useC           = True # Use Celsius in Labels
 usegrid        = False
 xtk2           = np.arange(0,39,3)
 plotar1        = False
-plotlegend     = False # Plot autocorrelation legend
+plotlegend     = True # Plot autocorrelation legend
 yrticks        = [1/100,1/20,1/10,1/5]
 
 
@@ -820,7 +825,10 @@ order = rids
 
 # Do Plotting
 # ---------------
-fig,axs =plt.subplots(2,3,figsize=(16,8))
+if plotlegend:
+    fig,axs =plt.subplots(2,3,figsize=(16,12))
+else:
+    fig,axs =plt.subplots(2,3,figsize=(16,8))
 sp_id = 0
 # Plot the autocorrelation (top row)
 for i in range(len(rids)):
@@ -965,10 +973,16 @@ for i in range(len(rids)):
     sp_id += 1
 
 plt.tight_layout()
-plt.savefig("%sRegional_Autocorrelation_Spectra%s.png"%(figpath,smoothname),
-            dpi=200,transparent=False)
+
+if pubready:
+    plt.savefig("%sFig07a_Regional_Autocorrelation_Spectra%s.png"%(figpath,smoothname),
+                dpi=1200,transparent=False)
+else:
+    plt.savefig("%sRegional_Autocorrelation_Spectra%s.png"%(figpath,smoothname),
+                dpi=200,transparent=False)
 
 #%% Plot the North Atlantic Power Spectra
+
 
 rid = 7
 
@@ -1063,7 +1077,8 @@ plt.savefig("%sCESM_v_SM_ac_spectra_%s.png"% (figpath,regions[rid]),dpi=150)
 
 
 """
-NOTE: This is now outdated. 
+NOTE: This is now outdated
+
 See viz_inputs_point for the updated script, which uses the continuous AMV
 Pattern!
 """
@@ -1332,8 +1347,10 @@ for a in range(2):
 fig.supylabel("Log Ratio")
 #txt = viz.add_ylabel("Log Ratio",ax=axs.flatten())
 
-plt.savefig("%sRegional_Spectra_Ratio_2-panel_%s.png"%(figpath,flab),dpi=150,bbox_inche='tight')
-
+if pubready:
+    plt.savefig("%sFig10_Regional_Spectra_Ratio.eps"%(figpath),dpi=1200,bbox_inche='tight',format='eps')
+else:
+    plt.savefig("%sRegional_Spectra_Ratio_2-panel_%s.png"%(figpath,flab),dpi=150,bbox_inche='tight')
 
 #%%
 # #%% Remake using subplot grids (Note Working)

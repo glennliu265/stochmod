@@ -41,36 +41,35 @@ import time
 import cmocean
 
 #%% User Edits
-
 projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath = projpath + '03_Scripts/stochmod/'
 datpath    = projpath + '01_Data/'
-outpath    = projpath + '02_Figures/20220808/'
+outpath    = projpath + '02_Figures/20220824/'
 input_path  = datpath + 'model_input/'
 proc.makedir(outpath)
 
 
+pubready = True # Set to True to save figures as EPS for publication
+
 # Put slab version first, then the load_load func. searches in the same
 # directory replace "SLAB_PIC" with "FULL_PIC"
-frcname = "flxeof_090pct_FULL-PIC_eofcorr2_Fprime_rolln0"
+frcname  = "flxeof_090pct_FULL-PIC_eofcorr2_Fprime_rolln0"
 #frcname = "flxeof_090pct_FULL-PIC_eofcorr2"
 #frcname = "Qek_eof_090pct_FULL_PIC_eofcorr0"
 
 # Which point do you want to visualize conditions for?
-lonf = -30#-55#
-latf = 50#11 #50
+lonf       = -30 #-55#
+latf       = 50  #11 #50
 flocstring = "lon%i_lat%i" % (lonf,latf)
-locstring = "%i$\degree$N, %i$\degree$W" % (latf,np.abs(lonf))
+locstring  = "%i$\degree$N, %i$\degree$W" % (latf,np.abs(lonf))
 
 # Additional Plotting Parameters
-bbox = [-80,0,9,62]
+bbox       = [-80,0,9,62]
 #mconfig = "FULL_PIC"
 #if mconfig == "FULL_PIC":
 #    configname = "Fully-Coupled PiC"
 
 #bboxplot  = [-100,20,-10,80]
-
-
 #mconfig = "FULL_PIC"
 
 # # ------------
@@ -127,12 +126,9 @@ regionlong  = ("Subpolar","Subtropical","Tropical","North Atlantic","North Atlan
 bbcol       = ["Blue","Red","Yellow","Black","Black"]
 bbcol       = ["Blue","Red","Yellow","Black","Black","magenta","red"]
 bbsty       = ["solid","dashed","solid","dotted","dotted","dashed","dotted"]
-
-method = 4
-lagstr = 'lag1'
-
-brew_cat8 = ['#7fc97f','#beaed4','#fdc086','#ffff99','#386cb0','#f0027f','#bf5b17','#666666']
-
+method      = 4
+lagstr      = 'lag1'
+brew_cat8   = ['#7fc97f','#beaed4','#fdc086','#ffff99','#386cb0','#f0027f','#bf5b17','#666666']
 #%% Load All Inputs (Basinwide)
 
 # Use the function used for sm_rewrite.py
@@ -170,45 +166,31 @@ beta = scm.calc_beta(h)
 # -------------------
 #%% Fancy Kprev Plot
 # -------------------
-
-import matplotlib as mpl
-#mpl.rcParams
-
-from matplotlib import rc
-rc('font', **{'family': 'serif', 'serif': ['DejaVu Sans']})
-
-from matplotlib import font_manager
-font_dirs = ['/Users/gliu/Downloads/Red_Hat_Display/static/']
-font_files = font_manager.findSystemFonts(fontpaths=font_dirs)
-for font_file in font_files:
-    font_manager.fontManager.addfont(font_file)
-
-plt.rcParams['font.family'] = "Red Hat Display"
-
-
-#rc('text', usetex=False)
-
-#mpl.rcParams['text.usetex'] = False
-#csfont = {'fontname':'Futura'}
-
+"""
+Figure 01 in Stochastic Model Paper
+    - Updated for Revision 01 (08/24/2022)
+"""
 usegrid = False
 
 monstr_kprv = np.append(mons3,'Jan')
-fig,ax = plt.subplots(1,1,figsize=(6,4),constrained_layout=True)
+if pubready:
+    fig,ax = plt.subplots(1,1,figsize=(4.5,3.5),constrained_layout=True)
+else:
+    fig,ax = plt.subplots(1,1,figsize=(6,4),constrained_layout=True)
 viz.viz_kprev(hpt,kprev,locstring=locstring,
-              ax=ax,msize=10,mstyle="X",lw=2.5,txtalpha=.65,usetitle=False)
+              ax=ax,msize=10,mstyle="X",lw=2.5,txtalpha=.55,usetitle=False)
 if usegrid:
     ax.grid(True,ls='dotted')
-    
 ax.set_xticklabels(monstr_kprv) 
 ax.set_ylim([10,150])
 ax.set_yticks(np.arange(10,170,20))
-
 ax.minorticks_on()
 ax.xaxis.set_tick_params(which='minor', bottom=False)
 
-plt.savefig(outpath+"MLD_Detrainment_month_%s.png" % (flocstring),dpi=200)
-
+if pubready:
+    plt.savefig(outpath+"Fig01_Detrainment_Example.eps" % (flocstring),dpi=1200,format='eps')
+else:
+    plt.savefig(outpath+"MLD_Detrainment_month_%s.png" % (flocstring),dpi=200)
 #%% manuallly load forcing for debugging
 load_forcing_manual=False
 
@@ -321,7 +303,11 @@ for m in range(2): # Loop for SLAB, and FULL
     ax1.legend(ls, [l.get_label() for l in ls],loc='upper center')
     if notitle is False:
         ax1.set_title(title)
-    plt.savefig(outpath+"Scycle_MLD_Forcing_%s_Triaxis_%s.png"% (flocstring,mcf),dpi=150,bbox_inches='tight')
+    
+    if pubready:
+        plt.savefig(outpath+"Fig04a_Scycle_Point_%s.eps"% (mcf),dpi=1200,format='eps',bbox_inches='tight')
+    else:
+        plt.savefig(outpath+"Scycle_MLD_Forcing_%s_Triaxis_%s.png"% (flocstring,mcf),dpi=150,bbox_inches='tight')
 
 # ****************************************************************************
 #%% Some Basinwide Plots...
@@ -354,7 +340,8 @@ for v,varname in tqdm(enumerate(invars_name)):
 
 #%% Annual Average Plot (Squared Sum)
 clvl=np.arange(0,75,2.5)
-fig,axs =  plt.subplots(1,2,subplot_kw={'projection':ccrs.PlateCarree()})
+fig,axs =  plt.subplots(1,2,subplot_kw={'projection':ccrs.PlateCarree()},
+                        figsize=(10,4),constrained_layout=True)
 for i in range(2):
     ax = axs[i]
     ax = viz.add_coast_grid(ax=ax,bbox=bbox)
@@ -362,23 +349,20 @@ for i in range(2):
     ax.set_title(cnames[i])
     
 fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal')
-plt.suptitle("Annual Mean Sqrt(Sum($EOF^2$))",y=1.05)
+plt.suptitle("Annual Mean Sqrt(Sum($EOF^2$))",y=1.1)
 
-#alpha2 = np.sqrt(np.nansum(alpha**2,2))
-#alphafull2 = 
 #%% Annual Average sums
-
 clvl=np.arange(-70,75,5)
-fig,axs =  plt.subplots(1,2,subplot_kw={'projection':ccrs.PlateCarree()})
+fig,axs =  plt.subplots(1,2,subplot_kw={'projection':ccrs.PlateCarree()},
+                        figsize=(10,4),constrained_layout=True)
 for i in range(2):
     ax = axs[i]
     ax = viz.add_coast_grid(ax=ax,bbox=bbox)
-    pcm=ax.contourf(lon,lat,np.nanmean(alphasum[i],2).T,levels=clvl,cmap=cmocean.cm.balance)
+    pcm=ax.contourf(lon,lat,np.nanmean(alphasum[i],2).T,levels=clvl,cmap=cmocean.cm.balance,extend='both')
     ax.set_title(cnames[i])
     
 fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal')
-plt.suptitle("Sum(EOF^2)",y=1.05)
-
+plt.suptitle("Sum($EOF^2$)",y=1.05)
 diff = np.nanmean(alphasum[1],2) - np.nanmean(alphasum[0],2)
 # --------------------- --------------------- --------------------- ---------------------
 #%% Compute seasonal averages
@@ -411,7 +395,6 @@ cb.set_label("Total Forcing Amplitude ($W/m^2$)")
 plt.savefig("%sForcing_SeasonaAvg_%s.png"%(outpath,frcname),dpi=200)
 #%% Plot the Damping Patterns
 
-
 clvl=np.arange(-60,65,5)
 fig,axs =  plt.subplots(1,4,figsize=(12,4),subplot_kw={'projection':ccrs.PlateCarree()})
 
@@ -424,7 +407,6 @@ for i in range(4):
 
 cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='vertical',fraction=0.009)
 cb.set_label("Atmospheric Damping ($W/m^2$)")
-
 
 #%% Plot Beta
 
@@ -441,15 +423,11 @@ fig.colorbar(pcm,ax=axs.flatten())
 
 #%% Plot "Cumulative beta"
 
-
-
 betacumu = beta.sum(-1)
 fig,ax =  plt.subplots(1,1,figsize=(7,7),subplot_kw={'projection':ccrs.PlateCarree()})
 ax = viz.add_coast_grid(ax=ax,bbox=bbox,fill_color='gray')
 pcm = ax.contourf(lon,lat,betacumu.T)
 cb=fig.colorbar(pcm,ax=ax)
-
-
 #%% Plot max MLD variations
 
 bboxplot    = [-80,0,5,60]
@@ -554,7 +532,6 @@ cblabs2 = (u"Contour = 5 $Wm^{-2}$",u"Contour = 5 $Wm^{-2} \degree C^{-1}$",u"Co
 
 cints  = (np.arange(0,105,5),np.arange(0,45,5),cintmld
           )
-
 
 cmaps  = ('hot',cmapdamp,cmapmld) 
 
@@ -687,6 +664,9 @@ for row,subfig in enumerate(subfigs):
 #plt.show()
 plt.savefig(outpath+"Seasonal_Inputs_CESM-FULL.png",dpi=200,bbox_inches='tight')
 #%% Try Subfigures Method (FIXED CONSTRAINED LAYOUT, for SM Draft 2)
+"""
+Final form for Revision 01!!
+"""
 import matplotlib as mpl
 
 # Set Inputs
@@ -705,6 +685,11 @@ vnames = (r"Total Forcing Amplitude ($F'$)",
           r"Atmospheric Damping ($\lambda_a$)",
           r"Mixed-Layer Depth ($h$)")
 
+vnames_simp = (r"$F'$",
+               r"$\lambda_a$",
+               r"$h$"
+               )
+
 cints  = (np.arange(0,105,5),np.arange(0,45,5),cintmld
           )
 
@@ -721,9 +706,38 @@ mpl.rcParams['font.sans-serif'] = "stix"
 mpl.rcParams['font.family'] = "STIXGeneral"
 mpl.rcParams.update(mpl.rcParamsDefault)
 
-
+## Note EPS Format is not working..
+# if pubready:
+#     fig,axs = plt.subplots(3,4,constrained_layout=True,
+#                            figsize=(8,4.),subplot_kw={'projection':ccrs.PlateCarree()})
+#     fsz_splb  = 12
+#     fsz_ylab  = 12
+#     fsz_ll    = 10 # Lat/Lon Labels
+#     fsz_title = 12
+    
+#     vnames_sel = vnames_simp
+#     ylbl_horiz = -0.35
+#     ylbl_vert  = 0.50
+#     ylbl_rot   = 'horizontal'
+#     sp_horiz = -.05
+    
+#else:
+    
 fig,axs = plt.subplots(3,4,constrained_layout=True,
                        figsize=(14,8),subplot_kw={'projection':ccrs.PlateCarree()})
+
+
+fsz_splb = 18
+fsz_ylab = 12
+fsz_ll   = 12
+fsz_title = 14
+
+ylbl_horiz = -0.15
+ylbl_vert = 0.55
+ylbl_rot = 'vertical'
+vnames_sel = vnames
+
+sp_horiz = 0
 
 if notitle is False:
     fig.suptitle("Stochastic Model Inputs (CESM1-FULL, Seasonal Average)",fontsize=20)
@@ -752,7 +766,7 @@ for row in range(3):
         
         # Set Title (First Row Only)
         if v == 0:
-            ax.set_title(snamesl[s],fontsize=14)
+            ax.set_title(snamesl[s],fontsize=fsz_title)
         if v < 3:
             plotvar = (invar[s] * limask).T
         # else:
@@ -770,14 +784,15 @@ for row in range(3):
             #pcm = ax.contourf(lon,lat,plotvar,levels=cint,extend='both',cmap=cmap)
             
         #print(ax)
-        ax  = viz.add_coast_grid(ax=ax,bbox=bbox,blabels=blabel,fill_color='gray',ignore_error=True)
-        ax = viz.label_sp(sp_id,ax=ax,fontsize=18,fig=fig,labelstyle="(%s)",case='lower',alpha=.75)
+        ax  = viz.add_coast_grid(ax=ax,bbox=bbox,blabels=blabel,fill_color='gray',ignore_error=True,fontsize=fsz_ll)
+        ax  = viz.label_sp(sp_id,ax=ax,fontsize=fsz_splb,fig=fig,labelstyle="(%s)",case='lower',alpha=.75,x=sp_horiz)
         sp_id += 1
         
         if leftlabel:
             if s == 0:
-                ax.text(-0.15, 0.55, vnames[v], va='bottom', ha='center',rotation='vertical',
-                        rotation_mode='anchor',transform=ax.transAxes)
+                
+                ax.text(ylbl_horiz, ylbl_vert, vnames_sel[v], va='bottom', ha='center',rotation=ylbl_rot,
+                        rotation_mode='anchor',transform=ax.transAxes,fontsize=fsz_ylab)
 
     cb = fig.colorbar(pcm,ax=axs[row,:],orientation='vertical',fraction=0.009,pad=.010)
     #cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction=0.075,pad=.1)
@@ -786,7 +801,12 @@ for row in range(3):
         
 #fig.set_constrained_layout_pads(w_pad=4 / 72, h_pad=4 / 72, hspace=0, wspace=0)
 #plt.show()
-plt.savefig(outpath+"Seasonal_Inputs_CESM-FULL.png",dpi=200,bbox_inches='tight')
+
+if pubready:
+    #plt.savefig(outpath+"Fig02_Seasonal_Avg_Parameters_CESM-FULL.eps",dpi=600,bbox_inches='tight',format='eps')
+    plt.savefig(outpath+"Fig02_Seasonal_Avg_Parameters_CESM-FULL.png",dpi=900,bbox_inches='tight')
+else:
+    plt.savefig(outpath+"Seasonal_Inputs_CESM-FULL.png",dpi=900,bbox_inches='tight')
 
 #%% Plot CESM1-SLAB Forcing and Damping
 
@@ -1149,7 +1169,6 @@ if recalc:
         ds_all.append(ds.DEPTH_MIXED_LAYER)
     ds_all = xr.concat(ds_all,dim="month")
     
-    
     # Get dimensions, read to numpy array
     lenlon = len(ds_all[0].LONG)
     lenlat = len(ds_all[0].LAT)
@@ -1182,15 +1201,30 @@ _,mm_mld = proc.lon360to180(lon360,mm_mld)
 mld_diff = h-mm_mld
 hdiff_savg,monstrs=proc.calc_savg(mld_diff,return_str=True,debug=True)
 mm_savg,monstrs = proc.calc_savg(mm_mld,return_str=True,debug=True)
-#%% Make the Plot
+#%% Make the Plot (MIMOC vs CESM)
+
+"""
+Version Submitted to Draft 2
+"""
 
 notitle = True
 plotmld = False # Tur to just plot mimoc seasonal avg
 bboxplot = [-80,0,9,62]
 
-fig,axs = plt.subplots(2,2,figsize=(10,8.25),constrained_layout=True,
-                      subplot_kw={'projection':ccrs.PlateCarree()})
-
+if pubready:
+    fig,axs = plt.subplots(2,2,figsize=(6.5,5.45),constrained_layout=True,
+                          subplot_kw={'projection':ccrs.PlateCarree()})
+    
+    fsz_title = 14
+    fsz_cbar  = 12
+    
+    
+else:
+    fig,axs = plt.subplots(2,2,figsize=(10,8.25),constrained_layout=True,
+                          subplot_kw={'projection':ccrs.PlateCarree()})
+    fsz_title = 18
+    fsz_cbar  = 14
+    
 sp_id = 0
 for s,ax in enumerate(axs.flatten()):
     
@@ -1207,21 +1241,21 @@ for s,ax in enumerate(axs.flatten()):
     else:
         pcm = ax.pcolormesh(lon,lat,hdiff_savg[s].T,vmin=-250,vmax=250,cmap='cmo.balance')
     
-    
     ax = viz.add_coast_grid(ax=ax,bbox=bbox,fill_color='gray',blabels=blabel)
-    ax.set_title(monstrs[s],fontsize=18)
+    ax.set_title(monstrs[s],fontsize=fsz_title)
     
     ax = viz.label_sp(sp_id,ax=ax,fontsize=14,fig=fig,labelstyle="(%s)",case='lower',alpha=.75)
     sp_id += 1
 cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction=0.035,pad=0.05)
-cb.set_label("Mixed-layer depth (m)")
+cb.set_label("Mixed-layer depth (m)",fontsize=fsz_cbar)
+
 if notitle is False:
     plt.suptitle("Seasonal Mean Mixed Layer Depth Differences in meters \n (CESM1 - MIMOC)",fontsize=14,y=.94)
-plt.savefig("%sMLD_Differences-CESM1_MIMOC_Savg.png" %(outpath),dpi=200,bbox_inches='tight')
-
-
-
-
+if pubready:
+    #plt.savefig("%sFig11_MLD_CESM_v_MIMOC.eps" %(outpath),dpi=900,bbox_inches='tight',format='eps')
+    plt.savefig("%sFig11_MLD_CESM_v_MIMOC.png" %(outpath),dpi=900,bbox_inches='tight')
+else:
+    plt.savefig("%sMLD_Differences-CESM1_MIMOC_Savg.png" %(outpath),dpi=200,bbox_inches='tight')
 
 # -------------------------------------------------------
 #%% Plot Seasonal Variation in parameters for each region
