@@ -35,9 +35,9 @@ bbsty       = ["solid","dashed","solid","dotted","dotted","dashed","dotted"]
 # AMV Pattern Contours
 cint        = np.arange(-0.45,0.50,0.05) # Used this for 7/26/2021 Meeting
 cl_int      = np.arange(-0.45,0.50,0.05)
-cmax  = 0.5
-cstep = 0.025
-lstep = 0.05
+cmax        = 0.5
+cstep       = 0.025
+lstep       = 0.05
 cint,cl_int = viz.return_clevels(cmax,cstep,lstep)
 clb = ["%.2f"%i for i in cint[::4]]
 bboxplot    = [-80,0,9,65]#[-80,0,5,60] # Updated 8/8/2022 for AMV

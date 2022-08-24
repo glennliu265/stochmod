@@ -6,6 +6,8 @@ Convert matfile containing CESM1-LE Heat Flux Damping to NetCDF Files
 Beginning of script taken from viz_hfdamping.py.
 
 Created on Fri Jan 14 15:02:44 2022
+
+
 @author: gliu
 """
 
@@ -48,7 +50,7 @@ bbox = [280, 360, 0, 90]
 cmap = cmocean.cm.tempo
 
 # Set string for lagmax
-lagmax = lags[-1]
+lagmax      = lags[-1]
 save_allens = 0 # Option to save output that has been averaged for lags, but not ens
 
 

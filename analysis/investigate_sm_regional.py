@@ -153,7 +153,14 @@ lon180g,latg  = scm.load_latlon(rawpath)
 #%% For each model read in the data
 
 # Select a particular region
-reg_sel  = [-80,0,10,20] # (Tropics)
+reg_sel  =[-36,-20,44,60]
+"""
+Other Regions
+North Atlantic [-80,0,10,20]
+NNA Box (from JCLI review)
+
+"""
+
 reg_strf = "lon%ito%i_lat%ito%i" % (reg_sel[0],reg_sel[1],reg_sel[2],reg_sel[3])
 
 # Load in data and take annual average
@@ -217,9 +224,6 @@ for f in range(len(fnames)):
     amvpats.append(amvpat)
     amvids.append(amvidx)
     
-    
-
-    
 #%% Select a point, and compute the spectra vs. CESM
 
 lonf = -30
@@ -232,7 +236,7 @@ amvpats_avg = amvpats_sel.mean(0)
 
 # Get Point Indices
 klon,klat    = proc.find_latlon(lonf,latf,lonr2,latr2)
-locstring    = "Lon: %.2f, Lat: %.2f" % (lonr[klon],latr[klat])
+locstring    = "Lon: %.2f, Lat: %.2f" % (lonr[klonf],latr[klat])
 locfstring   = "lon%i_lat%i" % (lonf,latf)
 
 inssts     = (sst_all[klon,klat,:,0],sst_all[klon,klat,:,1],
@@ -285,7 +289,6 @@ ax2.plot(lonr2[klon],latr2[klat],marker="x",color="k",markersize=10)
 plt.savefig("%sSST_Spectra_Comparison_%s.png"%(figpath,locfstring),dpi=150,bbox_inches='tight')
 
 #%% Repeat Analysis for all points within the region
-
 
 # Do spectral analysis for stochastic model
 spec_sm     = np.zeros((nmod,nlonr,nlatr,freqns[0]))*np.nan # [model x lon x lat x freq]
@@ -447,8 +450,6 @@ inputs = [h,kprevall,dampingslab,dampingfull,alpha,alpha_full,hblt]
 outputs,_,_ = scm.cut_regions(inputs,lon,lat,reg_sel,0)
 h,kprev,damping,dampingfull,alpha,alpha_full,hblt = outputs
 
-
-
 #outputs_pt = scm.cut_regions(inputs,lon,lat,reg_sel,1,points=[lonf,latf])
 #h_pt,kprev_pt,damping_pt,dampingfull_pt,alpha_pt,alpha_full_pt,hblt_pt = outputs_pt
 
@@ -527,7 +528,7 @@ plt.suptitle("SST Variance ($K^2$) at Periods > %i years" % (int(1/thresvals[t])
 savename = "%sSST_Variance_%s_thresid%i_CONTOUR.png" % (figpath,fnames[0][30:99],t)
 plt.savefig(savename,dpi=150)
 
-#%% Selet a threshold
+#%% Select a threshold
 
 vthres_sel = 0.10
 kthres     = specvars[:,:,mid,t] > vthres_sel
@@ -750,6 +751,7 @@ for mid,ax in enumerate(axs):
     
 
 #%%
+
 fig,axs = plt.subplots(1,3,figsize=(12,8),sharex=True,sharey=True)
 
 for mid,ax in enumerate(axs):
