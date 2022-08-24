@@ -46,7 +46,7 @@ varname    = "SST" #"SST"
 
 # Set Output Directory
 # --------------------
-figpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220622/'
+figpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220817/'
 proc.makedir(figpath)
 outpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/'
 savename   = "%s%s_%s_autocorrelation_%s_%s.npz" %  (outpath,mconfig,varname,thresname,lagname)
@@ -163,7 +163,7 @@ integr_ac = 1 + 2*np.trapz(acmax**2,x=lags,axis=-1)
 
 rkmonth                  = 1
 maxmincorr,maxids,minids = proc.calc_remidx_simple(acs_final,rkmonth,monthdim=3,lagdim=-1,debug=True)
-remidx                   = maxmincorr[1,...] - maxmincorr[0,...]
+remidx                   = maxmincorr[1,...] - maxmincorr[0,...] # [year x lat x lon x (ens) x thres]
 
 #%% Debugging plot for testing the re-emergence detection
 
@@ -345,7 +345,7 @@ integr_ac_cesm = 1 + 2 * np.trapz(acmax_cesm**2,x=lags,axis=-1) # [lon x lat x (
 #%% Compute REM-Index for CESM
 
 cesm_maxmincorr,maxids,minids = proc.calc_remidx_simple(cesm_acs,rkmonth,monthdim=3,lagdim=-1,debug=True)
-cesm_remidx                   = cesm_maxmincorr[1,...] - cesm_maxmincorr[0,...]
+cesm_remidx                   = cesm_maxmincorr[1,...] - cesm_maxmincorr[0,...] # [year lat lon model thres]
 
 
 #%% Rename variables for ease
@@ -1324,7 +1324,62 @@ for yr in range(5):
                                                                        t2names[modelsel[0]],
                                                                        t2names[modelsel[1]],yr)
     plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+#%% Same as above, but differencing warm vs. cold anomalies for the selected model
+# For Thesis Committee Meeting 8/17/2022
+
+bboxplot = [-80,0,0,65]
+modelsel = 1
+#thres   = 2
+imon     = 1
+yr       = 0
+
+for yr in range(5):
+    clvls = np.arange(-.5,.55,.05)
+    fig,axs = plt.subplots(1,3,subplot_kw={'projection':ccrs.PlateCarree()},
+                           constrained_layout=True,figsize=(16,6))
     
+    for a in range(3):
+        
+        ax = axs.flatten()[a]
+        
+        blabel = [0,0,0,1]
+        if (a == 0):
+            blabel[0] = 1
+        ax = viz.add_coast_grid(ax,bbox=bboxplot,blabels=blabel,
+                                fill_color="gray",ignore_error=True)
+        
+        if a <2:
+            plotvar = remidxall[yr,:,:,modelsel,a]
+            cmap    = 'inferno'
+            clvls   = np.arange(0,0.55,0.05)
+            cblbl   = "RE Index (Max - Min Correlation)"
+            title   = "%s" % threslabs[a]
+        elif a == 2:
+            plotvar = remidxall[yr,:,:,modelsel,1] - remidxall[yr,:,:,modelsel,0]
+            cmap    = 'cmo.balance'
+            clvls   = np.arange(-.4,.45,.05)
+            cblbl   = "Difference In RE Index"
+            title   = "Difference (Warm - Cold)"
+        
+        cf = ax.pcolormesh(lon,lat,plotvar.T,cmap=cmap,vmin=clvls[0],vmax=clvls[-1])
+        cl = ax.contour(lon,lat,plotvar.T,levels=clvls,colors="k",linewidths=0.5)
+        ax.clabel(cl,fontsize=10)
+        ax.set_title(title)
+        
+        if a == 1:
+            cb = fig.colorbar(cf,ax=axs[:2].flatten(),orientation='horizontal',fraction=0.035,pad=0.01)
+            cb.set_label(cblbl)
+        elif a == 2:
+            cb = fig.colorbar(cf,ax=ax,orientation='horizontal',fraction=0.035,pad=0.01)
+            cb.set_label(cblbl)
+    
+    plt.suptitle("%s Year %i Re-emergence Index (%s)" % (mons3[rkmonth],yr+1,t2names[modelsel]),y=.95)
+    savename = "%sREMIdx_Intercomparison_mon%02i_PosNeg_%s_Y%i.png" % (figpath,rkmonth+1,
+                                                                       t2names[modelsel],yr)
+    plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+
     
 #%% Try to figure out the year of the last re-emergence
 
