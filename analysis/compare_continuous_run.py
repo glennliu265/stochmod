@@ -428,6 +428,22 @@ cb.set_label("AMV Pattern ($\degree C \, \sigma_{AMV}^{-1}$)")
 savename = "%sAMV_Patterns_HFF_Ablation_%s.png" % (figpath,expset)
 plt.savefig(savename, dpi=150, bbox_inches='tight')
 
+
+#%% Experiment 2 (ENSO removal): Load CESM NO ENSO + ENSO Data
+
+fn = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_output/../SSTreg_ENSOnoENSO_CESM-FULL_lon-40to-10_lat20to40.npz"
+ld = np.load(fn,allow_pickle=True)
+
+rssts_full = ld['rssts']
+cesm_full_noenso = rssts_full[0]
+# (ENsO Removed, ENSO Retained)
+
+
+# Compute Spectra Quickly
+specs,freqs,CCs,dofs,r1s = scm.quick_spectrum([cesm_full_noenso,],[nsmooth[3+i],],pct)
+spec_noenso = specs[0]
+freqs_noenso = freqs[0]
+
 #%% Experiment 2, plot spectra for the selected region
 
 
@@ -438,25 +454,25 @@ fig,ax = plt.subplots(1,1,figsize=(8,5))
 
 plotspecs = (rspectra[0][1],rspectra[1][1],
              rspectra[0][2],rspectra[1][2],
-             cspecs[1]
+             cspecs[1],spec_noenso
              )
 plotssts       = (sst_regs[0][1,:],sst_regs[1][1,:],
               sst_regs[0][2,:],sst_regs[1][2,:],
-              crssts[1]
+              crssts[1],cesm_full_noenso,
               )
 
 specnames = ("Vary h (ENSO removed)","Vary h",
              "Entraining (ENSO removed)","Entraining",
-             "CESM-FULL")
+             "CESM-FULL","CESM-FULL (ENSO removed)")
 speccolors = ("magenta","magenta",
               "orange","orange",
-              "k")
+              "k","k")
 specls     = ("solid","dashed",
               "solid","dashed",
-              "solid"
+              "solid","dashed",
               )
 
-lws         = (1,1.5,1,1.5,1,)
+lws         = (1,1.5,1,1.5,1,1.5)
 
 
 smspec     = rfreqs[0][0]
@@ -465,9 +481,10 @@ cspec      = cfreqs[1]
 
 nspecs = len(plotspecs)
 for n in range(nspecs):
-    if n < nspecs-1:
-        
+    if n < nspecs-2:
         plotfreq = smspec * dtplot
+    elif n == nspecs-1:
+        plotfreq = freqs_noenso *dtplot
     else:
         plotfreq = cspec * dtplot
     
@@ -491,7 +508,11 @@ ax2.set_xticklabels(xper)
 ax2.grid(True,ls='dotted',color='gray')
 ax2.set_xlabel("Period (Years)")
 
-ax.set_title("ENSO Removal Effect from Heat Flux Feedback in %s" % (bboxname))
+
+ax.axvline([0.27])
+ax.axvline([1/8])
+
+ax.set_title("ENSO Removal Effect from Heat Flux Feedback Estimates in %s" % (bboxname))
 plt.savefig("%sENSO_comparison_%s.png" % (figpath,bboxname),dpi=150)
 
 
