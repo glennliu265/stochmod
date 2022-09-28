@@ -8,10 +8,13 @@ Support separate calculation for warm and cold anomalies
 Based on postprocess_autocorrelation.py
 Uses data preprocessed by reemergence/preprocess_data.py
 
+Threshold variables also processed via preprocess_data.py
+
 Created on Thu Mar 17 17:09:18 2022
 
 @author: gliu
 """
+
 import sys
 import time
 import numpy as np
@@ -33,7 +36,7 @@ thresholds  = [0,] # Standard Deviations
 conf        = 0.95
 tails       = 2
 
-mconfig    = "SM_Qek"#"HadISST" #["PIC-FULL","HTR-FULL","PIC_SLAB","HadISST","ERSST"]
+mconfig    = "PIC-FULL"#"HadISST" #["PIC-FULL","HTR-FULL","PIC_SLAB","HadISST","ERSST"]
 runid      = 9
 thresholds = [0,]
 thresname  = "thres" + "to".join(["%i" % i for i in thresholds])
@@ -43,6 +46,17 @@ varname    = "SST" # ["TS","SSS","SST]
 loadmask   = False #"/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/model_input/limask180_FULL-HTR.npy"
 glonpath   = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/model_input/CESM1_lon180.npy"
 glatpath   = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/model_input/CESM1_lat.npy"
+
+# Load another variable to compare thresholds (might need to manually correct)
+thresvar      = True #
+thresvar_name = "HMXL"  
+thresvar_path = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/thresholdvar/HMXL_FULL_PIC_lon-80to0_lat0to65_DTNone.nc"
+if thresvar is True:
+    loadvar = xr.open_dataset(thresvar_path)
+    loadvar = loadvar[thresvar_name].values.squeeze() # [time x lat x lon]
+    
+    # Adjust dimensions to [lon x lat x time x (otherdims)]
+    loadvar = loadvar.transpose(2,1,0)#[...,None]
 
 # Plotting Params
 # ---------------
@@ -83,7 +97,7 @@ else:
     
     
     # Output Paths
-    figpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220325/'
+    figpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220930/'
     outpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/'
     
 # Import modules
@@ -120,8 +134,6 @@ elif mconfig == "HadISST":
     mnames     = ["HadISST",]
 elif mconfig == "ERSST":
     fnames = ["ERSST_detrend2_startyr1900_endyr2016.npz"]
-    
-    
 
 # Set Output Directory
 # --------------------
@@ -129,6 +141,8 @@ proc.makedir(figpath)
 savename   = "%s%s_%s_autocorrelation_%s_%s.npz" %  (outpath,mconfig,varname,thresname,lagname)
 if "SM" in mconfig:
     savename = proc.addstrtoext(savename,"_runid2%02i" % (runid))
+if thresvar is True:
+    savename = proc.addstrtoext(savename,"_thresvar%s" % (thresvar_name))
 
 print("Output will save to %s" % savename)
 
@@ -229,6 +243,7 @@ Inputs are:
     3) lat      [lat]
     4) thresholds [Numeric] (Standard Deviations)
     5) savename [str] Full path to output file
+    6) loadvar(optional) [lon x lat x time x otherdims] (thresholding variable)
     
 """
 # First things first, combine lat/lon/otherdims, remove nan points
@@ -254,11 +269,20 @@ nthres          = len(thresholds)
 sstrs                = sst.reshape(npts,ntime)
 if varname == "SSS":
     sstrs[:,219]     = 0 # There is something wrong with this timestep?
-sst_valid,knan,okpts = proc.find_nan(sstrs,1) # [finepoints,time]
+if thresvar: # Only analyze where both threshold variable and target var are non-NaN
+    loadvarrs = loadvar.reshape(npts,ntime)
+    sst_valid,knan,okpts = proc.find_nan(sstrs*loadvarrs,1) # [finepoints,time]
+else:
+    sst_valid,knan,okpts = proc.find_nan(sstrs,1) # [finepoints,time]
 npts_valid           = sst_valid.shape[0] 
+
 
 # Split to Year x Month
 sst_valid = sst_valid.reshape(npts_valid,nyr,12)
+if thresvar: # Select non-NaN points for thresholding variable
+    loadvar_valid = loadvarrs[okpts,:]
+    loadvar_valid = loadvar_valid.reshape(npts_valid,nyr,12)
+
 
 # Preallocate (nthres + 1 (for all thresholds), and last is all data)
 class_count = np.zeros((npts_valid,12,nthres+2)) # [pt x eventmonth x threshold]
@@ -272,7 +296,11 @@ for im in range(12):
     
     # For that month, determine which years fall into which thresholds [pts,years]
     sst_mon = sst_valid[:,:,im] # [pts x yr]
-    sst_mon_classes = proc.make_classes_nd(sst_mon,thresholds,dim=1,debug=False)
+    if thresvar:
+        loadvar_mon = loadvar_valid[:,:,im]
+        sst_mon_classes = proc.make_classes_nd(loadvar_mon,thresholds,dim=1,debug=False)
+    else:
+        sst_mon_classes = proc.make_classes_nd(sst_mon,thresholds,dim=1,debug=False)
     
     for th in range(nthres+2): # Loop for each threshold
     
