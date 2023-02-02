@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-
-Examine ENSO-removal in the Tropical Atlantic
-
-
 "Was there incomplete removal of ENSO in the CESM-FULL simulations?"
+
+Examine ENSO-removal in the Tropical Atlantic (or any other region)
+
+Examine differences at a point, or regionally-averaged SST
+Save output to visualize with other scripts.
+
 
 Created on Thu Feb 24 21:37:26 2022
 
@@ -30,7 +32,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20220225/"
+    figpath     = projpath + "02_Figures/20220822/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -211,6 +213,67 @@ for i in range(2):
 
 ax.legend()
 plt.savefig("%sSST_Autocorrelation_ENSO_Removal_%s.png"% (figpath,flocstring),dpi=100)
+
+
+#%% Compare the spectra over a particular region
+# Made to answer reviewer comments in Revision 1 of SM Paper
+
+# Set up the variables
+bbox_ST_e   = [-40,-10,20,40]
+bb_sel = bbox_ST_e
+invars     = [ts_noenso,tsa_enso.reshape(1801*12,192,288)]
+vnames      = ["CESM-FULL (ENSO removed)","CESM-FULL"]
+
+
+# Flip longitude to degrees West and lon x lat x time
+invars180 = [proc.lon360to180(lon,v.transpose(2,1,0))[1] for v in invars]
+lon180,_ = proc.lon360to180(lon,np.zeros((288,192,1)))
+
+# Select Region
+rssts = [proc.sel_region(v,lon180,lat,bb_sel,reg_avg=1,awgt=1) for v in invars180]
+
+
+# Calculate Spectra
+nsmooth  = 100
+pct      = 0.10
+nsmooths = np.ones(2) * nsmooth 
+specs,freqs,CCs,dofs,r1s = scm.quick_spectrum(rssts,nsmooths,pct,verbose=False)
+
+
+#%% Plot Spectra with differences
+dtplot = 3600*24*365
+xtks   = [1/100,1/50,1/25,1/10,1/5,1/2,1/1]
+xper   = [int(1/x) for x in xtks]
+
+fig,ax = plt.subplots(1,1,figsize=(12,6))
+
+for i in range(2):
+    ax.plot(freqs[i]*dtplot,specs[i]/dtplot,label=vnames[i])
+
+ax.set_xlim([xtks[0],xtks[-1]])
+ax.set_xlabel("Period (Years)")
+ax.set_ylabel("Power ($K^2 cpy^{-1}$)")
+ax.grid(True)
+ax.legend()
+
+ax2 = ax.twiny()
+ax2.set_xlim([xtks[0],xtks[-1]])
+ax2.set_xticks(xtks)
+ax2.set_xticklabels(xper)
+ax2.grid(True,ls='dotted',color='gray')
+ax2.set_xlabel("Period (Years)")
+
+#%% Save SSTs for comparison with ENSO removal experiments
+locfn,_ = proc.make_locstring_bbox(bb_sel)
+outfn   = "%s../SSTreg_ENSOnoENSO_CESM-FULL_%s.npz" % (datpath,locfn)
+np.savez(outfn,**{
+        'rssts':rssts,
+        'bbox' : bb_sel,
+        'vnames': vnames,
+        }
+         )
+
+
 
 
 
