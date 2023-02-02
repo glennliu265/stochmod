@@ -63,6 +63,8 @@ if thresvar is True:
 colors   = ['b','r','k']
 bboxplot = [-80,0,0,60]
 bboxlim  = [-80,0,0,65]
+
+debug = False # Debug section below script (set to True to run)
 #%% Set Paths for Input (need to update to generalize for variable name)
 
 if stormtrack:
@@ -271,7 +273,9 @@ if varname == "SSS":
     sstrs[:,219]     = 0 # There is something wrong with this timestep?
 if thresvar: # Only analyze where both threshold variable and target var are non-NaN
     loadvarrs = loadvar.reshape(npts,ntime)
-    sst_valid,knan,okpts = proc.find_nan(sstrs*loadvarrs,1) # [finepoints,time]
+    _,knan,okpts = proc.find_nan(sstrs*loadvarrs,1) # [finepoints,time]
+    sst_valid     = sstrs[okpts,:]
+    loadvar_valid = loadvarrs[okpts,:]
 else:
     sst_valid,knan,okpts = proc.find_nan(sstrs,1) # [finepoints,time]
 npts_valid           = sst_valid.shape[0] 
@@ -280,9 +284,7 @@ npts_valid           = sst_valid.shape[0]
 # Split to Year x Month
 sst_valid = sst_valid.reshape(npts_valid,nyr,12)
 if thresvar: # Select non-NaN points for thresholding variable
-    loadvar_valid = loadvarrs[okpts,:]
     loadvar_valid = loadvar_valid.reshape(npts_valid,nyr,12)
-
 
 # Preallocate (nthres + 1 (for all thresholds), and last is all data)
 class_count = np.zeros((npts_valid,12,nthres+2)) # [pt x eventmonth x threshold]
@@ -292,7 +294,7 @@ sst_cfs     = np.zeros((npts_valid,12,nthres+2,nlags,2))  # [pt x eventmonth x t
 # A pretty ugly loop....
 # Now loop for each month
 for im in range(12):
-    print(im)
+    #print(im)
     
     # For that month, determine which years fall into which thresholds [pts,years]
     sst_mon = sst_valid[:,:,im] # [pts x yr]
@@ -401,3 +403,49 @@ np.savez(savename,**{
 
 print("Script ran in %.2fs!"%(time.time()-st))
 print("Output saved to %s."% (savename))
+
+
+#%% Debugging Corner
+
+if debug:
+    
+    """
+    Section one, examine subsetting at a point...
+    """
+    nlon = len(lon)
+    nlat = len(lat)
+    kpt  = np.ravel_multi_index(np.array(([40],[53])),(nlon,nlat))
+    
+    
+    # Get Point Variable and reshape to yr x mon
+    sstpt  = sstrs[kpt,:]
+    mldpt  = loadvarrs[kpt,:]
+    sst_in = sstpt.reshape(int(sstpt.shape[1]/12),12) # []
+    mld_in = mldpt.reshape(sst_in.shape)
+    
+    # Calculate autocorrelation (no mask)
+    acs    = proc.calc_lagcovar(sst_in.T,sst_in.T,lags,im+1,0,yr_mask=None,debug=False)
+    plt.plot(acs)
+    
+    # Calculate autocorrelation with mask
+    loadvar_mon = loadvar_valid[:,:,im]
+    sst_mon     = sst_valid[:,:,im]
+    
+    sst_class = proc.make_classes_nd(sst_mon,thresholds,dim=1,debug=False)[kpt,:]
+    mld_class = proc.make_classes_nd(loadvar_mon,thresholds,dim=1,debug=False)[kpt,:]
+    
+    mask_sst     = np.where(sst_class.squeeze() == th)[0] # Indices of valid years
+    mask_mld     = np.where(mld_class.squeeze() == th)[0] # Indices of valid years
+    
+    acs_sst,yr_count_sst = proc.calc_lagcovar(sst_in.T,sst_in.T,lags,im+1,0,yr_mask=mask_sst,debug=False)
+    acs_mld,yr_count_mld = proc.calc_lagcovar(sst_in.T,sst_in.T,lags,im+1,0,yr_mask=mask_mld,debug=False)
+    
+    fig,ax=plt.subplots(1,1)
+    ax.plot(lags,acs_sst,label="SST Threshold, count=%i" % yr_count_sst,color='k')
+    ax.plot(lags,acs_mld,label="MLD Threshold, count=%i" % yr_count_mld,color='b')
+    ax.legend()
+    
+    fig,ax = plt.subplots(1,1)
+    ax.plot(sst_in_actual[0,:],label="actual SST")
+    ax.plot(sst_in[:,0])
+    ax.legend()
