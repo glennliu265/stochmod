@@ -45,6 +45,8 @@ thresholds = [0,]
 thresname  = "thres" + "to".join(["%i" % i for i in thresholds])
 varname    = "SST" #"SST"
 
+thresvar      = True #
+thresvar_name = "HMXL"
 
 
 # Set Output Directory
@@ -55,6 +57,8 @@ outpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergen
 savename   = "%s%s_%s_autocorrelation_%s_%s.npz" %  (outpath,mconfig,varname,thresname,lagname)
 if "SM" in mconfig:
     savename = proc.addstrtoext(savename,"_runid2%02i" % (runid))
+if thresvar is True:
+    savename = proc.addstrtoext(savename,"_thresvar%s" % (thresvar_name))
 print("Loading the following dataset: %s" % savename)
 
 
@@ -120,7 +124,7 @@ print("Data loaded in %.2fs"% (time.time()-st))
 # Select a Point
 lonf   = -30
 latf   = 50
-kmonth = 6
+kmonth = 1
 imodel = 2
 
 # Set xticks
@@ -165,7 +169,7 @@ else:
         # ---------------------------
         cnt = count_final[klon,klat,kmonth,th]
         ac_conf = proc.calc_conflag(acs_final[klon,klat,kmonth,th,:],conf,tails,cnt)
-        ax.fill_between(lags,ac_conf[:,0],ac_conf[:,1],color=colors[th],alpha=0.25,zorder=1)
+        ax.fill_between(lags,ac_conf[:,0],ac_conf[:,1],color=colors[th],alpha=0.25,zorder=1,label="")
         
         #ax.plot(lags,acs_final[klon,klat,kmonth,0,:,kmonth],label="Cold Anomalies (%i)" % (count_final[klon,klat,kmonth,0]),color='b')
         #ax.plot(lags,acs_final[klon,klat,kmonth,1,:,kmonth],label="Warm Anomalies (%i)" % (count_final[klon,klat,kmonth,th]),color='r')
@@ -173,8 +177,8 @@ else:
     
 ax.set_xticks(xtk2,labels=xtk_lbl)
 ax.set_xlim([xtk2[0],xtk2[-1]])
-ax.set_ylabel()
-ax.legend("Correlation")
+ax.set_ylabel("Correlation")
+ax.legend()
 plt.savefig("%sAutocorrelation_WarmCold_%s_%s_month%i.png"% (figpath,mconfig,locstr,kmonth+1),dpi=150)
 
 #%% Contour the Autocorrelation (Similar to in Park et al. 2006)

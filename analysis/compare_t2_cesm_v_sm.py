@@ -42,7 +42,7 @@ runid       = 3
 allruns     = True # Set to True to load all runs, then avg.
 thresholds = [0,]
 thresname  = "thres" + "to".join(["%i" % i for i in thresholds])
-varname    = "SST" #"SST"
+varname    = "SSS" #"SST"
 
 # Set Output Directory
 # --------------------
