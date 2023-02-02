@@ -3,6 +3,9 @@
 """
 Created on Wed Aug 19 11:22:46 2020
 
+20220927: Appears to be a plot for NAO/EAP for CESM1-LE. Still works though
+there seems to be some errors with the axes, etc.
+
 @author: gliu
 """
 
@@ -34,7 +37,7 @@ from cartopy.util import add_cyclic_point
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath = projpath + '03_Scripts/stochmod/'
 datpath = projpath + '01_Data/'
-outpath = projpath + '02_Figures/20200823/'
+outpath = projpath + '02_Figures/20220927/'
 naotype = 0
 # File Name
 datfile = "NAO_Monthly_Regression_PC123_naotype%i.npz" % naotype

@@ -76,7 +76,7 @@ def preprocess(ds,varkeep):
     # Correct time issue (model should start on January, but time is expressed as "days since...")
     if ds.time.values[0].month != 1:
         startyr = str(ds.time.values[0].year)
-        correctedtime = xr.cftime_range(start=startyr,end="2005-12-31",freq="MS",calendar="noleap") 
+        correctedtime = xr.cftime_range(start=startyr,end="2005-12-31",freq="MS",calendar="noleap",) 
         ds = ds.assign_coords(time=correctedtime) 
         print("\tCorrected Start to: %s; End to: %s" %  (str(ds.time.values[0]),str(ds.time.values[-1])))
     

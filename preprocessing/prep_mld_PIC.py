@@ -23,7 +23,7 @@ import xesmf as xe
 
 #%% User Edits
 
-varname       = "SST" # "HMXL"
+varname       = "BSF" # "HMXL"
 mconfig       = "FULL_HTR" # [FULL_PIC, SLAB_PIC, FULL_HTR]
 
 use_xesmf     = True # Use xESMF for regridding. False = box average

@@ -15,7 +15,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 #%%
-
 # # Regional Analysis Settings (NEW, with STG Split)
 # Regional Analysis Settings
 bbox_SP     = [-60,-15,40,65]
