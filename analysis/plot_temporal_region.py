@@ -30,7 +30,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20220824/"
+    figpath     = projpath + "02_Figures/20220830/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -79,7 +79,7 @@ else:
 lags = np.arange(0,37,1)
 
 # Set the Visualization mode
-darkmode   = False
+darkmode   = True
 if darkmode:
     plt.style.use("dark_background")
     dfcol = "w"
@@ -403,8 +403,6 @@ for rid in range(len(regions)):
         print("Variance for region %s, model %s is %f" % (regions[rid],cesmname[model],sstvar))
         sstvarscesm[rid,model]   = sstvar
 #%% Do some spectral analysis
-
-
 
 ssmooth    = 30        # Stochastic Model Smoothing
 cnsmooths  = [100,100] # CESM1 Smoothing
@@ -894,6 +892,7 @@ for i in range(len(rids)):
         conf_in = None
     
     #speclabels = ["%s (%.3f $^{\circ}C^2$)" % (specnames[i],sstvarall[rid][i]) for i in range(len(insst)) ]
+    nspecs = len(specsall[rid])
     speclabels=["" for i in range(nspecs)]
     
     if plotlog:
@@ -980,6 +979,135 @@ if pubready:
 else:
     plt.savefig("%sRegional_Autocorrelation_Spectra%s.png"%(figpath,smoothname),
                 dpi=200,transparent=False)
+
+#%% Presentation for Model Hierarchies: Plot Each Region Separately
+
+rids = [0, 6, 5]
+
+nspecs = len(rids)
+
+
+if darkmode:
+    if "k" in speccolors:
+        speccolors[speccolors.index('k')] = 'w'
+
+
+sp_id = 0
+# Plot the power spectra (bottom row)
+for i in range(len(rids)+1):
+    
+    fig,ax = plt.subplots(1,1,figsize=(8,3),constrained_layout=True)
+    
+    #ax  = axs[1,i]
+    
+    if i == len(rids):
+        rid = order[-1]
+        legendflag = True
+    else:
+        rid = order[i]
+        legendflag = False
+    
+    if plotar1:
+        conf_in = Cfsall[rid]
+    else:
+        conf_in = None
+    
+    #speclabels = ["%s (%.3f $^{\circ}C^2$)" % (specnames[i],sstvarall[rid][i]) for i in range(len(insst)) ]
+    nspecs = len(specsall[rid])
+    speclabels= specnames
+    
+    
+    if legendflag:
+        
+        plotnames  = ("Non-Entraining","Entraining","CESM-FULL")
+        plotcolors = ('magenta','orange','w')
+        for n in range(3):
+            ax.plot(0,0,color=plotcolors[n],label=plotnames[n])
+        ax.legend(ncol=3,fontsize=12)
+        
+    else:
+        
+        if plotlog:
+            ax,ax2 = viz.plot_freqlog(specsall[rid],freqsall[rid],speclabels,speccolors,lw=alw,
+                                 ax=ax,plottitle=regionlong[rid],
+                                 xlm=xlm,xtick=yrticks,return_ax2=True,
+                                 plotids=plotidspec,legend=False,usegrid=usegrid)
+        else:
+                
+            
+            ax,ax2 = viz.plot_freqlin(specsall[rid],freqsall[rid],speclabels,speccolors,lw=alw,
+                                 ax=ax,plottitle=regionlong[rid],plotconf=conf_in,
+                                 xlm=xlm,xtick=yrticks,return_ax2=True,
+                                 plotids=plotidspec,legend=legendflag,linearx=linearx,usegrid=usegrid)
+    
+            
+        # Turn off title and second axis labels
+        if periodx: # Switch Frequency with Period for x-axis.
+            ax2.set_xlabel("")
+            sxtk2 = ax2.get_xticklabels()
+            xtk2new = np.repeat("",len(sxtk2))
+            ax2.set_xticklabels(sxtk2new)
+            ax.set_xticklabels(1/xtks)
+            
+            # Move period labels to ax1
+            ax.set_xticklabels(xper)
+            ax.set_xlabel("Period (Years)")
+        else:
+            if i == 1:
+                ax2.set_xlabel("Period (Years)")
+        
+        
+        #ax.grid(False,ls='dotted',alpha=0.5)
+        
+        # Set Rotation of Period Labels
+        if plotlog is False:
+            rotation  =0
+            xfontsize =8
+        else:
+            rotation  =0
+            xfontsize =8
+        
+        if periodx:
+            plt.setp(ax.get_xticklabels(), rotation=rotation,fontsize=xfontsize)
+        else:
+            plt.setp(ax2.get_xticklabels(), rotation=rotation,fontsize=xfontsize)
+        
+        if useC:
+            ax.set_ylabel("Power Spectrum ($\degree C^2 /cpy$)",fontsize=axisfs)
+        else:
+            ax.set_ylabel("Power Spectrum ($K^2 /cpy$)",fontsize=axisfs)
+                
+        if i == 0:# Turn off y label except for leftmost plot
+    
+            ax.set_ylim(specylim_spg)
+        else:
+    
+            ax.set_ylim(specylim_stg)
+            
+            
+        if plotlog:
+            ax.set_ylim([1e-2,1e0])
+            
+        ax.set_title(title,color=bbcol[rid],fontsize=16,fontweight="bold")
+        ax.set_xlabel("Frequency (Cycles/Year)",fontsize=axisfs)
+        ax2.set_xlabel("Period (Years)",fontsize=axisfs)
+    
+        #title = "%s Power Spectra" % (regions[rid])
+        #title = ""
+        #ax.set_title(region[rid],color=bbcol[rid],fontsize=12)
+        
+        ax = viz.label_sp(sp_id,fontsize=14,fig=fig,labelstyle="(%s)",case='lower',alpha=0.7)
+        sp_id += 1
+        
+    if legendflag:
+        plt.savefig("%sRegional_Autocorrelation_Spectra%s_%s_legend.png"%(figpath,smoothname,regions[rid]),
+                    dpi=200,transparent=False)
+
+    else:
+        plt.savefig("%sRegional_Autocorrelation_Spectra%s_%s.png"%(figpath,smoothname,regions[rid]),
+                    dpi=200,transparent=False)
+
+plt.tight_layout()
 
 #%% Plot the North Atlantic Power Spectra
 
@@ -1083,6 +1211,8 @@ See viz_inputs_point for the updated script, which uses the continuous AMV
 Pattern!
 """
 
+pointonly = False
+
 cid      = 0
 rids     = [0,6,5,]
 bboxtemp = [-85,-5,15,68]
@@ -1107,31 +1237,39 @@ ax = viz.add_coast_grid(ax,bboxtemp,fill_color='gray',ignore_error=True,fix_lon=
 if plotamv:
     pcm = ax.contourf(long,latg,cesmpat[4][0].T,cmap='cmo.balance',levels=cint)
 fig.patch.set_alpha(1)  # solution
+ax.plot(-30,50,marker="*",color='yellow',markersize=7.5,markeredgecolor='k',markeredgewidth=.4)
+if pointonly: # Just plot the point
 
-# # Plot the amv pattern
-props = dict(boxstyle='square', facecolor='white', alpha=0.8)
-
-# Add text and background highlights
-txtspg  = ax.text(-38,50,"SPG",ha='center',fontsize=15,weight='bold') 
-txtstgw = ax.text(-60,27,"STGw",ha='center',fontsize=15,weight='bold') 
-txtstge = ax.text(-25,27,"STGe",ha='center',fontsize=15,weight='bold') 
-for txt in [txtspg,txtstgw,txtstge]:
-    txt.set_path_effects([PathEffects.withStroke(linewidth=2.5, foreground='w')])
-
-# First Plot Solid lines below
-for bb in rids:
-    ax,ll = viz.plot_box(bboxes[bb],ax=ax,leglab=regions[bb],
-                          color=bbcol[bb],linestyle="solid",linewidth=3,return_line=True)
-
-# Then plot dashed lines above
-ls = []
-for bb in rids:
     
-    ax,ll = viz.plot_box(bboxes[bb],ax=ax,leglab=regions[bb],
-                          color=bbcol[bb],linestyle="dotted",linewidth=3,return_line=True)
-    ls.append(ll)
 
-plt.savefig("%sRegional_BBOX_Locator.png"%figpath,dpi=100,bbox_inches='tight',transparent=True)
+    plt.savefig("%sRegional_BBOX_Locator_pointonly.png"%figpath,dpi=100,bbox_inches='tight',transparent=True)
+else:
+    
+    # # Plot the amv pattern
+    props = dict(boxstyle='square', facecolor='white', alpha=0.8)
+    
+    # Add text and background highlights
+    txtspg  = ax.text(-38,50,"SPG",ha='center',fontsize=15,weight='bold',color="k") 
+    txtstgw = ax.text(-60,27,"STGw",ha='center',fontsize=15,weight='bold',color="k") 
+    txtstge = ax.text(-25,27,"STGe",ha='center',fontsize=15,weight='bold',color="k") 
+    for txt in [txtspg,txtstgw,txtstge]:
+        txt.set_path_effects([PathEffects.withStroke(linewidth=2.5, foreground='w')])
+    
+    # First Plot Solid lines below
+    for bb in rids:
+        ax,ll = viz.plot_box(bboxes[bb],ax=ax,leglab=regions[bb],
+                              color=bbcol[bb],linestyle="solid",linewidth=3,return_line=True)
+    
+    # Then plot dashed lines above
+    ls = []
+    for bb in rids:
+        
+        ax,ll = viz.plot_box(bboxes[bb],ax=ax,leglab=regions[bb],
+                              color=bbcol[bb],linestyle="dotted",linewidth=3,return_line=True)
+        ls.append(ll)
+    
+    
+        plt.savefig("%sRegional_BBOX_Locator.png"%figpath,dpi=100,bbox_inches='tight',transparent=True)
 
 #%% Plot ratios of SLAB and FULL
 
