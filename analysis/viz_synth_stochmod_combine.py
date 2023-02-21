@@ -35,7 +35,7 @@ projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 datpath     = projpath + '01_Data/'
 input_path  = datpath + 'model_input/'
 output_path = datpath + 'model_output/'
-outpath     = projpath + '02_Figures/20220824/'
+outpath     = projpath + '02_Figures/20230220/'
 proc.makedir(outpath)
 
 pubready   = True
@@ -99,7 +99,7 @@ config.pop('mldpt',None)
 
 
 # Plotting Mode
-darkmode = False
+darkmode = True
 if darkmode:
     plt.style.use("dark_background")
     dfcol = "w"
@@ -824,6 +824,7 @@ sepentrain = False  # Separate entrain/non-entraining models
 sepfig     = True
 #includevar = False # Include Variance in Legend
 lower_focus = True # Set to true to include specific lines for this particular plot 
+plotslab    = True # Set to true to plot slab
 
 if sepentrain:
     plotids = [[0,1,2,3,8,5],
@@ -842,7 +843,10 @@ else:
                    [5,6,7]
                    ]
 
-plotids = [[7,8],[7,8,3],[7,8,3,5],[7,8,5,6]]
+if plotslab:
+    plotids = [[7,8],[7,8,3],[7,8,3,5],[7,8,5,6]]
+else:
+    plotids = [[7,3],[7,5],[7,5,6]]
 
 if notitle:
     titles = ["",""]
@@ -888,7 +892,7 @@ for i in range(len(plotids)):
     xtk2new = np.repeat("",len(xtk2))
     ax2.set_xticklabels(xtk2new)
     
-    ax.set_xticklabels(1/xtks)
+    ax.set_xticklabels(1/np.array(xtks))
     
     ax.set_xlabel('Period (Years)',fontsize=12)
     ax.set_ylabel("Power ($K^2/cpy$)")
