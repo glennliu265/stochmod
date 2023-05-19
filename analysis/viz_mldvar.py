@@ -32,7 +32,7 @@ importlib.reload(viz)
 
 # Paths
 datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/CESM_proc/"
-figpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220629/"
+figpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20230519/"
 proc.makedir(figpath)
 ncname = "HMXL_FULL_PIC_bilinear.nc"
 
@@ -44,8 +44,7 @@ bbox           = [-100,20,0,75]
 bboxplot       = [-80,0,0,67]
 
 #%% Load the data in...
-ds = xr.open_dataset(datpath+ncname)
-
+ds    = xr.open_dataset(datpath+ncname).load()
 lon   = ds.lon.values
 lat   = ds.lat.values
 mld   = ds.HMXL.values
@@ -55,7 +54,6 @@ times = ds.time.values
 
 #%%
 
-
 varr,lonr,latr = proc.sel_region(mld.transpose(2,1,0),lon,lat,bbox) # [lon x lat x time]
 
 nlon,nlat,ntime = varr.shape
@@ -63,6 +61,212 @@ nyr             = int(ntime/12)
 varr            = varr.reshape(nlon,nlat,nyr,12)
 
 stdvar          = np.std(varr,2)
+
+scycle          = varr.mean(2)
+
+
+#%% Look at the wintertime variability
+
+# Get the winter component
+varr_winter = varr[:,:,:,[10,11,0]].reshape(nlon,nlat,nyr*3)
+
+# Compute wintertime standard deivation
+stdvar_winter = np.std(stdvar,2)
+
+
+#%%
+
+plotvar = stdvar_winter[:,:].T/100
+vlms          = [0,300]
+clins         = np.arange(100,1100,100)
+plot_bbox_spg = [-65,-5,42,68]
+
+fig,ax   = plt.subplots(1,1,constrained_layout=True,
+                       subplot_kw={'projection': ccrs.PlateCarree()},figsize=(8,4))
+ax       = viz.add_coast_grid(ax,bbox=plot_bbox_spg,fill_color="gray")
+pcm      = ax.pcolormesh(lonr,latr,plotvar,cmap="cmo.deep",vmin=vlms[0],vmax=vlms[1])
+cl= ax.contour(lonr,latr,plotvar,levels=clins,linewidths=0.5,colors="w")
+ax.clabel(cl)
+fig.colorbar(pcm,ax=ax,fraction=0.021,pad=0.01)
+ax.set_title("1$\sigma$ Wintertime Mean MLD (m)")
+savename = "%sCESM1_PIC_Mean_wintertime_mld.png" % (figpath)
+plt.savefig(savename,dpi=150,bbox_inches="tight")
+
+#%% Multi Panel Wintertime Mean
+plot_months = [9,10,11,0,1,2,3,4]
+
+vlms          = [0,500]
+clins         = np.arange(100,1100,100)
+
+fig,axs     = plt.subplots(4,2,constrained_layout=True,
+                       subplot_kw={'projection': ccrs.PlateCarree()},figsize=(12,12))
+
+for ia in range(len(plot_months)):
+    
+    ax = axs.flatten()[ia]
+    im = plot_months[ia]
+    plotvar= stdvar[:,:,im].T/100
+    
+    blabel = [0,0,0,0]
+    if ia%2 == 0:
+        blabel[0] = 1
+    if ia>5:
+        blabel[-1]=1
+    
+    ax       = viz.add_coast_grid(ax,bbox=plot_bbox_spg,fill_color="gray",blabels=blabel)
+    pcm      = ax.pcolormesh(lonr,latr,plotvar,cmap="cmo.deep",vmin=vlms[0],vmax=vlms[1])
+    cl= ax.contour(lonr,latr,plotvar,levels=clins,linewidths=0.5,colors="w")
+    ax.clabel(cl)
+    
+    #ax.set_title("Month %i" % (im+1))
+    ax = viz.label_sp(mons3[im],ax=ax,alpha=0.95,labelstyle="%s",usenumber=True,fontsize=14)
+    
+cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction=0.035,pad=0.01)
+cb.set_label("$1\sigma$ Mixed Layer Depth (m)")
+    
+
+
+savename = "%sInterannMLDVar_selected_months_%ito%i.png" % (figpath,plot_months[0],plot_months[-1])
+plt.savefig(savename,dpi=150,bbox_inches="tight")
+
+
+#%% Look at the standard variation versus the seasonal cycle
+
+# Get the maximum interannual variable and month for each point
+stdvar_max     = np.nanmax(stdvar,2)
+stdvar_max_mon = np.argmax(stdvar,2)+1
+
+
+# Compute the range of the seasonal cycle
+scycle_range   = np.ptp(scycle,axis=2)
+
+
+
+# Set up the plot
+blabel     = [1,0,0,1]
+def init_spg_plot(bbox_spg=[-65, -5, 42, 68],blabel=[1,0,0,1]):
+    fig,ax     = plt.subplots(1,1,constrained_layout=True,
+                           subplot_kw={'projection': ccrs.PlateCarree()},figsize=(8,3.5))
+    ax         = viz.add_coast_grid(ax,bbox=bbox_spg,fill_color="gray",blabels=blabel)
+    return fig,ax
+
+
+# Plot the maximum interannual variability
+plotvar = stdvar_max.T/100
+cmap    = "cmo.deep"
+clins   = [100,200,300,400,500,600]
+fig,ax  = init_spg_plot()
+ax.set_title("Interannual Variability of MLD (m)")
+pcm     = ax.pcolormesh(lonr,latr,plotvar,cmap=cmap,vmin=0,vmax=500)
+cb      = fig.colorbar(pcm,ax=ax,fraction=0.035,pad=0.02)
+cl= ax.contour(lonr,latr,plotvar,levels=clins,linewidths=0.5,colors="w")
+ax.clabel(cl)
+savename = "%sMLD_Interann_Var.png" % figpath
+plt.savefig(savename,dpi=150,bbox_inches="tight")
+
+# Check just wintertime MLD variability
+plotvar = stdvar_winter.T/100
+cmap    = "cmo.deep"
+clins   = [100,200,300,400,500,600]
+fig,ax  = init_spg_plot()
+ax.set_title("Interannual Variability of MLD$_{winter}$ (m)")
+pcm     = ax.pcolormesh(lonr,latr,plotvar,cmap=cmap,vmin=0,vmax=500)
+cb      = fig.colorbar(pcm,ax=ax,fraction=0.035,pad=0.02)
+cl= ax.contour(lonr,latr,plotvar,levels=clins,linewidths=0.5,colors="w")
+ax.clabel(cl)
+savename = "%sMLD_Interann_Var_winter.png" % figpath
+plt.savefig(savename,dpi=150,bbox_inches="tight")
+
+# Plot month of max variability
+plotvar = stdvar_max_mon.T
+clvls   = np.arange(0,13,1)
+import matplotlib as mpl
+cmap    = plt.cm.gist_ncar
+norm = mpl.colors.BoundaryNorm(clvls, cmap.N)
+fig,ax  = init_spg_plot()
+ax.set_title("Month of max Interannual Variability")
+pcm     = ax.pcolormesh(lonr,latr,plotvar,cmap=cmap,norm=norm)
+cb      = fig.colorbar(pcm,ax=ax,fraction=0.035,pad=0.02)
+savename = "%sMLD_Interann_Var_Mon.png" % figpath
+plt.savefig(savename,dpi=150,bbox_inches="tight")
+
+# Plot the maximum scycle
+plotvar = scycle_range.T/100
+cmap    = "cmo.dense"
+clins   = [100,200,300,400,500,600,700,800,900,1000,1200]
+fig,ax  = init_spg_plot()
+ax.set_title("Max Seasonal Range in MLD (m)")
+pcm     = ax.pcolormesh(lonr,latr,plotvar,cmap=cmap,vmin=0,vmax=1500)
+cb      = fig.colorbar(pcm,ax=ax,fraction=0.035,pad=0.02)
+cl= ax.contour(lonr,latr,plotvar,levels=clins,linewidths=0.5,colors="w")
+ax.clabel(cl)
+savename = "%sMLD_AnnRange.png" % figpath
+plt.savefig(savename,dpi=150,bbox_inches="tight")
+
+# Plot the ratio
+plotlog = False
+if plotlog:
+    plotvar = np.log(stdvar_max/scycle_range).T
+    vlms = [-1,1]
+    title = "$log_{10}$(Interannual Variability / Seasonal Range)"
+    clins = [0,1]
+else:
+    plotvar = (stdvar_max/scycle_range).T
+    vlms = [0,2]
+    title = "Interannual Variability / Seasonal Range"
+    clins = [1,2]
+cmap    = "cmo.balance"
+#clins   = [100,200,300,400,500,600,700,800,900,1000,1200]
+fig,ax  = init_spg_plot()
+ax.set_title(title)
+pcm     = ax.pcolormesh(lonr,latr,plotvar,cmap=cmap,vmin=vlms[0],vmax=vlms[1])
+cb      = fig.colorbar(pcm,ax=ax,fraction=0.035,pad=0.02)
+cl      = ax.contour(lonr,latr,plotvar,levels=clins,linewidths=0.5,colors="k")
+ax.clabel(cl)
+savename = "%sMLD_VarRatio_plotlog%i.png" % (figpath,plotlog)
+plt.savefig(savename,dpi=150,bbox_inches="tight")
+
+#%% Compare with HBLT
+
+hblt_slab = np.load(datpath+"../SLAB_PIC_hblt.npy")
+hblt_reg,_,_  = proc.sel_region(hblt_slab,lon,lat,bbox)
+
+hmxl_annmean = scycle.mean(2)
+hblt_annmean = np.nanmean(hblt_reg,2)
+
+# Compare the values for the subpolar gyre
+
+
+plotvar = (hmxl_annmean/100 - hblt_annmean).T
+cmap    = "cmo.balance"
+#clins   = [100,200,300,400,500,600]
+fig,ax  = init_spg_plot()
+ax.set_title("HBLT (SLAB) - HMXL (Ann. Mean, FULL) (m)")
+pcm     = ax.pcolormesh(lonr,latr,plotvar,cmap=cmap,vmin=-150,vmax=150)
+cb      = fig.colorbar(pcm,ax=ax,fraction=0.035,pad=0.02)
+cl      = ax.contour(lonr,latr,plotvar,levels=clins,linewidths=0.5,colors="w",vmin=-400,vmax=400)
+ax.clabel(cl)
+savename = "%sMLD_HMXL_minus_HBLT.png" % figpath
+plt.savefig(savename,dpi=150,bbox_inches="tight")
+
+
+
+#%% Examine characteristics from observational MLD
+
+# Load MIMOC data (from viz_inputs_point.py)
+mldpath = datpath + "../MIMOC_ML_v2.2_PT_S/"
+#testpath = mldpath + "MIMOC_ML_v2.2_PT_S_MLP_month01.nc"
+nclist = glob.glob(mldpath+"*.nc")
+nclist.sort()
+print(nclist)
+
+# Read in and concatenate by month variable
+ds_all = []
+for nc in nclist:
+    ds = xr.open_dataset(nc)
+    print(ds)
+    ds_all.append(ds.DEPTH_MIXED_LAYER)
+ds_all = xr.concat(ds_all,dim="month")
 
 
 
