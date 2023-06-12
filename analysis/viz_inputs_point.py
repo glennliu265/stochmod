@@ -54,7 +54,8 @@ pubready = False # Set to True to save figures as EPS for publication
 
 # Put slab version first, then the load_load func. searches in the same
 # directory replace "SLAB_PIC" with "FULL_PIC"
-frcname  = "flxeof_090pct_FULL-PIC_eofcorr2_Fprime_rolln0"
+#frcname  = "flxeof_090pct_FULL-PIC_eofcorr2_Fprime_rolln0"
+frcname  = "flxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0"
 #frcname = "flxeof_090pct_FULL-PIC_eofcorr2"
 #frcname = "Qek_eof_090pct_FULL_PIC_eofcorr0"
 
@@ -366,6 +367,7 @@ for i in range(2):
     
 fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal')
 plt.suptitle("Annual Mean Sqrt(Sum($EOF^2$))",y=1.1)
+plt.show()
 
 #%% Annual Average sums
 clvl=np.arange(-70,75,5)
@@ -747,19 +749,32 @@ for row,subfig in enumerate(subfigs):
 #plt.show()
 plt.savefig(outpath+"Seasonal_Inputs_CESM-FULL.png",dpi=200,bbox_inches='tight')
 #%% Try Subfigures Method (FIXED CONSTRAINED LAYOUT, for SM Draft 2)
+# NOTE: This is also the final version!
+
 """
 Final form for Revision 01!!
 """
+
 import matplotlib as mpl
 
 # Set Inputs
+plot_config = "SLAB" # "SLAB" or "FULL"
+
+# Indicate variables
+if plot_config =="FULL":
+    invars = (alphaavg,dampingavg,havg)
+elif plot_config =="SLAB":
+    invars = (alphaavgslab,dampingavgslab,havgslab)
+print("Plotting Seasonal variation in parameters for %s" % plot_config)
+
+# Set Color Parameters
 #cintmld = np.concatenate([np.arange(0,105,5)np.arange(125,225,25),np.arange()])
 cintmld  = [0,10,20,30,40,50,60,70,80,90,100,125,150,175,200,300,400,500,600,700,750,1000,1250]
 #cmapmld = colors.LinearSegmentedColormap.from_list('mldmap',['w','indigo','k'],gamma=0.37)
 cmapmld  = colors.LinearSegmentedColormap.from_list('mldmap',['w','indigo','k'],gamma=1)
 cmapdamp = colors.LinearSegmentedColormap.from_list('mldmap',['darkgreen','mintcream'],gamma=1)
 
-invars = (alphaavg,dampingavg,havg)
+# Set Labels
 cblabs = ("Total Forcing Amplitude \n Contour = 5 $W/m^2$",
           "Atmospheric Damping \n Contour = 5 $W/m^2 / \degree C$",
           "Mixed-Layer Depth \n Contours = 10-250 $m$"
@@ -767,27 +782,32 @@ cblabs = ("Total Forcing Amplitude \n Contour = 5 $W/m^2$",
 vnames = (r"Total Forcing Amplitude ($F'$)",
           r"Atmospheric Damping ($\lambda_a$)",
           r"Mixed-Layer Depth ($h$)")
-
 vnames_simp = (r"$F'$",
                r"$\lambda_a$",
                r"$h$"
                )
-
-cints  = (np.arange(0,105,5),np.arange(0,45,5),cintmld
+cints  = (np.arange(0,105,5),
+          np.arange(0,45,5),
+          cintmld
           )
-
-cmaps  = ('gist_heat_r','cmo.algae',cmapmld) 
-
+cmaps  = ('gist_heat_r',
+          'cmo.algae',
+          cmapmld) 
 snamesl = ('Winter (DJF)','Spring (MAM)','Summer (JJA)','Fall (SON)')
 
 
+
+# Set Font Parameters
+mpl.rcParams['font.sans-serif'] = "stix"
+mpl.rcParams['font.family'] = "STIXGeneral"
+mpl.rcParams.update(mpl.rcParamsDefault)
+
+# Toggles
 notitle   = True
 nocblabel = True
 leftlabel = True
 
-mpl.rcParams['font.sans-serif'] = "stix"
-mpl.rcParams['font.family'] = "STIXGeneral"
-mpl.rcParams.update(mpl.rcParamsDefault)
+
 
 ## Note EPS Format is not working..
 # if pubready:
@@ -803,7 +823,6 @@ mpl.rcParams.update(mpl.rcParamsDefault)
 #     ylbl_vert  = 0.50
 #     ylbl_rot   = 'horizontal'
 #     sp_horiz = -.05
-    
 #else:
 
 fig,axs = plt.subplots(3,4,constrained_layout=True,
@@ -823,7 +842,7 @@ vnames_sel = vnames
 sp_horiz = 0
 
 if notitle is False:
-    fig.suptitle("Stochastic Model Inputs (CESM1-FULL, Seasonal Average)",fontsize=20)
+    fig.suptitle("Stochastic Model Inputs (CESM1-%s, Seasonal Average)" % plot_config,fontsize=20)
 
 # Create 3x1 subfigs
 sp_id = 0
@@ -887,9 +906,9 @@ for row in range(3):
 
 if pubready:
     #plt.savefig(outpath+"Fig02_Seasonal_Avg_Parameters_CESM-FULL.eps",dpi=600,bbox_inches='tight',format='eps')
-    plt.savefig(outpath+"Fig02_Seasonal_Avg_Parameters_CESM-FULL.png",dpi=900,bbox_inches='tight')
+    plt.savefig(outpath+"Fig02_Seasonal_Avg_Parameters_CESM-%s.png"% plot_config,dpi=900,bbox_inches='tight')
 else:
-    plt.savefig(outpath+"Seasonal_Inputs_CESM-FULL.png",dpi=900,bbox_inches='tight')
+    plt.savefig(outpath+"Seasonal_Inputs_CESM-%s.png"%plot_config,dpi=900,bbox_inches='tight')
 
 #%% Plot CESM1-SLAB Forcing and Damping
 
@@ -1070,7 +1089,7 @@ plt.savefig("%sHFLX_values_FULL-SLAB_Savg_regional.png" %(outpath),dpi=150,bbox_
 
 
 # ----------------------------------------------------------
-# %% Plot the differences between CESM1-FULL and CESM1-SLAB
+#%% Plot the differences between CESM1-FULL and CESM1-SLAB
 # ----------------------------------------------------------
 
 # Declare the lists
@@ -1137,14 +1156,77 @@ for row,subfig in enumerate(subfigs):
         
     cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='vertical',fraction=0.009,pad=.010)
     cb.set_label(cblabs2[v],fontsize=12)
-#plt.show()
-plt.savefig(outpath+"Seasonal_Inputs_SLAB-Minus-FULL.png",dpi=200,bbox_inches='tight')
+plt.show()
+#plt.savefig(outpath+"Seasonal_Inputs_SLAB-Minus-FULL.png",dpi=200,bbox_inches='tight')
 
 # ---------------------------------------------------
 #%% Compare CESM1 Differences for a selected variable
 # ---------------------------------------------------
 
 
+comparison_name = "Heat_Flux_Damping"
+
+
+# Labels
+if comparison_name == "Forcing_Amplitude":
+    slabvar         = np.array(alphaavgslab)
+    fullvar         = np.array(alphaavg)
+    diff            = fullvar - slabvar
+    varname         = "Forcing"
+    varunit         = "W $m^{-2}$"
+    plotvars        = [slabvar,diff]
+    clvls           = [np.arange(0,105,5),np.arange(-10,11,1)]
+    varnames        =   ["%s (SOM)"% (varname),"%s Difference (FCM - SOM)" % (varname)]
+    cmaps           = ['gist_heat_r',"cmo.balance"]
+elif comparison_name == "Heat_Flux_Damping":
+    slabvar         = np.array(dampingavgslab)
+    fullvar         = np.array(dampingavg)
+    diff            = fullvar - slabvar
+    varname         = "$\lambda_a$"
+    varunit         = "$W/m^2 / \degree C$"
+    plotvars        = [slabvar,diff]
+    clvls           = [np.arange(0,45,5),np.arange(-24,26,2)]
+   
+    varnames        = ["%s (SOM)"% (varname),"%s Difference (FCM - SOM)" % (varname)]
+    cmaps           = ['cmo.algae','PuOr_r']
+
+
+
+cblab           = "%s %s" % (varname,varunit)
+bbox_damp        = [-80, 0, 9, 65]
+
+# Set up variables
+consistent_mask = np.ones((288,192))
+consistent_mask[slabvar.sum(0)==0] = np.nan
+consistent_mask[fullvar.sum(0)==0] = np.nan
+
+fig,axs =  plt.subplots(2,4,figsize=(15,5),constrained_layout=True,
+                        subplot_kw={'projection':ccrs.PlateCarree()})
+
+for v in range(2):
+    for a in range(4):
+        ax = axs[v,a]
+        blabels = [0,0,0,0]
+        if a == 0:
+            blabels[0] = 1
+            ax.text(-0.20, 0.55, varnames[v], va='bottom', ha='center',rotation='vertical',
+                    rotation_mode='anchor',transform=ax.transAxes)
+        if v == 1:
+            blabels[-1] = 1
+        if v == 0:
+            ax.set_title(snames[a])
+            
+        
+        pcm=ax.contourf(lon,lat,plotvars[v][a,:,:].T * consistent_mask.T,levels=clvls[v],cmap=cmaps[v],extend='both')
+        cl = ax.contour(lon,lat,plotvars[v][a,:,:].T * consistent_mask.T,levels=clvls[v],colors="w",linewidths=0.5,extend='both',alpha=0)
+        cl_lab = ax.clabel(pcm,levels=clvls[v][::2],inline_spacing=0,fontsize=8,colors="k")
+        ax = viz.add_coast_grid(ax=ax,bbox=bbox_damp,blabels=blabels,fill_color='gray')
+    
+    cb = fig.colorbar(pcm,ax = axs[v,:].flatten(),fraction=0.01,pad=0.01)
+    
+#plt.show()
+savename = "%s%s_Comparison_SLAB_DIFF.png" % (outpath,comparison_name)
+plt.savefig(savename,dpi=200,bbox_inches="tight")
 
 # --------------------------------------
 #%% Compare CESM1 FULL MLD with Levitus
