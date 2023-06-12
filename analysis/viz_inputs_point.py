@@ -39,17 +39,18 @@ import colorcet as cc
 import scm
 import time
 import cmocean
+from matplotlib import colors
 
 #%% User Edits
 projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath = projpath + '03_Scripts/stochmod/'
 datpath    = projpath + '01_Data/'
-outpath    = projpath + '02_Figures/20220824/'
+outpath    = projpath + '02_Figures/20230612/'
 input_path  = datpath + 'model_input/'
 proc.makedir(outpath)
 
 
-pubready = True # Set to True to save figures as EPS for publication
+pubready = False # Set to True to save figures as EPS for publication
 
 # Put slab version first, then the load_load func. searches in the same
 # directory replace "SLAB_PIC" with "FULL_PIC"
@@ -145,6 +146,21 @@ klon,klat = proc.find_latlon(lonf,latf,lon,lat)
 locstring      = "lon%i_lat%i" % (lonf,latf)
 locstringtitle = "Lon: %.1f Lat: %.1f" % (lonf,latf)
 
+
+#%% Quick spatial check to locate masl
+
+# Mask seems to come from damping
+damping_slab_mask = dampingslab.sum(2).T
+damping_full_mask = dampingfull.sum(2).T
+
+plt.pcolormesh(dampingfull.sum(2).T)
+plt.pcolormesh(dampingslab.sum(2).T)
+
+alpha_slab_mask = np.sum(alpha,(2,3)).T
+alpha_full_mask = np.sum(alpha_full,(2,3)).T
+
+
+
 # -------------------------------------
 #%% Retrieve data for point comparisons
 # -------------------------------------
@@ -163,6 +179,7 @@ hpt,kprev,lbd_a,lbd_af,Fpt,Fpt_f = inputs_pt
 
 # Calculate entrainment related damping
 beta = scm.calc_beta(h)
+
 # -------------------
 #%% Fancy Kprev Plot
 # -------------------
@@ -188,7 +205,7 @@ ax.minorticks_on()
 ax.xaxis.set_tick_params(which='minor', bottom=False)
 
 if pubready:
-    plt.savefig(outpath+"Fig01_Detrainment_Example.eps" % (flocstring),dpi=1200,format='eps')
+    plt.savefig(outpath+"Fig01_Detrainment_Example.eps",dpi=1200,format='eps')
 else:
     plt.savefig(outpath+"MLD_Detrainment_month_%s.png" % (flocstring),dpi=200)
 #%% manuallly load forcing for debugging
@@ -225,7 +242,6 @@ ax.set_xlim([0,11])
 
 useC    = True
 notitle = True
-
 
 def make_patch_spines_invisible(ax):
     #Source: https://matplotlib.org/2.0.2/examples/pylab_examples/multiple_yaxis_with_spines.html
@@ -378,6 +394,7 @@ alphaavgslab,snames = proc.calc_savg(alphas2[0],debug=True,return_str=True)
 dampingavgslab,snames = proc.calc_savg(dampingslab,debug=True,return_str=True)
 havgslab,snames = proc.calc_savg(hblt,debug=True,return_str=True)
 
+# -----------------------------------------------------------------------------
 #%% Plot the Forcing Patterns
 
 clvl=np.arange(0,105,5)
@@ -408,39 +425,105 @@ for i in range(4):
 cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='vertical',fraction=0.009)
 cb.set_label("Atmospheric Damping ($W/m^2$)")
 
-#%% Plot Beta
+#%% Plot Beta (1/s)
 
-fig,axs =  plt.subplots(1,4,figsize=(12,4),subplot_kw={'projection':ccrs.PlateCarree()})
-clvl = np.linspace(0,1.5,20)
+fig,axs =  plt.subplots(1,4,figsize=(12,4),constrained_layout=True,
+                        subplot_kw={'projection':ccrs.PlateCarree()})
+clvl    = np.arange(0,1.6,.1)#np.linspace(0,1.5,20)
 
 for i in range(4):
     ax = axs[i]
-    pcm=ax.contourf(lon,lat,betaavg[i].T,levels=clvl,cmap=cmocean.cm.balance,extend='both')
-    ax = viz.add_coast_grid(ax=ax,bbox=bbox,blabels=[0,0,0,0],fill_color='gray')
+    blabels = [0,0,0,1]
+    if i == 0:
+        blabels[0] = 1
+    pcm=ax.contourf(lon,lat,betaavg[i].T,levels=clvl,cmap=cmocean.cm.solar,extend='both')
+    ax = viz.add_coast_grid(ax=ax,bbox=bbox,blabels=blabels,fill_color='gray')
     #fig.colorbar(pcm,ax=ax)
     ax.set_title(snames[i])
-fig.colorbar(pcm,ax=axs.flatten())
+
+cb = fig.colorbar(pcm,ax=axs.flatten(),fraction=0.095,orientation="horizontal",pad=0.05)
+cb = cb.set_label(r"Entrainment Damping ($\frac{w_e}{h}=ln(\frac{h[t+1]}{h[t]})$; units=$s^{-1}$)")
+
+savename = "%sviz_inputs_Beta_Savg.png" % (outpath)
+plt.savefig(savename,bbox_inches="tight",dpi=200)
+
+#%% Compare Damping (Lambda_a vs. Entrainment) (Updated 5/11/2023) 
+
+dt             = 3600*24*30
+use_h          = np.array(havgslab)#50*np.ones((4,288,192))#
+use_h_name     = "hslab"
+plot_timescale = False
+
+bbox_damp  = [-80, 0, 9, 65]
+cmap       = 'cmo.algae'#colors.LinearSegmentedColormap.from_list('mldmap',['darkgreen','mintcream'],gamma=1)
+
+
+# Set up variables
+lbd_a_in   = scm.convert_Wm2(np.array(dampingavg),use_h,dt=dt)
+dampnames  = ["Atmospheric Damping ($\lambda_a$)","Entrainment Damping "+r"($ \frac{w_e}{h} $)"]
+
+beta_corrected = np.array(betaavg)
+#beta_corrected[beta_corrected==0.] = np.nan
+
+dampvars   = [lbd_a_in,beta_corrected]
+consistent_mask = np.ones((288,192))
+consistent_mask[np.isnan(dampvars[0].sum(0))] = np.nan
+consistent_mask[np.isnan(dampvars[1].sum(0))] = np.nan
+#plt.pcolormesh(consistent_mask.T)
+
+
+
+if plot_timescale:
+    dunits = "months"
+    clvl   = np.arange(0,25,1)
+    dampvars = [1/dv for dv in dampvars]
+else:
+    dunits = "months$^{-1}$"
+    clvl   = np.arange(0,1.6,0.1)
+
+
+fig,axs =  plt.subplots(2,4,figsize=(15,5),constrained_layout=True,
+                        subplot_kw={'projection':ccrs.PlateCarree()})
+
+for v in range(2):
+    for a in range(4):
+        ax = axs[v,a]
+        blabels = [0,0,0,0]
+        if a == 0:
+            blabels[0] = 1
+            ax.text(-0.15, 0.55, dampnames[v], va='bottom', ha='center',rotation='vertical',
+                    rotation_mode='anchor',transform=ax.transAxes)
+        if v == 1:
+            blabels[-1] = 1
+        if v == 0:
+            ax.set_title(snames[a])
+            
+            
+        pcm=ax.contourf(lon,lat,dampvars[v][a,:,:].T * consistent_mask.T,levels=clvl,cmap=cmap,extend='both')
+            
+        ax = viz.add_coast_grid(ax=ax,bbox=bbox_damp,blabels=blabels,fill_color='gray')
+    
+    cb = fig.colorbar(pcm,ax = axs[v,:].flatten(),fraction=0.01,pad=0.01)
+#plt.suptitle("Damping (units=%s)" % (dunits) )
+savename = "%sDamping_Entrain_Atm_Comparison_%s.png" % (outpath,use_h_name)
+plt.savefig(savename,dpi=200,bbox_inches="tight")
 
 #%% Plot "Cumulative beta"
 
 betacumu = beta.sum(-1)
 fig,ax =  plt.subplots(1,1,figsize=(7,7),subplot_kw={'projection':ccrs.PlateCarree()})
 ax = viz.add_coast_grid(ax=ax,bbox=bbox,fill_color='gray')
-pcm = ax.contourf(lon,lat,betacumu.T)
+# pcm = ax.contourf(lon,lat,betacumu.T)
 cb=fig.colorbar(pcm,ax=ax)
-#%% Plot max MLD variations
+#%% Plot max MLD seasonal range 
 
 bboxplot    = [-80,0,5,60]
 hrange= np.nanmax(h,axis=2) - np.nanmin(h,axis=2)
 
-
 fig,ax =  plt.subplots(1,1,figsize=(8,4),subplot_kw={'projection':ccrs.PlateCarree()})
-
-pcm=ax.pcolormesh(lon,lat,hrange.T,vmin=0,vmax=125,cmap=cmocean.cm.dense)
-ax = viz.add_coast_grid(ax=ax,bbox=bboxplot,fill_color='gray')
+pcm    =  ax.pcolormesh(lon,lat,hrange.T,vmin=0,vmax=125,cmap=cmocean.cm.dense)
+ax     = viz.add_coast_grid(ax=ax,bbox=bboxplot,fill_color='gray')
 fig.colorbar(pcm,ax=ax)
-
-
 
 #%% Experiment with nonlinear colormap
 
@@ -722,7 +805,7 @@ mpl.rcParams.update(mpl.rcParamsDefault)
 #     sp_horiz = -.05
     
 #else:
-    
+
 fig,axs = plt.subplots(3,4,constrained_layout=True,
                        figsize=(14,8),subplot_kw={'projection':ccrs.PlateCarree()})
 
@@ -1054,11 +1137,13 @@ for row,subfig in enumerate(subfigs):
         
     cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='vertical',fraction=0.009,pad=.010)
     cb.set_label(cblabs2[v],fontsize=12)
-    
-
-    
 #plt.show()
 plt.savefig(outpath+"Seasonal_Inputs_SLAB-Minus-FULL.png",dpi=200,bbox_inches='tight')
+
+# ---------------------------------------------------
+#%% Compare CESM1 Differences for a selected variable
+# ---------------------------------------------------
+
 
 
 # --------------------------------------
