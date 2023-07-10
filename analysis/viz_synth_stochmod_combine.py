@@ -28,6 +28,8 @@ sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmo
 from amv import proc,viz
 import scm
 
+import scipy as sp
+
 #%% Settings
 
 # Set Paths
@@ -35,7 +37,7 @@ projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 datpath     = projpath + '01_Data/'
 input_path  = datpath + 'model_input/'
 output_path = datpath + 'model_output/'
-outpath     = projpath + '02_Figures/20230220/'
+outpath     = projpath + '02_Figures/20230711/'
 proc.makedir(outpath)
 
 pubready   = True
@@ -122,7 +124,7 @@ locstringtitle = "Lon: %.1f Lat: %.1f" % (query[0],query[1])
 #config['Fpt'] = np.roll(Fpt,1)
 ac,sst,dmp,frc,ent,Td,kmonth,params=scm.synth_stochmod(config,projpath=projpath)
 [o,a],damppt,mldpt,kprev,Fpt       =params
-darkmode = True
+darkmode = False
 
 # Read in CESM autocorrelation for all points'
 kmonth = np.argmax(mldpt)
@@ -392,12 +394,29 @@ ylm  = [0,3.0]
 plotids = [[0,1,2,3,8],
            [5,6,7]
            ]
-
+detrend_cesm = True
 
 # Combine lower and upper hierarchy
 inssts   = [c_ssts[0][1],c_ssts[1][1],c_ssts[2][1],c_ssts[3][1],sst[1],sst[2],sst[3],cssts[0],cssts[1]]
 nsmooths = np.concatenate([np.ones(len(inssts)-2)*nsmooth,cnsmooths])
 labels   = np.concatenate([labels_lower,labels_upper[1:],['CESM-FULL','CESM-SLAB']])
+
+if detrend_cesm:
+    for cexp in ['CESM-FULL','CESM-SLAB']:
+        c_index = list(labels).index(cexp)
+        sst_in = inssts[c_index]
+        #sst_dt = sp.signal.detrend(sst_in,)
+        output,tsmodel,residual = proc.polyfit_1d(np.arange(sst_in.shape[0]),sst_in,0)
+        sst_dt = sst_in - tsmodel
+        inssts[c_index] = sst_dt
+        print("Detrended %s" % cexp)
+        if debug:
+            fig,ax=plt.subplots(1,1)
+            ax.plot(sst_in,label="Undetreded SSTs")
+            ax.plot(sst_dt,label="Detrended SSTs")
+            ax.legend()
+        
+
 if useC:
     speclabels = ["%s (%.2f$ \, \degree C^{2}$)" % (labels[i],np.var(inssts[i])) for i in range(len(inssts))]
 
@@ -607,8 +626,6 @@ if sepfig is False:
         plt.savefig("%sFig06_SPG_Spectra.eps"% (outpath),dpi=1200,bbox_inches='tight',format='eps')
     else:
         plt.savefig(savename,dpi=200,bbox_inches='tight')
-    
-    
 
 
 # plotid = 
