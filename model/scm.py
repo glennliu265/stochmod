@@ -1589,7 +1589,7 @@ def synth_stochmod(config,verbose=False,viz=False,
         return autocorr,sst,dampingterm,forcingterm,entrainterm,Td,kmonth,params,specout
 
 def quick_spectrum(sst,nsmooth,pct,
-                   opt=1,dt=None,clvl=[.95],verbose=False):
+                   opt=1,dt=None,clvl=[.95],verbose=False,return_dict=False):
     """
     Quick spectral estimate of an array of timeseries
 
@@ -1661,6 +1661,15 @@ def quick_spectrum(sst,nsmooth,pct,
         # Calculate Confidence Interval
         CC = ybx.yo_speccl(freq,P,dof,r1,clvl)
         CCs.append(CC*dt_in)
+    if return_dict:
+        output_dict = {
+            "specs":specs,
+            "freqs":freqs,
+            "CCs": CCs,
+            "dofs":dofs,
+            "r1s":r1s,
+            }
+        return output_dict
     return specs,freqs,CCs,dofs,r1s
 
 #%% Data Loading
