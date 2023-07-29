@@ -30,7 +30,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20230220/"
+    figpath     = projpath + "02_Figures/20230512/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -79,7 +79,7 @@ else:
 lags = np.arange(0,37,1)
 
 # Set the Visualization mode
-darkmode   = True
+darkmode   = False
 if darkmode:
     plt.style.use("dark_background")
     dfcol = "w"
@@ -90,7 +90,7 @@ else:
 # Calculate in place (or load output from sm_postprocess_output)
 calc_inplace=False
 
-pubready = True
+pubready = False
 
 #%% Labels and Plotting
 
@@ -353,6 +353,9 @@ plt.savefig("%sSPG-NAT_Locator.png"%figpath,dpi=100,bbox_inches='tight',transpar
 
 #%% Load Stochastic Model Output (Regional SSTs)
 
+# set detrending option
+detrend_cesm = True
+
 # Load in SSTs for each region
 # ----------------------------
 if continuous: 
@@ -399,6 +402,10 @@ sstvarscesm = np.zeros((len(regions),2)) # Forcing x Region x Model
 for rid in range(len(regions)):
     for model in range(len(cesmname)):
         sstin  = sstcesm[rid][model]
+        if detrend_cesm:
+            output,tsmodel,residual = proc.polyfit_1d(np.arange(sstin.shape[0]),sstin,4)
+            sstin = sstin - tsmodel
+        
         sstvar = np.var(sstin)
         print("Variance for region %s, model %s is %f" % (regions[rid],cesmname[model],sstvar))
         sstvarscesm[rid,model]   = sstvar
@@ -470,6 +477,12 @@ if continuous:
         # Compute for CESM
         # ----------------
         insst_cesm                    =  [sstcesm[rid][0],sstcesm[rid][1]]
+        if detrend_cesm:
+            for ii in range(2):
+                sstin = insst_cesm[ii]
+                output,tsmodel,residual = proc.polyfit_1d(np.arange(sstin.shape[0]),sstin,1)
+                sst_dt = sstin - tsmodel
+                insst_cesm[ii] = sst_dt
         if use_ann:
             insst_cesm = [proc.ann_avg(sst,0)[1:] for sst in insst_cesm] # Ann avg, drop 1st year b/c odd
         cspecs,cfreqs,cCCs,cdofs,cr1s = scm.quick_spectrum(insst_cesm,cnsmooths,pct,dt=dt)
