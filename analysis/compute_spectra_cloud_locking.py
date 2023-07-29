@@ -25,7 +25,6 @@ import glob
 
 import nitime.algorithms as tsa
 
-
 # xxxxxxxxxxxx
 #%% User Edits
 # xxxxxxxxxxxx
@@ -131,17 +130,19 @@ ds_manom       = proc.xrdeseason(ds_var)
 var_manom      = ds_manom.values
 lonr,latr      = ds_manom.lon.values,ds_manom.lat.values
 
+
 # 5. Remove a linear trend
 # ----------------------------------------------------
 detrend_output = proc.detrend_dim(var_manom,0)
 var_detrended  = detrend_output[0]
+
 
 # 6. Debug by looking at a point and computing the spectra, determine smoothing amount
 # ----------------------------------------------------
 klon,klat      = proc.find_latlon(-30,50,lonr,latr)
 ts_point       = var_detrended[:,klat,klon]
 
-
+# Test out different smoothing across adjacent bands (Daniell window)
 nsmooths       = [10,25,50,100,]
 pct            = 0.10
 sst_in         = [ts_point,]*len(nsmooths)
@@ -149,10 +150,10 @@ spec_est       = scm.quick_spectrum(sst_in,nsmooths,pct,return_dict=True)
 freqs          = spec_est['freqs']
 specs          = spec_est['specs']
 
+# Log Log Plot
 fig,ax    = plt.subplots(1,1)
 for n in range(len(nsmooths)):
     ax.loglog(freqs[n][1:]*dt,specs[n]/dt,label="n_smooth=%i" % nsmooths[n])
-
 ax.axvline([1/(12*10)],color="k",label="Decade",ls='dashed')
 ax.axvline([1/(12)],color="gray",label="Annual",ls="solid")
 ax.axvline([1/(12*75)],color="orange",label="75-year",ls="dotted")
@@ -163,6 +164,19 @@ ax.set_ylim([1e-1,1e2])
 ax.set_xlabel("Frequency (cycles per month)")
 ax.set_ylabel("Power")
 
+# Linear Linear Plot
+fig,ax    = plt.subplots(1,1)
+for n in range(len(nsmooths)):
+    ax.plot(freqs[n][1:]*dt,specs[n]/dt,label="n_smooth=%i" % nsmooths[n])
+ax.axvline([1/(12*10)],color="k",label="Decade",ls='dashed')
+ax.axvline([1/(12)],color="gray",label="Annual",ls="solid")
+ax.axvline([1/(12*75)],color="orange",label="75-year",ls="dotted")
+ax.axvline([1/(12*100)],color="red",label="Centennial",ls="dotted")
+ax.legend()
+ax.set_xlim([1/(12*100),1/(12*5)])
+ax.set_ylim([1e-1,1e2])
+ax.set_xlabel("Frequency (cycles per month)")
+ax.set_ylabel("Power")
 
 # 7. Compute the power spectra
 # ----------------------------------------------------
@@ -190,7 +204,6 @@ out_dict = {
     }
 outname = "%sCloudLocking_%s_Spectra_nsmooth%i.npz" % (outpath,varname,nsmooth_select)
 np.savez(outname,**out_dict,allow_pickle=True)
-
 
 #%%
 
