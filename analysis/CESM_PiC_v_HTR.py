@@ -20,7 +20,7 @@ import numpy as np
 import sys
 import time
 
-
+from tqdm import tqdm
 import cartopy.crs as ccrs
 
 #%% User Edits
@@ -111,7 +111,7 @@ sst_anom_htr = sst_anom_htr - sst_anom_htr.mean(0)[None,...]
 nens,ntime_htr,nlat,nlon = sst_anom_htr.shape
 ntime_pic,nlat,nlon = sst_anom_pic.shape
 
-#%%
+#%% Compute NASST Index
 
 # Get SSTs
 ssts           = [sst_anom_pic,sst_anom_htr]
@@ -132,6 +132,7 @@ ssts[0] *= limask_universal[None,:,:]
 ssts[1] *= limask_universal[None,None,:,:]
 
 
+
 # Compute NASST Index
 nasst_pic = proc.area_avg(proc.flipdims(ssts[0]),bbox,lonr,latr,1)
 nasst_all = [nasst_pic,]
@@ -142,7 +143,71 @@ for e in range(nens):
 
 # Compute AMV Index
 
+#%% Do some quick visualization
+
+
+
+def polyfit_1d(x,y,order):
+    coeffs   = np.polyfit(x,y,order,)
+    
+    newmodel = [np.power(x,order-N)*np.array(coeffs)[N] for N in range(order+1)] 
+    newmodel = np.array(newmodel).sum(0)
+    residual = y - newmodel
+    return coeffs,newmodel,residual
+    
+    
+    
+    
+
+lpyr = 86
+nasst_pic_lp = proc.lp_butter(nasst_pic,lpyr,6)
+timepic      = np.arange(0,nasst_pic.shape[0]) + 400
+
+# Fit a linear trend
+order = 5
+#output  = np.polyfit(timepic,nasst_pic,1,)
+#tsmodel = timepic*output[0]+output[1]
+
+output,tsmodel,residual = polyfit_1d(timepic,nasst_pic,order)
+
+nasst_pic_detrended = nasst_pic - tsmodel
+
+fig,axs       = plt.subplots(2,1,figsize=(16,8))
+#ax.scatter(timepic,nasst_pic,lw=0.5)
+ax = axs[0]
+ax.set_title("NASST Timeseries Trend Removal CESM1 Preindustrial Control")
+ax.plot(timepic,nasst_pic,color="gray",lw=0.5,label="Undetrended Series")
+ax.plot(timepic,nasst_pic_lp,color="purple",label="Low Pass Filter (%i Years)" % (lpyr))
+ax.plot(timepic,tsmodel,color="cornflowerblue",lw=2.5,label="Linear Fit (%.2e*t + %.e)" % (output[0],output[1]))
+
+ax.plot(timepic,proc.lp_butter(nasst_pic-tsmodel,lpyr,6),label="Detrended + LP filtered NASST",color="orange")
+ax.axhline([0],ls="dashed",color="k")
+ax.legend()
+ax.grid(True,ls="dotted")
+ax.minorticks_on()
+ax.set_xlim([400,2200])
+
+ax = axs[1]
+ax.set_title("Residuals")
+ax.hist(residual,50,alpha=0.75,edgecolor="white")
+ax.grid(True,ls="dotted")
+ax.axvline([residual.mean()],ls="solid",color="k",label="$\mu$=%.2f"% (residual.mean()))
+ax.axvline([-residual.std()],ls="dotted",color="k",label="$1\sigma$=%.2f"% (residual.std()))
+ax.axvline([residual.std()],ls="dotted",color="k")
+ax.minorticks_on()
+ax.legend()
+
+plt.savefig("%sDetrended_NASST_order%02i_lpfilter%02i.png" % (figpath,order,lpyr),bbox_inches="tight",dpi=150)
+
+
 #%% Do spectral analysis 
+
+use_detrended=True
+
+if use_detrended:
+    nasst_all[0] = nasst_pic_detrended
+else:
+    nasst_all[0] = nasst_pic
 
 nsmooths  = (50,)+(4,)*nens
 pct       = 0.10
@@ -153,10 +218,79 @@ specs,freqs,CCs,dofs,r1s = scm.quick_spectrum(nasst_all,nsmooths,pct,
 smoothstr = "Smoothing: PiControl (%i), Historical (%i) | Taper: %03i" % (nsmooths[0],nsmooths[1],pct*100) + "%"
 smoothfn  = "smooth_PIC%i_HTR%i_taperpct%03i" % (nsmooths[0],nsmooths[1],pct*100)
 
+#%% Repeat for random ensemble of pic data
+
+# Create Random ensemble
+ensmem_len = 86 # Length of chunk
+ensmem_num = 42 # Number of ensemble members
+
+rand_samplestart = np.arange(0,nasst_pic.shape[0]-ensmem_len)
+np.random.shuffle(rand_samplestart)
+nasst_pic_ens = []
+sampled_years = []
+for e in range(ensmem_num):
+    startid = rand_samplestart[e]
+    yrange = np.arange(startid,startid+86,1)
+    sst_chunk = nasst_all[0][yrange]
+    sampled_years.append(yrange)
+    nasst_pic_ens.append(sst_chunk)
+
+# Compute Spectra    
+pspecs,pfreqs,pCCs,pdofs,pr1s = scm.quick_spectrum(nasst_pic_ens,nsmooths,pct,
+                                              opt=1,dt=dtyear,clvl=[.95],verbose=False)
+
+
+#%% Repeat for continuous chunks
+
+chunk_sample_cont = []
+nasst_pic_cont    = []
+pcnsmooths        = 4
+for istart in range(nasst_pic.shape[0]-ensmem_len):
+    
+    yrange = np.arange(istart,istart+86,1)
+    
+    chunk_sample_cont.append(yrange)
+    sst_chunk = nasst_all[0][yrange]
+    nasst_pic_cont.append(sst_chunk)
+    
+# Compute Spectra [pc for pic continous]
+pcspecs,pcfreqs,pcCCs,pcdofs,pcr1s = scm.quick_spectrum(nasst_pic_cont,pcnsmooths,pct,
+                                              opt=1,dt=dtyear,clvl=[.95],verbose=False)
+    
+
 #%% Plot the spectra
 
 alw     = 1.25
 dt      = dtyear
+
+
+def init_linear_spectra_cesm(xper=None,ax=None):
+    
+    plt.style.use('seaborn-v0_8-darkgrid')
+    
+    if xper is None:
+        xper = np.array([100,50,25,10,5,2.5])
+    figflag=False
+    if ax is None:
+        figflag = True
+        fig,ax  = plt.subplots(1,1,figsize=(8,3),constrained_layout=True)
+    xticks  = 1/np.array(xper) #* (1/dtyear)
+    xlbls   = xper.astype(int).astype(str)
+    
+    ax.legend()
+    ax.set_xticks(xticks)
+    ax.set_xticklabels(xlbls)
+    ax.set_xlabel("")
+    ax.set_xlim([xticks[0],xticks[-1]])
+    
+    ax.set_xlabel("Period (Years)")
+    ax.set_ylabel("Power ($\degree C^2 cpy^{-1}$)")
+    
+    if figflag:
+        return fig,ax
+    return ax
+    
+    
 
 
 for ee in range(nens):
@@ -198,6 +332,127 @@ for ee in range(nens):
     plt.savefig(savename,dpi=200,)
     #savename = "Power Spectra"
 
+#%% Comparison plot between PiControl "Ensemble" and Detrended Historical Ensemble
+
+xper   = np.array([100,50,25,10,5,2.5])
+fig,ax = init_linear_spectra_cesm(xper=xper)
+
+# Loop by ensemble member (assumes both ensembles are of the same size)
+for e in range(nens):
+    if e == 0:
+        lbl_htr="Historical (Indv. Ens)"
+        lbl_pic="PiControl %i-yr Chunk" % (ensmem_len)
+    else:
+        lbl_htr=""
+        lbl_pic=""
+        
+    ax.plot(freqs[1+e]*dt,specs[1+e]/dt,color="salmon",alpha=0.3 ,label=lbl_htr)
+    ax.plot(pfreqs[e] *dt,pspecs[e]/dt ,color="k"     ,alpha=0.1,label=lbl_pic)
+
+# Plot ensemble mean and full PiControl Timeseries
+ax.plot(freqs[1+e]*dt,np.array(specs[1:]).mean(0)/dt,color="red",alpha=1 ,label="Detrended Historical Ens. Mean")
+ax.plot(pfreqs[e] *dt,np.array(pspecs).mean(0)/dt ,color="k"     ,alpha=1,label="PiControl Ens. Mean")
+ax.plot(freqs[0][:-1]*dt,specs[0]/dt,label="PiControl Full Timeseries",color="k",ls='dashed') 
+
+ax.legend()
+savename = "%sNASST_PowerSpectra_PIC_v_HTR_%s_PiC_Ensemble_Comparison.png" % (figpath,smoothfn)
+plt.savefig(savename,dpi=200,)
+
+
+#%% Plot for continuous chunk (sliding animation)
+
+
+ystep   = 20
+ystarts = np.arange(0,nasst_pic.shape[0],ystep)
+
+yearpic = np.arange(0,nasst_pic.shape[0]) + 400
+
+pic_spectra_ens = np.array(pcspecs)  # {ens, freq}
+htr_spectra_ens = np.array(specs[1:])
+    
+    
+for iframe,istart in tqdm(enumerate(ystarts)):
+    
+    # Debugging sec ---
+    # iframe = 0
+    # istart = ystarts[0]
+    # -----
+    if istart >= (nasst_pic.shape[0]-86):#ystarts[-1]:
+        continue
+        #yrange = np.arange(istart,pic_spectra_ens.shape[0]-1)
+    else:
+        yrange = np.arange(istart,istart+ystep)
+    
+    fig,axs = plt.subplots(2,1,figsize=(8,4),constrained_layout=True)
+    
+    # Plot the spectra --------
+    ax = axs[0]
+    ax = init_linear_spectra_cesm(xper=xper,ax=ax)
+    
+    # Plot individual years
+    y_alpha = np.linspace(0.2,0.80,len(yrange))
+    for ii,y in enumerate(yrange):
+        
+        if y == istart:
+            lbl="PiControl Start Year = %i" % y
+            color="orange"
+            alpha = 0.8
+        else:
+            lbl=""
+            color="purple"
+            alpha = y_alpha[ii]
+        if y == yrange[-1]:
+            lbl="PiControl Start Year = %i" % y
+        ax.plot(pfreqs[e] *dt,pic_spectra_ens[y,:]/dt ,color=color,alpha=alpha,label=lbl)
+        
+    ax.set_ylim([0,0.16])
+    ax.set_title("Power Spectra (86-year Chunk)")
+        
+        
+    
+    # Plot Means
+    ax.plot(freqs[1+e]*dt,htr_spectra_ens.mean(0)/dt,color="red",alpha=1 ,label="Detrended Historical Ens. Mean")
+    ax.plot(pfreqs[e] *dt,pic_spectra_ens[yrange].mean(0)/dt ,color="k"     ,alpha=1,label="PiControl %i-yr Mean"%ystep)
+    ax.plot(freqs[0][:-1]*dt,specs[0]/dt,label="PiControl Full Timeseries",color="k",ls='dashed') 
+    
+    ax.legend()
+    
+    
+    # PLot the timeseries ------
+    ax = axs[1]
+    
+    ax.plot(yearpic,nasst_pic,color='gray',label="NASST Index",lw=0.4)
+    ax.plot(yearpic,proc.lp_butter(nasst_pic,100,6),color="red",label="100-Year LP Filter")
+    
+    ax.axvline([ystarts[iframe]+400],color="orange")
+    ax.axvline([ystarts[iframe]+ystep+400],color="purple")
+    
+    ax.minorticks_on()
+    ax.set_title("Start Years %i to %i" % (ystarts[iframe]+400,ystarts[iframe]+ystep+400))
+    #ax.set_xlim([400+((ystep-5)*iframe),500+((ystep-5)*iframe)])
+    ax.legend()
+    
+    savename = "%sDetrended_PiControl_Spectra_Envelopes_Frame%03i.png" % (figpath,iframe)
+    plt.savefig(savename,dpi=150,bbox_inches="tight")
+    
+    
+
+
+    
+    
+    
+    
+
+# Loop by ensemble member (assumes both ensembles are of the same size)
+
+# Plot ensemble mean and full PiControl Timeseries
+
+
+
+
+
+
+
 #%% Compute pointwise variance (normal and low-passed)
 
 
@@ -217,14 +472,7 @@ for ii in range(2):
             sst_ens_lp.append(sst_ens)
             
         ssts_lp.append(np.array(sst_ens_lp))
-    
         
-            
-        
-        
-        
-    
-    
 pic_var_lp       = ssts_lp[0].var(0)
 htr_var_byens_lp = ssts_lp[1].var(1)/pic_var_lp[None,:,:]
 
@@ -325,8 +573,6 @@ for aa in range(2):
         
         title   = "Historical (Ens. Avg. Pattern)"
         clims    = [-0.30,0.30]
-        
-
     
     blabel=[0,0,0,1]
     if aa == 0:

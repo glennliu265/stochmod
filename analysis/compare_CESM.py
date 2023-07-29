@@ -29,7 +29,7 @@ import dask
 projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath = projpath + '03_Scripts/stochmod/'
 datpath    = projpath + '01_Data/'
-outpathfig = projpath + '02_Figures/20200823/'
+outpathfig = projpath + '02_Figures/20240421/'
 
 bbox_SP = [-60,-15,40,65]
 bbox_ST = [-80,-10,20,40]
@@ -96,7 +96,7 @@ ylim = [-0.25,1]
 ytks = np.arange(-.25,1.25,0.25)
 
 # Load CESM1LE Verification Data
-cesmsst = np.load(projpath + "01_Data/SST_Timeseries_RegionAvg.npy",allow_pickle=True).item()
+cesmsst  = np.load(projpath + "01_Data/SST_Timeseries_RegionAvg.npy",allow_pickle=True).item()
 cesmauto = np.load(projpath + "01_Data/Autocorrelation_Region.npy",allow_pickle=True).item()
 
 # Set colors

@@ -628,41 +628,143 @@ if sepfig is False:
         plt.savefig(savename,dpi=200,bbox_inches='tight')
 
 
-# plotid = 
-# if plottype == "freqxpower":
-#     ax = viz.plot_freqxpower(specs[:4],freqs[:4],speclabels[:4],allcols[:4],
-#                          ax=ax,plottitle=r"Adding Varying Damping ($\lambda_a$) and Forcing ($\alpha$)",xtick=xtks,xlm=xlm)
-# elif plottype == "freqlin":
-#     ax = viz.plot_freqlin(specs[:4],freqs[:4],speclabels[:4],allcols[:4],
-#                          ax=ax,plottitle=r"Adding Varying Damping ($\lambda_a$) and Forcing ($\alpha$)",xtick=xtks,xlm=xlm)
-# elif plottype == "freqlog":
-#     ax = viz.plot_freqlog(specs[:4],freqs[:4],speclabels[:4],allcols[:4],
-#                          ax=ax,plottitle="Adding Varying Mixed Layer Depth ($h$) and Entrainment",xtick=xtks,xlm=xlm)
+#%% Load and compare with the spectra from the cloud-locked simnulations
+# Copied figure from above
 
+clpath            = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/CESM1_Cloud_Locking/proc/"
+nsmooth_select_cl = 25
+cl_ld = np.load("%sCloudLocking_%s_Spectra_nsmooth%i.npz" % (clpath,"TS",nsmooth_select_cl))
+kloncl,klatcl = proc.find_latlon(-30,50,cl_ld['lon'],cl_ld['lat'])
 
-# ax = axs[1]
-# if plottype == "freqxpower":
-#     ax = viz.plot_freqxpower(specs[4:],freqs[4:],speclabels[4:],allcols[4:],
-#                          ax=ax,plottitle="Adding Varying Mixed Layer Depth ($h$) and Entrainment",xtick=xtks,xlm=xlm)
-# elif plottype == "freqlin":
-#     ax = viz.plot_freqlin(specs[4:],freqs[4:],speclabels[4:],allcols[4:],
-#                          ax=ax,plottitle="Adding Varying Mixed Layer Depth ($h$) and Entrainment",xtick=xtks,xlm=xlm)
-# elif plottype == "freqlog":
-#     ax = viz.plot_freqlog(specs[4:],freqs[4:],speclabels[4:],allcols[4:],
-#                          ax=ax,plottitle="Adding Varying Mixed Layer Depth ($h$) and Entrainment",xtick=xtks,xlm=xlm)
-# ax.set_ylabel("")
-
-# #plt.suptitle("Regional AMV Index Spectra (unsmoothed, Forcing=%s)"%(frcnamelong[f]))
+cloudlock_spec = cl_ld['specs'][:,klatcl,kloncl]
+cloudlock_freq = cl_ld['freq']
 
 
 
+plottype    = 'freqlin'#'freqlin'
+sepentrain  = False  # Separate entrain/non-entraining models
+sepfig      = False
+#includevar = False # Include Variance in Legend
+lower_focus = False # Set to true to include specific lines for this particular plot 
+periodx     = False # Set to true to have just 1 x-axis, with periods
+linearx     = 1 # Keep frequency axis linear, period axis marked 
+lw          = 3
+incl_legend = True 
 
-# (all const, varyforce, vary damp)
-# inssts.insert(sst[1]) # Append all vary/constanth
-# inssts.append(sst[2]) # Append hvary
-# inssts.append(sst[3]) # Append entrain
-# #np.hstack([c_ssts[:3],])
+usegrid     = False
 
+axis_fsz    = 14
+tick_fsz    = 14
+legend_fsz  = 12
+
+xtks = [0.01, 0.05, 0.1 , 0.2 , 0.5 ]
+
+if sepentrain:
+    plotids = [[0,1,2,3,8,5],
+               [6,7]
+               ]
+    plotids = [[0,1,2,3,8],
+               [3,5,6,7]
+               ]
+else:
+    if lower_focus:
+        plotids = [[0,3,8],
+                   [3,5,6,7]
+                   ]
+    else:
+        plotids = [[0,2,1,3,8],
+                   [5,6,7,8]
+                   ]
+
+if notitle:
+    titles = ["",""]
+else:
+    titles = (r"Adding Varying Damping ($\lambda_a$) and Forcing ($\alpha$)",
+              "Adding Varying Mixed Layer Depth ($h$) and Entrainment"
+              )
+sharetitle = "SST Spectra (50$\degree$N, 30$\degree$W) \n" + \
+"Smoothing (# bands): Stochastic Model (%i), CESM-FULL (%i), CESM-SLAB (%i)" %  (nsmooth,cnsmooths[0],cnsmooths[1])
+
+#% Plot the spectra
+
+
+fig,ax = plt.subplots(1,1,figsize=(8,4))
+
+plotid = plotids[i]
+
+
+    
+if plottype == "freqxpower":
+    ax,ax2 = viz.plot_freqxpower(specs[plotid],freqs[plotid],speclabels[plotid],allcols[plotid],
+                         ax=ax,plottitle=titles[i],xtick=xtks,xlm=xlm,return_ax2=True)
+elif plottype == "freqlin":
+    ax,ax2 = viz.plot_freqlin(specs[plotid],freqs[plotid],speclabels[plotid],allcols[plotid],
+                         ax=ax,plottitle=titles[i],xtick=xtks,xlm=xlm,return_ax2=True,
+                         lw=lw,linearx=linearx,usegrid=usegrid)
+    if useC:
+        ylabel = "Power ($\degree C^2/cpy$)"
+    else:
+        ylabel = "Power ($K^2/cpy$)"
+elif plottype == "freqlog":
+    ax,ax2 = viz.plot_freqlog(specs[plotid],freqs[plotid],speclabels[plotid],allcols[plotid],
+                         ax=ax,plottitle=titles[i],xtick=xtks,xlm=xlm,return_ax2=True,lw=lw,
+                         semilogx=True)
+    #ax.set_ylim([1e-1,1e1])
+    if useC:
+        ylabel="Variance ($\degree C^2$)"
+    else:
+        ylabel = "Variance ($K^2$)"
+        
+    #ax2.set_xlabel("Period (Years)")
+if i == 1:
+    ax.set_ylabel("")
+ax.set_xlabel("")
+    
+plt.setp(ax2.get_xticklabels(), rotation=0,fontsize=tick_fsz)
+plt.setp(ax.get_xticklabels(), rotation=0,fontsize=tick_fsz)
+
+# if plottype is not 'freqlog':
+ax.set_ylim(ylm)
+if periodx: # Switch Frequency with Period for x-axis.
+    ax2.set_xlabel("")
+    xtk2 = ax2.get_xticklabels()
+    xtk2new = np.repeat("",len(xtk2))
+    ax2.set_xticklabels(xtk2new,fontsize=tick_fsz)
+    ax.set_xticklabels(1/xtks,fontsize=tick_fsz)
+
+if incl_legend:
+    lgd = viz.reorder_legend(ax)
+if sepfig is True: # Save separate figures
+    if periodx:
+        ax.set_xlabel('Period (Years)',fontsize=axis_fsz)
+    else:
+        ax.set_xlabel('Frequency (cycles/year)',fontsize=axis_fsz)
+    if useC:
+        ax.set_ylabel("Power ($\degree C^2/cpy$)",fontsize=axis_fsz)
+    else:
+        ax.set_ylabel("Power ($K^2/cpy$)",fontsize=axis_fsz)
+    savename = "%sNASST_Spectra_Stochmod_%s_%s_pct%03i_part%i.png" % (outpath,plottype,smoothname,pct*100,i)
+    plt.savefig(savename,dpi=200,bbox_inches='tight')
+else:
+    if i == 0:
+         ax.set_xlabel("")
+         if useC:
+             ax.set_ylabel("Power ($\degree C^2/cpy$)",fontsize=axis_fsz)
+         else:
+             ax.set_ylabel("Power ($K^2/cpy$)",fontsize=axis_fsz)
+    #if i == 1:
+       # ax.set_xlabel("Period (Years)")
+    #ax = viz.label_sp(i,case='lower', ax=ax, fontsize=16, labelstyle="(%s)")
+
+
+# Add cloud-locking spectra
+ax.plot(cloudlock_freq[1:]*dt,cloudlock_spec/dt,color="cyan")
+#ax.legend()
+
+# Y-axis Adjust
+plt.setp(ax.get_yticklabels(),fontsize=tick_fsz)
+# Turn on minor label
+ax.yaxis.set_minor_locator(tck.AutoMinorLocator())
 
 #%% Barplots
 
