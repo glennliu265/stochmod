@@ -2314,12 +2314,12 @@ def remove_enso(invar,ensoid,ensolag,monwin,reduceyr=True,verbose=True,times=Non
                 varin = varin.reshape(nyr*monwin,nlat*nlon)
             
             # Check for points that are all nan
-            delete_points = []
-            for i in range(varin.shape[0]):
-                if np.all(np.isnan(varin[i,:])):
-                    print("All nan at i=%i for month %i, removing from calculation" % (i,m)) 
-                    delete_points.append(i)
-                    
+            # delete_points = []
+            # for i in range(varin.shape[0]):
+            #     if np.all(np.isnan(varin[i,:])):
+            #         print("All nan at i=%i for month %i, removing from calculation" % (i,m)) 
+            #         delete_points.append(i)
+            
             ensoin = np.delete(ensoin,delete_points)
             varin  = np.delete(varin,delete_points,axis=0)
                     
