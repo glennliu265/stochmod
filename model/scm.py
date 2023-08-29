@@ -2320,8 +2320,8 @@ def remove_enso(invar,ensoid,ensolag,monwin,reduceyr=True,verbose=True,times=Non
             #         print("All nan at i=%i for month %i, removing from calculation" % (i,m)) 
             #         delete_points.append(i)
             
-            ensoin = np.delete(ensoin,delete_points)
-            varin  = np.delete(varin,delete_points,axis=0)
+            #ensoin = np.delete(ensoin,delete_points)
+            #varin  = np.delete(varin,delete_points,axis=0)
                     
             # Regress to obtain coefficients [space]
             varreg,_ = proc.regress_2d(ensoin.squeeze(),varin,nanwarn=1)
