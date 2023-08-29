@@ -2313,8 +2313,15 @@ def remove_enso(invar,ensoid,ensolag,monwin,reduceyr=True,verbose=True,times=Non
                 ensoin = ensoin.reshape(nyr*monwin)
                 varin = varin.reshape(nyr*monwin,nlat*nlon)
             
+            # Check for points that are all nan
+            for i in range(varin.shape[0]):
+                if np.all(np.isnan(varin[i,:])):
+                    print("All nan at i=%i for month %i, removing from calculation" % (i,m)) 
+                    ensoin = np.delete(ensoin,i)
+                    varin  = np.delete(varin,i,axis=0)
+                    
             # Regress to obtain coefficients [space]
-            varreg,_ = proc.regress_2d(ensoin.squeeze(),varin,nanwarn=0)
+            varreg,_ = proc.regress_2d(ensoin.squeeze(),varin,nanwarn=1)
             
             # Write to enso pattern
             ensopattern[m,:,:,pc] = varreg.reshape(nlat,nlon).copy()
