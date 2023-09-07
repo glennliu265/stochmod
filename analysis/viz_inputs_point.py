@@ -45,7 +45,7 @@ from matplotlib import colors
 projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath = projpath + '03_Scripts/stochmod/'
 datpath    = projpath + '01_Data/'
-outpath    = projpath + '02_Figures/20230612/'
+outpath    = projpath + '02_Figures/20230907/'
 input_path  = datpath + 'model_input/'
 proc.makedir(outpath)
 
@@ -526,6 +526,31 @@ fig,ax =  plt.subplots(1,1,figsize=(8,4),subplot_kw={'projection':ccrs.PlateCarr
 pcm    =  ax.pcolormesh(lon,lat,hrange.T,vmin=0,vmax=125,cmap=cmocean.cm.dense)
 ax     = viz.add_coast_grid(ax=ax,bbox=bboxplot,fill_color='gray')
 fig.colorbar(pcm,ax=ax)
+
+
+#%% Plot MLD for SLAB
+
+hslablvls  = np.arange(0,100,10)
+hslab_deep = np.arange(100,1100,100) 
+
+bboxplot_hslab = [-80,0,0,65]
+fig,ax =  plt.subplots(1,1,figsize=(12,8),constrained_layout=True,
+                       subplot_kw={'projection':ccrs.PlateCarree()})
+pcm    =  ax.contourf(lon,lat,havgslab[0].T,levels=hslablvls,cmap=cmocean.cm.dense,extend="both")
+
+cldeep    = ax.contour(lon,lat,havgslab[0].T,levels=hslab_deep,colors="w",linewidths=0.75)
+clshallow = ax.contour(lon,lat,havgslab[0].T,levels=hslablvls,colors="k",linewidths=0.75)
+
+ax.clabel(cldeep,inline_spacing=-7,fontsize=16)
+ax.clabel(clshallow,inline_spacing=-7,fontsize=16)
+
+ax     = viz.add_coast_grid(ax=ax,bbox=bboxplot_hslab,fill_color='gray',line_color='gray')
+cb = fig.colorbar(pcm,ax=ax,pad=0.01,orientation='horizontal',fraction=0.05)
+cb.set_label("h (meters)")
+ax.set_title("Mixed Layer Depth in CESM1 SLAB",fontsize=19)
+savename = "%sSLAB_CESM1_MLD.png" % outpath
+plt.savefig(savename,bbox_inches='tight',dpi=150)
+
 
 #%% Experiment with nonlinear colormap
 
