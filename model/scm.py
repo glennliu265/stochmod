@@ -3355,7 +3355,6 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
         Td_name = custom_params["Tdexp"]
         ldTd      = np.load(input_path+Td_name)
         Td_raw  = ldTd['Tddamp']
-        Td_raw *= limask[None,:,:]
         # Restrict to Region ------------------------------------------
         outputsTd,_,_ = cut_regions([Td_raw],ldTd['lon'],ldTd['lat'],bboxsim,pointmode,points=points)
         Tdexp = outputsTd[0]
