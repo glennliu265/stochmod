@@ -274,7 +274,7 @@ for f in range(len(frcnames)):
             print("Using Ekman Forcing!")
             correction_str = '_Qek'
             expname = proc.addstrtoext(expname,correction_str)
-        if "Tdexp" in custom_params.leys():
+        if "Tdexp" in custom_params.keys():
             print("Using Td Damping!")
             correction_str = '_Tddamp'
             expname = proc.addstrtoext(expname,correction_str)
