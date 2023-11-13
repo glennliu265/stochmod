@@ -47,7 +47,6 @@ def calc_Td(t,index,values,prevmon=False,debug=False):
         Set to True to calculate Td0. The default is False.
     debug : TYPE, optional
         Set to True to print outputs. The default is False.
-
     Returns
     -------
     Td: INT if prevmon=False, Tuple (Td1,Td0) if prevmon=False
@@ -634,7 +633,8 @@ def noentrain(t_end,lbd,T0,F,FAC,multFAC=1,debug=False):
 
 # Entrain Model (Single Point)
 def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=False,
-            Tdgrab=None):
+            Tdgrab=None,add_F=None,return_dict=False,Tdexp=None):
+    
     """
     SST Stochastic Model, with Entrainment
     Integrated with the forward method at a single point
@@ -668,6 +668,11 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
         Set to true to print messages at each timestep. The default is False.
     Td0 : Array of len[Tdgrab]
         Initial temperatures below the mixed layer from previous experiments to append
+    add_F : ARRAY [tend,]
+        Additional forcing to add directly intot he equation (multiple by integration factor if chosen)
+    Tdexp : ARRAY [12]
+        Decay time applied to Td detrained/formed at each given month (Td * exp(-Tdexp * kmonth)). Default is 0 (no decay_)
+        
     
     Returns
     -------
@@ -694,18 +699,22 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
         t_end += len(Tdgrab) # Append years to beginning of simulation
         temp_ts = np.concatenate([Tdgrab,temp_ts])
         
+    if Tdexp is None:
+        Tdexp = np.zeros(12)
+        
+        
     if debug:
         noise_ts   = np.zeros(t_end)
         damp_ts    = np.zeros(t_end)
         entrain_ts = np.zeros(t_end)
         Td_ts      = np.zeros(t_end)
+        
     entrain_term = np.zeros(t_end)
     
     # Prepare the entrainment term
     explbd = np.exp(np.copy(-lbd))
     #explbd[explbd==1] = 0
     
-        
     # Loop for integration period (indexing convention from matlab)
     for t in np.arange(t0,t_end,1):
         
@@ -738,6 +747,15 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
                 else: # Use Td0 from last timestep
                     Td1 = calc_Td(t,kprev,temp_ts,prevmon=False,debug=debugprint)
                 
+                # Implement decay to Td
+                detrain_m1 = kprev[m-1]               # Month of Detrainment for that anomaly
+                idt1       = int(np.floor(detrain_m1)) - 1 # Get indices for Td decay timescale (rounding down to nearest month)
+                detrain_m0 = kprev[m-2]               # Repeat for previous month
+                idt0       = int(np.floor(detrain_m0)) - 1
+                Td0 = Td0 * np.exp(-Tdexp[idt0] * kprev[m-2])
+                Td1 = Td1 * np.exp(-Tdexp[idt1] * kprev[m-1])
+                
+                # Compute Td (in future, could implement month-dependent decay..)
                 Td = (Td1+Td0)/2
                 if debugprint:
                     print("Td is %.2f, which is average of Td1=%.2f, Td0=%.2f"%(Td,Td1,Td0)) 
@@ -751,6 +769,8 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
         # Get Noise/Forcing Term
         # ----------------------
         noise_term = F[t]
+        if add_F is not None:
+            noise_term = F[t] + add_F[t]
         
         # ----------------------
         # Calculate damping term
@@ -789,6 +809,16 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
         noise_ts   = noise_ts[t0:]
         entrain_ts = entrain_ts[t0:]
         Td_ts      = Td_ts[t0:]
+        if return_dict:
+            output_dict = {
+                'damping_term'       : damp_ts,
+                'noise_term'         : noise_ts,
+                'F_only'             : noise_ts - add_F,
+                'entrain_term'       : entrain_ts,
+                'integration_factor' : FAC,
+                'Td'                 : Td_ts
+                }
+            return output_dict
         return temp_ts,damp_ts,noise_ts,entrain_ts,Td_ts
     return temp_ts
 
@@ -1589,7 +1619,7 @@ def synth_stochmod(config,verbose=False,viz=False,
         return autocorr,sst,dampingterm,forcingterm,entrainterm,Td,kmonth,params,specout
 
 def quick_spectrum(sst,nsmooth,pct,
-                   opt=1,dt=None,clvl=[.95],verbose=False,return_dict=False):
+                   opt=1,dt=None,clvl=[.95],verbose=False,return_dict=False,dim=None):
     """
     Quick spectral estimate of an array of timeseries
 
@@ -1607,6 +1637,9 @@ def quick_spectrum(sst,nsmooth,pct,
         Time Interval. The default is 3600*24*30.
     clvl : ARRAY , optional
         Array of Confidence levels. The default is [.95].
+        
+    dim : INT, optional
+        Specify dimension to compute the spectra over
 
     Returns
     -------
@@ -1640,8 +1673,16 @@ def quick_spectrum(sst,nsmooth,pct,
     CCs = []
     dofs = []
     r1s = []
-    for i in range(len(sst)):
-        sstin = sst[i]
+    if dim is None:
+        n_ts = len(sst)
+    else:
+        n_ts = sst.shape[dim]
+    
+    for i in range(n_ts):
+        if dim is None:
+            sstin = sst[i]
+        else:
+            sstin = np.take_along_axis(sst,i,dim)
         dt_in = dt[i]
         
         # Calculate Spectrum
@@ -1649,7 +1690,6 @@ def quick_spectrum(sst,nsmooth,pct,
             sps = ybx.yo_spec(sstin,opt,nsmooth,pct,debug=False,verbose=verbose)
         else:
             sps = ybx.yo_spec(sstin,opt,nsmooth[i],pct,debug=False,verbose=verbose)
-        
         
         # Save spectrum and frequency, convert to 1/sec
         P,freq,dof,r1=sps
@@ -1661,13 +1701,14 @@ def quick_spectrum(sst,nsmooth,pct,
         # Calculate Confidence Interval
         CC = ybx.yo_speccl(freq,P,dof,r1,clvl)
         CCs.append(CC*dt_in)
+        
     if return_dict:
         output_dict = {
             "specs":specs,
             "freqs":freqs,
-            "CCs": CCs,
-            "dofs":dofs,
-            "r1s":r1s,
+            "CCs"  : CCs,
+            "dofs" :dofs,
+            "r1s"  :r1s,
             }
         return output_dict
     return specs,freqs,CCs,dofs,r1s
@@ -1894,7 +1935,8 @@ def indexwindow(invar,m,monwin,combinetime=False,verbose=False):
     return varout
 
 
-def calc_HF(sst,flx,lags,monwin,verbose=True,posatm=True,return_cov=False):
+def calc_HF(sst,flx,lags,monwin,verbose=True,posatm=True,return_cov=False,
+            var_denom=None,return_dict=False):
     """
     damping,autocorr,crosscorr=calc_HF(sst,flx,lags,monwin,verbose=True)
     Calculates the heat flux damping given SST and FLX anomalies using the
@@ -1919,6 +1961,14 @@ def calc_HF(sst,flx,lags,monwin,verbose=True,posatm=True,return_cov=False):
             set to true to display print messages
         6) posatm : BOOL
             check to true to set positive upwards into the atmosphere
+        
+        7) return_cov : BOOL
+            True to return covariance values
+        8) var_denom : ARRAY [year x time x lat x lon]
+            Rather than autovariance, replace SST(t) with vardenom(t).
+        9) return_dict : BOOL
+            True to return dictionary
+        
     Outputs
     -------     
         1) damping   : ARRAY [month x lag x lat x lon]
@@ -1933,6 +1983,8 @@ def calc_HF(sst,flx,lags,monwin,verbose=True,posatm=True,return_cov=False):
     
     sst = sst.reshape(nyr,12,nlat*nlon)
     flx = flx.reshape(sst.shape)
+    if var_denom is not None:
+        var_denom = var_denom.reshape(sst.shape)
     #sst = sst.reshape(int(ntime/12),12,nlat*nlon)
     #flx = flx.reshape(sst.shape)
     
@@ -1955,7 +2007,10 @@ def calc_HF(sst,flx,lags,monwin,verbose=True,posatm=True,return_cov=False):
             # Restrict to time ----
             flxmon = indexwindow(flx,m,monwin,combinetime=True,verbose=False)
             sstmon = indexwindow(sst,m,monwin,combinetime=True,verbose=False)
-            sstlag = indexwindow(sst,lm,monwin,combinetime=True,verbose=False)
+            if var_denom is None:
+                sstlag = indexwindow(sst,lm,monwin,combinetime=True,verbose=False)
+            else:
+                sstlag = indexwindow(var_denom,lm,monwin,combinetime=True,verbose=False)
             
             # Compute Correlation Coefficients ----
             crosscorr[m,l,:] = proc.pearsonr_2d(flxmon,sstlag,0) # [space]
@@ -1988,6 +2043,15 @@ def calc_HF(sst,flx,lags,monwin,verbose=True,posatm=True,return_cov=False):
             crosscorr*=-1
             covall*=-1
     
+    if return_dict:
+        outdict = {
+            'damping':damping,
+            'autocorr':autocorr,
+            'crosscorr':crosscorr,
+            'autocovall':autocovall,
+            'covall':covall
+            }
+        return outdict
     if return_cov:
         return damping,autocorr,crosscorr,autocovall,covall
     return damping,autocorr,crosscorr
@@ -2259,7 +2323,7 @@ def remove_enso(invar,ensoid,ensolag,monwin,reduceyr=True,verbose=True,times=Non
 
     # Standardize the index (stdev = 1)
     ensoid = ensoid/np.std(ensoid,(0,1))
-
+    
     # Shift ENSO by the specified enso lag
     ensoid = np.roll(ensoid,ensolag,axis=1) # (ex: Idx 0 (Jan) is now 11)
 
@@ -2985,20 +3049,20 @@ def integrate_noentrain(lbd,F,T0=0,multFAC=True,debug=False):
         return T,damping_term,forcing_term
     return T
 
-def integrate_entrain(h,kprev,lbd_a,F,T0=0,multFAC=True,debug=False,Td0=False):
+def integrate_entrain(h,kprev,lbd_a,F,T0=0,multFAC=True,debug=False,Td0=False,add_F=None,return_dict=False,Tdexp=None):
     """
     
     Parameters
     ----------
-    h : ARRAY [12,]
+    h : ARRAY [lon x lat x 12,]
         MIXED LAYER DEPTHS (M)
-    kprev : ARRAY [12,]
+    kprev : ARRAY [lon x lat x 12]
         INDICES OF DETRAINMENT MONTH
-    lbd_a : ARRAY
-        DESCRIPTION.
-    F : TYPE
-        DESCRIPTION.
-    T0 : TYPE, optional
+    lbd_a : ARRAY [lon x lat x 12]
+        Atmospheric heat flux damping, units of deg/sec.
+    F     : ARRAY [lon x lat x 12]
+        Forcing, in units of deg/sec
+    T0 : Initial temperature, optional
         DESCRIPTION. The default is 0.
     multFAC : TYPE, optional
         DESCRIPTION. The default is True.
@@ -3006,12 +3070,15 @@ def integrate_entrain(h,kprev,lbd_a,F,T0=0,multFAC=True,debug=False,Td0=False):
         DESCRIPTION. The default is False.
     Td0 : ARRAY [len(Tdgrab)]
         DESCRIPTION. The default is False.
-
+    add_F : ARRAYs [lon x lat x time]
+        Additional forcing to add to the expression. This is directly
+        passed into the function for each point and nothing further is done...
+        
     Returns
     -------
     TYPE
         DESCRIPTION.
-
+        
     """
     
     nlon,nlat,ntime = F.shape
@@ -3027,6 +3094,10 @@ def integrate_entrain(h,kprev,lbd_a,F,T0=0,multFAC=True,debug=False,Td0=False):
     FAC = 1
     if multFAC:
         FAC = calc_FAC(lbd)
+        
+    # Set Td damping timescale
+    if Tdexp is None:
+        Tdexp = np.zeros(FAC.shape)
     
     # Preallocate
     T      = np.zeros((nlon,nlat,ntime))
@@ -3052,8 +3123,15 @@ def integrate_entrain(h,kprev,lbd_a,F,T0=0,multFAC=True,debug=False,Td0=False):
             # If initial values are provided, get value
             T0_in = T0[o,a]
             
+            # Check for additional forcing
+            if add_F is not None:
+                add_F_in = add_F[o,a,:]
+            else:
+                add_F_in = None
+                
             # Integrate in time
-            temp_ts,damp_ts,noise_ts,entrain_ts,Td_ts = entrain(ntime,lbd[o,a,:],T0_in,F[o,a,:],beta[o,a,:],h[o,a,:],kprev[o,a,:],FAC[o,a,:],multFAC=multFAC,debug=True,debugprint=False,Tdgrab=Tdgrab)
+            temp_ts,damp_ts,noise_ts,entrain_ts,Td_ts = entrain(ntime,lbd[o,a,:],T0_in,F[o,a,:],beta[o,a,:],h[o,a,:],kprev[o,a,:],FAC[o,a,:],
+                                                                multFAC=multFAC,debug=True,debugprint=False,Tdgrab=Tdgrab,add_F=add_F_in,Tdexp=Tdexp[o,a,:])
             
             # Save outputs
             T[o,a,:]            = temp_ts.copy()
@@ -3070,8 +3148,18 @@ def integrate_entrain(h,kprev,lbd_a,F,T0=0,multFAC=True,debug=False,Td0=False):
         print("WARNING ALL ARE NAN")
     
     if debug:
+        if return_dict:
+            output_dict = {
+                'T'            : T,
+                'damping_term' : damping_term,
+                'forcing_term' : forcing_term,
+                'entrain_term' : entrain_term,
+                "Td"           : Td,
+                "beta"         : beta,
+                "FAC"          : FAC,
+                }
+            return output_dict
         return T,damping_term,forcing_term,entrain_term,Td
-    
     return T
 
 def method1(lbd,include_b=True):
@@ -3260,6 +3348,19 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
     else:
         qek_flag = False
         
+    # If option is set, load Tdexp
+    # -----------------------------------------------------------
+    if "Tdexp" in custom_params.keys():
+        print("Now Including Td Damping")
+        Td_name = custom_params["Tdexp"]
+        ldTd      = np.load(input_path+Td_name)
+        Td_raw  = ldTd['Tddamp']
+        Td_raw *= limask[None,:,:]
+        # Restrict to Region ------------------------------------------
+        outputsTd,_,_ = cut_regions([Td_raw],ldTd['lon'],ldTd['lat'],bboxsim,pointmode,points=points)
+        Tdexp = outputsTd[0]
+    else:
+        Tdexp = None
 
     # Load data from an older experiment to continue the run
     # ------------------------------------------------------
@@ -3353,7 +3454,7 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
                 print("Saving terms separately for budget analysis. Only the entrain model will run.")
                 # Calculate each term separately 
                 T,damping_term,forcing_term,entrain_term,Td   = integrate_entrain(h_in,kprev,lbd_a,F,
-                                                                                  T0=T0,multFAC=True,debug=True,Td0=Td0)
+                                                                                  T0=T0,multFAC=True,debug=True,Td0=Td0,Tdexp=Tdexp)
                 
                 # Compute some things that were in intergrate_entrain
                 beta = calc_beta(h_in)
@@ -3362,7 +3463,7 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
                 
             else:
                 T   = integrate_entrain(h_in,kprev,lbd_a,F,
-                                        T0 = T0,multFAC=True,debug=False,Td0=Td0)
+                                        T0 = T0,multFAC=True,debug=False,Td0=Td0,Tdexp=Tdexp)
         
         if budget:
             savedict = {

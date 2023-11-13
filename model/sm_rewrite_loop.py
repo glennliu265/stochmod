@@ -116,6 +116,8 @@ startfile   = None
 custom_params         = {}
 # Uncomment to add q_ek of your choosing...
 #custom_params['q_ek'] = "Qek_eof_090pct_FULL_PIC_eofcorr0_Fprime_rolln0.npy"
+custom_params["Tdexp"] = "Td_Damping_HTR_ens01_13lagfit.npz"
+
 
 # Save for Budget Analyses
 budget = False # Set to True to only run entrain, and save budget analyses separately
@@ -263,7 +265,6 @@ for f in range(len(frcnames)):
     expnames = []
     for r,runid in enumerate(runids):
         
-        
         expname    = "%sstoch_output_forcing%s_%iyr_run%s_ampq%i_method%i_useslab%i%s.npz" % (output_path,frcname,int(t_end/12),runid,ampq,method,useslab,ensostr)
         if budget:
             expname = proc.addstrtoext(expname,"_budget")
@@ -273,7 +274,10 @@ for f in range(len(frcnames)):
             print("Using Ekman Forcing!")
             correction_str = '_Qek'
             expname = proc.addstrtoext(expname,correction_str)
-        
+        if "Tdexp" in custom_params.leys():
+            print("Using Td Damping!")
+            correction_str = '_Tddamp'
+            expname = proc.addstrtoext(expname,correction_str)
         
         if continuous:
             if r == 0: # First Run
