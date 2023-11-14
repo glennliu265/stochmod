@@ -292,7 +292,7 @@ fnames = ["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_
 fnames = ["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02i_ampq0_method5_useslab2" %i for i in range(10)]
 
 # 90% Variance, Default with Td Damping
-fnames = ["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_useslab0_ensorem0_Tddamp.npz" %i for i in range(10)]
+fnames = ["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_useslab0_ensorem0_Tddamp" %i for i in range(10)]
 
 print("Now processing the following files: \n ")
 print(*fnames, sep='\n')
