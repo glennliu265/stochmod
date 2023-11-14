@@ -16,7 +16,7 @@ import sys
 import cmocean
 from tqdm import tqdm
 #%% Set Paths, Import Custom Modules
-stormtrack = 0
+stormtrack = 1
 if stormtrack == 0:
     projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
     datpath     = projpath + '01_Data/model_output/'
@@ -291,10 +291,13 @@ fnames = ["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_
 #stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run209_ampq0_method5_useslab2.npz
 fnames = ["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02i_ampq0_method5_useslab2" %i for i in range(10)]
 
+# 90% Variance, Default with Td Damping
+fnames = ["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_useslab0_ensorem0_Tddamp.npz" %i for i in range(10)]
+
 print("Now processing the following files: \n ")
 print(*fnames, sep='\n')
 
-n_models=1 # SET TO 1 for EKMAN FORCING< None for all others!!!!
+n_models=None # SET TO 1 for EKMAN FORCING< None for all others!!!!
 #%% Post Process Outputs (Calculate AMV, Autocorrelation)
 for frcname in tqdm(fnames):
     expid = frcname
