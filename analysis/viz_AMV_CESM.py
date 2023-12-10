@@ -37,7 +37,7 @@ import yo_box as ybx
 
 # Path to data 
 projpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
-outpath = projpath + '02_Figures/20230220/'
+outpath = projpath + '02_Figures/20231127/'
 proc.makedir(outpath)
 datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/"
 
@@ -132,7 +132,6 @@ print("preprocessed PiC Data in %.2fs"%(time.time()-st))
 # # sstfull = sstfull.transpose(2,1,0)
 # # sstslab = sstslab.transpose(2,1,0)
 
-
 # # Flip longitude
 # st = time.time()
 # lon180,sstfull = proc.lon360to180(lon360,sstfull)
@@ -151,7 +150,6 @@ print("preprocessed PiC Data in %.2fs"%(time.time()-st))
 
 # #
 # #proc.sel_region(sstfull,lon360,
-
 
 #%% Save the data above as netcdf files
 
@@ -183,6 +181,7 @@ for s in tqdm(range(2)):
     print("Saving to %s" % savename)
     da.to_netcdf(savename,
              encoding=encoding_dict)
+
 # --------------------------------------------------------------
 #%% Postprocess in manner similar to the stochastic model output
 # --------------------------------------------------------------
@@ -196,7 +195,6 @@ projpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/
 datpath1     = projpath + '01_Data/model_output/'
 rawpath     = projpath + '01_Data/model_input/'
 outpathdat  = datpath1 + '/proc/'
-
 
 #%% Set preloaded inputs, # of lags
 preload = [lon180,lat,sstas]

@@ -160,8 +160,6 @@ plt.pcolormesh(dampingslab.sum(2).T)
 alpha_slab_mask = np.sum(alpha,(2,3)).T
 alpha_full_mask = np.sum(alpha_full,(2,3)).T
 
-
-
 # -------------------------------------
 #%% Retrieve data for point comparisons
 # -------------------------------------

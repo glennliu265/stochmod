@@ -42,7 +42,8 @@ scriptpath = projpath + '03_Scripts/stochmod/'
 datpath    = projpath + '01_Data/'
 outpath    = projpath + '02_Figures/20210125_AMVTele/'
 input_path  = datpath + 'model_input/'
-outfigpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20210204/"
+outfigpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20231208/"
+proc.makedir(outfigpath)
 
 # Plotting range
 cmbal = cmocean.cm.balance
@@ -371,4 +372,86 @@ for o in tqdm(range(nlon)):
 np.save("%sFULL_PIC_HMXL_hclim.npy"% (input_path),mldcycle)
 np.save("%sFULL_PIC_HMXL_kprev.npy"% (input_path),kprev)
 np.save("%sFULL_PIC_HMXL_hclim_400to1400mean.npy"% (input_path),mld_1kmean)
+
+
+#%% Redo above but for HBLT
+
+# Load in PIC FULL HBLT, processed by prep_mld_PIC.py
+# Mixed Layer Depths
+st = time.time()
+dshblt = xr.open_dataset(datpath+"/CESM_proc/HBLT_FULL_PIC_bilinear.nc")
+hblt = dshblt.HBLT.values/100
+lon = dshblt.lon.values
+lat = dshblt.lat.values
+hblt = hblt.transpose(2,1,0) # [time x lat x lon] --> [lon x lat x time]
+print("Loaded MLD in %.2fs"% (time.time()-st))
+
+
+# Calculate seasonal MLDs
+scycleh,hblt_monyr = proc.calc_clim(hblt,2,returnts=1)
+
+# Calculate 1kyr mean
+hblt_1kyr   = hblt[:,:,:1000]
+hblt_1kmean = hblt_1kyr.mean(2)
+
+# Calculate Kprev
+kprev_hblt = np.zeros((nlon,nlat,12))*np.nan
+for o in tqdm(range(nlon)):
+    for a in range(nlat):
+        hbltpt = scycleh[o,a,:]
+        kprev_hblt[o,a,:],_=scm.find_kprev(hbltpt)
+        
+        
+# Save some outputs
+np.save("%sFULL_PIC_HBLT_hclim.npy"% (input_path),scycleh)
+np.save("%sFULL_PIC_HBLT_kprev.npy"% (input_path),kprev_hblt)
+np.save("%sFULL_PIC_HBLT_hclim_400to1400mean.npy"% (input_path),hblt_1kmean)
+
+if debug:
+    lonf,latf = -30,50
+    klon,klat = proc.find_latlon(lonf,latf,lon,lat)
+    
+    # Plot Differences in Seasonal Cycle at a Point
+    fig,ax = plt.subplots(1,1,constrained_layout=True,figsize=(6,4))
+    mons3 = proc.get_monstr(nletters=3)
+    ax.plot(mons3,mldcycle[klon,klat,:],label="HMXL")
+    ax.plot(mons3,scycleh[klon,klat,:] ,label="HBLT")
+    ax.legend()
+    ax.set_title("Climatology in CESM1 PiC @ 30W, 50N")
+    ax.set_xlabel("Depth (meters)")
+    savename = "%sHBLT_v_HMXL.png" % (outfigpath)
+    plt.savefig(savename,dpi=150,bbox_inches='tight')
+    
+    # Plot Seasonal Cycle in Differences
+    mld_savg,snames = proc.calc_savg(mldcycle,return_str=True)
+    hblt_savg=proc.calc_savg(scycleh)
+    
+    fig,axs = viz.init_fig(2,2,figsize=(12,8))
+    bboxplot = [-80,0,30,70]
+    cmaxs    = [150,200,20,50]
+    for ax in axs.flatten():
+        ax = viz.add_coast_grid(ax,bbox=bboxplot,)
+    
+    
+    for s in range(4):
+        
+        ax= axs.flatten()[s]
+        plotvar = mld_savg[s] - hblt_savg[s]
+        cmax = cmaxs[s]
+        pcm = ax.pcolormesh(lon,lat,plotvar.T,cmap="cmo.balance",vmin=-cmax,vmax=cmax)
+        fig.colorbar(pcm,ax=ax,fraction=0.045,orientation='horizontal',pad=0.01)
+        ax.set_title(snames[s],fontsize=18)
+    plt.suptitle("Seasonal Average Differences (HMXL - HBLT)",fontsize=22)
+    savename = "%sHBLT_v_HMXL_savg.png" % (outfigpath)
+    plt.savefig(savename,dpi=150,bbox_inches='tight')
+        
+    
+
+
+
+
+
+#%%
+
+
     

@@ -40,14 +40,15 @@ projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 datpath     = projpath + '01_Data/'
 input_path  = datpath + 'model_input/'
 output_path = datpath + 'model_output/'
-outpath = projpath + '02_Figures/20210316/'
+outpath = projpath + '02_Figures/20230914/'
+proc.makedir(outpath)
 
 # Load in control data for 50N 30W
 #fullauto =np.load(datpath+"Autocorrelation_30W50N_FULL_PIC_12805.npy",allow_pickle=True)
 fullauto = np.load(datpath+"FULL_PIC_autocorr_lon330_lat50_lags0to36_month2.npy")
 
-mons3=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
-labels=["MLD Fixed","MLD Mean","MLD Seasonal","MLD Entrain"]
+mons3    = ('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
+labels   = ["MLD Fixed","MLD Mean","MLD Seasonal","MLD Entrain"]
 #labels=["MLD (MAX)","MLD Seasonal","MLD Entrain"]
 #colors=["red","orange","magenta","blue"]
 expcolors = ('blue','orange','magenta','red')
@@ -181,7 +182,7 @@ def synth_stochmod(config,verbose=False,viz=False,
         if verbose:
             print("Generating New Forcing")
     else:
-        randts = np.load(output_path+"Forcing_fstd%.2f_%s.npy"% (config['fstd'],config['runid']))
+        randts = np.load(output_path+"../model_input/Forcing_fstd%.2f_%s.npy"% (config['fstd'],config['runid']))
         if verbose:
             print("Loading Old Forcing")
     
@@ -336,7 +337,7 @@ locstringtitle = "Lon: %.1f Lat: %.1f" % (query[0],query[1])
 # Run Model
 #config['Fpt'] = np.roll(Fpt,1)
 ac,sst,dmp,frc,ent,Td,kmonth,params=synth_stochmod(config)
-[o,a],damppt,mldpt,kprev,Fpt = params
+[o,a],damppt,mldpt,kprev,Fpt       = params
 
 # Read in CESM autocorrelation for all points'
 kmonth = np.argmax(mldpt)
@@ -384,7 +385,6 @@ ax.legend(fontsize=8)
 plt.tight_layout()
 plt.savefig(outpath+"Compare_Autocorrelation_CESM.png",dpi=200)
 
-
 #%% Quick plot of the output
 
 fig,ax=plt.subplots(1,1,figsize=(8,3))
@@ -408,6 +408,7 @@ ax.set_ylabel("degC")
 ax.set_title("Stochastic Model SST (12-year Running Mean)")
 plt.tight_layout()
 plt.savefig("%sStochasticModelSST_comparison.png"%(outpath),dpi=150)
+
 # -------------------------
 #%% # Run some experiments
 # -------------------------
@@ -546,8 +547,6 @@ vcalc = [sst[i],dmp[i],frc[i]]
 vac = []
 for v in vcalc:
     vac.append(scm.calc_autocorr([v],config['lags'],kmonth+1))
-    
-
 
 fig,ax = plt.subplots(1,1)
 title="Autocorrelation by Term for %s model \n %s" % (labels[i],locstringtitle,)

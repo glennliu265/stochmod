@@ -21,12 +21,13 @@ import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+import os
 
 #%% Select dataset to postprocess
 
 # Set Machine
 # -----------
-stormtrack = 0 # Set to True to run on stormtrack, False for local run
+stormtrack  = 1 # Set to True to run on stormtrack, False for local run
 
 # Autocorrelation parameters
 # --------------------------
@@ -36,7 +37,8 @@ thresholds  = [0,] # Standard Deviations
 conf        = 0.95
 tails       = 2
 
-mconfig    = "PIC-FULL"#"HadISST" #["PIC-FULL","HTR-FULL","PIC_SLAB","HadISST","ERSST"]
+# For Stochastic Model Output, indicate SM_[runname], with runnames indicated in stochmod_params
+mconfig    = "SM_Tddamp"# "PIC-FULL"#"HadISST" #["PIC-FULL","HTR-FULL","PIC_SLAB","HadISST","ERSST"]
 runid      = 9
 thresholds = [0,]
 thresname  = "thres" + "to".join(["%i" % i for i in thresholds])
@@ -48,9 +50,13 @@ glonpath   = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_D
 glatpath   = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/model_input/CESM1_lat.npy"
 
 # Load another variable to compare thresholds (might need to manually correct)
-thresvar      = True #
+thresvar      = False #
 thresvar_name = "HMXL"  
-thresvar_path = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/thresholdvar/HMXL_FULL_PIC_lon-80to0_lat0to65_DTNone.nc"
+if stormtrack:
+    thresvar_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/thresholdvar/HMXL_FULL_PIC_lon-80to0_lat0to65_DTNone.nc"
+else:
+    thresvar_path = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/thresholdvar/HMXL_FULL_PIC_lon-80to0_lat0to65_DTNone.nc"
+
 if thresvar is True:
     loadvar = xr.open_dataset(thresvar_path)
     loadvar = loadvar[thresvar_name].values.squeeze() # [time x lat x lon]
@@ -101,23 +107,33 @@ else:
     # Output Paths
     figpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220930/'
     outpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/'
-    
+
+cwd = os.getcwd()
+sys.path.append(cwd+"/../")
+import stochmod_params as sparams
+   
 # Import modules
 from amv import proc,viz
 import scm
+import stochmod_params as sparams
 
-# Set Input Names
+#%% Set Input Names
 # ---------------
 if "SM" in mconfig: # Stochastic model
     # Postprocess Continuous SM  Run
     # ------------------------------
+    smname = mconfig[3:] # Crop out "SM_"
     print("WARNING! Not set up for stormtrack yet.")
+    
+    fnames = sparams.rundicts[smname]
+    fnames = ["stoch_output_%s.npz" % f for f in fnames]
+    
     if "Qek" in mconfig:
-        fnames      = ["stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_dmp0_Qek.npz" %i for i in range(10)]
         mnames      = ["entraining"] 
     else:
-        fnames      = ["stoch_output_forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_dmp0.npz" %i for i in range(10)]
         mnames      = ["constant h","vary h","entraining"]
+    
+    
 elif "PIC" in mconfig:
     # Postproess Continuous CESM Run
     # ------------------------------
@@ -147,7 +163,6 @@ if thresvar is True:
     savename = proc.addstrtoext(savename,"_thresvar%s" % (thresvar_name))
 
 print("Output will save to %s" % savename)
-
 #%% Read in the data (Need to update for variable name)
 st = time.time()
 
@@ -210,13 +225,12 @@ elif mconfig == "ERSST":
     # Load the data
     sst,lat,lon=scm.load_ersst(datpath,startyr=1900)
     
-    # Fliip the longitude
+    # Flip the longitude
     lon,sst = proc.lon360to180(lon,sst)
     
     # Slice to region
     sst,lon,lat = proc.sel_region(sst,lon,lat,bboxlim)
-    
-    
+
 print("Loaded data in %.2fs"% (time.time()-st))
 
 # Apply land/ice mask if needed
@@ -271,8 +285,10 @@ nthres          = len(thresholds)
 sstrs                = sst.reshape(npts,ntime)
 if varname == "SSS":
     sstrs[:,219]     = 0 # There is something wrong with this timestep?
+    
 if thresvar: # Only analyze where both threshold variable and target var are non-NaN
-    loadvarrs = loadvar.reshape(npts,ntime)
+    ntimeldvar = loadvar.shape[2]
+    loadvarrs    = loadvar.reshape(nlat*nlon,ntimeldvar)
     _,knan,okpts = proc.find_nan(sstrs*loadvarrs,1) # [finepoints,time]
     sst_valid     = sstrs[okpts,:]
     loadvar_valid = loadvarrs[okpts,:]

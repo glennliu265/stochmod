@@ -30,7 +30,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20230512/"
+    figpath     = projpath + "02_Figures/20231117/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -60,9 +60,10 @@ continuous = True # Set to True to Load a continuous run with the lines below
 if continuous:
     # Do a continuous Run
     # -------------------
-    fnames   = ["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_dmp0"%i for i in range(10)]
+    fnames   = ["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_useslab0_ensorem0_Tddamp"%i for i in range(10)]
     frcnamelong = ["$F'$ run 2%02d" % (i) for i in range(10)]
     exname   = "Fprime_amq0_method5_cont"
+    
 else:
     # Options to determine the experiment ID (Old Format)
     # --------------------------------------------------
@@ -519,7 +520,7 @@ else:
     bb = []
     vv = []
     for rid in range(len(regions)):
-        
+    
         # Get SSTs
         insst = []
         for mid in range(len(modelnames)):

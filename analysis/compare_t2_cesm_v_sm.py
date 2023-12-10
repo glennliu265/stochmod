@@ -46,7 +46,7 @@ varname    = "SSS" #"SST"
 
 # Set Output Directory
 # --------------------
-figpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220817/'
+figpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20231117/'
 proc.makedir(figpath)
 outpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/'
 savename   = "%s%s_%s_autocorrelation_%s_%s.npz" %  (outpath,mconfig,varname,thresname,lagname)
@@ -67,7 +67,7 @@ mcolors     = ["red","magenta","orange"]
 # Postprocess Continuous SM  Run
 # ------------------------------
 datpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_output/"
-fnames      = ["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_dmp0"%i for i in range(10)]
+fnames      = ["forcingflxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0_1000yr_run2%02d_ampq0_method5_useslab0_ensorem0_Tddamp"%i for i in range(10)]
 mnames      = ["constant h","vary h","entraining"] 
 
 #%% Load in the stochastic model data

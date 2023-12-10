@@ -95,5 +95,42 @@ rundicts  = dict(zip(runnames,runlists))
 #%% General Names for Plotting, Display, ETC
 
 
+#%% Stochastic Model Hierarchy Names
+
+# Taken some sections from analysis/sm_paper_stylesheet/
+modelnames  = ("Constant h (Level 3)","Vary h (Level 4)","Entraining (Level 5)")
+mcolors     = ["red","magenta","orange"]
+
+
+
+# SM Lower Hierarchy (05/25/2021)
+ecol_lower       = ["blue",'cyan','gold','red']
+els_lower        = ["dotted","dashdot","dashed","solid"]
+# labels_lower     = ["All Constant",
+#                      r"Vary $F'$",
+#                      r"Vary $\lambda_a$",
+#                      "Vary $F'$ and $\lambda_a$"] 
+labels_lower     = ["All Constant (Level 1)",
+                     r"Vary $F'$ (Level 2b)",
+                     r"Vary $\lambda_a$ (Level 2a)",
+                     "Vary $F'$ and $\lambda_a$ (Level 3)"]  # Added Level Labels
+
+# SM Upper Hierarchy (05/25/2021)
+
+
+
+# SM Upper Hierarchy (05/25/2021)
+# labels_upper = ["h=50m",
+#                  "Vary $F'$ and $\lambda_a$",
+#                  "Vary $F'$, $h$, and $\lambda_a$",
+#                  "Entraining"]
+labels_upper = ["h=50m",
+                 "Vary $F'$ and $\lambda_a$ (Level 3)",
+                 "Vary $F'$, $h$, and $\lambda_a$ (Level 4)",
+                 "Entraining (Level 5)"] # Added Level Labels
+ecol_upper = ('mediumorchid','red','magenta','orange')
+els_upper = ["dashdot","solid","dotted","dashed"]
+
+
 #%%
 

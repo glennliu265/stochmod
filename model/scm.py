@@ -1037,6 +1037,7 @@ def noentrain_2d(randts,lbd,T0,F,FAC,multFAC=1,debug=False):
     return temp_ts
 
 #%% Postprocessing Utilities
+
 def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
                             returnresults=False,preload=None,
                             mask_pacific=False,savesep=False,
@@ -1082,11 +1083,11 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
     bbox_TR     = [-75,-15,10,20]
     bbox_NA     = [-80,0 ,0,65]
     bbox_NA_new = [-80,0,10,65]
-    bbox_ST_w  = [-80,-40,20,40]
-    bbox_ST_e  = [-40,-10,20,40]
-    bbox_NA_ex = [-80,0,20,60]
-    regions = ("SPG","STG","TRO","NAT","NNAT","STGe","STGw","NATex")        # Region Names
-    bboxes = (bbox_SP,bbox_ST,bbox_TR,bbox_NA,bbox_NA_new,bbox_ST_e,bbox_ST_w,bbox_NA_ex) # Bounding Boxes
+    bbox_ST_w   = [-80,-40,20,40]
+    bbox_ST_e   = [-40,-10,20,40]
+    bbox_NA_ex  = [-80,0,20,60]
+    regions     = ("SPG","STG","TRO","NAT","NNAT","STGe","STGw","NATex")        # Region Names
+    bboxes      = (bbox_SP,bbox_ST,bbox_TR,bbox_NA,bbox_NA_new,bbox_ST_e,bbox_ST_w,bbox_NA_ex) # Bounding Boxes
     
     #% ---- Read in Data ----
     start = time.time()
@@ -1117,7 +1118,7 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
         lonr,latr,sst = preload
     if n_models is None:
         n_models = len(sst) # Checks number of SSTs is list by default
-       
+    
     # Load MLD Data
     # -------------
     mld = np.load(rawpath+"FULL_PIC_HMXL_hclim.npy") # Climatological MLD
@@ -1265,7 +1266,8 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
     print("Data has been saved to %s" % (outpathdat))
     if returnresults == True:
         return sstregion,autocorr_region,kmonths,sstavg_region,amvidx_region,amvpat_region
-    
+
+
 def calc_autocorr(sst,lags,basemonth,calc_conf=False,conf=0.95,tails=2):
     """
     Calculate autocorrelation for output of stochastic models
@@ -3100,7 +3102,7 @@ def integrate_entrain(h,kprev,lbd_a,F,T0=0,multFAC=True,debug=False,Td0=False,ad
         Tdexp = np.zeros(FAC.shape)
     
     # Preallocate
-    T      = np.zeros((nlon,nlat,ntime))
+    T            = np.zeros((nlon,nlat,ntime))
     damping_term = T.copy()
     forcing_term = T.copy()
     entrain_term = T.copy()
@@ -3157,6 +3159,7 @@ def integrate_entrain(h,kprev,lbd_a,F,T0=0,multFAC=True,debug=False,Td0=False,ad
                 "Td"           : Td,
                 "beta"         : beta,
                 "FAC"          : FAC,
+                "lbd"          : lbd,
                 }
             return output_dict
         return T,damping_term,forcing_term,entrain_term,Td

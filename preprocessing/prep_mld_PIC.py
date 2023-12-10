@@ -23,8 +23,8 @@ import xesmf as xe
 
 #%% User Edits
 
-varname       = "BSF" # "HMXL"
-mconfig       = "FULL_HTR" # [FULL_PIC, SLAB_PIC, FULL_HTR]
+varname       = "HBLT" # "HMXL"
+mconfig       = "FULL_PIC" # [FULL_PIC, SLAB_PIC, FULL_HTR]
 
 use_xesmf     = True # Use xESMF for regridding. False = box average
 method        = "bilinear" # regridding method
@@ -48,6 +48,8 @@ elif mconfig == "FULL_HTR":
 # Adjust data path on stormtrack
 if varname == "SSS":
     datpath   = "/vortex/jetstream/climate/data1/yokwon/CESM1_LE/processed/ocn/proc/tseries/monthly/SSS/"
+elif varname == "HBLT":
+    datpath  = "/stormtrack/data4/glliu/01_Data/CESM1_PIC/HBLT/"
 else:
     datpath   = "/vortex/jetstream/climate/data1/yokwon/CESM1_LE/downloaded/ocn/proc/tseries/monthly/%s/" % varname
 
