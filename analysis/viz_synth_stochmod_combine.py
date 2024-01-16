@@ -12,7 +12,8 @@ Contains Plots for
  - Stochastic Model Plots (ACs, Spectra)
  - Presentations, successively adding lines for lower/upper hierarchy
  - AGU 2021 Poster (Vertically stacked AC and Spectra)
- - OSM Plots
+ - OSM 2022 Plots
+ - Cloud Locked Simulation Spectra + AC Comparison
 
 Created on Wed Oct  6 22:17:26 2021
 
@@ -37,7 +38,7 @@ projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 datpath     = projpath + '01_Data/'
 input_path  = datpath + 'model_input/'
 output_path = datpath + 'model_output/'
-outpath     = projpath + '02_Figures/20230711/'
+outpath     = projpath + '02_Figures/20240119/'
 proc.makedir(outpath)
 
 pubready   = True
@@ -101,7 +102,7 @@ config.pop('mldpt',None)
 
 
 # Plotting Mode
-darkmode = True
+darkmode = False
 if darkmode:
     plt.style.use("dark_background")
     dfcol = "w"
@@ -122,8 +123,8 @@ locstringtitle = "Lon: %.1f Lat: %.1f" % (query[0],query[1])
 
 # Run Model
 #config['Fpt'] = np.roll(Fpt,1)
-ac,sst,dmp,frc,ent,Td,kmonth,params=scm.synth_stochmod(config,projpath=projpath)
-[o,a],damppt,mldpt,kprev,Fpt       =params
+ac,sst,dmp,frc,ent,Td,kmonth,params = scm.synth_stochmod(config,projpath=projpath)
+[o,a],damppt,mldpt,kprev,Fpt        = params
 darkmode = False
 
 # Read in CESM autocorrelation for all points'
@@ -161,6 +162,8 @@ Fptdef = Fpt.copy()
 sstall = sst
 
 #%% Load Constant_v_vary experiments
+# This was saved from constant_v_variable.py
+
 savenames = "%sconst_v_vary_%s_runid%s_%s.npz" % (output_path,config['mconfig'],config['runid'],config['fname'])
 print("Loading %s" % savenames)
 ld        = np.load(savenames,allow_pickle=True)
@@ -179,6 +182,7 @@ confs     = ld['confs']
 #     'forces':forces,
 #     'explongs':explongs
 #     },allow_pickle=True)
+
 # --------------------
 #%% Calculate Confidence Intervals
 # --------------------
@@ -1360,3 +1364,75 @@ ax.plot(monfreq*dtplot, monspec/dtplot,label="monthly")
 ax.set_xlim([0,1])
 ax.set_ylabel("Frequency (1/year)")
 #ax.plot(yrfreqs*dtplot,yrspec/dtplot)
+
+
+
+# -----------------------------------------------------------------------------
+# %% Monthly Variance
+# -----------------------------------------------------------------------------
+"""
+Note: Copied lines from "calculate spectra cell around l.371
+
+"""
+
+# Make Monthly Variance Plots
+inssts   = [c_ssts[0][1],c_ssts[1][1],c_ssts[2][1],c_ssts[3][1],sst[1],sst[2],sst[3],cssts[0],cssts[1]]
+nsmooths = np.concatenate([np.ones(len(inssts)-2)*nsmooth,cnsmooths])
+labels   = np.concatenate([labels_lower,labels_upper[1:],['CESM-FULL','CESM-SLAB']])
+allcols  = np.concatenate([ecol_lower,ecol_upper[1:],[dfcol,"gray"]])
+
+# Check and compute monthly variance
+[print(sst.shape) for sst in inssts]
+monvars = [proc.calc_monvar(sst) for sst in inssts]
+
+# Load/Set some plotting params
+plotids = [[0,1,2,4,7,8],[4,5,6,7,8]] # Top/Bottom Hierarchy Levels
+
+
+# Save the Output for debugging
+outdir = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/debug_stochmod/"
+savename = "%ssynth_stochmod_combine_output.npz" % outdir
+np.savez(savename,**{
+    'ssts':inssts,
+    'labels' : labels,
+    'colors' : allcols,
+    'monvars': monvars,
+    'acs' : allacs,
+    'specs': specs,
+    'freqs': freqs,
+    })
+
+#%% Plot Monthly Variance for Each level of the hiErarchy
+fsz_axis = 14
+fsz_sp   = 16
+fsz_ticks = 14
+labelssp = ["Levels 1-3","Levels (3-5)"]
+# Visualize Output
+fig,axs = plt.subplots(2,1,sharey=True,constrained_layout=True,figsize=(8,8))
+
+for a in range(2):
+    ax = axs[a]
+    
+    plotid = plotids[a]
+    
+    # Plot Lower hierarchy
+    for pid in plotid:
+        if pid > 6:
+            ls='dashed'
+            marker="d"
+        else:
+            ls="solid"
+            marker="o"
+        ax.plot(mons3,monvars[pid],label=labels[pid],color=allcols[pid],lw=2.5,marker=marker,ls=ls)
+    
+    # Axis Formatting
+    ax.set_xlim([0,11])
+    ax.legend(ncol=2,fontsize=fsz_axis-2)
+    ax.grid(True,ls='dashed')
+    ax.set_ylim([0.1,1.6])
+    ax = viz.label_sp(labelssp[a],labelstyle="%s",usenumber=True,ax=ax,alpha=0.75,fontsize=fsz_sp)
+    ax.set_ylabel(r"SST Variance ($\degree C^2$)",fontsize=  fsz_axis)
+    ax.tick_params(axis='both', labelsize=fsz_ticks)
+
+savename = "%sMonthlyVariance_50N30W.png" % outpath
+plt.savefig(savename,dpi=150,bbox_inches="tight")
