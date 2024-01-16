@@ -11,7 +11,6 @@ Copied blocks from the stochmod_synth script
 @author: gliu
 """
 
-
 import numpy as np
 from scipy.io import loadmat,savemat
 import matplotlib.pyplot as plt
@@ -36,7 +35,7 @@ projpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/
 datpath     = projpath + '01_Data/'
 input_path  = datpath + 'model_input/'
 output_path = datpath + 'model_output/'
-outpath     = projpath + '02_Figures/20220225/'
+outpath     = projpath + '02_Figures/20240115/'
 proc.makedir(outpath)
 
 darkmode = False

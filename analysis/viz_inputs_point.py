@@ -8,14 +8,14 @@ Plots included...
 
 [1] Comparing EOF-based forcing (SLAB and FULL) vs. Old Forcing (FLXSTD)
 [2] Seasonal cycle of inputs (Damping, Forcing, MLD) from Generals
-
 [3] Stochastic Model Inputs (seasonal averages, FULL)
-
 
 Created on Tue Apr 27 01:20:49 2021
 Updated Oct 2021 ...
 
+
 @author: gliu
+
 """
 
 import sys
@@ -42,10 +42,10 @@ import cmocean
 from matplotlib import colors
 
 #%% User Edits
-projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
-scriptpath = projpath + '03_Scripts/stochmod/'
-datpath    = projpath + '01_Data/'
-outpath    = projpath + '02_Figures/20230907/'
+projpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
+scriptpath  = projpath + '03_Scripts/stochmod/'
+datpath     = projpath + '01_Data/'
+outpath     = projpath + '02_Figures/20230907/'
 input_path  = datpath + 'model_input/'
 proc.makedir(outpath)
 
