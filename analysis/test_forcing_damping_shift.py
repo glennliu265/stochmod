@@ -37,6 +37,9 @@ import yo_box as ybx
 # Path to Input Data
 input_path = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/'
 
+figpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Figures/20240119"
+proc.makedir(figpath)
+
 #%% Load the Different Forcings
 
 # Forcing File Names
@@ -46,7 +49,6 @@ fnames = [
     "flxeof_090pct_FULL-PIC_eofcorr2_Fprime_rolln0.npy",
     
     ]
-
 fnames_long = ["NAO-EAP DJFM (pt)","FLXSTD EOF (pt,SLAB)","FLXSTD EOF (pt,FULL)"]
 
 # Load and print dimensions
@@ -95,14 +97,6 @@ dsf = proc.format_ds(dsf)
 # Compute Monthly variance
 dsmonvar = dsf.groupby('time.month').var('time')
 fprimestd = dsmonvar.values.transpose(2,1,0)
-
-# Append
-#dsf     = proc.format(
-
-#Fprime  = dsf.sel(lon=lonf+360,lat=latf,method='nearest').Fprime.values # Time
-#ntime   = len(Fprime)
-#Fpt_new     = Fprime.reshape(int(ntime/12),12).std(0) 
-
 
 #%% Examine what is going on at the point
 
@@ -212,22 +206,28 @@ dampingroll = 0
 
 rollstr = "damproll%i_forceroll%i" % (dampingroll,forcingroll)
 
-#%%
+#%% Integrate the stochastic Model
 
-debug = True
+debug = False
 
 outputs = []
 for ex in range(nexps):
     
+    
+    # Get Forcing/Damping and Roll
     f_in = np.roll(forcings[ex].copy(),forcingroll)
     d_in = np.roll(dampings[ex].copy(),dampingroll)
     
-    smconfig = {}
-    smconfig['forcing'] = f_in.copy()[None,None,:] # [x x 12]
-    smconfig['damping'] = d_in.copy()[None,None,:]
-    smconfig['h']       = np.ones((1,1,12)) * hblt
     
-    if debug:
+    # Set up Stochastic Model Input -------------------------------------------
+    smconfig = {}
+    smconfig['eta']     = eta.copy()               # White Noise Forcing
+    smconfig['forcing'] = f_in.copy()[None,None,:] # [x x 12] # Forcing Amplitude (W/m2)
+    smconfig['damping'] = d_in.copy()[None,None,:] # Damping Amplitude (degC/W/m2)
+    smconfig['h']       = np.ones((1,1,12)) * hblt # MLD (meters)
+    
+    
+    if debug: # Debug Plot of the Inputs
         fig,ax = viz.init_monplot(1,1,)
         ax.plot(mons3,smconfig['forcing'].squeeze(),label='forcing')
         ax2 = ax.twinx()
@@ -235,33 +235,26 @@ for ex in range(nexps):
         ax.legend()
         ax.set_title("Experiment %i" % (ex+1))
     
-    
-    
-    # Convert units
+    # Convert units (W/m2 to degC/S)
     smconfig['damping']=scm.convert_Wm2(smconfig['damping'],smconfig['h'],dt)[None,None,:]
     smconfig['forcing']=scm.convert_Wm2(smconfig['forcing'],smconfig['h'],dt)
     
-    
     # Make Forcing
-    smconfig['Fprime']= np.tile(smconfig['forcing'],nyrs) * eta[None,None,:]
+    smconfig['Fprime']= np.tile(smconfig['forcing'],nyrs) * smconfig['eta'][None,None,:]
     
-    
-    
+    # Do Integration
     output = scm.integrate_noentrain(smconfig['damping'],smconfig['Fprime'],debug=True)
+    # -------------------------------------------------------------------------
     outputs.append(output)
-    
-#% Calculate some diagnostics
-ssts    = [o[0].squeeze() for o in outputs]
-monvars = [proc.calc_monvar(s) for s in ssts]
-
-acs_all = [] # [basemonth][experiment]
-for im in range(12):
-    #sstin = [s[None,None,:] for s in ssts]
-    acout      = scm.calc_autocorr(ssts,lags,im+1)
-    acout_proc = [acout[ii] for ii in range(nexps) ] # Convert from dict to list
-    acs_all.append(acout_proc)
 
 
+# % Calculate some diagnostics
+ssts      = [o[0].squeeze() for o in outputs]
+tsmetrics = scm.compute_sm_metrics(ssts)
+
+
+monvars = tsmetrics['monvars']
+acs_all = tsmetrics['acfs']
 
 #%% Plot forcing and damping
 
@@ -293,7 +286,7 @@ for ff in range(nexps):
     
     viz.label_sp(expnames[ff],x=0.45,ax=ax,labelstyle="%s",usenumber=True)
 plt.suptitle("Damping Shift (%i) | Forcing Shift (%i)" % (dampingroll, forcingroll))
-savename = "%sDebug_Forcing_v_Damping_%s.png" % (outpath,rollstr)
+savename = "%sDebug_Forcing_v_Damping_%s.png" % (figpath,rollstr)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 #%% Plot monvar
@@ -304,22 +297,20 @@ for ff in range(nexps):
     plotvar = monvars[ff]
     ax.plot(mons3,plotvar,label=expnames[ff],marker="o")
 
-
 ax.plot(mons3,mvs[-1],label="SLAB",color="gray",ls="dashed")
 ax.legend()
 ax.set_ylim([0.5,1.5])
 
 plt.suptitle("Damping Shift (%i) | Forcing Shift (%i)" % (dampingroll, forcingroll))
-savename = "%sDebug_Monthly_Variance_%s.png" % (outpath,rollstr)
+savename = "%sDebug_Monthly_Variance_%s.png" % (figpath,rollstr)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 #%% Plot autocorrelation
 
 kmonth = 2
 xtksl  = np.arange(0,37,3)
-
-title = "ACF (Lag 0 = %s) | Damping Shift (%i) | Forcing Shift (%i)" % (mons3[kmonth],dampingroll, forcingroll)
-fig,ax=viz.init_acplot(kmonth,xtksl,lags,title=title)
+title  = "ACF (Lag 0 = %s) | Damping Shift (%i) | Forcing Shift (%i)" % (mons3[kmonth],dampingroll, forcingroll)
+fig,ax = viz.init_acplot(kmonth,xtksl,lags,title=title)
 
 for ff in range(nexps):
     plotvar = acs_all[kmonth][ff]
@@ -329,7 +320,7 @@ for ff in range(nexps):
 ax.plot(lags,acs_old[8],label=lbs[8],ls='dashed')
 ax.legend()
 
-
-
-savename = "%sDebug_ACF_basemonth%i_%s.png" % (outpath,kmonth+1,rollstr)
+savename = "%sDebug_ACF_basemonth%i_%s.png" % (figpath,kmonth+1,rollstr)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+#%% Plot 

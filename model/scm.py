@@ -3677,3 +3677,62 @@ def unpack_smdict(indict):
             for mod in range(nmodels):
                 unpacked[run,reg,mod,:] = indict[run][reg][mod]
     return unpacked
+
+
+#%% Convenience
+def compute_sm_metrics(ssts,
+                    nsmooth=20,
+                    pct=0.10,
+                    opt=1,
+                    dt=3600*24*30,
+                    lags=np.arange(37)):
+    """
+    Given a list of 1-D timeseries for SST, loops through each one and computes the ACF for
+    each basemonth, the Spectra, and the Monthly variance.
+
+    Parameters
+    ----------
+    ssts : TYPE
+        DESCRIPTION.
+    nsmooth : INT or list of INT, optional
+        Number of adjacent bands to smooth over. The default is 100.
+    pct : NUMERIC, optional
+        Percentage of spectra to taper. The default is 0.10.
+    opt : INT, optional
+        Detrending option for yo_spec (0=demean, 1=demean+detrend). The default is 1.
+    dt : NUMERIC, optional
+        Time step interval in sectonds. The default is 3600*24*30.
+    lags : LIST of Int, optional
+        Lags over which to compute the ACF. The default is np.arange(37).
+
+    Returns
+    -------
+    outdict : Output dictionary with ACFs, Spectra Output, and Monthly Variance
+    """
+    
+    nexps   = len(ssts)
+    
+    # 1. Compute the autocorrelation for each basemonth -----------------------
+    acs_all = [] # [basemonth][experiment]
+    for im in range(12):
+        acout      = calc_autocorr(ssts,lags,im+1) # scm function
+        acout_proc = [acout[ii] for ii in range(nexps) ] # Convert from dict to list
+        acs_all.append(acout_proc)
+    
+    # 2. Compute the spectra --------------------------------------------------
+    spec_output = quick_spectrum(ssts,nsmooth,pct,opt=opt,dt=dt,return_dict=True) # scm function
+    
+    # 3. Compute the monthly variance -----------------------------------------
+    monvars = [proc.calc_monvar(s) for s in ssts]
+    
+    # 4. Save the output
+    outdict = {
+        "acfs"    : acs_all,
+        "specs"   : spec_output['specs'],
+        "freqs"   : spec_output['freqs'],
+        "monvars" : monvars,
+        "CCs"     : spec_output['CCs'],
+        "dofs"    : spec_output['dofs'],
+        "r1s"     : spec_output['r1s'],
+        }
+    return outdict
