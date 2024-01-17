@@ -1268,7 +1268,7 @@ def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
         return sstregion,autocorr_region,kmonths,sstavg_region,amvidx_region,amvpat_region
 
 
-def calc_autocorr(sst,lags,basemonth,calc_conf=False,conf=0.95,tails=2):
+def calc_autocorr(sst,lags,basemonth,calc_conf=False,conf=0.95,tails=2,verbose=False):
     """
     Calculate autocorrelation for output of stochastic models
     
@@ -1279,7 +1279,7 @@ def calc_autocorr(sst,lags,basemonth,calc_conf=False,conf=0.95,tails=2):
     lags : ARRAY
         Lags to calculate autocorrelation for
     basemonth : INT
-        Month corresponding to lag 0 (ex. Jan=1)
+        Month corresponding to lag 0 (ex. Jan=1) (NOT THE INDEX)
     calc_conf : BOOL
         Set to true to calculate confidence intervals
     conf : NUMERIC
@@ -1308,7 +1308,7 @@ def calc_autocorr(sst,lags,basemonth,calc_conf=False,conf=0.95,tails=2):
         tsmodel2 = signal.detrend(tsmodel2,axis=1,type='linear')
         
         # Calculate the autocorrelation
-        autocorr[model] = proc.calc_lagcovar(tsmodel2,tsmodel2,lags,basemonth,1)
+        autocorr[model] = proc.calc_lagcovar(tsmodel2,tsmodel2,lags,basemonth,1,debug=verbose)
         
         confs[model] = proc.calc_conflag(autocorr[model],conf,tails,tsmodel.shape[1])
     if calc_conf:
