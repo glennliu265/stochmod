@@ -411,6 +411,8 @@ eta      = np.random.normal(0,1,nyrs*12)
 
 hblt     = 54.61088498433431 # Meters, the mixed layer depth used in CESM Slab
 
+lags     = np.arange(37)
+
 #%% Set Forcings and dampings
 forcings = [fptsq[1],fptsq[2],fprimept]
 dampings = [dpt[0],dpt[1],dpt[1]]
@@ -424,12 +426,14 @@ savename = "%ssynth_stochmod_combine_output.npz" % outdir
 
 ld  = np.load(savename,allow_pickle=True)
 mvs = ld['monvars']
-lbs = ld['labels'] 
+lbs = ld['labels']
+
+acs_old = ld['acs'] 
 
 
 
-# Experiment with different rolls
-forcingroll = 0
+#%% Experiment with different rolls
+forcingroll = 1
 dampingroll = 0
 
 rollstr = "damproll%i_forceroll%i" % (dampingroll,forcingroll)
@@ -476,6 +480,13 @@ for ex in range(nexps):
 ssts    = [o[0].squeeze() for o in outputs]
 monvars = [proc.calc_monvar(s) for s in ssts]
 
+acs_all = [] # [basemonth][experiment]
+for im in range(12):
+    #sstin = [s[None,None,:] for s in ssts]
+    acout      = scm.calc_autocorr(ssts,lags,im+1)
+    acout_proc = [acout[ii] for ii in range(nexps) ] # Convert from dict to list
+    acs_all.append(acout_proc)
+
 
 
 #%% Plot forcing and damping
@@ -511,10 +522,7 @@ plt.suptitle("Damping Shift (%i) | Forcing Shift (%i)" % (dampingroll, forcingro
 savename = "%sDebug_Forcing_v_Damping_%s.png" % (outpath,rollstr)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
 
-
-
-
-#%% PLot monvar
+#%% Plot monvar
 
 fig,ax = viz.init_monplot(1,1)
 
@@ -531,8 +539,28 @@ plt.suptitle("Damping Shift (%i) | Forcing Shift (%i)" % (dampingroll, forcingro
 savename = "%sDebug_Monthly_Variance_%s.png" % (outpath,rollstr)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
 
+#%% Plot autocorrelation
 
-#%%
+kmonth = 2
+xtksl  = np.arange(0,37,3)
+
+title = "ACF (Lag 0 = %s) | Damping Shift (%i) | Forcing Shift (%i)" % (mons3[kmonth],dampingroll, forcingroll)
+fig,ax=viz.init_acplot(kmonth,xtksl,lags,title=title)
+
+for ff in range(nexps):
+    plotvar = acs_all[kmonth][ff]
+    ax.plot(lags,plotvar,label=expnames[ff],marker="o")
+    
+    
+ax.plot(lags,acs_old[8],label=lbs[8],ls='dashed')
+ax.legend()
+
+
+
+savename = "%sDebug_ACF_basemonth%i_%s.png" % (outpath,kmonth+1,rollstr)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+#%% 
 
 
 #
