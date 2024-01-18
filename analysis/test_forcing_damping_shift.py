@@ -329,13 +329,13 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 # -----------------------------------------------------------------------------
 
 # Selec input forcing/damping
-ex           = 0
-forcing_in   = forcings[ex]
-damping_in   = dampings[ex]
+#ex           = 0
+forcing_in   = fprimept#forcings[ex]
+damping_in   = dpt[1] # dampings[ex]
 
 # Select the forcing/damping roll amounts (amt to roll forward)
-frolls = [0,0,1,1] # forcing
-drolls = [0,1,0,1] # damping
+frolls = [0,0,1,1]#np.arange(13)##np.zeros(13)#[0,0,1,1] # forcing
+drolls = [0,1,0,1]#np.zeros(13)#np.arange(13)#[0,1,0,1] # damping
 
 # Loop for combinations
 ncombo = len(frolls)
@@ -396,15 +396,15 @@ tsmetrics = scm.compute_sm_metrics(ssts)
 
 #%%
 
-nc = 2
+nc     = 2
+kmonth = 1
 
 for nc in range(ncombo):
-    
     
     ytks  = np.arange(10,80,10)
     ytks2 = np.arange(0,36,5)
     
-    fig,axs = viz.init_monplot(2,1,figsize=(6,5.5))
+    fig,axs = viz.init_monplot(3,1,figsize=(6,8),skipaxis=[2,])
     
     # Plot Monthly Variance
     ax = axs[0]
@@ -417,7 +417,7 @@ for nc in range(ncombo):
     
     ax.plot(mons3,mvs[-1],label="SLAB",color="gray",ls="dashed")
     ax.legend()
-    ax.set_ylim([0.5,1.5])
+    ax.set_ylim([0,2])
     ax.set_ylabel("SST Variance (degC2)")
     
     
@@ -449,7 +449,27 @@ for nc in range(ncombo):
     # Subplot Title
     # viz.label_sp(expnames[ff],x=0.45,ax=ax,labelstyle="%s",usenumber=True)
     
-    plt.suptitle("Damping Shift (%i) | Forcing Shift (%i)" % (drolls[nc], frolls[nc]))
+    
+    # --- <0> . <0> --- <0> . <0> ---
+    ax     = axs[2]
+    title3 = ""
+
+    ax,_ = viz.init_acplot(kmonth,xtksl,lags,ax=ax,title=title3)
+    
+    ax.set_xlim([0,lags[-1]])
+    ax.set_xticks(xtksl)
+    
+    # Plot Base
+    ax.plot(lags,tsmetrics['acfs'][0][kmonth],label="base",marker="o",color='purple',alpha=0.2)
+    
+    # Plot Rolled Version
+    ax.plot(lags,tsmetrics['acfs'][nc][kmonth],label=rollnames[nc],marker="o",color='purple')
+    
+    # Plot SLAB
+    ax.plot(lags,acs_old[8],label=lbs[8],ls='dashed',color='gray')
+    ax.set_xticks(xtksl)
+    
+    plt.suptitle("Damping Shift (%i) | Forcing Shift (%i)" % (drolls[nc], frolls[nc]),y=1.01)
     
     
     savename = "%s/Debug_Monvar_%s.png" % (figpath,rollnames[nc])
