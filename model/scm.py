@@ -3051,7 +3051,11 @@ def integrate_noentrain(lbd,F,T0=0,multFAC=True,debug=False):
         return T,damping_term,forcing_term
     return T
 
-def integrate_entrain(h,kprev,lbd_a,F,T0=0,multFAC=True,debug=False,Td0=False,add_F=None,return_dict=False,Tdexp=None):
+def integrate_entrain(h,kprev,lbd_a,F,T0=None,
+                      multFAC=True,debug=False,
+                      Td0=False,add_F=None,
+                      return_dict=False,Tdexp=None,
+                      beta=None):
     """
     
     Parameters
@@ -3075,6 +3079,8 @@ def integrate_entrain(h,kprev,lbd_a,F,T0=0,multFAC=True,debug=False,Td0=False,ad
     add_F : ARRAYs [lon x lat x time]
         Additional forcing to add to the expression. This is directly
         passed into the function for each point and nothing further is done...
+    beta: ARRAY [lon x lat x 12]
+        Set to manually include entrainment damping
         
     Returns
     -------
@@ -3085,8 +3091,13 @@ def integrate_entrain(h,kprev,lbd_a,F,T0=0,multFAC=True,debug=False,Td0=False,ad
     
     nlon,nlat,ntime = F.shape
     
+    # Replace T0 if it is not set
+    if T0 is None:
+        T0 = np.zeros((nlon,nlat))
+    
     # Calculate beta
-    beta = calc_beta(h)
+    if beta is None:
+        beta = calc_beta(h)
     
     # Add entrainment damping, set up lbd terms
     lbd = lbd_a + beta
@@ -3149,7 +3160,7 @@ def integrate_entrain(h,kprev,lbd_a,F,T0=0,multFAC=True,debug=False,Td0=False,ad
     if np.all(np.isnan(T)):
         print("WARNING ALL ARE NAN")
     
-    if debug:
+    if debug or return_dict:
         if return_dict:
             output_dict = {
                 'T'            : T,

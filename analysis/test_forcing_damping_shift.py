@@ -37,7 +37,7 @@ import yo_box as ybx
 # Path to Input Data
 input_path = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/'
 
-figpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20240119/"
+figpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20240122/"
 proc.makedir(figpath)
 
 #%% Load the Different Forcings
@@ -98,6 +98,16 @@ dsf = proc.format_ds(dsf)
 # Compute Monthly variance
 dsmonvar = dsf.groupby('time.month').var('time')
 fprimestd = dsmonvar.values.transpose(2,1,0)
+
+#%% Load SLAB SST at the point
+
+ncts = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/CESM_proc/TS_anom_PIC_SLAB.nc"
+dsts = xr.open_dataset(ncts)
+dspt = dsts.sel(lon=lonf+360,lat=latf,method='nearest')
+sst_slab = dspt.TS.values
+
+tsmetrics_slab = scm.compute_sm_metrics([sst_slab,])
+
 
 #%% Examine what is going on at the point
 
@@ -193,10 +203,9 @@ nexps    = len(forcings)
 outdir   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/debug_stochmod/"
 savename = "%ssynth_stochmod_combine_output.npz" % outdir
 
-ld  = np.load(savename,allow_pickle=True)
-mvs = ld['monvars']
-lbs = ld['labels']
-
+ld      = np.load(savename,allow_pickle=True)
+mvs     = ld['monvars']
+lbs     = ld['labels']
 acs_old = ld['acs'] 
 
 
@@ -211,6 +220,9 @@ rollstr     = "damproll%i_forceroll%i" % (dampingroll,forcingroll)
 debug = False
 
 outputs = []
+
+fcopy = []
+dcopy = []
 for ex in range(nexps):
     
     
@@ -248,6 +260,8 @@ for ex in range(nexps):
     
     outputs.append(output)
 
+    fcopy.append(f_in.copy())
+    dcopy.append(d_in.copy())
 
 # % Calculate some diagnostics
 ssts      = [o[0].squeeze() for o in outputs]
@@ -299,6 +313,7 @@ for ff in range(nexps):
     ax.plot(mons3,plotvar,label=expnames[ff],marker="o")
 
 ax.plot(mons3,mvs[-1],label="SLAB",color="gray",ls="dashed")
+#ax.plot(mons3,tsmetrics_slab['monvars'][0],color='k',ls='dotted')
 ax.legend()
 ax.set_ylim([0.5,1.5])
 
@@ -308,7 +323,7 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 #%% Plot autocorrelation
 
-kmonth = 2
+kmonth = 1
 xtksl  = np.arange(0,37,3)
 title  = "ACF (Lag 0 = %s) | Damping Shift (%i) | Forcing Shift (%i)" % (mons3[kmonth],dampingroll, forcingroll)
 fig,ax = viz.init_acplot(kmonth,xtksl,lags,title=title)
@@ -319,7 +334,12 @@ for ff in range(nexps):
     
     
 ax.plot(lags,acs_old[8],label=lbs[8],ls='dashed')
+
+ax.plot(lags,tsmetrics_slab['acfs'][kmonth][0],label='SLAB Recalculated',ls='dotted',color='black')
+
 ax.legend()
+
+
 
 savename = "%sDebug_ACF_basemonth%i_%s.png" % (figpath,kmonth+1,rollstr)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
@@ -330,15 +350,15 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 # Selec input forcing/damping
 #ex           = 0
-forcing_in   = fprimept#forcings[ex]
-damping_in   = dpt[1] # dampings[ex]
+forcing_in   = forcings[2]#fprimept#forcings[2]#fprimept#forcings[ex]
+damping_in   = dampings[2]#dpt[1] # dampings[ex]
 
 # Select the forcing/damping roll amounts (amt to roll forward)
 frolls = [0,0,1,1]#np.arange(13)##np.zeros(13)#[0,0,1,1] # forcing
 drolls = [0,1,0,1]#np.zeros(13)#np.arange(13)#[0,1,0,1] # damping
 
 # Loop for combinations
-ncombo = len(frolls)
+ncombo    = len(frolls)
 routputs  = [] # [Combo][term (SST, Forcing, Damping)]
 rforcings = []
 rdampings = []
@@ -386,12 +406,12 @@ for n in range(ncombo):
     routputs.append(output)
     rollnames.append(rollstr)
     
-    rforcings.append(f_in)
-    rdampings.append(d_in)
+    rforcings.append(f_in.copy())
+    rdampings.append(d_in.copy())
 
 # Calculate the Output
 ssts      = [o[0].squeeze() for o in routputs]
-tsmetrics = scm.compute_sm_metrics(ssts)
+tsmetrics = scm.compute_sm_metrics(ssts,)
 
 
 #%%
@@ -406,16 +426,21 @@ for nc in range(ncombo):
     
     fig,axs = viz.init_monplot(3,1,figsize=(6,8),skipaxis=[2,])
     
+    
+    labroll_nice = "Shifted (var=%.3f)" % (np.var(ssts[nc]))
+    labbase_nice = "Base    (var=%.3f)" % (np.var(ssts[0]))
+    labslab_nice = "Slab    (var=%.3f)" % (np.var(sst_slab))
+    
     # Plot Monthly Variance
     ax = axs[0]
     plotvar = tsmetrics['monvars'][nc]
-    ax.plot(mons3,plotvar,label=rollnames[nc],marker="o",color='purple')
+    ax.plot(mons3,plotvar,label=labroll_nice,marker="o",color='purple')
     
     # Plot Base
     plotvar = tsmetrics['monvars'][0]
-    ax.plot(mons3,plotvar,label="base",marker="o",color='purple',alpha=0.2)
+    ax.plot(mons3,plotvar,label=labroll_base,marker="o",color='purple',alpha=0.2)
     
-    ax.plot(mons3,mvs[-1],label="SLAB",color="gray",ls="dashed")
+    ax.plot(mons3,mvs[-1],label=labslab_nice,color="gray",ls="dashed")
     ax.legend()
     ax.set_ylim([0,2])
     ax.set_ylabel("SST Variance (degC2)")
@@ -446,27 +471,28 @@ for nc in range(ncombo):
     ax2.set_ylim([0,35])
     ax2.set_yticks(ytks2)
     ax2.set_ylabel("Damping (degC/W/m2)")
+    
     # Subplot Title
     # viz.label_sp(expnames[ff],x=0.45,ax=ax,labelstyle="%s",usenumber=True)
-    
     
     # --- <0> . <0> --- <0> . <0> ---
     ax     = axs[2]
     title3 = ""
-
+    
     ax,_ = viz.init_acplot(kmonth,xtksl,lags,ax=ax,title=title3)
     
     ax.set_xlim([0,lags[-1]])
     ax.set_xticks(xtksl)
     
     # Plot Base
-    ax.plot(lags,tsmetrics['acfs'][0][kmonth],label="base",marker="o",color='purple',alpha=0.2)
+    ax.plot(lags,tsmetrics['acfs'][kmonth][0],label="base",marker="o",color='purple',alpha=0.2)
     
     # Plot Rolled Version
-    ax.plot(lags,tsmetrics['acfs'][nc][kmonth],label=rollnames[nc],marker="o",color='purple')
+    ax.plot(lags,tsmetrics['acfs'][kmonth][nc],label=rollnames[nc],marker="o",color='purple')
     
     # Plot SLAB
-    ax.plot(lags,acs_old[8],label=lbs[8],ls='dashed',color='gray')
+    ax.plot(lags,tsmetrics_slab['acfs'][kmonth][0],label='SLAB',ls='dashed',color='gray')
+    #ax.plot(lags,acs_old[8],label=lbs[8],ls='dashed',color='gray')
     ax.set_xticks(xtksl)
     
     plt.suptitle("Damping Shift (%i) | Forcing Shift (%i)" % (drolls[nc], frolls[nc]),y=1.01)
@@ -474,3 +500,43 @@ for nc in range(ncombo):
     
     savename = "%s/Debug_Monvar_%s.png" % (figpath,rollnames[nc])
     plt.savefig(savename,dpi=150,bbox_inches='tight')
+#%% Try to figure what is going on with autocorrelation
+
+akmonth = 1
+xtksl  = np.arange(0,37,3)
+title  = "ACF (Lag 0 = %s) | Damping Shift (%i) | Forcing Shift (%i)" % (mons3[kmonth],dampingroll, forcingroll)
+fig,ax = viz.init_acplot(kmonth,xtksl,lags,title=title)
+
+for ff in range(nexps):
+    plotvar = acs_all[kmonth][ff]
+    ax.plot(lags,plotvar,label=expnames[ff],marker="o")
+    
+
+
+ax.plot(lags,tsmetrics['acfs'][0][kmonth],label="base",marker="o",color='purple',alpha=0.2)
+
+ax.plot(lags,acs_old[8],label=lbs[8],ls='dashed')
+
+ax.plot(lags,tsmetrics_slab['acfs'][kmonth][0],label='SLAB Recalculated',ls='dotted',color='black')
+
+ax.legend()
+
+
+
+savename = "%sDebug_ACF_basemonth%i_%s.png" % (figpath,kmonth+1,rollstr)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+#%% Check forcing and damping (this doesn't appear to be the culprit)
+
+fig,axs = viz.init_monplot(2,1)
+ax = axs[0]
+ax.plot(mons3,fcopy[2],label="Exp2 Forcing")
+ax.plot(mons3,rforcings[0],label="Rollexp Forcing")
+#ax.plot(mons3,rforcings[2],label="Rollexp Forcing 1",ls='dashed',color="k")
+#ax.plot(mons3,fprimept,label="Fprimept",color='violet',marker='o',ls='dotted')
+ax.legend()
+
+ax = axs[1]
+ax.plot(mons3,dcopy[2],label="Exp2 Damping")
+ax.plot(mons3,rdampings[0],label="Rollexp Forcing",ls='dotted')
+ax.legend()
