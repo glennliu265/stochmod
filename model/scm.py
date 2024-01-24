@@ -8,7 +8,7 @@ Created on Mon Jul 27 11:49:57 2020
 @author: gliu
 """
 
-# %%Dependencies
+#%% Packages
 import numpy as np
 import xarray as xr
 from scipy.io import loadmat
@@ -3051,6 +3051,83 @@ def integrate_noentrain(lbd,F,T0=0,multFAC=True,debug=False):
         return T,damping_term,forcing_term
     return T
 
+
+def intgr_noentrain(lbd,F,white_noise,T0=0,multFAC=True,debug=False):
+    """
+    Copy of integrate_noentrain, but with updated
+    indexing, etc (copied 2024.01.23, should replace original function)
+    
+    T,[damping_term],[forcing_term] = integrate_noentrain(lbd,F,T0=0,multFAC=True,debug=False)
+    
+    Integrate non-entraining stochastic model.
+    T(t) = exp(-lbd)*T(t-1) + (1-exp(-lbd))/lbd * F(t)
+    
+    Parameters
+    ----------
+    lbd : ARRAY [lon x lat x mon]
+        Atmospheric damping in units of [1/mon]
+    F :  ARRAY [lon x lat x mon]
+        Forcing term in units of [degC/mon]
+    white_noise : ARRAY [time]
+        White noise timeseries (unit variance)
+    T0 : Numeric, optional
+        Initial Temperature. The default is 0.
+    multFAC : BOOL, optional
+        Multiply by integration factor. The default is True.
+    debug : BOOL, optional
+        Set to true to return all terms separately. The default is False.
+
+    Returns
+    -------
+    T : ARRAY [lon x lat x time]
+        Output temperature
+    damping_term : ARRAY [lon x lat x time]
+        exp(-lbd)*T(t-1)
+    forcing_term : ARRAY [lon x lat x time]
+        FAC*F(t)
+
+    """
+    ntime       = white_noise.shape[-1]
+    nlon,nlat,_ = F.shape
+    
+    # Calculate Integration Factor
+    FAC = 1
+    if multFAC:
+        FAC = calc_FAC(lbd)
+    
+    # Prepare other terms
+    explbd = np.exp(-lbd)
+    
+    # Preallocate
+    T            = np.zeros((nlon,nlat,ntime)) * T0 #Set initial value
+    damping_term = T.copy()
+    forcing_term = T.copy()
+    
+    # Integrate Forward
+    for t in tqdm(range(ntime)):
+        
+        # Get the month and Month Index
+        m = (t+1)%12 # Start from January, params are same month
+        if m == 0:
+            m = 12
+        im = m -1 # Month Index (0=Jan)
+        
+        # Form the terms and step forrward
+        damping_term[:,:,t] = explbd[:,:,im] * T[:,:,t-1] # lbd(0) * T(-1)
+        forcing_term[:,:,t] = FAC[:,:,im] * F[:,:,im-1] * white_noise[:,:,t-1] # F(-1)
+        T[:,:,t]            = damping_term[:,:,t] + forcing_term[:,:,t]
+    
+    # Apply masked based on forcing term
+    msk = F.sum(2)
+    msk[~np.isnan(msk)] = 1
+    T *= msk[:,:,None]
+    if np.all(np.isnan(T)):
+        print("WARNING ALL ARE NAN")
+    
+    if debug:
+        return T,damping_term,forcing_term
+    return T
+
 def integrate_entrain(h,kprev,lbd_a,F,T0=None,
                       multFAC=True,debug=False,
                       Td0=False,add_F=None,
@@ -3175,6 +3252,8 @@ def integrate_entrain(h,kprev,lbd_a,F,T0=None,
             return output_dict
         return T,damping_term,forcing_term,entrain_term,Td
     return T
+
+
 
 def method1(lbd,include_b=True):
     a = 1-lbd
