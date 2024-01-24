@@ -2991,9 +2991,9 @@ def integrate_noentrain(lbd,F,T0=0,multFAC=True,debug=False):
     ----------
     lbd : ARRAY [lon x lat x mon]
         Atmospheric damping in units of [1/mon]
-    F : ARRAY [lon x lat x time]
+    F   : ARRAY [lon x lat x time]
         Forcing term in units of [degC/mon]
-    T0 : Numeric, optional
+    T0  : Numeric, optional
         Initial Temperature. The default is 0.
     multFAC : BOOL, optional
         Multiply by integration factor. The default is True.
@@ -3010,6 +3010,16 @@ def integrate_noentrain(lbd,F,T0=0,multFAC=True,debug=False):
         FAC*F(t)
 
     """
+    # Check Dimensions and get shape
+    lbd1d,f1d = False,False
+    if (len(lbd.shape) == 1):
+        lbd = lbd[None,None,:] # Make 3-D
+        if debug:
+            print("Warning, lbd should be 3D.")
+    if (len(F.shape) ==1):
+        F   = F[None,None,:] # Make 3-D
+        if debug:
+            print("Warning, F should be 3D.")
     nlon,nlat,ntime = F.shape
     
     # Calculate Integration Factor
@@ -3019,27 +3029,25 @@ def integrate_noentrain(lbd,F,T0=0,multFAC=True,debug=False):
     
     # Prepare other terms
     explbd = np.exp(-lbd)
-    #explbd[explbd==1] =0 # Set the term to zero where damping is insignificant
     
     # Preallocate
     T            = np.zeros((nlon,nlat,ntime))
-    T[:,:,0]     = T0 # Set first value
+    T[:,:,-1]    = T0 # Set first value (will overwrite)
     damping_term = T.copy()
     forcing_term = T.copy()
     
     # Integrate Forward
     for t in tqdm(range(ntime)):
         
-        # Get the month 
-        m = (t+1)%12 # Start from January, params are same month
-        if m == 0:
-            m = 12
+        # Get the month & month ind
+        im = t%12 # Starts from t(0) = Jan
         
-        # Form the terms and step forrward
-        damping_term[:,:,t] = explbd[:,:,m-1] * T[:,:,t-1]
-        forcing_term[:,:,t] = FAC[:,:,m-1] * F[:,:,t]
+        # Form the terms and step forrward: T(0) = lbd(0) * T(-1) + F(-1)
+        # ex. T(Jan) = lbd(Jan) * T(Dec) + F d(Dec))
+        damping_term[:,:,t] = explbd[:,:,im] * T[:,:,t-1] # exp(lbd)T'
+        forcing_term[:,:,t] = FAC[:,:,im]    * F[:,:,t-1] # FAC*F'
         T[:,:,t]            = damping_term[:,:,t] + forcing_term[:,:,t]
-    
+        
     # Apply masked based on forcing term
     msk = F.sum(2)
     msk[~np.isnan(msk)] = 1
@@ -3087,6 +3095,10 @@ def intgr_noentrain(lbd,F,white_noise,T0=0,multFAC=True,debug=False):
         FAC*F(t)
 
     """
+    # Check Dimensions
+    #if (len(lbd.shape) == 1) or (len(F.shape) == 1):
+        
+    
     ntime       = white_noise.shape[-1]
     nlon,nlat,_ = F.shape
     
