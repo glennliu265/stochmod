@@ -22,7 +22,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20220726/"
+    figpath     = projpath + "02_Figures/20240126/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -153,7 +153,8 @@ lon180g,latg  = scm.load_latlon(rawpath)
 #%% For each model read in the data
 
 # Select a particular region
-reg_sel  =[-36,-20,44,60]
+#reg_sel  =[-36,-20,44,60]
+reg_sel = [-45,-10, 50,60] # Yeagar SPG Box (Martha)
 """
 Other Regions
 North Atlantic [-80,0,10,20]
@@ -917,4 +918,60 @@ savename = "%sSST_Variance_%s.png" % (figpath,fnames[0][30:99])
 plt.savefig(savename,dpi=150)
 
 
+#%% For Martha's AMS Presentation, Compute ACF
+
+# sst_all [Lon x Lat x Time x Model]
+# sst_cesm [lon x lat x time]
+
+# (1) Take Regional Average (SM)
+nlon,nlat,ntime,nh=sst_all.shape
+ravg_sm = proc.sel_region(sst_all,lonr2,latr2,reg_sel,reg_avg=1,awgt=1,autoreshape=True)
+ravg_sm = ravg_sm.reshape(ntime,nh)
+
+# Take Regional Average (CESM)
+ravg_cesm = [proc.sel_region(sst,lonr2,latr2,reg_sel,reg_avg=1,awgt=1) for sst in sst_cesm]
+
+#% (2) Combine Files into lists for analysis
+ssts_in = [ravg_sm[:,ii] for ii in range(3)] + ravg_cesm
+mnames  = [r"Vary $F'$, $\lambda^a$",
+           r"Vary $F'$, $\lambda^a$, $h$",
+           "Entraining",
+           "FCM",
+           "SOM"]
+mcolors  = ["red","magenta","orange","w","gray"]
+mmarkers = ["o","o","s","d","d"] 
+mls = ["solid","solid","solid",'dashed','dashed']
+
+#% (3) Compute the Metrics
+tsmetrics = scm.compute_sm_metrics(ssts_in)
+
+
+#%% Make the plot (lower)
+kmonth  = 1
+xtksl   = np.arange(0,37,3)
+
+lw      = 3
+
+
+for i in range(2):
+    if i == 0:
+        plotids = [0,4]
+        title   = "Stochastic Model vs. SOM"
+        fn      = "%sLowerHierarchy_SPG_ACF_mon%s.png" % (figpath,kmonth+1)
+    elif i == 1:
+        plotids = [1,2,3]
+        title   = "Stochastic Model vs. FCM"
+        fn      = "%sUpperHierarchy_SPG_ACF_mon%s.png" % (figpath,kmonth+1)
+    
+    fig,ax  = plt.subplots(1,1,constrained_layout=True,figsize=(8,4))
+    ax,_      = viz.init_acplot(kmonth,xtksl,lags,ax=ax,title=title)
+    
+    for ip in plotids:
+        plotvar = tsmetrics['acfs'][kmonth][ip]
+        ax.plot(lags,plotvar,label=mnames[ip],color=mcolors[ip],
+                lw=lw,ls=mls[ip])
+    ax.legend()
+    plt.savefig(fn,dpi=200,bbox_inches='tight')
+    #ax.plot()
+ 
 
