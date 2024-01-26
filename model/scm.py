@@ -463,6 +463,9 @@ def calc_kprev_lin(h,entrain1=-1,entrain0=0):
 
 def calc_tau_detrain(hcycle,kprev,z,tau_est,debug=False):
     """
+    A series of linear interpolations to retrieve the timescale tau
+    at the depth and time of detrainment.
+    
     Inputs:
         hcycle  [month] (NUMERIC)        : Mixed Layer Depth cycle in [meters]
         kprev   [month] (NUMERIC)        : Time of detraining month
@@ -489,8 +492,8 @@ def calc_tau_detrain(hcycle,kprev,z,tau_est,debug=False):
         delta_m = detrain_mon - dm0
         
         # Use linear interpolation in time to retrieve detrainment level
-        h0       = hcycle[dm0]
-        h1       = hcycle[dm1]
+        h0       = hcycle[dm0-1] # Subtract 1 since dm0,dm1 is the actual month
+        h1       = hcycle[dm1-1]
         hdetrain = np.interp(delta_m,[0,1],[h0,h1])
         if debug:
             # Check Linear Detrend
@@ -499,8 +502,8 @@ def calc_tau_detrain(hcycle,kprev,z,tau_est,debug=False):
             plt.axvline(delta_m,color="k")
         
         # Retrieve tau values for months above and below
-        tau0 = tau_est[dm0,:] # [Depth]
-        tau1 = tau_est[dm1,:] 
+        tau0 = tau_est[dm0-1,:] # [Depth]
+        tau1 = tau_est[dm1-1,:] 
         
         # Do linear interpolation in time to get timescale
         x_in = [0,1]
@@ -822,13 +825,27 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
                 else: # Use Td0 from last timestep
                     Td1 = calc_Td(t,kprev,temp_ts,prevmon=False,debug=debugprint)
                 
-                # Implement decay to Td
-                detrain_m1 = kprev[m-1]               # Month of Detrainment for that anomaly
-                idt1       = int(np.floor(detrain_m1)) - 1 # Get indices for Td decay timescale (rounding down to nearest month)
-                detrain_m0 = kprev[m-2]               # Repeat for previous month
-                idt0       = int(np.floor(detrain_m0)) - 1
-                Td0 = Td0 * np.exp(-Tdexp[idt0] * kprev[m-2])
-                Td1 = Td1 * np.exp(-Tdexp[idt1] * kprev[m-1])
+                # # Implement decay to Td (This older version assumed Tdexp was not already preorted by training month...)
+                # detrain_m1 = kprev[m-1]               # Month of Detrainment for that anomaly
+                # idt1       = int(np.floor(detrain_m1)) - 1 # Get indices for Td decay timescale (rounding down to nearest month)
+                # detrain_m0 = kprev[m-2]               # Repeat for previous month
+                # idt0       = int(np.floor(detrain_m0)) - 1
+                # Td0 = Td0 * np.exp(-Tdexp[idt0] * kprev[m-2])
+                # Td1 = Td1 * np.exp(-Tdexp[idt1] * kprev[m-1])
+                
+                if (Td0 is None) & (h.argmin()==m-2): # For first entraining month
+                    delta_t_1 = m - kprev[m-1] #dt = current month - detraining month
+                    Td1       = Td1 * np.exp(-Tdexp[m-1] * delta_t_1)
+                    Td0       = Td1 # Previous month does not have entrinment
+                if Td0 is None: # Calculate Td0 (NOTE NEED TO CHECK THIS STEP...)
+                    delta_t_1 = m - kprev[m-1]
+                    Td1       = Td1 * np.exp(-Tdexp[m-1] * delta_t_1)
+                    delta_t_0 = (m-1) - kprev[m-2]
+                    Td0       = Td0 * np.exp(-Tdexp[m-2] * delta_t_0)
+                else: # Used Td0 from last timestep
+                    delta_t_1 = m - kprev[m-1]
+                    Td1       = Td1 * np.exp(-Tdexp[m-1] * delta_t_1)
+                
                 
                 # Compute Td (in future, could implement month-dependent decay..)
                 Td = (Td1+Td0)/2
@@ -896,6 +913,17 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
             return output_dict
         return temp_ts,damp_ts,noise_ts,entrain_ts,Td_ts
     return temp_ts
+
+def calc_kprev_dmon(m,kprev):
+    im    = m-1
+    kpmon = kprev[im]
+    if m < kprev:
+        dmon = (m+12) - kprev
+    elif m > kprev:
+        dmon = m-kprev
+    return dmon
+    
+    
 
 # Entrain Model (Single Point)
 def entrain_parallel(inputs):
