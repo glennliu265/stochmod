@@ -28,6 +28,7 @@ import time
 import yo_box as ybx
 import tbx
 import pandas as pd
+import scipy as sp
 
 #%% Helper Functions/Utilities
 
@@ -459,6 +460,80 @@ def calc_kprev_lin(h,entrain1=-1,entrain0=0):
                 kprev[t] = kfind
         # End Loop
     return kprev
+
+def calc_tau_detrain(hcycle,kprev,z,tau_est,debug=False):
+    """
+    Inputs:
+        hcycle  [month] (NUMERIC)        : Mixed Layer Depth cycle in [meters]
+        kprev   [month] (NUMERIC)        : Time of detraining month
+        z       [depth] (NUMERIC)        : Model Levels over which tau was estimated in [meters]
+        tau_est [month, depth] (NUMERIC) : E-folding timescale estimates
+        debug   [BOOL] : True to add debugging plots
+        
+    Return:
+        tau_out [month] : E-folding timescales at the given detraining depth and time
+        
+    """
+    tau_detrain=np.zeros([12])
+    for im in range(12):
+        
+        detrain_mon = kprev[im]
+        if detrain_mon == 0:
+            tau_detrain[im] = 0. # No detrainment.
+            continue
+        
+        # Part 1: Linear interpolation in time
+        # Take month above and below
+        dm0     = int(np.floor(detrain_mon))
+        dm1     = dm0+1
+        delta_m = detrain_mon - dm0
+        
+        # Use linear interpolation in time to retrieve detrainment level
+        h0       = hcycle[dm0]
+        h1       = hcycle[dm1]
+        hdetrain = np.interp(delta_m,[0,1],[h0,h1])
+        if debug:
+            # Check Linear Detrend
+            plt.plot([0,delta_m,1],[h0,hdetrain,h1],marker="x")
+            plt.axhline(hdetrain,color="k")
+            plt.axvline(delta_m,color="k")
+        
+        # Retrieve tau values for months above and below
+        tau0 = tau_est[dm0,:] # [Depth]
+        tau1 = tau_est[dm1,:] 
+        
+        # Do linear interpolation in time to get timescale
+        x_in = [0,1]
+        y_in = np.array([tau0,tau1])
+        f    = sp.interpolate.interp1d(x_in,y_in,axis=0)
+        tau_fill = f(delta_m)
+        
+        if debug:
+            zz = 44
+            fig,ax = plt.subplots(1,1)
+            ax.plot([0,delta_m,1],[tau0[zz],tau_fill[zz],tau1[zz]],marker="x")
+            plt.axhline(tau_fill[zz],color="k")
+            plt.axvline(delta_m,color="k")
+            
+        # Linearly interpolate again to get timescale relative to two depths
+        knear = np.argmin(np.abs(z-hdetrain)) # Get nearest z level
+        if z[knear] > hdetrain: # hdetrain is between [k,k+1]
+            k0 = knear-1
+            k1 = knear
+        elif z[knear] <= hdetrain: # hdetrain is between [k-1,k]
+            k0 = knear -1
+            k1 = knear
+        tau_out = np.interp(hdetrain,[z[k0],z[k1]],[tau_fill[k0],tau_fill[k1]])
+        if debug:
+            fig,ax = plt.subplots(1,1)
+            ax.plot([z[k0],hdetrain,z[k1]],[tau_fill[k0],tau_out,tau_fill[k1]],marker="x")
+            plt.axhline(tau_out,color="k")
+            plt.axvline(hdetrain,color="k")
+        
+        tau_detrain[im] = tau_out.copy()
+        # End month loop
+    return tau_detrain
+    
 
 def convert_NAO(hclim,naopattern,dt,rho=1000,cp0=4218,hfix=50,usemax=False,hmean=None):
     """
