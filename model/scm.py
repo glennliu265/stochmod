@@ -833,17 +833,18 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
                 # Td0 = Td0 * np.exp(-Tdexp[idt0] * kprev[m-2])
                 # Td1 = Td1 * np.exp(-Tdexp[idt1] * kprev[m-1])
                 
-                if (Td0 is None) & (h.argmin()==m-2): # For first entraining month
-                    delta_t_1 = m - kprev[m-1] #dt = current month - detraining month
-                    Td1       = Td1 * np.exp(-Tdexp[m-1] * delta_t_1)
-                    Td0       = Td1 # Previous month does not have entrinment
-                if Td0 is None: # Calculate Td0 (NOTE NEED TO CHECK THIS STEP...)
-                    delta_t_1 = m - kprev[m-1]
-                    Td1       = Td1 * np.exp(-Tdexp[m-1] * delta_t_1)
-                    delta_t_0 = (m-1) - kprev[m-2]
-                    Td0       = Td0 * np.exp(-Tdexp[m-2] * delta_t_0)
-                else: # Used Td0 from last timestep
-                    delta_t_1 = m - kprev[m-1]
+                if (Td0 is None):
+                    if (h.argmin()==m-2): # For first entraining month
+                        delta_t_1 = calc_kprev_dmon(m,kprev) # dt = current month - detraining month
+                        Td1       = Td1 * np.exp(-Tdexp[m-1] * delta_t_1)
+                        Td0       = Td1 # Previous month does not have entrinment
+                    else: # Calculate Td0 (NOTE NEED TO CHECK THIS STEP, when might this apply?)
+                        delta_t_1 = calc_kprev_dmon(m,kprev)
+                        Td1       = Td1 * np.exp(-Tdexp[m-1] * delta_t_1)
+                        delta_t_0 = calc_kprev_dmon(m-1,kprev)
+                        Td0       = Td0 * np.exp(-Tdexp[m-2] * delta_t_0)
+                else: # Use Td0 from last timestep
+                    delta_t_1 = calc_kprev_dmon(m,kprev)
                     Td1       = Td1 * np.exp(-Tdexp[m-1] * delta_t_1)
                 
                 
@@ -917,10 +918,10 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
 def calc_kprev_dmon(m,kprev):
     im    = m-1
     kpmon = kprev[im]
-    if m < kprev:
-        dmon = (m+12) - kprev
-    elif m > kprev:
-        dmon = m-kprev
+    if m < kpmon:
+        dmon = (m+12) - kpmon
+    elif m >= kpmon:
+        dmon = m-kpmon
     return dmon
     
     
