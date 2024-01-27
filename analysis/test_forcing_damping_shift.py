@@ -63,6 +63,7 @@ floadsq = [np.sqrt(np.nansum((fl**2),2)) for fl in fload]
 lon,lat = scm.load_latlon()
 lonf,latf=-30,50
 klon,klat = proc.find_latlon(lonf,latf,lon,lat)
+locfn,loctitle=proc.make_locstring(lonf,latf)
 
 # Compare EOF 1 Month 1 of both forcings
 imode = 1
@@ -210,12 +211,30 @@ eta      = np.random.normal(0,1,nyrs*12)
 hblt     = 54.61088498433431 # Meters, the mixed layer depth used in CESM Slab
 lags     = np.arange(37)
 
-#%% Load other Mixed Layers
-hmx_ds = xr.open_dataset(input_path+"mld/PIC_FULL_HMXL_hclim.nc")
-hmxl   = hmx_ds.sel(lon=lonf,lat=latf,method='nearest').h.values
+#%% Load other Mixed Layers --------------
+hmx_ds   = xr.open_dataset(input_path+"mld/PIC_FULL_HMXL_hclim.nc")
+hmxl     = hmx_ds.sel(lon=lonf,lat=latf,method='nearest').h.values
 
 hbl_ds   = xr.open_dataset(input_path+"mld/PIC_FULL_HBLT_hclim.nc")
 hblt_mon = hbl_ds.sel(lon=lonf,lat=latf,method='nearest').h.values
+
+#% Quick Plot of HBLT vs HMXL <0> <0>
+
+mons3 = proc.get_monstr(nletters=3)
+fig,ax=viz.init_monplot(1,1)
+
+muhblt = np.nanmean(hblt_mon)
+muhmxl = np.nanmean(hmxl)
+ax.plot(mons3,hblt_mon,marker="d",label="HBLT")
+ax.plot(mons3,hmxl,marker='s',label="HMXL")
+
+ax.axhline(muhblt,c="orange",label="$\mu_{HBLT}$ = %.2f" % (muhblt),ls='dashed',lw=0.75)
+ax.axhline(muhmxl,c="blue",label="$\mu_{HMXL}$ = %.2f" % (muhmxl),ls='dashed',lw=0.75)
+ax.legend()
+ax.set_title("CESM1 Mixed Layer Depth Seasonal Cycle (PiControl) @ %s" % loctitle)
+ax.set_ylabel("MLD (m)")
+savename = "%sHBLT_v_HMXL_CESM1_PiControl_%s.png" % (figpath,locfn)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 #%% Set Forcings and dampings
 forcings = [fptsq[1],fptsq[2],fprimept]
