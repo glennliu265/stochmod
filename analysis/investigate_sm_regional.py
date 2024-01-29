@@ -946,7 +946,11 @@ mls = ["solid","solid","solid",'dashed','dashed']
 tsmetrics = scm.compute_sm_metrics(ssts_in)
 
 
-#%% Make the plot (lower)
+kmonth  = 1
+xtksl   = np.arange(0,37,3)
+lw      = 3
+
+#%% Make the plot (spearated by lower/upper hierarchy)
 kmonth  = 1
 xtksl   = np.arange(0,37,3)
 
@@ -974,4 +978,34 @@ for i in range(2):
     plt.savefig(fn,dpi=200,bbox_inches='tight')
     #ax.plot()
  
+#%% Make a FCM vs SOM plot for March
+kmonth = 1  
+
+plotids = [3,4]
+title   = "CESM1 FCM vs. SOM" 
+fn      = "%sCESM_FCMvSOM_SPG_ACF_mon%s.png" % (figpath,kmonth+1)
+
+
+fig,ax  = plt.subplots(1,1,constrained_layout=True,figsize=(8,4))
+ax,_      = viz.init_acplot(kmonth,xtksl,lags,ax=ax,title=title)
+
+for ip in plotids:
+    plotvar = tsmetrics['acfs'][kmonth][ip]
+    ax.plot(lags,plotvar,label=mnames[ip],color=mcolors[ip],
+            lw=lw,ls="dashed")
+ax.legend()
+plt.savefig(fn,dpi=200,bbox_inches='tight')
+#ax.plot()
+
+#%% Plot monthly variance
+
+fig,ax = plt.subplots(1,1,figsize=(6,4),constrained_layout=True)
+
+plotids = [0,4]
+
+for ip in plotids:
+    plotvar = tsmetrics['monvars'][ip]
+    ax.plot(mons3,plotvar,label=mnames[ip],color=mcolors[ip],
+            lw=lw,ls="dashed",marker="o")
+ax.grid(True,ls='dotted')
 
