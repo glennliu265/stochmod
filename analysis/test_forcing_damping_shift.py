@@ -7,6 +7,9 @@ Test The Effect of Rolling Forcing and Damping
 Moved from stochmod/analysis/Debug_Forcing
 Copied upper section from reemergence/stochmod_point
 
+Also includes from plots used for AMS 2024 presentation by Martha
+
+
 Created on Wed Jan 17 15:03:58 2024
 
 @author: gliu
@@ -37,7 +40,7 @@ import yo_box as ybx
 # Path to Input Data
 input_path = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/'
 
-figpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20240122/"
+figpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20240126/"
 proc.makedir(figpath)
 
 #%% Load the Different Forcings
@@ -350,6 +353,8 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 #%% Plot monvar
 
+
+
 fig,ax = viz.init_monplot(1,1)
 
 for ff in range(nexps):
@@ -398,8 +403,8 @@ forcing_in   = forcings[2]#fprimept#forcings[2]#fprimept#forcings[ex]
 damping_in   = dampings[2]#dpt[1] # dampings[ex]
 
 # Select the forcing/damping roll amounts (amt to roll forward)
-frolls = [0,0,1,1]#np.arange(13)##np.zeros(13)#[0,0,1,1] # forcing
-drolls = [0,-1,0,-1]#np.zeros(13)#np.arange(13)#[0,1,0,1] # damping
+frolls = [1,]#[0,0,1,1]#np.arange(13)##np.zeros(13)#[0,0,1,1] # forcing
+drolls = [0,]#[0,-1,0,-1]#np.zeros(13)#np.arange(13)#[0,1,0,1] # damping
 
 # Loop for combinations
 ncombo    = len(frolls)
@@ -660,7 +665,7 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 #%% Experiment 4: Try Adding MLD Variability and Entrainment
 
 
-mlds     = [hblt_mon,]
+mlds     = [hmxl,]
 forcings = [fprimept,]
 dampings = [dpt[1],]
 nexps = len(mlds)
@@ -672,9 +677,15 @@ hnames   = ["Vary $F'$ and $\lambda_a$ (Level 3)",
 "Vary $F'$, $h$, and $\lambda_a$ (Level 4)",
 "Entraining (Level 5)"]
 
-forcingroll = 1
+forcingroll = 0
 dampingroll = 0
 mldroll     = 0
+
+# Temp fix for when forcing indexing is corrected for nonentraining code only..
+# When forcingroll is set to 1, do not roll case for Level4 (vary MLD)
+# made for purposes of generating AMS figure for Martha, will remove this when 
+# code is corrected
+entrainpatch = True 
 
 rollstr = "froll%i_droll%i_hroll%i" % (forcingroll,dampingroll,mldroll)
 outputs     = []
@@ -704,6 +715,21 @@ for ex in range(nexps):
             smconfig['h']       = np.ones((1,1,12))*hblt # MLD (meters)
         else:
             smconfig['h']       = h_in.copy()[None,None,:] # MLD (meters)
+        
+        if (entrainpatch) and (forcingroll == 1) and (hconfig ==1):
+            print("Temporary patch for Level 4")
+            
+            
+            f_fix = np.roll(forcings[ex].copy(),0)
+            h_fix = np.roll(mlds[ex].copy(),-1)
+            d_fix = np.roll(dampings[ex].copy(),-1)
+            
+            smconfig['forcing'] = f_fix.copy()[None,None,:]
+            smconfig['h'] = h_fix.copy()[None,None,:]
+            smconfig['damping'] = d_fix.copy()[None,None,:]
+            
+            
+        
         
         # Calculate Kprev
         kout,_              = scm.find_kprev(h_in,)
@@ -766,6 +792,55 @@ ax.set_ylabel("SST Variance ($\degree C^2$)")
 plt.suptitle("Damping Shift (%i) | Forcing Shift (%i) | MLD Shift (%i)" % (dampingroll, forcingroll,mldroll))
 savename = "%sDebug_Monthly_Variance_Entrain_%s.png" % (figpath,rollstr)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+#%% Same as above, but AMS 2024 version (for Martha)
+
+
+ahcolors  = ["red","violet","orange"]
+ahmarkers = ["d","x","o"]
+ahnames   = ["Vary $F'$ and $\lambda^a$",
+"Vary $F'$, $h$, and $\lambda_a$",
+"Entraining"]
+
+# Toggle plotting option
+plotid = 1
+
+if plotid == 0: # Plot everything
+    plotids  = [0,1,2]
+    savename = "%sMonthly_Variance_30W_50N.png" % (figpath)
+    ylm = [0,1.5]
+if plotid == 1: # Just SOM vs. SM (no entrainment, no MLD variation)
+    plotids  = [0,]
+    savename = "%sMonthly_Variance_30W_50N_SOM_v_SM.png" % (figpath)
+    ylm = [0.3,1.5]
+if plotid == 2: # Just SOM vs. SM (no entrainment, no MLD variation)
+    plotids  = [1,2]
+    savename = "%sMonthly_Variance_30W_50N_FCM_v_SM.png" % (figpath)
+    ylm = [0.3,1.5]
+
+fig,ax =  plt.subplots(1,1,figsize=(6,4),constrained_layout=True)
+
+for ff in plotids:
+    lab = "%s ($\sigma^2$=%.2f)" % (ahnames[ff],np.var(ssts[ff]))
+    plotvar = monvars[ff]
+    ax.plot(mons3,plotvar,label=lab,marker=ahmarkers[ff],c=ahcolors[ff],ls='solid')
+ax.grid(True,ls='dotted')
+
+if plotid in [0,1]:
+    ax.plot(mons3,tsmetrics_slab['monvars'][0],label="SOM ($\sigma^2$=%.2f)" % (np.var(sst_slab)),color="gray",ls="dashed")
+if plotid in [0,2]:
+    ax.plot(mons3,tsmetrics_full['monvars'][0],label="FCM ($\sigma^2$=%.2f)" % (np.var(sst_full)),color="w",ls="dashed")
+#ax.plot(mons3,tsmetrics_slab['monvars'][0],color='k',ls='dotted')
+ax.legend(ncol=2,framealpha=0.4)
+ax.set_ylim(ylm)
+
+ax.set_ylabel("SST Variance ($\degree C^2$)")
+ax.set_title("Monthy SST Variance @ %s" % loctitle)
+#plt.suptitle("Damping Shift (%i) | Forcing Shift (%i) | MLD Shift (%i)" % (dampingroll, forcingroll,mldroll))
+
+plt.savefig(savename,dpi=200,bbox_inches='tight')
+
+
 
 #%% Plot autocorrelation
 

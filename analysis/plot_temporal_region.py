@@ -30,7 +30,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20231117/"
+    figpath     = projpath + "02_Figures/20240126/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -80,7 +80,7 @@ else:
 lags = np.arange(0,37,1)
 
 # Set the Visualization mode
-darkmode   = False
+darkmode   = True
 if darkmode:
     plt.style.use("dark_background")
     dfcol = "w"
@@ -1576,4 +1576,6 @@ else:
 #%% Appendix Plot: North Atlantic SST
 
 fig = plt.figure()
+
+#%% Add Plot of just the subpolar region
 
