@@ -711,7 +711,7 @@ def noentrain(t_end,lbd,T0,F,FAC,multFAC=1,debug=False):
 
 # Entrain Model (Single Point)
 def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=False,
-            Tdgrab=None,add_F=None,return_dict=False,Tdexp=None):
+            Tdgrab=None,add_F=None,return_dict=False,Tdexp=None,old_index=False):
     
     """
     SST Stochastic Model, with Entrainment
@@ -797,10 +797,8 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
     for t in np.arange(t0,t_end,1):
         
         # Get the month (start from Jan, so +1)
-        m  = (t+1)%12
-        #m=t%12
-        if m == 0:
-            m = 12
+        im  = t%12
+        m   = im+1
         
         # --------------------------
         # Calculate entrainment term
@@ -810,14 +808,14 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
                 print("Skipping t=%i" % t)
             entrain_term = 0
         else: # Otherwise, 
-            if beta[m-1] == 0: # For months with no entrainment
+            if beta[im] == 0: # For months with no entrainment
                 entrain_term = 0
                 Td0          = None # Reset Td0 term
                 if debugprint:
                     print("No entrainment on month %i"%m)
                     print("--------------------\n")
             else:
-                if (Td0 is None) & (h.argmin()==m-2) :# For first entraining month
+                if (Td0 is None) & (h.argmin()==im-1) :# For first entraining month
                     Td1 = calc_Td(t,kprev,temp_ts,prevmon=False,debug=debugprint)
                     Td0 = Td1 # Previous month does not have entrainment!
                 if Td0 is None: # Calculate Td0 
@@ -825,20 +823,15 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
                 else: # Use Td0 from last timestep
                     Td1 = calc_Td(t,kprev,temp_ts,prevmon=False,debug=debugprint)
                 
-                # # Implement decay to Td (This older version assumed Tdexp was not already preorted by training month...)
-                # detrain_m1 = kprev[m-1]               # Month of Detrainment for that anomaly
-                # idt1       = int(np.floor(detrain_m1)) - 1 # Get indices for Td decay timescale (rounding down to nearest month)
-                # detrain_m0 = kprev[m-2]               # Repeat for previous month
-                # idt0       = int(np.floor(detrain_m0)) - 1
-                # Td0 = Td0 * np.exp(-Tdexp[idt0] * kprev[m-2])
-                # Td1 = Td1 * np.exp(-Tdexp[idt1] * kprev[m-1])
-                
                 if (Td0 is None):
-                    if (h.argmin()==m-2): # For first entraining month
+                    if (h.argmin()==im-1): # For first entraining month
                         delta_t_1 = calc_kprev_dmon(m,kprev) # dt = current month - detraining month
                         Td1       = Td1 * np.exp(-Tdexp[m-1] * delta_t_1)
                         Td0       = Td1 # Previous month does not have entrinment
                     else: # Calculate Td0 (NOTE NEED TO CHECK THIS STEP, when might this apply?)
+                        print("Td0=None condition applies on month %i" % m)
+                        print("Exiting script, check scm line 833.")
+                        break
                         delta_t_1 = calc_kprev_dmon(m,kprev)
                         Td1       = Td1 * np.exp(-Tdexp[m-1] * delta_t_1)
                         delta_t_0 = calc_kprev_dmon(m-1,kprev)
@@ -846,7 +839,6 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
                 else: # Use Td0 from last timestep
                     delta_t_1 = calc_kprev_dmon(m,kprev)
                     Td1       = Td1 * np.exp(-Tdexp[m-1] * delta_t_1)
-                
                 
                 # Compute Td (in future, could implement month-dependent decay..)
                 Td = (Td1+Td0)/2
@@ -861,23 +853,27 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
         # ----------------------
         # Get Noise/Forcing Term
         # ----------------------
-        noise_term = F[t]
+        if old_index:
+            t_get = t
+        else:
+            t_get = t-1
+        noise_term = F[t_get]
         if add_F is not None:
-            noise_term = F[t] + add_F[t]
+            noise_term = F[t_get] + add_F[t_get]
         
         # ----------------------
         # Calculate damping term
         # ----------------------
         if t == 0:
-            damp_term = explbd[m-1]*T0
+            damp_term = explbd[im]*T0
         else:
-            damp_term = explbd[m-1]*temp_ts[t-1]
+            damp_term = explbd[im]*temp_ts[t-1]
         
         # ------------------------
         # Check Integration Factor
         # ------------------------
         if multFAC:
-            integration_factor = FAC[m-1]
+            integration_factor = FAC[im]
         else:
             integration_factor = 1
         
@@ -3084,7 +3080,7 @@ def integrate_Q(lbd,F,T,mld,cp0=3996,rho=1026,dt=3600*24*30,debug=False):
         return Q,q,lbdT
     return Q
 
-def integrate_noentrain(lbd,F,T0=0,multFAC=True,debug=False):
+def integrate_noentrain(lbd,F,T0=0,multFAC=True,debug=False,old_index=False):
     """
     T,[damping_term],[forcing_term] = integrate_noentrain(lbd,F,T0=0,multFAC=True,debug=False)
     
@@ -3103,6 +3099,9 @@ def integrate_noentrain(lbd,F,T0=0,multFAC=True,debug=False):
         Multiply by integration factor. The default is True.
     debug : BOOL, optional
         Set to true to return all terms separately. The default is False.
+    old_index:BOOL, optional
+        For troubleshooting, index forcing at same timestep as T (T(1) = lbd(1)*T(-1) + F(1))
+        
 
     Returns
     -------
@@ -3149,7 +3148,10 @@ def integrate_noentrain(lbd,F,T0=0,multFAC=True,debug=False):
         # Form the terms and step forrward: T(0) = lbd(0) * T(-1) + F(-1)
         # ex. T(Jan) = lbd(Jan) * T(Dec) + F d(Dec))
         damping_term[:,:,t] = explbd[:,:,im] * T[:,:,t-1] # exp(lbd)T'
-        forcing_term[:,:,t] = FAC[:,:,im]    * F[:,:,t-1] # FAC*F'
+        if old_index: # F(0)
+            forcing_term[:,:,t] = FAC[:,:,im]    * F[:,:,t] # FAC*F'
+        else: # F(-1)
+            forcing_term[:,:,t] = FAC[:,:,im]    * F[:,:,t-1] # FAC*F'
         T[:,:,t]            = damping_term[:,:,t] + forcing_term[:,:,t]
         
     # Apply masked based on forcing term
@@ -3248,7 +3250,7 @@ def integrate_entrain(h,kprev,lbd_a,F,T0=None,
                       multFAC=True,debug=False,
                       Td0=False,add_F=None,
                       return_dict=False,Tdexp=None,
-                      beta=None):
+                      beta=None,old_index=False):
     """
     
     Parameters
@@ -3319,7 +3321,7 @@ def integrate_entrain(h,kprev,lbd_a,F,T0=None,
             # Skip land/ice points, checking the forcing term
             if np.any(np.isnan(F[o,a,:])):
                 continue
-            
+             
             # Get Last [Tdgrab] values for selected point
             if Td0 is not False:
                 Tdgrab = Td0[o,a,:]
@@ -3337,7 +3339,8 @@ def integrate_entrain(h,kprev,lbd_a,F,T0=None,
                 
             # Integrate in time
             temp_ts,damp_ts,noise_ts,entrain_ts,Td_ts = entrain(ntime,lbd[o,a,:],T0_in,F[o,a,:],beta[o,a,:],h[o,a,:],kprev[o,a,:],FAC[o,a,:],
-                                                                multFAC=multFAC,debug=True,debugprint=False,Tdgrab=Tdgrab,add_F=add_F_in,Tdexp=Tdexp[o,a,:])
+                                                                multFAC=multFAC,debug=True,debugprint=False,Tdgrab=Tdgrab,add_F=add_F_in,Tdexp=Tdexp[o,a,:],
+                                                                old_index=old_index)
             
             # Save outputs
             T[o,a,:]            = temp_ts.copy()
