@@ -94,6 +94,13 @@ rundicts  = dict(zip(runnames,runlists))
 
 #%% General Names for Plotting, Display, ETC
 
+# Bounding Boxes [LonW, LonE, LatS, latN]
+amvbbox       = [-80,0,0,65]   # AMV Calculation box
+bbox_crop     = [-90,20,0,90]  # Preprocessing box
+
+
+
+
 
 #%% Stochastic Model Hierarchy Names
 
