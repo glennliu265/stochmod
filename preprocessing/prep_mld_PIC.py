@@ -24,7 +24,7 @@ import xesmf as xe
 #%% User Edits
 
 varname       = "HBLT" # "HMXL"
-mconfig       = "FULL_PIC" # [FULL_PIC, SLAB_PIC, FULL_HTR]
+mconfig       = "FULL_HTR" # [FULL_PIC, SLAB_PIC, FULL_HTR]
 
 use_xesmf     = True # Use xESMF for regridding. False = box average
 method        = "bilinear" # regridding method
@@ -41,15 +41,18 @@ elif mconfig == "SLAB_PIC":
     ncsearch      = "e.e11.B1850C5CN.f09_g16.*.pop.h.%s.*.nc" % varname
 elif mconfig == "FULL_HTR":
     ncsearch      = "b.e11.B20TRC5CNBDRD.f09_g16.*.pop.h.%s.*.nc" % varname
-    catdim  = 'ensemble'
-    savesep = True # Save each ensemble member separately
+    catdim        = 'ensemble'
+    savesep       = True # Save each ensemble member separately
     use_mfdataset = False
 
 # Adjust data path on stormtrack
 if varname == "SSS":
     datpath   = "/vortex/jetstream/climate/data1/yokwon/CESM1_LE/processed/ocn/proc/tseries/monthly/SSS/"
 elif varname == "HBLT":
-    datpath  = "/stormtrack/data4/glliu/01_Data/CESM1_PIC/HBLT/"
+    if "HTR" in mconfig:
+        datpath  = "/stormtrack/data4/glliu/01_Data/CESM1_LE/HBLT/"
+    elif "PIC" in mconfig:
+        datpath  = "/stormtrack/data4/glliu/01_Data/CESM1_PIC/HBLT/"
 else:
     datpath   = "/vortex/jetstream/climate/data1/yokwon/CESM1_LE/downloaded/ocn/proc/tseries/monthly/%s/" % varname
 
