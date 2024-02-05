@@ -40,18 +40,16 @@ import yo_box as ybx
 # Path to Input Data
 input_path = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/'
 
-figpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20240126/"
+figpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20240202/"
 proc.makedir(figpath)
 
 #%% Load the Different Forcings
 
 # Forcing File Names
 fnames = [
-    
     "SLAB_PIC_NAO_EAP_NHFLX_Forcing_DJFM-MON.npy",
     "flxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0.npy",
     "flxeof_090pct_FULL-PIC_eofcorr2_Fprime_rolln0.npy",
-    
     ]
 fnames_long = ["NAO-EAP DJFM (pt)","FLXSTD EOF (pt,SLAB)","FLXSTD EOF (pt,FULL)"]
 
@@ -93,15 +91,15 @@ fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction=0.025,pad=0.
 
 # Load Fprime 
 fname    = "Fprime_PIC_SLAB_rolln0.nc"
-dsf      = xr.open_dataset(input_path+"../"+fname).Fprime.load()
+dsf      = xr.open_dataset(input_path+"../"+fname).Fprime#.load()
 dsf      = proc.format_ds(dsf)
-
+dsf      = dsf.sel(lon=lonf,lat=latf,method='nearest').load()
 # Flip Longitude
-dsf = proc.format_ds(dsf)
+#dsf = proc.format_ds(dsf)
 
 # Compute Monthly variance
 dsmonvar = dsf.groupby('time.month').var('time')
-fprimestd = dsmonvar.values.transpose(2,1,0)
+#fprimestd = dsmonvar.values.transpose(2,1,0)
 
 #%% Load SLAB SST at the point
 
@@ -112,25 +110,26 @@ sst_slab = dspt.TS.values
 tsmetrics_slab = scm.compute_sm_metrics([sst_slab,])
 
 #%% Load FULL SST at a point
+
 ncts1 = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/CESM_proc/TS_anom_PIC_FULL.nc"
 dsts1 = xr.open_dataset(ncts1)
 dspt1 = dsts1.sel(lon=lonf+360,lat=latf,method='nearest')
-sst_full = dspt1.TS.values
-tsmetrics_full = scm.compute_sm_metrics([sst_full,])
 
+sst_full       = dspt1.TS.values
+tsmetrics_full = scm.compute_sm_metrics([sst_full,])
 
 #%% Load Fprime Forcings from checK_fprime_whitening
 
 outpathr  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/ptdata/lon330_lat50/Fprime_rolltest/"
 savename = outpathr+"RollTest_Fprime.npz"
 
-ld = np.load(savename,allow_pickle=True)
+ld            = np.load(savename,allow_pickle=True)
 
 fprimemetrics = ld['metris'].item()['monvars']
 
 fprimemonvars = [np.sqrt(f) for f in fprimemetrics]
 
-fprimenames = ld['names']
+fprimenames   = ld['names']
 
 #%% Examine what is going on at the point
 
@@ -138,7 +137,7 @@ fprimenames = ld['names']
 fpt   = [fl[klon,klat,:,:] for fl in fload]
 fptsq = [np.sqrt(np.nansum(f**2,0)) for f in fpt] 
 
-fprimept = np.sqrt(fprimestd[klon,klat,:])
+fprimept = np.sqrt(dsmonvar)
 
 # Load plotting variables
 mons3 = proc.get_monstr(nletters=3)
@@ -222,9 +221,8 @@ hbl_ds   = xr.open_dataset(input_path+"mld/PIC_FULL_HBLT_hclim.nc")
 hblt_mon = hbl_ds.sel(lon=lonf,lat=latf,method='nearest').h.values
 
 #% Quick Plot of HBLT vs HMXL <0> <0>
-
-mons3 = proc.get_monstr(nletters=3)
-fig,ax=viz.init_monplot(1,1)
+mons3  = proc.get_monstr(nletters=3)
+fig,ax = viz.init_monplot(1,1)
 
 muhblt = np.nanmean(hblt_mon)
 muhmxl = np.nanmean(hmxl)
@@ -320,8 +318,8 @@ acs_all = tsmetrics['acfs']
 
 #%% Plot forcing and damping
 
-ytks  = np.arange(10,80,10)
-ytks2 = np.arange(0,36,5)
+ytks    = np.arange(10,80,10)
+ytks2   = np.arange(0,36,5)
 
 fig,axs = viz.init_monplot(3,1,figsize=(6,5.5))
 
@@ -352,8 +350,6 @@ savename = "%sDebug_Forcing_v_Damping_%s.png" % (figpath,rollstr)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 #%% Plot monvar
-
-
 
 fig,ax = viz.init_monplot(1,1)
 
@@ -468,6 +464,7 @@ tsmetrics = scm.compute_sm_metrics(ssts,)
 nc     = 2
 kmonth = 1
 
+
 for nc in range(ncombo):
     
     ytks  = np.arange(10,80,10)
@@ -548,6 +545,97 @@ for nc in range(ncombo):
     
     savename = "%s/Debug_Monvar_%s.png" % (figpath,rollnames[nc])
     plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+#%% Make the above into a function
+
+
+nc       = 0
+savename = "%s/Debug_Monvar_%s.png" % (figpath,rollnames[nc])
+sst_shift = ssts[nc]
+sst_ref   = ssts[0]
+
+def make_diagnostic_plot(sst_shift,sst_ref,savename,):
+    
+    ytks    = np.arange(10,80,10)
+    ytks2   = np.arange(0,36,5)
+    
+    # Initialize Plot
+    fig,axs = viz.init_monplot(3,1,figsize=(6,8),skipaxis=[2,])
+    
+    labroll_nice = "Shifted (var=%.3f)" % (np.var(ssts[nc]))
+    labbase_nice = "Base    (var=%.3f)" % (np.var(ssts[0]))
+    labslab_nice = "Slab    (var=%.3f)" % (np.var(sst_slab))
+    
+    # Plot Monthly Variance
+    ax = axs[0]
+    plotvar = tsmetrics['monvars'][nc]
+    ax.plot(mons3,plotvar,label=labroll_nice,marker="o",color='purple')
+    
+    # Plot Base
+    plotvar = tsmetrics['monvars'][0]
+    ax.plot(mons3,plotvar,label=labbase_nice,marker="o",color='purple',alpha=0.2)
+    
+    ax.plot(mons3,mvs[-1],label=labslab_nice,color="gray",ls="dashed")
+    ax.legend()
+    ax.set_ylim([0,2])
+    ax.set_ylabel("SST Variance (degC2)")
+    
+    
+    # --- <0> . <0> --- <0> . <0> ---
+    # Plot Forcing and Damping Shift
+    ax = axs[1]
+    
+    # Plot Forcing/Damping (Base)
+    ax.plot(mons3,rforcings[0],color="cornflowerblue",lw=2.5,label="forcing",marker="o",alpha=0.15)
+    ax2 = ax.twinx()
+    ax2.plot(mons3,rdampings[0],color="red",lw=2.5,label="damping",marker='d',ls='dashed',alpha=0.15)
+    
+    # Plot Forcing (Rolled)
+    ax.plot(mons3,rforcings[nc],color="cornflowerblue",lw=2.5,label="forcing",marker="o")
+    ax.tick_params(axis='y', colors='cornflowerblue')
+    
+    # Plot Damping (Rolled)
+    ax2.plot(mons3,rdampings[nc],color="red",lw=2.5,label="damping",marker='d',ls='dashed')
+    ax2.tick_params(axis='y', colors='red')
+    
+    # Set Limits and Ticks
+    ax.set_ylim([10,70])
+    ax.set_yticks(ytks)
+    ax.set_ylabel("Forcing (W/m2)")
+    
+    ax2.set_ylim([0,35])
+    ax2.set_yticks(ytks2)
+    ax2.set_ylabel("Damping (degC/W/m2)")
+    
+    # Subplot Title
+    # viz.label_sp(expnames[ff],x=0.45,ax=ax,labelstyle="%s",usenumber=True)
+    
+    # --- <0> . <0> --- <0> . <0> ---
+    ax     = axs[2]
+    title3 = ""
+    
+    ax,_ = viz.init_acplot(kmonth,xtksl,lags,ax=ax,title=title3)
+    
+    ax.set_xlim([0,lags[-1]])
+    ax.set_xticks(xtksl)
+    
+    # Plot Base
+    ax.plot(lags,tsmetrics['acfs'][kmonth][0],label="base",marker="o",color='purple',alpha=0.2)
+    
+    # Plot Rolled Version
+    ax.plot(lags,tsmetrics['acfs'][kmonth][nc],label=rollnames[nc],marker="o",color='purple')
+    
+    # Plot SLAB
+    ax.plot(lags,tsmetrics_slab['acfs'][kmonth][0],label='SLAB',ls='dashed',color='gray')
+    #ax.plot(lags,acs_old[8],label=lbs[8],ls='dashed',color='gray')
+    ax.set_xticks(xtksl)
+    
+    plt.suptitle("Damping Shift (%i) | Forcing Shift (%i)" % (drolls[nc], frolls[nc]),y=1.01)
+    
+    plt.savefig(savename,dpi=150,bbox_inches='tight')
+    
+
+
 
 # -----------------------------------------------------------------------------
 #%% Experiment 3: Try Different Fprime Forcings
@@ -660,14 +748,15 @@ ax.legend()
 savename = "%sDebug_ACF_FprimeShift_basemonth%i_%s.png" % (figpath,kmonth+1,rollstr)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
 
-
+# -----------------------------------------------------------------------------
 # -----------------------------------------------------------------------------
 #%% Experiment 4: Try Adding MLD Variability and Entrainment
-
-
+# Also general experiment for single roll/shift
+# -----------------------------------------------------------------------------
+# 
 mlds     = [hmxl,]
 forcings = [fprimept,]
-dampings = [dpt[1],]
+dampings = [dpt[3],] # [dpt[1]]
 nexps = len(mlds)
 
 
@@ -677,30 +766,42 @@ hnames   = ["Vary $F'$ and $\lambda_a$ (Level 3)",
 "Vary $F'$, $h$, and $\lambda_a$ (Level 4)",
 "Entraining (Level 5)"]
 
-forcingroll = 0
-dampingroll = 0
-mldroll     = 0
+old_index   = True # Set to True for case where T(1) = lbd(1)*T(0) + F(1) instead of F(0) 
+half_mode   = False
+
+forcingroll     = 1
+dampingroll     = 0
+mldroll         = 1
+
+hdenom_lbd_roll = 0 # How to roll h in the denominator of lambda. If 0, it will be the same as mldroll
 
 # Temp fix for when forcing indexing is corrected for nonentraining code only..
 # When forcingroll is set to 1, do not roll case for Level4 (vary MLD)
 # made for purposes of generating AMS figure for Martha, will remove this when 
 # code is corrected
-entrainpatch = True 
+entrainpatch = False 
 
-rollstr = "froll%i_droll%i_hroll%i" % (forcingroll,dampingroll,mldroll)
-outputs     = []
-fcopy = []
-dcopy = []
-hcopy = []
+rollstr       = "froll%i_droll%i_hroll%i_oldindex%i_halfmode%i" % (forcingroll,dampingroll,mldroll,old_index,half_mode)
+rstitle1      = "Damping Shift (%s) | Forcing Shift (%s) | MLD Shift (%s)\n" % (dampingroll, forcingroll,mldroll)
+rstitle2      = "MLD Denom Shift (%s) | Old Indexing: %s | Half Mode %s" % (hdenom_lbd_roll,old_index,half_mode)
+rollstr_title = rstitle1 + rstitle2
+
+outputs      = []
+fcopy        = []
+dcopy        = []
+hcopy        = []
 for ex in range(nexps):
-    
-    
     
     # Get Forcing/Damping and Roll
     f_in = np.roll(forcings[ex].copy(),forcingroll)
     h_in = np.roll(mlds[ex].copy(),mldroll)
     d_in = np.roll(dampings[ex].copy(),dampingroll)
     
+    if half_mode:
+        # Then average : T_in = [T(1) + T(roll)]/2
+        f_in = (f_in + forcings[ex].copy())/2
+        h_in = (h_in + mlds[ex].copy())/2
+        d_in = (d_in + dampings[ex].copy())/2
     
     outputs_h = []
     for hconfig in range(3):
@@ -716,39 +817,46 @@ for ex in range(nexps):
         else:
             smconfig['h']       = h_in.copy()[None,None,:] # MLD (meters)
         
+        # --------------------------------------------------------
+        # Manual case while functions are being repaired
         if (entrainpatch) and (forcingroll == 1) and (hconfig ==1):
             print("Temporary patch for Level 4")
-            
             
             f_fix = np.roll(forcings[ex].copy(),0)
             h_fix = np.roll(mlds[ex].copy(),-1)
             d_fix = np.roll(dampings[ex].copy(),-1)
             
             smconfig['forcing'] = f_fix.copy()[None,None,:]
-            smconfig['h'] = h_fix.copy()[None,None,:]
+            smconfig['h']       = h_fix.copy()[None,None,:]
             smconfig['damping'] = d_fix.copy()[None,None,:]
-            
-            
+        # --------------------------------------------------------
         
         
         # Calculate Kprev
         kout,_              = scm.find_kprev(h_in,)
         smconfig['kprev']   = kout[None,None]
         
-        # Run Stochastic Model (No entrain) ---------------------------------------
+        
         # Convert units (W/m2 to degC/S)
-        smconfig['damping']=scm.convert_Wm2(smconfig['damping'],smconfig['h'],dt)[None,None,:]
+        if (hdenom_lbd_roll==0) or hconfig == 0:  # Dont do this for SLAB run because h is the same value 
+            smconfig['damping']=scm.convert_Wm2(smconfig['damping'],smconfig['h'],dt)[None,None,:]
+        elif hconfig !=0: 
+            smconfig['damping']=scm.convert_Wm2(smconfig['damping'],np.roll(mlds[ex].copy(),hdenom_lbd_roll),dt)[None,None,:]
+            
         smconfig['forcing']=scm.convert_Wm2(smconfig['forcing'],smconfig['h'],dt)
         
+        
+        # Run Stochastic Model (No entrain) ---------------------------------------
         # Make Forcing
         smconfig['Fprime']= np.tile(smconfig['forcing'],nyrs) * smconfig['eta'][None,None,:]
         
         # Do Integration
         if hconfig < 2:
-            output = scm.integrate_noentrain(smconfig['damping'],smconfig['Fprime'],debug=True)
+            output = scm.integrate_noentrain(smconfig['damping'],smconfig['Fprime'],
+                                             debug=True,old_index=old_index)
         else:
             output = scm.integrate_entrain(smconfig['h'],smconfig['kprev'],smconfig['damping'],
-                                           smconfig['Fprime'],debug=True,return_dict=True)
+                                           smconfig['Fprime'],debug=True,return_dict=True,old_index=old_index)
         
         # -------------------------------------------------------------------------
         outputs_h.append(output)
@@ -761,26 +869,39 @@ for ex in range(nexps):
 outputs_in = outputs[0] # Drop ex since I'm only using 1 value for now
 # % Calculate some diagnostics
 ssts      = [outputs_in[0][0],outputs_in[1][0],outputs_in[2]['T']]#[o[0].squeeze() for o in outputs]
-ssts      = [s.squeeze() for s in ssts]
+#ssts      = [np.roll(s.squeeze(),-1) for s in ssts]
+ssts = [s.squeeze() for s in ssts]
 tsmetrics = scm.compute_sm_metrics(ssts)
 
 
 monvars = tsmetrics['monvars']
 acs_all = tsmetrics['acfs']
 
+#%% Plot Monthly Variance
+
+import matplotlib as mpl
 
 
+#mpl.rc('text', usetex=True)
+mpl.rcParams['mathtext.fontset'] = 'stix'#'custom' 
+mpl.rcParams['font.family'] = 'STIXGeneral'#'Courier'#'STIXGeneral'
 
-#%%
+#mpl.rcParams['mathtext.fontset'] = 'custom' 
+#mpl.rcParams['font.family'] = 'Euphemia UCAS'#'STIXGeneral'
 
-fig,ax = viz.init_monplot(1,1)
+#sorted([f.name for f in mpl.font_manager.fontManager.ttflist])
+
+alw = 2.5
+
+plt.close()
+fig,axs = viz.init_monplot(3,1,figsize=(6,12),skipaxis=[2,])
+
+ax  = axs[1]
 
 for ff in range(3):
     lab = "Level %i (var=%.2f)" % (3+ff,np.var(ssts[ff]))
     plotvar = monvars[ff]
     ax.plot(mons3,plotvar,label=lab,marker=hmarkers[ff],c=hcolors[ff],ls='solid')
-
-
 
 ax.plot(mons3,tsmetrics_slab['monvars'][0],label="SLAB (var=%.2f)" % (np.var(sst_slab)),color="gray",ls="dashed")
 ax.plot(mons3,tsmetrics_full['monvars'][0],label="FULL (var=%.2f)" % (np.var(sst_full)),color="k",ls="dashed")
@@ -789,12 +910,85 @@ ax.legend(ncol=2)
 ax.set_ylim([0,1.5])
 
 ax.set_ylabel("SST Variance ($\degree C^2$)")
-plt.suptitle("Damping Shift (%i) | Forcing Shift (%i) | MLD Shift (%i)" % (dampingroll, forcingroll,mldroll))
+plt.suptitle(rollstr_title)
+
+# Plot the Seasonal Cycle ---
+ax = axs[0]
+
+# Plot Forcing
+if old_index:
+    l1=ax.plot(mons3,fcopy[ex],label="Forcing",lw=alw,color="violet",marker="o")
+    ax.plot(mons3,forcings[ex],label="",lw=alw,color="violet",alpha=0.3,ls='dashed')
+else:
+    l1=ax.plot(mons3,np.roll(fcopy[ex],1),label="Forcing",lw=alw,color="violet",marker="o")
+    ax.plot(mons3,np.roll(forcings[ex],1),label="",lw=alw,color="violet",alpha=0.3,ls='dashed')
+
+# Plot Damping
+l2=ax.plot(mons3,dcopy[ex],label="Damping",lw=alw,color="red",marker="s")
+ax.plot(mons3,dampings[ex],label="",lw=alw,color="red",alpha=0.3,ls='dashed')
+ax.set_ylabel(r"Forcing [W/$m^2$] or Damping [$\degree C/W/m^2$]")
+
+
+# Plot MLD
+axh = ax.twinx()
+l3=axh.plot(mons3,hcopy[ex],label="MLD",lw=alw,color='darkblue',marker="d")
+axh.plot(mons3,mlds[ex],label="MLD",lw=alw,color='darkblue',alpha=0.3,ls='dashed')
+ax.legend([l1[0],l2[0],l3[0]],["Forcing","Damping","Mixed-Layer Depth"])
+axh.set_ylabel("Depth [meters]")
+
+axh.spines['right'].set_color('darkblue')
+axh.spines['left'].set_color('violet')
+
+# Plot  ACF -------
+ax     = axs[2]
+title3 = ""
+
+ax,_ = viz.init_acplot(kmonth,xtksl,lags,ax=ax,title=title3)
+
+ax.set_xlim([0,lags[-1]])
+ax.set_xticks(xtksl)
+
+for ff in range(3):
+    plotvar = acs_all[kmonth][ff]
+    ax.plot(lags,plotvar,label=hnames[ff],marker=hmarkers[ff],c=hcolors[ff],lw=alw)
+    
+    
+#ax.plot(lags,acs_old[8],label=lbs[8],ls='dashed')
+
+ax.plot(lags,tsmetrics_slab['acfs'][kmonth][0],label='SLAB',ls='dotted',color='gray',lw=alw)
+ax.plot(lags,tsmetrics_full['acfs'][kmonth][0],label='FULL',ls='dashed',color='black',lw=alw)
+
 savename = "%sDebug_Monthly_Variance_Entrain_%s.png" % (figpath,rollstr)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
+plt.show()
 
-#%% Same as above, but AMS 2024 version (for Martha)
+#%% Plot autocorrelation
 
+kmonth = 3
+xtksl  = np.arange(0,37,3)
+title  = "ACF (Lag 0 = %s) | Damping Shift (%i) | Forcing Shift (%i) | MLD Shift (%i)" % (mons3[kmonth],dampingroll, forcingroll,mldroll)
+fig,ax = viz.init_acplot(kmonth,xtksl,lags,title=title)
+
+for ff in range(3):
+    plotvar = acs_all[kmonth][ff]
+    ax.plot(lags,plotvar,label=hnames[ff],marker=hmarkers[ff],c=hcolors[ff])
+    
+    
+ax.plot(lags,acs_old[8],label=lbs[8],ls='dashed')
+
+ax.plot(lags,tsmetrics_slab['acfs'][kmonth][0],label='SLAB',ls='dotted',color='gray')
+ax.plot(lags,tsmetrics_full['acfs'][kmonth][0],label='FULL',ls='dashed',color='black')
+
+ax.legend()
+
+savename = "%sDebug_ACF__Entrain_basemonth%i_%s.png" % (figpath,kmonth+1,rollstr)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+plt.show()
+plt.close()
+#fig,ax=plt.subplots
+
+
+#%% Monthly Vvariance, AMS 2024 version (for Martha)
 
 ahcolors  = ["red","violet","orange"]
 ahmarkers = ["d","x","o"]
@@ -842,28 +1036,138 @@ plt.savefig(savename,dpi=200,bbox_inches='tight')
 
 
 
-#%% Plot autocorrelation
 
-kmonth = 1
-xtksl  = np.arange(0,37,3)
-title  = "ACF (Lag 0 = %s) | Damping Shift (%i) | Forcing Shift (%i) | MLD Shift (%i)" % (mons3[kmonth],dampingroll, forcingroll,mldroll)
-fig,ax = viz.init_acplot(kmonth,xtksl,lags,title=title)
+#%% Check Beta
 
-for ff in range(3):
-    plotvar = acs_all[kmonth][ff]
-    ax.plot(lags,plotvar,label=hnames[ff],marker=hmarkers[ff],c=hcolors[ff])
+fig,ax = plt.subplots(1,1)
+
+ax.plot(mons3,hmxl,marker="o")
+ax.invert_yaxis()
+ax2 = ax.twinx()
+ax2.plot(mons3,scm.calc_beta(hmxl[None,None,:]).squeeze())
+
+plt.show()
+
+# -----------------------------------------------------------------------------
+#%% (Exp 6) Do timing experiments
+# -----------------------------------------------------------------------------
+
+
+# Regions between these markers are unchanged from above ************** 
+mlds     = [hmxl,]
+forcings = [fprimept,]
+dampings = [dpt[1],]
+nexps    = len(mlds)
+
+hcolors  = ["red","violet","orange"]
+hmarkers = ["d","x","o"]
+hnames   = ["Vary $F'$ and $\lambda_a$ (Level 3)",
+"Vary $F'$, $h$, and $\lambda_a$ (Level 4)",
+"Entraining (Level 5)"]
+
+old_index   = False # Set to True for case where T(1) = lbd(1)*T(0) + F(1) instead of F(0) 
+half_mode   = False
+
+forcingroll     = 0
+dampingroll     = 0
+mldroll         = 0
+
+hdenom_lbd_roll = 0 # How to roll h in the denominator of lambda. If 0, it will be the same as mldroll
+
+# Temp fix for when forcing indexing is corrected for nonentraining code only..
+# When forcingroll is set to 1, do not roll case for Level4 (vary MLD)
+# made for purposes of generating AMS figure for Martha, will remove this when 
+# code is corrected
+entrainpatch = False 
+
+rollstr      = "froll%i_droll%i_hroll%i_oldindex%i_halfmode%i" % (forcingroll,dampingroll,mldroll,old_index,half_mode)
+
+outputs      = []
+fcopy        = []
+dcopy        = []
+hcopy        = []
+for ex in range(nexps):
     
+    # Get Forcing/Damping and Roll
+    f_in = np.roll(forcings[ex].copy(),forcingroll)
+    h_in = np.roll(mlds[ex].copy(),mldroll)
+    d_in = np.roll(dampings[ex].copy(),dampingroll)
     
-ax.plot(lags,acs_old[8],label=lbs[8],ls='dashed')
+    if half_mode:
+        # Then average : T_in = [T(1) + T(roll)]/2
+        f_in = (f_in + forcings[ex].copy())/2
+        h_in = (h_in + mlds[ex].copy())/2
+        d_in = (d_in + dampings[ex].copy())/2
+    
+    outputs_h = []
+    for hconfig in range(3):
+        
+        # Set up Stochastic Model Input...
+        smconfig = {}
+        smconfig['eta']     = eta.copy()               # White Noise Forcing
+        smconfig['forcing'] = f_in.copy()[None,None,:] # [x x 12] # Forcing Amplitude (W/m2)
+        smconfig['damping'] = d_in.copy()[None,None,:] # Damping Amplitude (degC/W/m2)
+        
+        if hconfig == 0:
+            smconfig['h']       = np.ones((1,1,12))*hblt # MLD (meters)
+        else:
+            smconfig['h']       = h_in.copy()[None,None,:] # MLD (meters)
+        
+        # --------------------------------------------------------
+        # Manual case while functions are being repaired
+        if (entrainpatch) and (forcingroll == 1) and (hconfig ==1):
+            print("Temporary patch for Level 4")
+            
+            f_fix = np.roll(forcings[ex].copy(),0)
+            h_fix = np.roll(mlds[ex].copy(),-1)
+            d_fix = np.roll(dampings[ex].copy(),-1)
+            
+            smconfig['forcing'] = f_fix.copy()[None,None,:]
+            smconfig['h']       = h_fix.copy()[None,None,:]
+            smconfig['damping'] = d_fix.copy()[None,None,:]
+        # --------------------------------------------------------
+        
+        
+        # Calculate Kprev
+        kout,_              = scm.find_kprev(h_in,)
+        smconfig['kprev']   = kout[None,None]
+        
+        
+        # Convert units (W/m2 to degC/S)
+        if (hdenom_lbd_roll==0) or hconfig == 0:  # Dont do this for SLAB run because h is the same value 
+            smconfig['damping']=scm.convert_Wm2(smconfig['damping'],smconfig['h'],dt)[None,None,:]
+        elif hconfig !=0: 
+            smconfig['damping']=scm.convert_Wm2(smconfig['damping'],np.roll(mlds[ex].copy(),hdenom_lbd_roll),dt)[None,None,:]
+            
+        smconfig['forcing']=scm.convert_Wm2(smconfig['forcing'],smconfig['h'],dt)
+        
+        
+        # Run Stochastic Model (No entrain) ---------------------------------------
+        # Make Forcing
+        smconfig['Fprime']= np.tile(smconfig['forcing'],nyrs) * smconfig['eta'][None,None,:]
+        
+        # Do Integration
+        if hconfig < 2:
+            output = scm.integrate_noentrain(smconfig['damping'],smconfig['Fprime'],
+                                             debug=True,old_index=old_index)
+        else:
+            output = scm.integrate_entrain(smconfig['h'],smconfig['kprev'],smconfig['damping'],
+                                           smconfig['Fprime'],debug=True,return_dict=True,old_index=old_index)
+        
+        # -------------------------------------------------------------------------
+        outputs_h.append(output)
+        
+    outputs.append(outputs_h)
+    fcopy.append(f_in.copy())
+    dcopy.append(d_in.copy())
+    hcopy.append(h_in.copy())
+#%
+outputs_in = outputs[0] # Drop ex since I'm only using 1 value for now
+# % Calculate some diagnostics
+ssts      = [outputs_in[0][0],outputs_in[1][0],outputs_in[2]['T']]#[o[0].squeeze() for o in outputs]
+ssts      = [s.squeeze() for s in ssts]
+tsmetrics = scm.compute_sm_metrics(ssts)
 
-ax.plot(lags,tsmetrics_slab['acfs'][kmonth][0],label='SLAB',ls='dotted',color='gray')
-ax.plot(lags,tsmetrics_full['acfs'][kmonth][0],label='FULL',ls='dashed',color='black')
 
-ax.legend()
-
-savename = "%sDebug_ACF__Entrain_basemonth%i_%s.png" % (figpath,kmonth+1,rollstr)
-plt.savefig(savename,dpi=150,bbox_inches='tight')
-
-plt.close()
-#fig,ax=plt.subplots
-
+monvars = tsmetrics['monvars']
+acs_all = tsmetrics['acfs']
