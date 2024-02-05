@@ -42,11 +42,11 @@ runid       = 3
 allruns     = True # Set to True to load all runs, then avg.
 thresholds = [0,]
 thresname  = "thres" + "to".join(["%i" % i for i in thresholds])
-varname    = "SSS" #"SST"
+varname    = "SST" #"SST"
 
 # Set Output Directory
 # --------------------
-figpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20231117/'
+figpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20240209/'
 proc.makedir(figpath)
 outpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/'
 savename   = "%s%s_%s_autocorrelation_%s_%s.npz" %  (outpath,mconfig,varname,thresname,lagname)
@@ -308,7 +308,6 @@ for a in range(2):
 plt.savefig("%sMLD_we_maxclim.png"%figpath,dpi=150,bbox_inches='tight')
 
 #%% Load  and compare with CESM-PiC
-
 mconfigs = ("SLAB","FULL")
 
 cesm_acs = []

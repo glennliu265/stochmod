@@ -919,8 +919,6 @@ def calc_kprev_dmon(m,kprev):
     elif m >= kpmon:
         dmon = m-kpmon
     return dmon
-    
-    
 
 # Entrain Model (Single Point)
 def entrain_parallel(inputs):

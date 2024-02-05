@@ -33,7 +33,7 @@ if stormtrack == 0:
     datpath     = projpath + '01_Data/model_output/'
     rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20220519/"
+    figpath     = projpath + "02_Figures/20240202/"
    
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -76,7 +76,7 @@ flip360=True # change longitude back to degrees east for final output
 # 0.5 = lbd*[T(t-1)+T(t)]/2
 rolln    = 0  
 mconfigs = ("SLAB","FULL")
-
+#%%
 for mconfig in mconfigs:
     #%% Load in the Temperature Anomalies
     # [lon x lat x time]
@@ -230,6 +230,7 @@ for mconfig in mconfigs:
     proc.numpy_to_da(Fprime,times,lat,lonsave,'Fprime',savenetcdf=savename)
 
 
+
 # ---------------------------------------------------------------------------
 #%% Test different lags. Run up to the symbol ($$) above (loaded in all data)
 # ---------------------------------------------------------------------------
@@ -303,6 +304,4 @@ for v in range(2):
     ax.set_ylabel("Power ($W/m^{2}/cpy$)")
     ax.grid(True,ls='dotted')
     plt.savefig("%s%s_Power_Spectra_CESM1-%s.png"% (figpath,vnames[v],mconfig),dpi=150)
-    
-
 

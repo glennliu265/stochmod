@@ -132,7 +132,7 @@ T0         = 0 # Init Temp
 ampq       = 0 #0 = none 1 = old method, 2 = method 1, 3 = method 2
 
 # Damping Significance Test Method
-method     = 5 # 1 = No Testing; 2 = SST autocorr; 3 = SST-FLX crosscorr, 4 = Both 
+method     = 5 # 1 = No Testing; 2 = SST autocorr; 3 = SST-FLX crosscorr, 4 = Both, 5 - replace insignificant values in FULL with those from SLAB
 lagstr     = "lag1"
 
 # Point information

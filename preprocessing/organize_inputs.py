@@ -4,6 +4,8 @@
 
 Organize Stochastic Model Inputs
 
+NOTE Need to check groupby operation in organize inputs
+
 Load in and check inputs
 
 
@@ -39,6 +41,7 @@ PIC_FULL_Fprime_EOF_090pct_eofcorr2_rolln0.nc
 Created on Mon Jan 22 10:36:59 2024
 
 @author: gliu
+
 """
 
 #%% Import Stuff
@@ -78,7 +81,7 @@ def save_smoutput(varname,varout,indict,savename):
 # =============================================================================
 #%% Taken from scm.load_inputs, output from the stochastic model paper 
 # =============================================================================
-figpath  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20240122/"
+figpath  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20240202/"
 input_path = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/"
 proc.makedir(figpath)
 
@@ -324,7 +327,9 @@ dsh.close()
 fn  = "Fprime_PIC_SLAB_rolln0.nc"
 ds  = xr.open_dataset(input_path + "../" + fn).load()
 dsf = proc.format_ds(ds)
+
 dsfstd = dsf.groupby('time.month').std('time')
+
 dsfstd = dsfstd.rename({'month':'mon'})
 dsfstd = dsfstd.rename({'Fprime':'alpha'})
 
