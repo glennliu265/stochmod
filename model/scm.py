@@ -3078,7 +3078,7 @@ def integrate_Q(lbd,F,T,mld,cp0=3996,rho=1026,dt=3600*24*30,debug=False):
         return Q,q,lbdT
     return Q
 
-def integrate_noentrain(lbd,F,T0=0,multFAC=True,debug=False,old_index=False):
+def integrate_noentrain(lbd,F,T0=0,multFAC=True,debug=False,old_index=False,return_dict=False):
     """
     T,[damping_term],[forcing_term] = integrate_noentrain(lbd,F,T0=0,multFAC=True,debug=False)
     
@@ -3160,12 +3160,22 @@ def integrate_noentrain(lbd,F,T0=0,multFAC=True,debug=False,old_index=False):
         print("WARNING ALL ARE NAN")
     
     if debug:
+        if return_dict:
+            output_dict = {
+                'T'            : T,
+                'damping_term' : damping_term,
+                'forcing_term' : forcing_term,
+                "FAC"          : FAC,
+                "lbd"          : lbd,
+                }
+            return output_dict
         return T,damping_term,forcing_term
     return T
 
 
 def intgr_noentrain(lbd,F,white_noise,T0=0,multFAC=True,debug=False):
     """
+    NOTE delete this, I think I will stick with the original function integrate_noentrain()
     Copy of integrate_noentrain, but with updated
     indexing, etc (copied 2024.01.23, should replace original function)
     
