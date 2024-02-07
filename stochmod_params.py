@@ -99,6 +99,25 @@ amvbbox       = [-80,0,0,65]   # AMV Calculation box
 bbox_crop     = [-90,20,0,90]  # Preprocessing box
 
 
+#%% Regional Analysis
+
+# Copied below from sm_paper_stylesheet, 2024.02.05 ---------------------------
+# # Regional Analysis Settings (NEW, with STG Split)
+# Regional Analysis Settings
+bbox_SP     = [-60,-15,40,65]
+bbox_ST     = [-80,-10,20,40]
+bbox_TR     = [-75,-15,10,20]
+bbox_NA     = [-80,0 ,0,65]
+bbox_NA_new = [-80,0,10,65]
+bbox_ST_w   = [-80,-40,20,40]
+bbox_ST_e   = [-40,-10,20,40]
+regions     = ("SPG","STG","TRO","NAT","NNAT","STGe","STGw")        # Region Names
+bboxes      = (bbox_SP,bbox_ST,bbox_TR,bbox_NA,bbox_NA_new,bbox_ST_e,bbox_ST_w) # Bounding Boxes
+regionlong  = ("Subpolar","Subtropical","Tropical","North Atlantic","North Atlantic","Subtropical (East)","Subtropical (West)",)
+bbcol       = ["Blue","Red","Yellow","Black","Black"]
+bbcol       = ["Blue","Red","Yellow","Black","Black","magenta","red"]
+bbsty       = ["solid","dashed","solid","dotted","dotted","dashed","dotted"]
+# -----------------------------------------------------------------------------
 
 
 
