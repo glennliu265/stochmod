@@ -492,8 +492,8 @@ def calc_tau_detrain(hcycle,kprev,z,tau_est,debug=False):
         delta_m = detrain_mon - dm0
         
         # Use linear interpolation in time to retrieve detrainment level
-        h0       = hcycle[dm0-1] # Subtract 1 since dm0,dm1 is the actual month
-        h1       = hcycle[dm1-1]
+        h0       = hcycle[(dm0-1)%12] # Subtract 1 since dm0,dm1 is the actual month
+        h1       = hcycle[(dm1-1)%12]
         hdetrain = np.interp(delta_m,[0,1],[h0,h1])
         if debug:
             # Check Linear Detrend
@@ -502,8 +502,8 @@ def calc_tau_detrain(hcycle,kprev,z,tau_est,debug=False):
             plt.axvline(delta_m,color="k")
         
         # Retrieve tau values for months above and below
-        tau0 = tau_est[dm0-1,:] # [Depth]
-        tau1 = tau_est[dm1-1,:] 
+        tau0 = tau_est[(dm0-1)%12,:] # [Depth]
+        tau1 = tau_est[(dm1-1)%12,:] 
         
         # Do linear interpolation in time to get timescale
         x_in = [0,1]
