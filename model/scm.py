@@ -69,7 +69,7 @@ def calc_Td(t,index,values,prevmon=False,debug=False):
         months.append(m0)
     if debug:
         print("t=%i, Month is %i"%(t,m1))
-
+    
     # Loop for each month
     Td = []
     mcnts = [1,0] # Amount to add to get the index
@@ -306,7 +306,7 @@ def set_stochparams(h,damping,dt,ND=True,rho=1000,cp0=4218,hfix=50,usemax=False,
     return lbd,lbd_entr,FAC,beta
 
 
-def find_kprev(h,debug=False):
+def find_kprev(h,debug=False,returnh=True):
     """
     Script to find the month of detrainment, given a seasonal
     cycle of mixed layer depths
@@ -396,8 +396,10 @@ def find_kprev(h,debug=False):
             
             # Go back one month
             ifindm -= 1
-    
-    return kprev, hout
+    if returnh:
+        return kprev,hout
+    else:
+        return kprev
 
 def calc_kprev_lin(h,entrain1=-1,entrain0=0):
     """
@@ -711,7 +713,7 @@ def noentrain(t_end,lbd,T0,F,FAC,multFAC=1,debug=False):
 
 # Entrain Model (Single Point)
 def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=False,
-            Tdgrab=None,add_F=None,return_dict=False,Tdexp=None,old_index=False):
+            Tdgrab=None,add_F=None,return_dict=False,Tdexp=None,old_index=False,Td_corr=False):
     
     """
     SST Stochastic Model, with Entrainment
@@ -750,6 +752,9 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
         Additional forcing to add directly intot he equation (multiple by integration factor if chosen)
     Tdexp : ARRAY [12]
         Decay time applied to Td detrained/formed at each given month (Td * exp(-Tdexp * kmonth)). Default is 0 (no decay_)
+    Td_corr : BOOL
+        Set to True if Tdexp provided is the correlation rather than the timescale.
+        Uses Td_corr=False as default since if no damping is provided, exp(0) = 1 (no decay).
         
     
     Returns
@@ -803,43 +808,65 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
         # --------------------------
         # Calculate entrainment term
         # --------------------------
-        if (t<12) and (Tdgrab is None): # Start Entrainment term after first 12 months
+        if (t<12) and (Tdgrab is None): # Only start Entrainment term after first 12 months
             if debugprint:
                 print("Skipping t=%i" % t)
             entrain_term = 0
-        else: # Otherwise, 
-            if beta[im] == 0: # For months with no entrainment
-                entrain_term = 0
+        else:
+            
+            if beta[im] == 0:       # For months with no entrainment
+                entrain_term = 0    # Set Entrainment Term to Zero
                 Td0          = None # Reset Td0 term
                 if debugprint:
                     print("No entrainment on month %i"%m)
                     print("--------------------\n")
-            else:
+            else: # Retrieve temperature at detraining months
+                
                 if (Td0 is None) & (h.argmin()==im-1) :# For first entraining month
                     Td1 = calc_Td(t,kprev,temp_ts,prevmon=False,debug=debugprint)
                     Td0 = Td1 # Previous month does not have entrainment!
-                if Td0 is None: # Calculate Td0 
+                
+                if (Td0 is None): # Calculate Td0 for other entraining months
                     Td1,Td0 = calc_Td(t,kprev,temp_ts,prevmon=True,debug=debugprint)
                 else: # Use Td0 from last timestep
                     Td1 = calc_Td(t,kprev,temp_ts,prevmon=False,debug=debugprint)
                 
-                if (Td0 is None):
+                # Now apply deep damping
+                if (Td0 is None): # For cases where there is no Td0
+                    
                     if (h.argmin()==im-1): # For first entraining month
-                        delta_t_1 = calc_kprev_dmon(m,kprev) # dt = current month - detraining month
-                        Td1       = Td1 * np.exp(-Tdexp[m-1] * delta_t_1)
-                        Td0       = Td1 # Previous month does not have entrinment
-                    else: # Calculate Td0 (NOTE NEED TO CHECK THIS STEP, when might this apply?)
+                        if Td_corr: # Conversion not needed (direct correlation provided)
+                            decay_factor = Tdexp[m-1]
+                        else:
+                            delta_t_1       = calc_kprev_dmon(m,kprev) # dt = current month - detraining month
+                            decay_factor    = np.exp(-Tdexp[m-1] * delta_t_1)
+                        Td1             = Td1 * decay_factor
+                        Td0             = Td1 # Previous month does not have entrinment
+                        
+                    else: # Calculate Td0 (NOTE NEED TO CHECK THIS STEP, when might this apply? It seems to not really apply)
                         print("Td0=None condition applies on month %i" % m)
-                        print("Exiting script, check scm line 833.")
+                        print("Exiting script, check scm line 833 (or around here).")
                         break
-                        delta_t_1 = calc_kprev_dmon(m,kprev)
-                        Td1       = Td1 * np.exp(-Tdexp[m-1] * delta_t_1)
-                        delta_t_0 = calc_kprev_dmon(m-1,kprev)
-                        Td0       = Td0 * np.exp(-Tdexp[m-2] * delta_t_0)
+                        if Td_corr:
+                            delta_t_1     = calc_kprev_dmon(m,kprev)
+                            decay_factor1 = np.exp(-Tdexp[m-1] * delta_t_1)
+                            delta_t_0     = calc_kprev_dmon(m-1,kprev)
+                            decay_factor0 = np.exp(-Tdexp[m-2] * delta_t_0)
+                        else:
+                            decay_factor1 = Tdexp[m-1]
+                            decay_factor0 = Tdexp[m-2]
+                        
+                        Td1           = Td1 * decay_factor1
+                        Td0           = Td0 * decay_factor0
+                    
                 else: # Use Td0 from last timestep
-                    delta_t_1 = calc_kprev_dmon(m,kprev)
-                    Td1       = Td1 * np.exp(-Tdexp[m-1] * delta_t_1)
-                
+                    if Td_corr:
+                        decay_factor = Tdexp[m-1]
+                    else:
+                        delta_t_1    = calc_kprev_dmon(m,kprev)
+                        decay_factor = np.exp(-Tdexp[m-1] * delta_t_1)
+                    Td1          = Td1 * decay_factor
+
                 # Compute Td (in future, could implement month-dependent decay..)
                 Td = (Td1+Td0)/2
                 if debugprint:
@@ -911,13 +938,22 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
         return temp_ts,damp_ts,noise_ts,entrain_ts,Td_ts
     return temp_ts
 
+def calc_Td_decay_factor(kprev,m,Tdexp):
+    # For when Td_corr is true
+    delta_t        = calc_kprev_dmon(m,kprev) # dt = current month - detraining month
+    decay_factor   = np.exp(-Tdexp[m-1] * delta_t)
+    return decay_factor
+    
+
 def calc_kprev_dmon(m,kprev):
     im    = m-1
     kpmon = kprev[im]
     if m < kpmon:
         dmon = (m+12) - kpmon
-    elif m >= kpmon:
+    elif m > kpmon:
         dmon = m-kpmon
+    elif m == kpmon:
+        dmon = 12 # 12 months have passed.
     return dmon
 
 # Entrain Model (Single Point)
@@ -1133,6 +1169,27 @@ def noentrain_2d(randts,lbd,T0,F,FAC,multFAC=1,debug=False):
     if debug:
         return temp_ts,damp_term,noise_term
     return temp_ts
+
+
+def get_detrain_depth(kprev,h):
+    """
+    Given detrainment times [kprev: mon] and mixed layer depths [h: mon]
+    Retrieve the approximate detrainment depth via linear interpolation
+    """
+    hdetrain = np.zeros(12)*np.nan
+    for im in range(12):
+        detrain_mon = kprev[im] # Get Detrainment Month
+        if detrain_mon == 0.:
+            continue
+        idfloor      = int(np.floor(detrain_mon))-1
+        idceil       = int(np.ceil(detrain_mon))-1
+        hfloor       = h[idfloor]
+        hceil        = h[idceil]
+        detrain_time = detrain_mon-1-idfloor
+        if detrain_time >= 1:
+            print("Warning, detrain time not between lower/upper bounds...")
+        hdetrain[im]= np.interp(detrain_time,[0,1],[hfloor,hceil])
+    return hdetrain
 
 #%% Postprocessing Utilities
 
@@ -3258,7 +3315,7 @@ def integrate_entrain(h,kprev,lbd_a,F,T0=None,
                       multFAC=True,debug=False,
                       Td0=False,add_F=None,
                       return_dict=False,Tdexp=None,
-                      beta=None,old_index=False):
+                      beta=None,old_index=False,Td_corr=False):
     """
     
     Parameters
@@ -3314,6 +3371,8 @@ def integrate_entrain(h,kprev,lbd_a,F,T0=None,
     # Set Td damping timescale
     if Tdexp is None:
         Tdexp = np.zeros(FAC.shape)
+        if Td_corr is True:
+            Tdexp = np.ones(FAC.shape) # Since we are not exponentiating, Tdexp * T = T if Tdexp = 1
     
     # Preallocate
     T            = np.zeros((nlon,nlat,ntime))
@@ -3348,7 +3407,7 @@ def integrate_entrain(h,kprev,lbd_a,F,T0=None,
             # Integrate in time
             temp_ts,damp_ts,noise_ts,entrain_ts,Td_ts = entrain(ntime,lbd[o,a,:],T0_in,F[o,a,:],beta[o,a,:],h[o,a,:],kprev[o,a,:],FAC[o,a,:],
                                                                 multFAC=multFAC,debug=True,debugprint=False,Tdgrab=Tdgrab,add_F=add_F_in,Tdexp=Tdexp[o,a,:],
-                                                                old_index=old_index)
+                                                                old_index=old_index,Td_corr=Td_corr)
             
             # Save outputs
             T[o,a,:]            = temp_ts.copy()
@@ -3973,7 +4032,16 @@ def repair_expparams(expparams_raw):
             arrout = np.array(arrout)
         expparams[kn] = arrout
     return expparams
-
+    
+def patch_expparams(expparams,verbose=True):
+    # Add toggles/settings that were implemented at a later date to run_SSS_basinwide
+    print("Patching Parameter Dictionary...")
+    # 2024.03.25: Added toggle for specifiying whether lbd_d is a correlation or 1/months
+    if "Td_corr" not in expparams.keys():
+        print("\tAdded Td_corr = False (Updated 2024.03.25)")
+        expparams["Td_corr"] = False # By default, previous versions assumed lbd_d was 1/months
+    return expparams
+    
 def gen_expdir(expdir):
     proc.makedir(expdir + "Input")
     proc.makedir(expdir + "Output")
