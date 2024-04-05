@@ -1776,7 +1776,7 @@ def synth_stochmod(config,verbose=False,viz=False,
         return autocorr,sst,dampingterm,forcingterm,entrainterm,Td,kmonth,params,specout
 
 def quick_spectrum(sst,nsmooth,pct,
-                   opt=1,dt=None,clvl=[.95],verbose=False,return_dict=False,dim=None):
+                   opt=1,dt=None,clvl=[.95],verbose=False,return_dict=False,dim=None,make_arr=False):
     """
     Quick spectral estimate of an array of timeseries
 
@@ -1858,7 +1858,12 @@ def quick_spectrum(sst,nsmooth,pct,
         # Calculate Confidence Interval
         CC = ybx.yo_speccl(freq,P,dof,r1,clvl)
         CCs.append(CC*dt_in)
-        
+    
+    if make_arr:
+        arrsout = [specs,freqs,CCs,dofs,r1s]
+        arrsout = [np.array(a) for a in arrsout]
+        specs,freqs,CCs,dofs,r1s = arrsout
+    
     if return_dict:
         output_dict = {
             "specs":specs,
@@ -1869,6 +1874,12 @@ def quick_spectrum(sst,nsmooth,pct,
             }
         return output_dict
     return specs,freqs,CCs,dofs,r1s
+
+def get_freqdim(ts,dt=None,opt=1,nsmooth=2,pct=0.10,verbose=False,debug=False):
+    if dt is None:
+        dt = 3600*24*30
+    sps = ybx.yo_spec(ts,opt,nsmooth,pct,debug=False,verbose=verbose)
+    return sps[1]/dt
 
 #%% Data Loading
 
@@ -4050,5 +4061,3 @@ def gen_expdir(expdir):
     return None
 
 #%%
-
-    
