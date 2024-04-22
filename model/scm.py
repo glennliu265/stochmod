@@ -1470,6 +1470,34 @@ def calc_autocorr(sst,lags,basemonth,calc_conf=False,conf=0.95,tails=2,verbose=F
         return autocorr,confs
     return autocorr
 
+def calc_autocorr_mon(ts,lags,verbose=False,return_da=True):
+    # Given 1-D array (time), compute monthly lag correlation
+    #ts        = ts.values
+    tsyrmon   = proc.year2mon(ts)  # [mon x yr]
+    #print(tsyrmon.shape)
+    assert tsyrmon.shape[0] == 12,"Timeseries dims (%s) are wrong (should be mon x year)" % (str(tsyrmon.shape))
+    
+    # Deseason
+    tsa = tsyrmon - np.mean(tsyrmon,1)[:,None]
+    
+    # Detrend
+    tsa = signal.detrend(tsa,axis=1,type='linear')
+    
+    acf    = []
+    for im in range(12):
+        ac = proc.calc_lagcovar(tsa,tsa,lags,im+1,0,debug=verbose)
+        acf.append(ac)
+    acf    = np.array(acf)
+    if return_da:
+        coords = dict(mon=np.arange(1,13,1),lag=lags)
+        acf     = xr.DataArray(acf,coords=coords,dims=coords,name='acf')
+        return acf
+    return acf
+    
+    
+    
+    
+
 #%% Synthetic Stochastic Model Wrapper
 
 def load_data(mconfig,ftype,projpath=None):
