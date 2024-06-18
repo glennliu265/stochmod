@@ -314,7 +314,7 @@ def find_kprev(h,debug=False,returnh=True):
     Parameters
     ----------
     h : ARRAY [12,]
-        Seasonal Mixed layer depth cycle
+        Seasonal Mixed layer depth cyclemondet
 
     Returns
     -------
@@ -1470,7 +1470,7 @@ def calc_autocorr(sst,lags,basemonth,calc_conf=False,conf=0.95,tails=2,verbose=F
         return autocorr,confs
     return autocorr
 
-def calc_autocorr_mon(ts,lags,verbose=False,return_da=True):
+def calc_autocorr_mon(ts,lags,ts1=None,verbose=False,return_da=True):
     # Given 1-D array (time), compute monthly lag correlation
     #ts        = ts.values
     tsyrmon   = proc.year2mon(ts)  # [mon x yr]
@@ -1483,9 +1483,20 @@ def calc_autocorr_mon(ts,lags,verbose=False,return_da=True):
     # Detrend
     tsa = signal.detrend(tsa,axis=1,type='linear')
     
+    if ts1 is not None: # Repeat for above, but for ts1
+        ts1_yrmon = proc.year2mon(ts1)
+        assert ts1_yrmon.shape[0] == 12,"Timeseries dims (%s) are wrong (should be mon x year)" % (str(ts1_yrmon.shape))
+        ts1a = ts1_yrmon - np.mean(ts1_yrmon,1)[:,None]  # Deseason
+        ts1a = signal.detrend(ts1a,axis=1,type='linear') # Detrend
+    
+    # Compute Autocorrelation (or Cross Correlation)
     acf    = []
     for im in range(12):
-        ac = proc.calc_lagcovar(tsa,tsa,lags,im+1,0,debug=verbose)
+        if ts1 is not None:
+            tsa_lag = ts1a
+        else:
+            tsa_lag = tsa
+        ac = proc.calc_lagcovar(tsa,tsa_lag,lags,im+1,0,debug=verbose)
         acf.append(ac)
     acf    = np.array(acf)
     if return_da:
@@ -1493,7 +1504,8 @@ def calc_autocorr_mon(ts,lags,verbose=False,return_da=True):
         acf     = xr.DataArray(acf,coords=coords,dims=coords,name='acf')
         return acf
     return acf
-    
+
+
     
     
     
@@ -1909,6 +1921,21 @@ def get_freqdim(ts,dt=None,opt=1,nsmooth=2,pct=0.10,verbose=False,debug=False):
     sps = ybx.yo_spec(ts,opt,nsmooth,pct,debug=False,verbose=verbose)
     return sps[1]/dt
 
+
+def point_spectra(ts, nsmooth=1, opt=1, dt=None, clvl=[.95], pct=0.1):
+    # Copied from viz_atmospheric_persistence
+    if np.any(np.isnan(ts)):
+        return np.nan
+    
+    if dt is None:  # Divides to return output in 1/sec
+        dt = 3600*24*30
+    sps = ybx.yo_spec(ts, opt, nsmooth, pct, debug=False, verbose=False)
+
+    P, freq, dof, r1 = sps
+    coords = dict(freq=freq/dt)
+    da_out = xr.DataArray(P*dt, coords=coords, dims=coords, name="spectra")
+    return da_out
+    
 #%% Data Loading
 
 def load_hadisst(datpath,method=2,startyr=1870,endyr=2018,grabpoint=None):
@@ -2583,8 +2610,8 @@ def remove_enso(invar,ensoid,ensolag,monwin,reduceyr=True,verbose=True,times=Non
             #ensoin = np.delete(ensoin,delete_points)
             #varin  = np.delete(varin,delete_points,axis=0)
                     
-            # Regress to obtain coefficients [space]
-            varreg,_ = proc.regress_2d(ensoin.squeeze(),varin,nanwarn=1)
+            # Regress to obtain coefficients [space] # [1xshape]
+            varreg,_ = proc.regress_2d(ensoin.squeeze(),varin,nanwarn=1).squeeze()
             
             # Write to enso pattern
             ensopattern[m,:,:,pc] = varreg.reshape(nlat,nlon).copy()
