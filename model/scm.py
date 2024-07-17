@@ -785,6 +785,15 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
     if Tdexp is None:
         Tdexp = np.zeros(12)
         
+    if np.any(np.isnan(Tdexp)):
+        
+        Tdexp[np.isnan(Tdexp)] = 0
+        if debugprint:
+            print("Warning, temporary correct, converting NaNs in lbd_d to zero")
+            print("\t need to check interpolating/lbd_d estimation step")
+            print("\t this will turn off entrainment at these steps")
+        #print("This will effectively elimiated")
+        
         
     if debug:
         noise_ts   = np.zeros(t_end)
@@ -909,13 +918,13 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
         # -----------------------
         
         temp_ts[t] = damp_term + (noise_term + entrain_term) * integration_factor
-        if np.isnan(temp_ts[t]):
-            print("Nan At timestep t=%i" % t)
-            print("\n Damp Term: %f" % damp_term)
-            print("\n Noise Term: %f" % noise_term)
-            print("\n Entrain Term: %f" % entrain_term)
-            print("\n Integr Factor Term: %f" % integration_factor)
-            break
+        # if np.isnan(temp_ts[t]):
+        #     print("Nan At timestep t=%i" % t)
+        #     print("\n Damp Term: %f" % damp_term)
+        #     print("\n Noise Term: %f" % noise_term)
+        #     print("\n Entrain Term: %f" % entrain_term)
+        #     print("\n Integr Factor Term: %f" % integration_factor)
+        #     break
 
         # ----------------------------------
         # Save other variables in debug mode
