@@ -907,7 +907,15 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
         # -----------------------
         # Compute the temperature
         # -----------------------
+        
         temp_ts[t] = damp_term + (noise_term + entrain_term) * integration_factor
+        if np.isnan(temp_ts[t]):
+            print("Nan At timestep t=%i" % t)
+            print("\n Damp Term: %f" % damp_term)
+            print("\n Noise Term: %f" % noise_term)
+            print("\n Entrain Term: %f" % entrain_term)
+            print("\n Integr Factor Term: %f" % integration_factor)
+            break
 
         # ----------------------------------
         # Save other variables in debug mode
@@ -3200,6 +3208,7 @@ def integrate_Q(lbd,F,T,mld,cp0=3996,rho=1026,dt=3600*24*30,debug=False):
         Q[:,:,t]    = q[:,:,t] + lbdT[:,:,t]
     if debug:
         return Q,q,lbdT
+    
     return Q
 
 def integrate_noentrain(lbd,F,T0=0,multFAC=True,debug=False,old_index=False,return_dict=False):
