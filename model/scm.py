@@ -1113,6 +1113,7 @@ def entrain_parallel(inputs):
     return temp_ts
 
 
+
 def noentrain_2d(randts,lbd,T0,F,FAC,multFAC=1,debug=False):
     
     """
@@ -1853,7 +1854,7 @@ def quick_spectrum(sst,nsmooth,pct,
         Array of Confidence levels. The default is [.95].
         
     dim : INT, optional
-        Specify dimension to compute the spectra over
+        Specify dimension to loop computation over
 
     Returns
     -------
@@ -1896,7 +1897,8 @@ def quick_spectrum(sst,nsmooth,pct,
         if dim is None:
             sstin = sst[i]
         else:
-            sstin = np.take_along_axis(sst,i,dim)
+            #sstin = np.take_along_axis(sst,i,dim)
+            sstin = np.take(sst,i,dim)
         dt_in = dt[i]
         
         # Calculate Spectrum
@@ -4133,5 +4135,255 @@ def gen_expdir(expdir):
     proc.makedir(expdir + "Metrics")
     proc.makedir(expdir + "Figures")
     return None
+
+
+def load_params(expparams,input_path,debug=False):
+    # Load stochastic model parameter inputs for [run_SSS_basinwide.py]
+    # Copied run_SSS_pointmode_coupled and updated in loading_func
+    # Loads and checks for all necessary inputs of the stochastic model
+    #
+    
+    # First, Check if there is EOF-based forcing (remove this if I eventually redo it)
+    if expparams['eof_forcing']:
+        print("EOF Forcing Detected.")
+        eof_flag = True
+    else:
+        eof_flag = False
+    
+    # Indicate the Parameter Names (sorry, it's all hard coded...)
+    if expparams['varname']== "SSS": # Check for LHFLX, PRECTOT, Sbar
+        chk_params = ["h","LHFLX","PRECTOT","Sbar","lbd_d","beta","kprev","lbd_a","Qek"]
+        param_type = ["mld","forcing","forcing","forcing","damping","mld","mld","damping",'forcing']
+    elif expparams['varname'] == "SST": # Check for Fprime
+        chk_params = ["h","Fprime","lbd_d","beta","kprev","lbd_a","Qek"]
+        param_type = ["mld","forcing","damping","mld","mld","damping",'forcing']
+    
+    # Check the params
+    ninputs       = len(chk_params)
+    inputs_ds     = {}
+    inputs        = {}
+    inputs_type   = {}
+    missing_input = []
+    for nn in range(ninputs):
+        # Get Parameter Name and Type
+        pname = chk_params[nn]
+        ptype = param_type[nn]
+        
+        # Check for Exceptions (Can Fix this in the preprocessing stage)
+        if pname == 'lbd_a':
+            da_varname = 'damping'
+        else:
+            da_varname = pname
+        
+        # Load DataArray
+        if type(expparams[pname])==str: # If String, Load from input folder
+            
+            # Load ds
+            if (expparams['varname'] == "SST") and (pname =="Fprime") and "Fprime" not in expparams[pname]:
+                
+                da_varname   = "LHFLX" # Swap to LHFLX for now
+                varname_swap = True # True so "Fprime" is input as da_varname later
+                swapname     = "Fprime" 
+            
+            else:
+                varname_swap = False
+                
+                #inputs_type['Fprime'] = 'forcing' # Add extra Fprime variable
+            
+            # Load ds
+            ds = xr.open_dataset(input_path + ptype + "/" + expparams[pname])[da_varname]
+            
+            
+            # Crop to region
+            
+            # Load dataarrays for debugging
+            dsreg            = proc.sel_region_xr(ds,expparams['bbox_sim']).load()
+            dsreg            = dsreg.drop_duplicates('lon')# Drop duplicate Lon (Hard coded fix, remove this)
+            inputs_ds[pname] = dsreg.copy() 
+            
+            # Load to numpy arrays 
+            varout           = dsreg.values
+            # varout           = varout[...,None,None]
+            # if debug:
+            #     print(pname) # Name of variable
+            #     print("\t%s" % str(ds.shape)) # Original Shape
+            #     print("\t%s" % str(varout.shape)) # Point Shape
+            inputs[pname]    = varout.copy()
+            
+            if ((da_varname == "Fprime") and (eof_flag)) or ("corrected" in expparams[pname]):
+                print("Loading %s correction factor for EOF forcing..." % pname)
+                ds_corr                          = xr.open_dataset(input_path + ptype + "/" + expparams[pname])['correction_factor']
+                ds_corr_reg                      = proc.sel_region_xr(ds_corr,expparams['bbox_sim']).load()
+                ds_corr_reg                      = ds_corr_reg.drop_duplicates('lon')
+                
+                if varname_swap == True:
+                    da_varname = pname # Swap from LHFLX back to Fprime for SST Integration
+                
+                # set key based on variable type
+                if da_varname == "Fprime":
+                    keyname = "correction_factor"
+                elif da_varname == "LHFLX":
+                    keyname = "correction_factor_evap"
+                elif da_varname == "PRECTOT":
+                    keyname = "correction_factor_prec"
+                
+                inputs_ds[keyname]   = ds_corr_reg.copy()
+                inputs[keyname]      = ds_corr_reg.values.copy()#[...,None,None]
+                if debug:
+                    print(da_varname + " Corr") # Variable Name
+                    print("\t%s" % str(ds_corr.shape))
+                    print("\t%s" % str(inputs[keyname].shape)) # Corrected Shape
+                inputs_type[keyname] = "forcing"
+            
+        else:
+            print("Did not find %s" % pname)
+            missing_input.append(pname)
+        
+        inputs_type[pname] = ptype
+    
+    #% Detect and Process Missing Inputs
+    
+    _,nlat,nlon=inputs['h'].shape
+    
+    for pname in missing_input:
+        if type(expparams[pname]) == float:
+            print("Float detected for <%s>. Making array with the repeated value %f" % (pname,expparams[pname]))
+            inputs[pname] = np.ones((12,nlat,nlon)) * expparams[pname]
+        else:
+            print("No value found for <%s>. Setting to zero." % pname)
+            inputs[pname] = np.zeros((12,nlat,nlon))
+    
+    # Get number of modes
+    if eof_flag:
+        if expparams['varname'] == "SST":
+            nmode = inputs['Fprime'].shape[0]
+        elif expparams['varname'] == "SSS":
+            nmode = inputs['LHFLX'].shape[0]
+            
+    # Unpack things from dictionary (added after for debugging)
+    ninputs     = len(inputs_ds)
+    param_names = list(inputs_ds.keys())
+    params_vv   = [] # Unpack from dictionary
+    for ni in range(ninputs):
+        pname = param_names[ni]
+        dsin  = inputs_ds[pname]
+        params_vv.append(dsin.copy())
+    return inputs,inputs_ds,inputs_type,params_vv
+
+def convert_inputs(expparams,inputs,dt=3600*24*30,rho=1026,L=2.5e6,cp=3850):
+    # Convert [inputs] for the stochastic model script [run_SSS_basinwide.py]
+    # with additional indicators/toggles
+    # contained in expparams.
+    # Output is [alpha],[Dconvert],[Qfactor]
+    # See testing of function in [loading_func.py]
+    if expparams['eof_forcing']:
+        eof_flag=True
+    else:
+        eof_flag=False
+    
+    # Do Unit Conversions --- O --- o --- o --- 0 --- o --- o --- 0 --- o --- o
+    if expparams["varname"] == "SSS": # Convert all to psu/mon ----------------
+        
+        # Evaporation <Forcing> ~~ ********************************************
+        if expparams['convert_LHFLX']: #~~
+            if eof_flag: # Check for EOFs
+                conversion_factor = ( dt*inputs['Sbar'] / (rho*L*inputs['h']))[None,...]
+                Econvert          = inputs['LHFLX'].copy() * conversion_factor # [Mon x Lat x Lon]
+                
+                # Add Correction Factor, if it exists
+                if 'correction_factor_evap' in list(inputs.keys()):
+                    print("Processing LHFLX/Evaporation Correction factor")
+                    QfactorE      = inputs['correction_factor_evap'].copy() * conversion_factor.squeeze()
+                else:
+                    QfactorE      = np.zeros((inputs['LHFLX'].shape[1:])) # Same Shape minus the mode dimension
+            else:
+                Econvert          = inputs['LHFLX'].copy() / (rho*L*inputs['h'])*dt*inputs['Sbar'] # [Mon x Lat x Lon]
+            
+            # Multiply both by -1 (since Q'_LH = -LE')
+            Econvert = Econvert * -1
+            QfactorE = QfactorE * -1
+            
+        else:
+            Econvert   = inputs['LHFLX'].copy()
+        
+        # Precip <Forcing> ~~ *************************************************
+        if expparams['convert_PRECTOT']:
+            
+            conversion_factor = ( dt*inputs['Sbar'] / inputs['h'] )
+            
+            if eof_flag:
+                Pconvert =  inputs['PRECTOT'] * conversion_factor[None,...]
+            else:
+                Pconvert =  inputs['PRECTOT'] * conversion_factor
+            
+            if (eof_flag) and ('correction_factor_prec' in list(inputs.keys())):
+                print("Processing Precip Correction factor")
+                QfactorP   = inputs['correction_factor_prec'] * conversion_factor
+            else:
+                QfactorP   = np.zeros((inputs['PRECTOT'].shape[1:])) # Same Shape minus the mode dimension
+        else:
+            Pconvert   = inputs['PRECTOT'].copy()
+        
+        # Atmospheric <Damping> ~~ ********************************************
+        if expparams['convert_lbd_a']:
+            print("WARNING: lbd_a unit conversion for SSS currently not supported")
+            Dconvert = inputs['lbd_a'].copy()
+        else:
+            Dconvert = inputs['lbd_a'].copy()
+            if np.nansum(Dconvert) < 0:
+                print("Flipping Sign")
+                Dconvert *= -1
+        
+        # Add Ekman Forcing, if it Exists (should be zero otherwise) ~~::::::::
+        Qekconvert = inputs['Qek'].copy()  * dt #  [(mode) x Mon x Lat x Lon]
+        
+        # Corrrection Factor **************************************************
+        if eof_flag:
+            Qfactor    = QfactorE + QfactorP # Combine Evap and Precip correction factor
+        
+        # Combine Evap and Precip (and Ekman Forcing)
+        alpha         = Econvert + Pconvert + Qekconvert
+    # Main Output: (alpha - all the forcings), (Dconvert - atm dampings)
+    # End SSS Conversion --------------------------------------------------
+    elif expparams['varname'] == "SST": # Convert to degC/mon
+        
+        # Convert Stochastic Heat Flux Forcing ~~
+        if expparams['convert_Fprime']:
+            if eof_flag:
+                
+                Fconvert   = inputs['Fprime'].copy()           / (rho*cp*inputs['h'])[None,:,:,:] * dt # Broadcast to mode x mon x lat x lon
+                # Also convert correction factor
+                Qfactor    = inputs['correction_factor'].copy()/ (rho*cp*inputs['h'])[:,:,:] * dt
+                
+            else:
+                Fconvert   = inputs['Fprime'].copy() / (rho*cp*inputs['h']) * dt
+        else:
+            Fconvert   = inputs['Fprime'].copy()
+        
+        # Convert Atmospheric Damping ~~
+        if expparams['convert_lbd_a']:
+            
+            Dconvert   = inputs['lbd_a'].copy() / (rho*cp*inputs['h']) * dt
+        else:
+            
+            Dconvert   = inputs['lbd_a'].copy()
+            if np.nansum(Dconvert) < 0:
+                print("Flipping Sign")
+                Dconvert *= -1
+        
+        # Add Ekman Forcing, if it exists (should be zero otherwise) ~~
+        if eof_flag:
+            Qekconvert = inputs['Qek'].copy() / (rho*cp*inputs['h'])[None,:,:,:] * dt
+        else:
+            Qekconvert = inputs['Qek'].copy() / (rho*cp*inputs['h']) * dt
+        
+        # Compute forcing amplitude
+        alpha = Fconvert + Qekconvert
+        # <End Variable Conversion Check>
+    # End SST Conversion --------------------------------------------------\
+    
+    return alpha,Dconvert,Qfactor
+
+
 
 #%%
