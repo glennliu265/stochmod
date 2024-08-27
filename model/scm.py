@@ -4385,7 +4385,7 @@ def convert_inputs(expparams,inputs,dt=3600*24*30,rho=1026,L=2.5e6,cp=3850,retur
                 Fconvert   = inputs['Fprime'].copy()           / (rho*cp*inputs['h'])[None,:,:,:] * dt # Broadcast to mode x mon x lat x lon]
                 # Also convert correction factor
                 QfactorF   = inputs['correction_factor'].copy()/ (rho*cp*inputs['h'])[:,:,:] * dt
-                outdict['correction_factor'] = Qfactor.copy()
+                outdict['correction_factor'] = QfactorF.copy()
                 
             else:
                 Fconvert   = inputs['Fprime'].copy() / (rho*cp*inputs['h']) * dt
