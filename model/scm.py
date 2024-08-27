@@ -4219,7 +4219,7 @@ def load_params(expparams,input_path,debug=False):
             inputs[pname]    = varout.copy()
             
             # Load Correction Factor
-            if ((da_varname == "Fprime") and (eof_flag)) or ("corrected" in expparams[pname]) or expparams['correct_Qek']:
+            if ((da_varname == "Fprime") and (eof_flag)) or ("corrected" in expparams[pname]) or (expparams['correct_Qek'] and (da_varname == "Qek")):
                 print("Loading %s correction factor for EOF forcing..." % pname)
                 
                 ds_corr                          = xr.open_dataset(input_path + ptype + "/" + expparams[pname])['correction_factor']
