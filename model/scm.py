@@ -4358,41 +4358,47 @@ def convert_inputs(expparams,inputs,dt=3600*24*30,rho=1026,L=2.5e6,cp=3850,retur
         outdict['lbd_a'] = Dconvert.copy()
         
         # Add Ekman Forcing, if it Exists (should be zero otherwise) ~~::::::::
-        Qekconvert = inputs['Qek'].copy()  * dt #  [(mode) x Mon x Lat x Lon]
+        # Note: No Qek additional Conversion is performed for SSS, units should be in [psu/sec]
+        Qekconvert     = inputs['Qek'].copy()  * dt #  [(mode) x Mon x Lat x Lon] Convert to [psu/mon]
         outdict['Qek'] = Qekconvert.copy()
+        if expparams['correct_Qek']:
+            QfactorQek = inputs['correction_factor_Qek'] * dt # Convert 
+        else:
+            QfactorQek = 0
         
-        # Corrrection Factor **************************************************
+        # Correction Factor **************************************************
         if eof_flag:
-            Qfactor    = QfactorE + QfactorP # Combine Evap and Precip correction factor
-            outdict["Qfactor"] = Qfactor.copy()
+            Qfactor             = QfactorE + QfactorP + QfactorQek # Combine Evap, Precip, Qek correction factors
+            outdict["Qfactor"]  = Qfactor.copy()
+        
         # Combine Evap and Precip (and Ekman Forcing)
         alpha         = Econvert + Pconvert + Qekconvert
         outdict['alpha'] = alpha.copy()
     # Main Output: (alpha - all the forcings), (Dconvert - atm dampings)
     # End SSS Conversion --------------------------------------------------
+    
     elif expparams['varname'] == "SST": # Convert to degC/mon
         
         # Convert Stochastic Heat Flux Forcing ~~
         if expparams['convert_Fprime']:
             if eof_flag:
-                
-                Fconvert   = inputs['Fprime'].copy()           / (rho*cp*inputs['h'])[None,:,:,:] * dt # Broadcast to mode x mon x lat x lon
+                Fconvert   = inputs['Fprime'].copy()           / (rho*cp*inputs['h'])[None,:,:,:] * dt # Broadcast to mode x mon x lat x lon]
                 # Also convert correction factor
-                Qfactor    = inputs['correction_factor'].copy()/ (rho*cp*inputs['h'])[:,:,:] * dt
-                
+                QfactorF   = inputs['correction_factor'].copy()/ (rho*cp*inputs['h'])[:,:,:] * dt
                 outdict['correction_factor'] = Qfactor.copy()
+                
             else:
                 Fconvert   = inputs['Fprime'].copy() / (rho*cp*inputs['h']) * dt
         else:
-            Fconvert   = inputs['Fprime'].copy()
+            if eof_flag: # [assume degC/mon]
+                QfactorF = inputs['correction_factor'].copy()
+            Fconvert     = inputs['Fprime'].copy()
         outdict['Fprime'] = Fconvert.copy()    
         
         # Convert Atmospheric Damping ~~
         if expparams['convert_lbd_a']:
-            
             Dconvert   = inputs['lbd_a'].copy() / (rho*cp*inputs['h']) * dt
         else:
-            
             Dconvert   = inputs['lbd_a'].copy()
             if np.nansum(Dconvert) < 0:
                 print("Flipping Sign")
@@ -4400,11 +4406,26 @@ def convert_inputs(expparams,inputs,dt=3600*24*30,rho=1026,L=2.5e6,cp=3850,retur
         outdict['lbd_a'] = Dconvert.copy()
         
         # Add Ekman Forcing, if it exists (should be zero otherwise) ~~
-        if eof_flag:
-            Qekconvert = inputs['Qek'].copy() / (rho*cp*inputs['h'])[None,:,:,:] * dt
-        else:
-            Qekconvert = inputs['Qek'].copy() / (rho*cp*inputs['h']) * dt
+        if expparams['convert_Qek']: # For old cases where Ekman forcing as in W/m2
+            if eof_flag:
+                Qekconvert = inputs['Qek'].copy() / (rho*cp*inputs['h'])[None,:,:,:] * dt
+            else:
+                Qekconvert = inputs['Qek'].copy() / (rho*cp*inputs['h']) * dt
+        else: # Otherwise convert from [degC/sec to degC/mon]
+            Qekconvert = inputs['Qek'].copy() * dt 
         outdict['Qek'] = Qekconvert.copy()
+        
+        # Ekman Factor Correction
+        if expparams['correct_Qek']:
+            if expparams['convert_Qek']: # For old cases where Ekman forcing as in W/m2
+                QfactorQek = inputs['correction_factor_Qek'] .copy() / (rho*cp*inputs['h']) * dt
+            else:
+                QfactorQek = inputs['correction_factor_Qek'] * dt # Convert 
+        
+        # Correction Factor **************************************************
+        if eof_flag:
+            Qfactor             = QfactorF + QfactorQek # Combine Fprime and Qek correction factors
+            outdict["Qfactor"]  = Qfactor.copy()
         
         # Compute forcing amplitude
         alpha = Fconvert + Qekconvert
