@@ -4122,12 +4122,25 @@ def repair_expparams(expparams_raw):
     
 def patch_expparams(expparams,verbose=True):
     # Add toggles/settings that were implemented at a later date to run_SSS_basinwide
+    
     print("Patching Parameter Dictionary...")
+    oldkeys = list(expparams.keys())
     # 2024.03.25: Added toggle for specifiying whether lbd_d is a correlation or 1/months
-    if "Td_corr" not in expparams.keys():
+    if "Td_corr" not in oldkeys:
         print("\tAdded Td_corr = False (Updated 2024.03.25)")
         expparams["Td_corr"] = False # By default, previous versions assumed lbd_d was 1/months
+    # 2024.08.27: Add Qek Correction and conversion
+    if "convert_Qek" not in oldkeys:
+        print("\tAdded convert_Qek = False (Updated 2024.08.27), True if SST")
+        if expparams['varname'] == "SST":
+            expparams["convert_Qek"] = True
+        else:
+            expparams["convert_Qek"] = False
+    if "correct_Qek" not in oldkeys:
+        print("\tAdded correct_Qek = False (Updated 2024.08.27)")
+        expparams["correct_Qek"] = False
     return expparams
+
     
 def gen_expdir(expdir):
     proc.makedir(expdir + "Input")
@@ -4180,26 +4193,21 @@ def load_params(expparams,input_path,debug=False):
             
             # Load ds
             if (expparams['varname'] == "SST") and (pname =="Fprime") and "Fprime" not in expparams[pname]:
-                
+                # For LHFLX Only Runs, switch Fprime with LHFLX...
                 da_varname   = "LHFLX" # Swap to LHFLX for now
                 varname_swap = True # True so "Fprime" is input as da_varname later
                 swapname     = "Fprime" 
-            
             else:
                 varname_swap = False
-                
-                #inputs_type['Fprime'] = 'forcing' # Add extra Fprime variable
             
             # Load ds
             ds = xr.open_dataset(input_path + ptype + "/" + expparams[pname])[da_varname]
             
             
             # Crop to region
-            
-            # Load dataarrays for debugging
             dsreg            = proc.sel_region_xr(ds,expparams['bbox_sim']).load()
             dsreg            = dsreg.drop_duplicates('lon')# Drop duplicate Lon (Hard coded fix, remove this)
-            inputs_ds[pname] = dsreg.copy() 
+            inputs_ds[pname] = dsreg.copy()
             
             # Load to numpy arrays 
             varout           = dsreg.values
@@ -4210,8 +4218,10 @@ def load_params(expparams,input_path,debug=False):
             #     print("\t%s" % str(varout.shape)) # Point Shape
             inputs[pname]    = varout.copy()
             
-            if ((da_varname == "Fprime") and (eof_flag)) or ("corrected" in expparams[pname]):
+            # Load Correction Factor
+            if ((da_varname == "Fprime") and (eof_flag)) or ("corrected" in expparams[pname]) or expparams['correct_Qek']:
                 print("Loading %s correction factor for EOF forcing..." % pname)
+                
                 ds_corr                          = xr.open_dataset(input_path + ptype + "/" + expparams[pname])['correction_factor']
                 ds_corr_reg                      = proc.sel_region_xr(ds_corr,expparams['bbox_sim']).load()
                 ds_corr_reg                      = ds_corr_reg.drop_duplicates('lon')
@@ -4222,6 +4232,8 @@ def load_params(expparams,input_path,debug=False):
                 # set key based on variable type
                 if da_varname == "Fprime":
                     keyname = "correction_factor"
+                elif da_varname == "Qek":
+                    keyname = "correction_factor_Qek"
                 elif da_varname == "LHFLX":
                     keyname = "correction_factor_evap"
                 elif da_varname == "PRECTOT":
@@ -4270,7 +4282,7 @@ def load_params(expparams,input_path,debug=False):
         params_vv.append(dsin.copy())
     return inputs,inputs_ds,inputs_type,params_vv
 
-def convert_inputs(expparams,inputs,dt=3600*24*30,rho=1026,L=2.5e6,cp=3850):
+def convert_inputs(expparams,inputs,dt=3600*24*30,rho=1026,L=2.5e6,cp=3850,return_sep=True):
     # Convert [inputs] for the stochastic model script [run_SSS_basinwide.py]
     # with additional indicators/toggles
     # contained in expparams.
@@ -4280,6 +4292,9 @@ def convert_inputs(expparams,inputs,dt=3600*24*30,rho=1026,L=2.5e6,cp=3850):
         eof_flag=True
     else:
         eof_flag=False
+    
+    # Dictionary for separate convert outpiuts
+    outdict = {}
     
     # Do Unit Conversions --- O --- o --- o --- 0 --- o --- o --- 0 --- o --- o
     if expparams["varname"] == "SSS": # Convert all to psu/mon ----------------
@@ -4303,8 +4318,11 @@ def convert_inputs(expparams,inputs,dt=3600*24*30,rho=1026,L=2.5e6,cp=3850):
             Econvert = Econvert * -1
             QfactorE = QfactorE * -1
             
+            outdict['correction_factor_evap'] = QfactorE.copy()
         else:
             Econvert   = inputs['LHFLX'].copy()
+            
+        outdict['LHFLX'] = Econvert.copy()
         
         # Precip <Forcing> ~~ *************************************************
         if expparams['convert_PRECTOT']:
@@ -4321,8 +4339,11 @@ def convert_inputs(expparams,inputs,dt=3600*24*30,rho=1026,L=2.5e6,cp=3850):
                 QfactorP   = inputs['correction_factor_prec'] * conversion_factor
             else:
                 QfactorP   = np.zeros((inputs['PRECTOT'].shape[1:])) # Same Shape minus the mode dimension
+            
+            outdict['correction_factor_prec'] = QfactorP.copy()
         else:
             Pconvert   = inputs['PRECTOT'].copy()
+        outdict['PRECTOT'] = Pconvert.copy()
         
         # Atmospheric <Damping> ~~ ********************************************
         if expparams['convert_lbd_a']:
@@ -4334,15 +4355,19 @@ def convert_inputs(expparams,inputs,dt=3600*24*30,rho=1026,L=2.5e6,cp=3850):
                 print("Flipping Sign")
                 Dconvert *= -1
         
+        outdict['lbd_a'] = Dconvert.copy()
+        
         # Add Ekman Forcing, if it Exists (should be zero otherwise) ~~::::::::
         Qekconvert = inputs['Qek'].copy()  * dt #  [(mode) x Mon x Lat x Lon]
+        outdict['Qek'] = Qekconvert.copy()
         
         # Corrrection Factor **************************************************
         if eof_flag:
             Qfactor    = QfactorE + QfactorP # Combine Evap and Precip correction factor
-        
+            outdict["Qfactor"] = Qfactor.copy()
         # Combine Evap and Precip (and Ekman Forcing)
         alpha         = Econvert + Pconvert + Qekconvert
+        outdict['alpha'] = alpha.copy()
     # Main Output: (alpha - all the forcings), (Dconvert - atm dampings)
     # End SSS Conversion --------------------------------------------------
     elif expparams['varname'] == "SST": # Convert to degC/mon
@@ -4355,10 +4380,12 @@ def convert_inputs(expparams,inputs,dt=3600*24*30,rho=1026,L=2.5e6,cp=3850):
                 # Also convert correction factor
                 Qfactor    = inputs['correction_factor'].copy()/ (rho*cp*inputs['h'])[:,:,:] * dt
                 
+                outdict['correction_factor'] = Qfactor.copy()
             else:
                 Fconvert   = inputs['Fprime'].copy() / (rho*cp*inputs['h']) * dt
         else:
             Fconvert   = inputs['Fprime'].copy()
+        outdict['Fprime'] = Fconvert.copy()    
         
         # Convert Atmospheric Damping ~~
         if expparams['convert_lbd_a']:
@@ -4370,18 +4397,23 @@ def convert_inputs(expparams,inputs,dt=3600*24*30,rho=1026,L=2.5e6,cp=3850):
             if np.nansum(Dconvert) < 0:
                 print("Flipping Sign")
                 Dconvert *= -1
+        outdict['lbd_a'] = Dconvert.copy()
         
         # Add Ekman Forcing, if it exists (should be zero otherwise) ~~
         if eof_flag:
             Qekconvert = inputs['Qek'].copy() / (rho*cp*inputs['h'])[None,:,:,:] * dt
         else:
             Qekconvert = inputs['Qek'].copy() / (rho*cp*inputs['h']) * dt
+        outdict['Qek'] = Qekconvert.copy()
         
         # Compute forcing amplitude
         alpha = Fconvert + Qekconvert
+        outdict['alpha'] = alpha.copy()
         # <End Variable Conversion Check>
     # End SST Conversion --------------------------------------------------\
     
+    if return_sep:
+        return outdict
     return alpha,Dconvert,Qfactor
 
 
