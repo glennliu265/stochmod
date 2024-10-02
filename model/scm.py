@@ -4368,6 +4368,7 @@ def convert_inputs(expparams,inputs,dt=3600*24*30,rho=1026,L=2.5e6,cp=3850,retur
         Qekconvert     = inputs['Qek'].copy()  * dt #  [(mode) x Mon x Lat x Lon] Convert to [psu/mon]
         outdict['Qek'] = Qekconvert.copy()
         if expparams['correct_Qek']:
+            print("Processing Qek (SSS) Correction factor")
             QfactorQek = inputs['correction_factor_Qek'] * dt # Convert 
             outdict['correction_factor_Qek'] = QfactorQek
         else:
