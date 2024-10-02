@@ -4282,7 +4282,7 @@ def load_params(expparams,input_path,debug=False):
         params_vv.append(dsin.copy())
     return inputs,inputs_ds,inputs_type,params_vv
 
-def convert_inputs(expparams,inputs,dt=3600*24*30,rho=1026,L=2.5e6,cp=3850,return_sep=True):
+def convert_inputs(expparams,inputs,dt=3600*24*30,rho=1026,L=2.5e6,cp=3850,return_sep=True,qfactor_sep=False):
     # Convert [inputs] for the stochastic model script [run_SSS_basinwide.py]
     # with additional indicators/toggles
     # contained in expparams.
@@ -4363,8 +4363,10 @@ def convert_inputs(expparams,inputs,dt=3600*24*30,rho=1026,L=2.5e6,cp=3850,retur
         outdict['Qek'] = Qekconvert.copy()
         if expparams['correct_Qek']:
             QfactorQek = inputs['correction_factor_Qek'] * dt # Convert 
+            outdict['correction_factor_Qek'] = QfactorQek
         else:
             QfactorQek = 0
+            
         
         # Correction Factor **************************************************
         if eof_flag:
@@ -4421,6 +4423,7 @@ def convert_inputs(expparams,inputs,dt=3600*24*30,rho=1026,L=2.5e6,cp=3850,retur
                 QfactorQek = inputs['correction_factor_Qek'] .copy() / (rho*cp*inputs['h']) * dt
             else:
                 QfactorQek = inputs['correction_factor_Qek'] * dt # Convert 
+            outdict['correction_factor_Qek'] = QfactorQek
         
         # Correction Factor **************************************************
         if eof_flag:
