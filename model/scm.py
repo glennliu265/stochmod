@@ -4139,6 +4139,10 @@ def patch_expparams(expparams,verbose=True):
     if "correct_Qek" not in oldkeys:
         print("\tAdded correct_Qek = False (Updated 2024.08.27)")
         expparams["correct_Qek"] = False
+    if "qfactor_sep" not in oldkeys:
+        print("\tAdded qfactor_sep = False (Updated 2024.10.02)")
+        expparams["qfactor_sep"] = False
+        
     return expparams
 
     
@@ -4288,6 +4292,8 @@ def convert_inputs(expparams,inputs,dt=3600*24*30,rho=1026,L=2.5e6,cp=3850,retur
     # contained in expparams.
     # Output is [alpha],[Dconvert],[Qfactor]
     # See testing of function in [loading_func.py]
+    # if qfactor_sep is False, returns Qfactor combined.
+    # else, returns separate Qfactors
     if expparams['eof_forcing']:
         eof_flag=True
     else:
@@ -4366,7 +4372,7 @@ def convert_inputs(expparams,inputs,dt=3600*24*30,rho=1026,L=2.5e6,cp=3850,retur
             outdict['correction_factor_Qek'] = QfactorQek
         else:
             QfactorQek = 0
-            
+        
         
         # Correction Factor **************************************************
         if eof_flag:
