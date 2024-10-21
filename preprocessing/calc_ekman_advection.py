@@ -134,7 +134,7 @@ if calc_dT:
     print("Completed in %.2fs"%(time.time()-st))
     
     # Calculate the mean temperature for each month
-    ts_monmean = ts.mean(0) # [month x lat x lon]
+    ts_monmean = ts.mean(0) # [month x lat x lon] # was year mon lat lon
     
     #% Temperature Gradient (Forward Difference)
     
@@ -321,9 +321,7 @@ if calc_dtau:
     if takeanom:
         taux = taux - taux.mean(1)[:,None,:]
         tauy = tauy - tauy.mean(1)[:,None,:]
-
-
-
+    
     #% Regress wind stress components to NHFLX PCs
     # ---------------------------------
     taux_pat = np.zeros((nlat*nlon,12,N_mode))
@@ -558,7 +556,7 @@ if calc_qek:
     # Calculate ekman heat flux #[lat x lon x mon x N]
     # ------------------------------------------------
     #q_ek = cp0 * dividef[:,:,None,None] * (-tauy_pat*dSSTdx[:,:,:,None] + taux_pat*dSSTdy[:,:,:,None])
-    q_ek = -1* cp0 *(rho*mld360[:,:,:,None]) * (u_ek*dSSTdx[:,:,:,None] + v_ek*dSSTdy[:,:,:,None])
+    q_ek     = -1* cp0 *(rho*mld360[:,:,:,None]) * (u_ek*dSSTdx[:,:,:,None] + v_ek*dSSTdy[:,:,:,None])
     q_ek_msk = q_ek * mskcoastal[:,:,None,None] # Apply coastal mask
     
     #% Save the output

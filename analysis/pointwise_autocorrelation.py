@@ -287,11 +287,12 @@ if varname == "SSS":
     sstrs[:,219]     = 0 # There is something wrong with this timestep?
     
 if thresvar: # Only analyze where both threshold variable and target var are non-NaN
-    ntimeldvar = loadvar.shape[2]
-    loadvarrs    = loadvar.reshape(nlat*nlon,ntimeldvar)
-    _,knan,okpts = proc.find_nan(sstrs*loadvarrs,1) # [finepoints,time]
+    ntimeldvar    = loadvar.shape[2]
+    loadvarrs     = loadvar.reshape(nlat*nlon,ntimeldvar)
+    _,knan,okpts  = proc.find_nan(sstrs*loadvarrs,1) # [finepoints,time]
     sst_valid     = sstrs[okpts,:]
     loadvar_valid = loadvarrs[okpts,:]
+    
 else:
     sst_valid,knan,okpts = proc.find_nan(sstrs,1) # [finepoints,time]
 npts_valid           = sst_valid.shape[0] 

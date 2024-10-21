@@ -206,7 +206,6 @@ thresval   = 1/20 # 20 years (Multidecadal)
 lowerthres = 0 # 
 dtplot     = 3600*24*365
 
-
 # Load the data (Just the Spectra)
 snames_full = [outpath+sname for sname in snames]
 if "PIC" in snames_full[0]:

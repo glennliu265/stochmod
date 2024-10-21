@@ -6,3 +6,5 @@ analysis/.ipynb_checkpoints/
 model/__pycache__/
 
 model/.ipynb_checkpoints/
+
+*.pyc

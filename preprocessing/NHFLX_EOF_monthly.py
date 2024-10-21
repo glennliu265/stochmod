@@ -239,6 +239,7 @@ print("Completed process in %.2fs"%(time.time()-st))
 
 #%% (**) Apply Area Weight (to region) ----------------------------------------------
 # ~1m5s
+
 wgt = np.sqrt(np.cos(np.radians(lat)))
 
 #plt.plot(wgt)
@@ -264,7 +265,7 @@ nptsall = nlat*nlon
 #slpwgt = slpwgt.reshape(ntime,nptsall) # Repeat for slp 
 slpwgt = slpa.reshape(ntime,nptsall) # Repeat for slp 
 okslp  = slpwgt#[:,okpts]
-
+#
 # Calculate Monthly Anomalies, change to [yr x mon x npts] -------------------
 okdata = okdata.reshape((nyr,12,npts))
 okdata = okdata - okdata.mean(0)[None,:,:]
@@ -375,9 +376,6 @@ for N in tqdm(range(N_modeplot)):
     else:
         chkbox = spgbox
     for m in range(12):
-        
-        
-        
         
         sumflx = proc.sel_region(eofall[:,:,[m],N],lon,lat,chkbox,reg_avg=True)
         sumslp = proc.sel_region(eofslp[:,:,[m],N],lon,lat,chkbox,reg_avg=True)
@@ -1172,11 +1170,8 @@ for m in range(12):
 #%% Plot Spectra of the PCs
 # -------------------------
 
-
 im      = 0
 N_mode  = 0
 nsmooth = 60
 pct     = 0.10
 
-
- 
