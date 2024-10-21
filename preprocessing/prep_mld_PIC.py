@@ -23,14 +23,16 @@ import xesmf as xe
 
 #%% User Edits
 
-varname       = "HBLT" # "HMXL"
-mconfig       = "FULL_HTR" # [FULL_PIC, SLAB_PIC, FULL_HTR]
+varname       = "HMXL" # "HMXL"
+mconfig       = "cesm2_pic" # [FULL_PIC, SLAB_PIC, FULL_HTR, cesm2_pic]
 
 use_xesmf     = True # Use xESMF for regridding. False = box average
 method        = "bilinear" # regridding method
 
 use_mfdataset = False # Open all datasets at once (currently only works for PIC, boxavg)
-outpath       = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/%s/" % varname
+#outpath       = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/%s/" % varname
+outpath        = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/01_hfdamping/output/proc/"
+savename       = "%s%s_%s_regrid_%s.nc" % (outpath,mconfig,varname,method)
 
 # Set ncsearch string on stormtrack based on input dataset
 catdim  = 'time'
@@ -44,17 +46,23 @@ elif mconfig == "FULL_HTR":
     catdim        = 'ensemble'
     savesep       = True # Save each ensemble member separately
     use_mfdataset = False
+elif mconfig == "cesm2_pic":
+    ncsearch      = "b.e21.B1850.f09_g17.CMIP6-piControl.*.pop.h.%s.*.nc" % varname
+    
 
 # Adjust data path on stormtrack
-if varname == "SSS":
-    datpath   = "/vortex/jetstream/climate/data1/yokwon/CESM1_LE/processed/ocn/proc/tseries/monthly/SSS/"
-elif varname == "HBLT":
-    if "HTR" in mconfig:
-        datpath  = "/stormtrack/data4/glliu/01_Data/CESM1_LE/HBLT/"
-    elif "PIC" in mconfig:
-        datpath  = "/stormtrack/data4/glliu/01_Data/CESM1_PIC/HBLT/"
-else:
-    datpath   = "/vortex/jetstream/climate/data1/yokwon/CESM1_LE/downloaded/ocn/proc/tseries/monthly/%s/" % varname
+if mconfig == "cesm2_pic":
+    datpath = "/stormtrack/data4/glliu/01_Data/CESM2_PiControl/FCM/ocn/%s/" % varname
+else: # Assume CESM1 Scenarios
+    if varname == "SSS":
+        datpath   = "/vortex/jetstream/climate/data1/yokwon/CESM1_LE/processed/ocn/proc/tseries/monthly/SSS/"
+    elif varname == "HBLT":
+        if "HTR" in mconfig:
+            datpath  = "/stormtrack/data4/glliu/01_Data/CESM1_LE/HBLT/"
+        elif "PIC" in mconfig:
+            datpath  = "/stormtrack/data4/glliu/01_Data/CESM1_PIC/HBLT/"
+    else:
+        datpath   = "/vortex/jetstream/climate/data1/yokwon/CESM1_LE/downloaded/ocn/proc/tseries/monthly/%s/" % varname
 
 # Set up variables to keep for preprocessing script
 varkeep   = [varname,"TLONG","TLAT","time"]
@@ -111,12 +119,13 @@ def getpt_pop_array(lonf,latf,invar,tlon,tlat,searchdeg=0.75,printfind=True,verb
     return invar[latid,lonid,:].mean(0) # Take mean along first dimension
 
 
+
 #%% Load in data
 
 if not use_xesmf:
     method = "boxAVG"
 
-savename = "%s%s_%s_%s.nc" % (outpath,varname,mconfig,method)
+savename = "%s%s_%s_regrid_%s.nc" % (outpath,mconfig,varname,method)
 
 # Get file names
 globby = datpath+ncsearch
@@ -171,14 +180,16 @@ if use_xesmf:
             
             # Save each ensemble member separately (or time period)
             if savesep: 
-                savename = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/%s_%s_%s_num%02i.nc" % (varname,mconfig,method,nc)
-                daproc.to_netcdf(savename,
+                #savename = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/%s_%s_%s_num%02i.nc" % (varname,mconfig,method,nc)
+                savename_sep  = savename[:-3] + "_num%02i" % (nc) + ".nc" #proc.adddstrtoext(savename_sep,"num%02i" % (nc),adjust=-1)
+                daproc.to_netcdf(savename_sep,
                                  encoding={varname: {'zlib': True}})
-                
+                print("Saved output to %s" % savename_sep)
         # Concatenate along selected dimension
         if not savesep:
             dsproc = xr.concat(ds_rgrd,dim=catdim)
         
+            
     else: # Do all at once (seems to be failing due to cf compliant issue)
         
         ds = ds.rename({"TLONG": "lon", "TLAT": "lat"})
@@ -202,6 +213,7 @@ if use_xesmf:
     if not savesep:
         dsproc.to_netcdf(savename,
                          encoding={varname: {'zlib': True}})
+        print("Saved output to %s" % savename)
     
 else:
 
@@ -258,6 +270,9 @@ else:
                       coords={'lon':lon1,'lat':lat,'time':times},
                       name = varname
                       )
-    dsproc.to_netcdf("/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/%s_PIC.nc" % (varname),
-                     encoding={varname: {'zlib': True}})
+    
+    dsproc.to_netcdf(savename,
+                      encoding={varname: {'zlib': True}})
+    # dsproc.to_netcdf("/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/%s_PIC.nc" % (varname),
+    #                  encoding={varname: {'zlib': True}})
 
