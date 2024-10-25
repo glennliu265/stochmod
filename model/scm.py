@@ -4142,6 +4142,9 @@ def patch_expparams(expparams,verbose=True):
     if "qfactor_sep" not in oldkeys:
         print("\tAdded qfactor_sep = False (Updated 2024.10.02)")
         expparams["qfactor_sep"] = False
+    if "share_noise" not in oldkeys:
+        print("\tAdded share_noise = False (Updated 2024.10.25)")
+        expparams["share_noise"] = False
         
     return expparams
 
