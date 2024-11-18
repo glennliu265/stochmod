@@ -4434,6 +4434,8 @@ def convert_inputs(expparams,inputs,dt=3600*24*30,rho=1026,L=2.5e6,cp=3850,retur
             else:
                 QfactorQek = inputs['correction_factor_Qek'] * dt # Convert 
             outdict['correction_factor_Qek'] = QfactorQek
+        else:
+            QfactorQek = 0
         
         # Correction Factor **************************************************
         if eof_flag:
