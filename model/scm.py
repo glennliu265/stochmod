@@ -326,7 +326,7 @@ def find_kprev(h,debug=False,returnh=True):
     """
     # Preallocate
     kprev = np.zeros(12)
-    hout = np.zeros(12)
+    hout  = np.zeros(12)
     
     # Month Array
     monthx = np.arange(1,13,1)  
@@ -338,8 +338,8 @@ def find_kprev(h,debug=False,returnh=True):
     
     for m in monthx:
         # Quick Indexing Fixes ------------------
-        im = m-1 # Month Index (Pythonic)
-        m0 = m-1 # Previous month
+        im = m-1   # Month Index (Pythonic)
+        m0 = m-1   # Previous month
         im0 = m0-1 # M-1 Index
         
         # Fix settings for january
@@ -366,23 +366,28 @@ def find_kprev(h,debug=False,returnh=True):
         hdiff = h - findmld
           
         searchflag = 0
-        ifindm = im0
+        ifindm     = im0
 
         while searchflag == 0:
-                
-            hfind= hdiff[ifindm]
+            # if np.abs(ifindm) > 12:
+            #     print("Warning, indexing exceeded 12 month limit. Value is %i" % ifindm)
+            #     continue
+            # else:
+            hfind = hdiff[ifindm]
+            #print("ifindm: %i | hfind: %f" % (ifindm,hfind))
             
             # For the first month greater than the target MLD,
             # grab this value and the value before it
-            if hfind > 0:
+            if hfind >= 0: # 2025.03.17, added equal in case the values it finds are zero...
+                
                 # Set searchflag to 1 to prepare for exit
-                searchflag = 1
+                searchflag  = 1
                 
                 # record MLD values
-                h_before = h[ifindm+1]
-                h_after  = h[ifindm]
-                m_before = monthx[ifindm+1]
-                m_after =  monthx[ifindm]
+                h_before    = h[ifindm+1]
+                h_after     = h[ifindm]
+                m_before    = monthx[ifindm+1]
+                m_after     = monthx[ifindm]
                 
                 # For months between Dec/Jan, assign value between 0 and 1
                 if ifindm < 0 and ifindm == -1:
@@ -713,7 +718,8 @@ def noentrain(t_end,lbd,T0,F,FAC,multFAC=1,debug=False):
 
 # Entrain Model (Single Point)
 def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=False,
-            Tdgrab=None,add_F=None,return_dict=False,Tdexp=None,old_index=False,Td_corr=False):
+            Tdgrab=None,add_F=None,return_dict=False,Tdexp=None,old_index=False,Td_corr=False,
+            max_thres=1e2):
     
     """
     SST Stochastic Model, with Entrainment
@@ -755,7 +761,8 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
     Td_corr : BOOL
         Set to True if Tdexp provided is the correlation rather than the timescale.
         Uses Td_corr=False as default since if no damping is provided, exp(0) = 1 (no decay).
-        
+    max_thres: NUMERIC
+        Stop the simulation if the values exceed this number
     
     Returns
     -------
@@ -925,7 +932,15 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
         #     print("\n Entrain Term: %f" % entrain_term)
         #     print("\n Integr Factor Term: %f" % integration_factor)
         #     break
-
+        
+        # If threshold is exceeded, stop the simulation
+        if temp_ts[t] > max_thres:
+            temp_ts[(t+1):]         = np.nan
+            damp_ts[(t+1):]         = np.nan
+            noise_ts[(t+1):]        = np.nan
+            entrain_ts[(t+1):]      = np.nan
+            break
+        
         # ----------------------------------
         # Save other variables in debug mode
         # ----------------------------------
@@ -2631,7 +2646,7 @@ def remove_enso(invar,ensoid,ensolag,monwin,reduceyr=True,verbose=True,times=Non
                     
             # Regress to obtain coefficients [space] # [1xshape]
             varreg,_ = proc.regress_2d(ensoin.squeeze(),varin,nanwarn=1)
-            varreg = varreg.squeeze()
+            #varreg = varreg.squeeze() # Note commented this out for 1D inputs, might break things...
             
             # Write to enso pattern
             ensopattern[m,:,:,pc] = varreg.reshape(nlat,nlon).copy()
@@ -4400,6 +4415,9 @@ def convert_inputs(expparams,inputs,dt=3600*24*30,rho=1026,L=2.5e6,cp=3850,retur
                 outdict['correction_factor'] = QfactorF.copy()
                 
             else:
+                if len(inputs['Fprime'].shape) > 3: # See if there is an singleton ensemble dimension, and squeeze if so
+                    inputs['Fprime'] = inputs['Fprime'].squeeze()
+                
                 Fconvert   = inputs['Fprime'].copy() / (rho*cp*inputs['h']) * dt
         else:
             if eof_flag: # [assume degC/mon]
