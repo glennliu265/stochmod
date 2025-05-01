@@ -32,6 +32,10 @@ import scipy as sp
 
 #%% Helper Functions/Utilities
 
+# =============================================================================
+#%% Stochastic Model Utilities
+# =============================================================================
+
 def calc_Td(t,index,values,prevmon=False,debug=False):
     """
     Calculate entraining temperature (Td) using linear interpolation.
@@ -111,6 +115,110 @@ def calc_Td(t,index,values,prevmon=False,debug=False):
         return Td
     else: # Just return Td1
         return Td[0]
+
+def find_kprev(h,debug=False,returnh=True):
+    """
+    Script to find the month of detrainment, given a seasonal
+    cycle of mixed layer depths
+
+    Parameters
+    ----------
+    h : ARRAY [12,]
+        Seasonal Mixed layer depth cyclemondet
+
+    Returns
+    -------
+    kprev : [12,]
+        Detrainment Month
+    hout : [12,]
+        Output for plotting(?)
+
+    """
+    # Preallocate
+    kprev = np.zeros(12)
+    hout  = np.zeros(12)
+    
+    # Month Array
+    monthx = np.arange(1,13,1)  
+    
+    # Determine if the mixed layer is deepening (true) or shoaling (false)--
+    dz = h / np.roll(h,1) 
+    dz = dz > 1
+    #dz = dz.values
+    
+    for m in monthx:
+        # Quick Indexing Fixes ------------------
+        im = m-1   # Month Index (Pythonic)
+        m0 = m-1   # Previous month
+        im0 = m0-1 # M-1 Index
+        
+        # Fix settings for january
+        if m0 < 1:
+            m0 = 12
+            im0 = m0-1
+        
+        # Set values for minimun/maximum -----------------------------------------
+        if im == h.argmax(): #or im== h.argmin():
+            if debug:
+                print("Ignoring %i, max/min" % m)
+            kprev[im] = m
+            hout[im] = h[im]
+            continue
+
+        # Ignore detrainment months
+        if dz[im] == False:
+            if debug:
+                print("Ignoring %i, shoaling month" % m)
+            continue
+        
+        # For all other entraining months.., search backwards
+        findmld = h[im]  # Target MLD   
+        hdiff = h - findmld
+          
+        searchflag = 0
+        ifindm     = im0
+
+        while searchflag == 0:
+            # if np.abs(ifindm) > 12:
+            #     print("Warning, indexing exceeded 12 month limit. Value is %i" % ifindm)
+            #     continue
+            # else:
+            hfind = hdiff[ifindm]
+            #print("ifindm: %i | hfind: %f" % (ifindm,hfind))
+            
+            # For the first month greater than the target MLD,
+            # grab this value and the value before it
+            if hfind >= 0: # 2025.03.17, added equal in case the values it finds are zero...
+                
+                # Set searchflag to 1 to prepare for exit
+                searchflag  = 1
+                
+                # record MLD values
+                h_before    = h[ifindm+1]
+                h_after     = h[ifindm]
+                m_before    = monthx[ifindm+1]
+                m_after     = monthx[ifindm]
+                
+                # For months between Dec/Jan, assign value between 0 and 1
+                if ifindm < 0 and ifindm == -1:
+                    m_after = ifindm+1
+                
+                # For even more negative indices
+                if debug:
+                    print("Found kprev for month %i it is %f!" % (m,np.interp(findmld,[h_before,h_after],[m_before,m_after])))
+                kprev[im] = np.interp(findmld,[h_before,h_after],[m_before,m_after])
+                hout[im] = findmld
+            
+            # Go back one month
+            ifindm -= 1
+    if returnh:
+        return kprev,hout
+    else:
+        return kprev
+
+# =============================================================================
+#%% stochmod Legacy Scripts
+# =============================================================================
 
 def cut_NAOregion(ds,bbox=[0,360,-90,90],mons=None,lonname='lon',latname='lat'):
     """
@@ -306,105 +414,7 @@ def set_stochparams(h,damping,dt,ND=True,rho=1000,cp0=4218,hfix=50,usemax=False,
     return lbd,lbd_entr,FAC,beta
 
 
-def find_kprev(h,debug=False,returnh=True):
-    """
-    Script to find the month of detrainment, given a seasonal
-    cycle of mixed layer depths
 
-    Parameters
-    ----------
-    h : ARRAY [12,]
-        Seasonal Mixed layer depth cyclemondet
-
-    Returns
-    -------
-    kprev : [12,]
-        Detrainment Month
-    hout : [12,]
-        Output for plotting(?)
-
-    """
-    # Preallocate
-    kprev = np.zeros(12)
-    hout  = np.zeros(12)
-    
-    # Month Array
-    monthx = np.arange(1,13,1)  
-    
-    # Determine if the mixed layer is deepening (true) or shoaling (false)--
-    dz = h / np.roll(h,1) 
-    dz = dz > 1
-    #dz = dz.values
-    
-    for m in monthx:
-        # Quick Indexing Fixes ------------------
-        im = m-1   # Month Index (Pythonic)
-        m0 = m-1   # Previous month
-        im0 = m0-1 # M-1 Index
-        
-        # Fix settings for january
-        if m0 < 1:
-            m0 = 12
-            im0 = m0-1
-        
-        # Set values for minimun/maximum -----------------------------------------
-        if im == h.argmax(): #or im== h.argmin():
-            if debug:
-                print("Ignoring %i, max/min" % m)
-            kprev[im] = m
-            hout[im] = h[im]
-            continue
-
-        # Ignore detrainment months
-        if dz[im] == False:
-            if debug:
-                print("Ignoring %i, shoaling month" % m)
-            continue
-        
-        # For all other entraining months.., search backwards
-        findmld = h[im]  # Target MLD   
-        hdiff = h - findmld
-          
-        searchflag = 0
-        ifindm     = im0
-
-        while searchflag == 0:
-            # if np.abs(ifindm) > 12:
-            #     print("Warning, indexing exceeded 12 month limit. Value is %i" % ifindm)
-            #     continue
-            # else:
-            hfind = hdiff[ifindm]
-            #print("ifindm: %i | hfind: %f" % (ifindm,hfind))
-            
-            # For the first month greater than the target MLD,
-            # grab this value and the value before it
-            if hfind >= 0: # 2025.03.17, added equal in case the values it finds are zero...
-                
-                # Set searchflag to 1 to prepare for exit
-                searchflag  = 1
-                
-                # record MLD values
-                h_before    = h[ifindm+1]
-                h_after     = h[ifindm]
-                m_before    = monthx[ifindm+1]
-                m_after     = monthx[ifindm]
-                
-                # For months between Dec/Jan, assign value between 0 and 1
-                if ifindm < 0 and ifindm == -1:
-                    m_after = ifindm+1
-                
-                # For even more negative indices
-                if debug:
-                    print("Found kprev for month %i it is %f!" % (m,np.interp(findmld,[h_before,h_after],[m_before,m_after])))
-                kprev[im] = np.interp(findmld,[h_before,h_after],[m_before,m_after])
-                hout[im] = findmld
-            
-            # Go back one month
-            ifindm -= 1
-    if returnh:
-        return kprev,hout
-    else:
-        return kprev
 
 def calc_kprev_lin(h,entrain1=-1,entrain0=0):
     """
@@ -467,6 +477,9 @@ def calc_kprev_lin(h,entrain1=-1,entrain0=0):
                 kprev[t] = kfind
         # End Loop
     return kprev
+
+
+# =============================================================================
 
 def calc_tau_detrain(hcycle,kprev,z,tau_est,debug=False):
     """
@@ -2341,6 +2354,7 @@ def prep_HF(damping,rsst,rflx,p,tails,dof,mode,
             3 --> SST-FLX cross correlation based
             4 --> Both 2 and 3
             5 --> Both, but replace FULL with SLAB if insignificant
+            6 --> Just set positive values to zero
         --- OPTIONAL ---
         8) returnall BOOL
             Set to True to return masks and frequency
@@ -2386,6 +2400,9 @@ def prep_HF(damping,rsst,rflx,p,tails,dof,mode,
         mtot = msst + mflx
         mall = msst * mflx
         mult = 2
+    elif mode == 6:
+        mall = np.where(damping<0,0,1)
+        mtot = mall.sum((0,1))
     
     # Apply Significance Mask
     dampingmasked = damping * mall
@@ -4351,7 +4368,7 @@ def convert_inputs(expparams,inputs,dt=3600*24*30,rho=1026,L=2.5e6,cp=3850,retur
         # Precip <Forcing> ~~ *************************************************
         if expparams['convert_PRECTOT']:
             
-            conversion_factor = ( dt*inputs['Sbar'] / inputs['h'] )
+            conversion_factor = ( dt * inputs['Sbar'] / inputs['h'] )
             
             if eof_flag:
                 Pconvert =  inputs['PRECTOT'] * conversion_factor[None,...]
