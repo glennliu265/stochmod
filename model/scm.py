@@ -431,7 +431,309 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
     return temp_ts
 
 
+def integrate_noentrain(lbd,F,T0=0,multFAC=True,debug=False,old_index=False,return_dict=False):
+    """
+    T,[damping_term],[forcing_term] = integrate_noentrain(lbd,F,T0=0,multFAC=True,debug=False)
+    
+    Integrate non-entraining stochastic model.
+    T(t) = exp(-lbd)*T(t-1) + (1-exp(-lbd))/lbd * F(t)
+    
+    Parameters
+    ----------
+    lbd : ARRAY [lon x lat x mon]
+        Atmospheric damping in units of [1/mon]
+    F   : ARRAY [lon x lat x time]
+        Forcing term in units of [degC/mon]
+    T0  : Numeric, optional
+        Initial Temperature. The default is 0.
+    multFAC : BOOL, optional
+        Multiply by integration factor. The default is True.
+    debug : BOOL, optional
+        Set to true to return all terms separately. The default is False.
+    old_index:BOOL, optional
+        For troubleshooting, index forcing at same timestep as T (T(1) = lbd(1)*T(-1) + F(1))
+        
 
+    Returns
+    -------
+    T : ARRAY [lon x lat x time]
+        Output temperature
+    damping_term : ARRAY [lon x lat x time]
+        exp(-lbd)*T(t-1)
+    forcing_term : ARRAY [lon x lat x time]
+        FAC*F(t)
+
+    """
+    # Check Dimensions and get shape
+    lbd1d,f1d = False,False
+    if (len(lbd.shape) == 1):
+        lbd = lbd[None,None,:] # Make 3-D
+        if debug:
+            print("Warning, lbd should be 3D.")
+    if (len(F.shape) ==1):
+        F   = F[None,None,:] # Make 3-D
+        if debug:
+            print("Warning, F should be 3D.")
+    nlon,nlat,ntime = F.shape
+    
+    # Calculate Integration Factor
+    FAC = 1
+    if multFAC:
+        FAC = calc_FAC(lbd)
+    
+    # Prepare other terms
+    explbd = np.exp(-lbd)
+    
+    # Preallocate
+    T            = np.zeros((nlon,nlat,ntime))
+    T[:,:,-1]    = T0 # Set first value (will overwrite)
+    damping_term = T.copy()
+    forcing_term = T.copy()
+    
+    # Integrate Forward
+    for t in tqdm(range(ntime)):
+        
+        # Get the month & month ind
+        im = t%12 # Starts from t(0) = Jan
+        
+        # Form the terms and step forrward: T(0) = lbd(0) * T(-1) + F(-1)
+        # ex. T(Jan) = lbd(Jan) * T(Dec) + F d(Dec))
+        damping_term[:,:,t] = explbd[:,:,im] * T[:,:,t-1] # exp(lbd)T'
+        if old_index: # F(0)
+            forcing_term[:,:,t] = FAC[:,:,im]    * F[:,:,t] # FAC*F'
+        else: # F(-1)
+            forcing_term[:,:,t] = FAC[:,:,im]    * F[:,:,t-1] # FAC*F'
+        T[:,:,t]            = damping_term[:,:,t] + forcing_term[:,:,t]
+        
+    # Apply masked based on forcing term
+    msk = F.sum(2)
+    msk[~np.isnan(msk)] = 1
+    T *= msk[:,:,None]
+    if np.all(np.isnan(T)):
+        print("WARNING ALL ARE NAN")
+    
+    if debug:
+        if return_dict:
+            output_dict = {
+                'T'            : T,
+                'damping_term' : damping_term,
+                'forcing_term' : forcing_term,
+                "FAC"          : FAC,
+                "lbd"          : lbd,
+                }
+            return output_dict
+        return T,damping_term,forcing_term
+    return T
+
+
+def intgr_noentrain(lbd,F,white_noise,T0=0,multFAC=True,debug=False):
+    """
+    NOTE delete this, I think I will stick with the original function integrate_noentrain()
+    Copy of integrate_noentrain, but with updated
+    indexing, etc (copied 2024.01.23, should replace original function)
+    
+    T,[damping_term],[forcing_term] = integrate_noentrain(lbd,F,T0=0,multFAC=True,debug=False)
+    
+    Integrate non-entraining stochastic model.
+    T(t) = exp(-lbd)*T(t-1) + (1-exp(-lbd))/lbd * F(t)
+    
+    Parameters
+    ----------
+    lbd : ARRAY [lon x lat x mon]
+        Atmospheric damping in units of [1/mon]
+    F :  ARRAY [lon x lat x mon]
+        Forcing term in units of [degC/mon]
+    white_noise : ARRAY [time]
+        White noise timeseries (unit variance)
+    T0 : Numeric, optional
+        Initial Temperature. The default is 0.
+    multFAC : BOOL, optional
+        Multiply by integration factor. The default is True.
+    debug : BOOL, optional
+        Set to true to return all terms separately. The default is False.
+
+    Returns
+    -------
+    T : ARRAY [lon x lat x time]
+        Output temperature
+    damping_term : ARRAY [lon x lat x time]
+        exp(-lbd)*T(t-1)
+    forcing_term : ARRAY [lon x lat x time]
+        FAC*F(t)
+
+    """
+    # Check Dimensions
+    #if (len(lbd.shape) == 1) or (len(F.shape) == 1):
+        
+    
+    ntime       = white_noise.shape[-1]
+    nlon,nlat,_ = F.shape
+    
+    # Calculate Integration Factor
+    FAC = 1
+    if multFAC:
+        FAC = calc_FAC(lbd)
+    
+    # Prepare other terms
+    explbd = np.exp(-lbd)
+    
+    # Preallocate
+    T            = np.zeros((nlon,nlat,ntime)) * T0 #Set initial value
+    damping_term = T.copy()
+    forcing_term = T.copy()
+    
+    # Integrate Forward
+    for t in tqdm(range(ntime)):
+        
+        # Get the month and Month Index
+        m = (t+1)%12 # Start from January, params are same month
+        if m == 0:
+            m = 12
+        im = m -1 # Month Index (0=Jan)
+        
+        # Form the terms and step forrward
+        damping_term[:,:,t] = explbd[:,:,im] * T[:,:,t-1] # lbd(0) * T(-1)
+        forcing_term[:,:,t] = FAC[:,:,im] * F[:,:,im-1] * white_noise[:,:,t-1] # F(-1)
+        T[:,:,t]            = damping_term[:,:,t] + forcing_term[:,:,t]
+    
+    # Apply masked based on forcing term
+    msk = F.sum(2)
+    msk[~np.isnan(msk)] = 1
+    T *= msk[:,:,None]
+    if np.all(np.isnan(T)):
+        print("WARNING ALL ARE NAN")
+    
+    if debug:
+        return T,damping_term,forcing_term
+    return T
+
+def integrate_entrain(h,kprev,lbd_a,F,T0=None,
+                      multFAC=True,debug=False,
+                      Td0=False,add_F=None,
+                      return_dict=False,Tdexp=None,
+                      beta=None,old_index=False,Td_corr=False):
+    """
+    
+    Parameters
+    ----------
+    h : ARRAY [lon x lat x 12,]
+        MIXED LAYER DEPTHS (M)
+    kprev : ARRAY [lon x lat x 12]
+        INDICES OF DETRAINMENT MONTH
+    lbd_a : ARRAY [lon x lat x 12]
+        Atmospheric heat flux damping, units of deg/sec.
+    F     : ARRAY [lon x lat x 12]
+        Forcing, in units of deg/sec
+    T0 : Initial temperature, optional
+        DESCRIPTION. The default is 0.
+    multFAC : TYPE, optional
+        DESCRIPTION. The default is True.
+    debug : TYPE, optional
+        DESCRIPTION. The default is False.
+    Td0 : ARRAY [len(Tdgrab)]
+        DESCRIPTION. The default is False.
+    add_F : ARRAYs [lon x lat x time]
+        Additional forcing to add to the expression. This is directly
+        passed into the function for each point and nothing further is done...
+    beta: ARRAY [lon x lat x 12]
+        Set to manually include entrainment damping
+        
+    Returns
+    -------
+    TYPE
+        DESCRIPTION.
+        
+    """
+    
+    nlon,nlat,ntime = F.shape
+    
+    # Replace T0 if it is not set
+    if T0 is None:
+        T0 = np.zeros((nlon,nlat))
+    
+    # Calculate beta
+    if beta is None:
+        beta = calc_beta(h)
+    
+    # Add entrainment damping, set up lbd terms
+    lbd = lbd_a + beta
+    #explbd = np.exp(-lbd)
+    
+    # Calculate Integration Factor
+    FAC = 1
+    if multFAC:
+        FAC = calc_FAC(lbd)
+        
+    # Set Td damping timescale
+    if Tdexp is None:
+        Tdexp = np.zeros(FAC.shape)
+        if Td_corr is True:
+            Tdexp = np.ones(FAC.shape) # Since we are not exponentiating, Tdexp * T = T if Tdexp = 1
+    
+    # Preallocate
+    T            = np.zeros((nlon,nlat,ntime))
+    damping_term = T.copy()
+    forcing_term = T.copy()
+    entrain_term = T.copy()
+    Td           = T.copy()
+    # Loop for each point
+    for a in tqdm(range(nlat)):
+        
+        for o in range(nlon):
+            
+            # Skip land/ice points, checking the forcing term
+            if np.any(np.isnan(F[o,a,:])):
+                continue
+             
+            # Get Last [Tdgrab] values for selected point
+            if Td0 is not False:
+                Tdgrab = Td0[o,a,:]
+            else:
+                Tdgrab = None
+                
+            # If initial values are provided, get value
+            T0_in = T0[o,a]
+            
+            # Check for additional forcing
+            if add_F is not None:
+                add_F_in = add_F[o,a,:]
+            else:
+                add_F_in = None
+                
+            # Integrate in time
+            temp_ts,damp_ts,noise_ts,entrain_ts,Td_ts = entrain(ntime,lbd[o,a,:],T0_in,F[o,a,:],beta[o,a,:],h[o,a,:],kprev[o,a,:],FAC[o,a,:],
+                                                                multFAC=multFAC,debug=True,debugprint=False,Tdgrab=Tdgrab,add_F=add_F_in,Tdexp=Tdexp[o,a,:],
+                                                                old_index=old_index,Td_corr=Td_corr)
+            
+            # Save outputs
+            T[o,a,:]            = temp_ts.copy()
+            damping_term[o,a,:] = damp_ts.copy()
+            forcing_term[o,a,:] = noise_ts.copy()
+            entrain_term[o,a,:] = entrain_ts.copy()
+            Td[o,a,:]           = Td_ts.copy()
+    
+    # Apply masked based on forcing term
+    msk = F.sum(2)
+    msk[~np.isnan(msk)] = 1
+    T *= msk[:,:,None]
+    if np.all(np.isnan(T)):
+        print("WARNING ALL ARE NAN")
+    
+    if debug or return_dict:
+        if return_dict:
+            output_dict = {
+                'T'            : T,
+                'damping_term' : damping_term,
+                'forcing_term' : forcing_term,
+                'entrain_term' : entrain_term,
+                "Td"           : Td,
+                "beta"         : beta,
+                "FAC"          : FAC,
+                "lbd"          : lbd,
+                }
+            return output_dict
+        return T,damping_term,forcing_term,entrain_term,Td
+    return T
 
 # =============================================================================
 #%% Stochastic Model Utilities
@@ -636,6 +938,369 @@ def calc_kprev_dmon(m,kprev):
         dmon = 12 # 12 months have passed.
     return dmon
 
+def calc_FAC(lbd,correct=True):
+    FAC         = np.nan_to_num((1-np.exp(-lbd))/lbd)
+    if correct:
+        FAC[FAC==0] = 1 # Change all zero FAC values to 1
+    return FAC
+
+def calc_beta(h):
+    beta = np.log( h / np.roll(h,1,axis=2) ) # h(t)/h(t-1) Is the time correct? Need to test effect
+    beta[beta<0] = 0 # Set non-entraining months to zero
+    return beta
+
+def repair_expparams(expparams_raw):
+    """
+    Repairs the loaded expparams file generated by run_SSS_basinwide.py
+    (they are all 0-d arrays)
+    """
+    expkeys     = list(expparams_raw.files)
+    expparams   = {}
+    for k in range(len(expkeys)):
+        kn     = expkeys[k]
+        arrout = expparams_raw[kn]
+        if arrout.shape == ():
+            arrout = arrout.item()
+        else:
+            arrout = np.array(arrout)
+        expparams[kn] = arrout
+    return expparams
+    
+def patch_expparams(expparams,verbose=True):
+    # Add toggles/settings that were implemented at a later date to run_SSS_basinwide
+    
+    print("Patching Parameter Dictionary...")
+    oldkeys = list(expparams.keys())
+    # 2024.03.25: Added toggle for specifiying whether lbd_d is a correlation or 1/months
+    if "Td_corr" not in oldkeys:
+        print("\tAdded Td_corr = False (Updated 2024.03.25)")
+        expparams["Td_corr"] = False # By default, previous versions assumed lbd_d was 1/months
+    # 2024.08.27: Add Qek Correction and conversion
+    if "convert_Qek" not in oldkeys:
+        print("\tAdded convert_Qek = False (Updated 2024.08.27), True if SST")
+        if expparams['varname'] == "SST":
+            expparams["convert_Qek"] = True
+        else:
+            expparams["convert_Qek"] = False
+    if "correct_Qek" not in oldkeys:
+        print("\tAdded correct_Qek = False (Updated 2024.08.27)")
+        expparams["correct_Qek"] = False
+    if "qfactor_sep" not in oldkeys:
+        print("\tAdded qfactor_sep = False (Updated 2024.10.02)")
+        expparams["qfactor_sep"] = False
+    if "share_noise" not in oldkeys:
+        print("\tAdded share_noise = False (Updated 2024.10.25)")
+        expparams["share_noise"] = False
+        
+    return expparams
+
+    
+def gen_expdir(expdir):
+    proc.makedir(expdir + "Input")
+    proc.makedir(expdir + "Output")
+    proc.makedir(expdir + "Metrics")
+    proc.makedir(expdir + "Figures")
+    return None
+
+
+def load_params(expparams,input_path,debug=False):
+    # Load stochastic model parameter inputs for [run_SSS_basinwide.py]
+    # Copied run_SSS_pointmode_coupled and updated in loading_func
+    # Loads and checks for all necessary inputs of the stochastic model
+    #
+    
+    # First, Check if there is EOF-based forcing (remove this if I eventually redo it)
+    if expparams['eof_forcing']:
+        print("EOF Forcing Detected.")
+        eof_flag = True
+    else:
+        eof_flag = False
+    
+    # Indicate the Parameter Names (sorry, it's all hard coded...)
+    if expparams['varname']== "SSS": # Check for LHFLX, PRECTOT, Sbar
+        chk_params = ["h","LHFLX","PRECTOT","Sbar","lbd_d","beta","kprev","lbd_a","Qek"]
+        param_type = ["mld","forcing","forcing","forcing","damping","mld","mld","damping",'forcing']
+    elif expparams['varname'] == "SST": # Check for Fprime
+        chk_params = ["h","Fprime","lbd_d","beta","kprev","lbd_a","Qek"]
+        param_type = ["mld","forcing","damping","mld","mld","damping",'forcing']
+    
+    # Check the params
+    ninputs       = len(chk_params)
+    inputs_ds     = {}
+    inputs        = {}
+    inputs_type   = {}
+    missing_input = []
+    for nn in range(ninputs):
+        # Get Parameter Name and Type
+        pname = chk_params[nn]
+        ptype = param_type[nn]
+        
+        # Check for Exceptions (Can Fix this in the preprocessing stage)
+        if pname == 'lbd_a':
+            da_varname = 'damping'
+        else:
+            da_varname = pname
+        
+        # Load DataArray
+        if type(expparams[pname])==str: # If String, Load from input folder
+            
+            # Load ds
+            if (expparams['varname'] == "SST") and (pname =="Fprime") and "Fprime" not in expparams[pname]:
+                # For LHFLX Only Runs, switch Fprime with LHFLX...
+                da_varname   = "LHFLX" # Swap to LHFLX for now
+                varname_swap = True # True so "Fprime" is input as da_varname later
+                swapname     = "Fprime" 
+            else:
+                varname_swap = False
+            
+            # Load ds
+            ds = xr.open_dataset(input_path + ptype + "/" + expparams[pname])[da_varname]
+            
+            
+            # Crop to region
+            dsreg            = proc.sel_region_xr(ds,expparams['bbox_sim']).load()
+            dsreg            = dsreg.drop_duplicates('lon')# Drop duplicate Lon (Hard coded fix, remove this)
+            inputs_ds[pname] = dsreg.copy()
+            
+            # Load to numpy arrays 
+            varout           = dsreg.values
+            # varout           = varout[...,None,None]
+            # if debug:
+            #     print(pname) # Name of variable
+            #     print("\t%s" % str(ds.shape)) # Original Shape
+            #     print("\t%s" % str(varout.shape)) # Point Shape
+            inputs[pname]    = varout.copy()
+            
+            # Load Correction Factor
+            if ((da_varname == "Fprime") and (eof_flag)) or ("corrected" in expparams[pname]) or (expparams['correct_Qek'] and (da_varname == "Qek")):
+                print("Loading %s correction factor for EOF forcing..." % pname)
+                
+                ds_corr                          = xr.open_dataset(input_path + ptype + "/" + expparams[pname])['correction_factor']
+                ds_corr_reg                      = proc.sel_region_xr(ds_corr,expparams['bbox_sim']).load()
+                ds_corr_reg                      = ds_corr_reg.drop_duplicates('lon')
+                
+                if varname_swap == True:
+                    da_varname = pname # Swap from LHFLX back to Fprime for SST Integration
+                
+                # set key based on variable type
+                if da_varname == "Fprime":
+                    keyname = "correction_factor"
+                elif da_varname == "Qek":
+                    keyname = "correction_factor_Qek"
+                elif da_varname == "LHFLX":
+                    keyname = "correction_factor_evap"
+                elif da_varname == "PRECTOT":
+                    keyname = "correction_factor_prec"
+                
+                inputs_ds[keyname]   = ds_corr_reg.copy()
+                inputs[keyname]      = ds_corr_reg.values.copy()#[...,None,None]
+                if debug:
+                    print(da_varname + " Corr") # Variable Name
+                    print("\t%s" % str(ds_corr.shape))
+                    print("\t%s" % str(inputs[keyname].shape)) # Corrected Shape
+                inputs_type[keyname] = "forcing"
+            
+        else:
+            print("Did not find %s" % pname)
+            missing_input.append(pname)
+        
+        inputs_type[pname] = ptype
+    
+    #% Detect and Process Missing Inputs
+    
+    _,nlat,nlon=inputs['h'].shape
+    
+    for pname in missing_input:
+        if type(expparams[pname]) == float:
+            print("Float detected for <%s>. Making array with the repeated value %f" % (pname,expparams[pname]))
+            inputs[pname] = np.ones((12,nlat,nlon)) * expparams[pname]
+        else:
+            print("No value found for <%s>. Setting to zero." % pname)
+            inputs[pname] = np.zeros((12,nlat,nlon))
+    
+    # Get number of modes
+    if eof_flag:
+        if expparams['varname'] == "SST":
+            nmode = inputs['Fprime'].shape[0]
+        elif expparams['varname'] == "SSS":
+            nmode = inputs['LHFLX'].shape[0]
+            
+    # Unpack things from dictionary (added after for debugging)
+    ninputs     = len(inputs_ds)
+    param_names = list(inputs_ds.keys())
+    params_vv   = [] # Unpack from dictionary
+    for ni in range(ninputs):
+        pname = param_names[ni]
+        dsin  = inputs_ds[pname]
+        params_vv.append(dsin.copy())
+    return inputs,inputs_ds,inputs_type,params_vv
+
+def convert_inputs(expparams,inputs,dt=3600*24*30,rho=1026,L=2.5e6,cp=3850,return_sep=True,qfactor_sep=False):
+    # Convert [inputs] for the stochastic model script [run_SSS_basinwide.py]
+    # with additional indicators/toggles
+    # contained in expparams.
+    # Output is [alpha],[Dconvert],[Qfactor]
+    # See testing of function in [loading_func.py]
+    # if qfactor_sep is False, returns Qfactor combined.
+    # else, returns separate Qfactors
+    if expparams['eof_forcing']:
+        eof_flag=True
+    else:
+        eof_flag=False
+    
+    # Dictionary for separate convert outpiuts
+    outdict = {}
+    
+    # Do Unit Conversions --- O --- o --- o --- 0 --- o --- o --- 0 --- o --- o
+    if expparams["varname"] == "SSS": # Convert all to psu/mon ----------------
+        
+        # Evaporation <Forcing> ~~ ********************************************
+        if expparams['convert_LHFLX']: #~~
+            if eof_flag: # Check for EOFs
+                conversion_factor = ( dt*inputs['Sbar'] / (rho*L*inputs['h']))[None,...]
+                Econvert          = inputs['LHFLX'].copy() * conversion_factor # [Mon x Lat x Lon]
+                
+                # Add Correction Factor, if it exists
+                if 'correction_factor_evap' in list(inputs.keys()):
+                    print("Processing LHFLX/Evaporation Correction factor")
+                    QfactorE      = inputs['correction_factor_evap'].copy() * conversion_factor.squeeze()
+                else:
+                    QfactorE      = np.zeros((inputs['LHFLX'].shape[1:])) # Same Shape minus the mode dimension
+            else:
+                Econvert          = inputs['LHFLX'].copy() / (rho*L*inputs['h'])*dt*inputs['Sbar'] # [Mon x Lat x Lon]
+            
+            # Multiply both by -1 (since Q'_LH = -LE')
+            Econvert = Econvert * -1
+            QfactorE = QfactorE * -1
+            
+            outdict['correction_factor_evap'] = QfactorE.copy()
+        else:
+            Econvert   = inputs['LHFLX'].copy()
+            
+        outdict['LHFLX'] = Econvert.copy()
+        
+        # Precip <Forcing> ~~ *************************************************
+        if expparams['convert_PRECTOT']:
+            
+            conversion_factor = ( dt * inputs['Sbar'] / inputs['h'] )
+            
+            if eof_flag:
+                Pconvert =  inputs['PRECTOT'] * conversion_factor[None,...]
+            else:
+                Pconvert =  inputs['PRECTOT'] * conversion_factor
+            
+            if (eof_flag) and ('correction_factor_prec' in list(inputs.keys())):
+                print("Processing Precip Correction factor")
+                QfactorP   = inputs['correction_factor_prec'] * conversion_factor
+            else:
+                QfactorP   = np.zeros((inputs['PRECTOT'].shape[1:])) # Same Shape minus the mode dimension
+            
+            outdict['correction_factor_prec'] = QfactorP.copy()
+        else:
+            Pconvert   = inputs['PRECTOT'].copy()
+        outdict['PRECTOT'] = Pconvert.copy()
+        
+        # Atmospheric <Damping> ~~ ********************************************
+        if expparams['convert_lbd_a']:
+            print("WARNING: lbd_a unit conversion for SSS currently not supported")
+            Dconvert = inputs['lbd_a'].copy()
+        else:
+            Dconvert = inputs['lbd_a'].copy()
+            if np.nansum(Dconvert) < 0:
+                print("Flipping Sign")
+                Dconvert *= -1
+        
+        outdict['lbd_a'] = Dconvert.copy()
+        
+        # Add Ekman Forcing, if it Exists (should be zero otherwise) ~~::::::::
+        # Note: No Qek additional Conversion is performed for SSS, units should be in [psu/sec]
+        Qekconvert     = inputs['Qek'].copy()  * dt #  [(mode) x Mon x Lat x Lon] Convert to [psu/mon]
+        outdict['Qek'] = Qekconvert.copy()
+        if expparams['correct_Qek']:
+            print("Processing Qek (SSS) Correction factor")
+            QfactorQek = inputs['correction_factor_Qek'] * dt # Convert 
+            outdict['correction_factor_Qek'] = QfactorQek
+        else:
+            QfactorQek = 0
+        
+        
+        # Correction Factor **************************************************
+        if eof_flag:
+            Qfactor             = QfactorE + QfactorP + QfactorQek # Combine Evap, Precip, Qek correction factors
+            outdict["Qfactor"]  = Qfactor.copy()
+        
+        # Combine Evap and Precip (and Ekman Forcing)
+        alpha         = Econvert + Pconvert + Qekconvert
+        outdict['alpha'] = alpha.copy()
+    # Main Output: (alpha - all the forcings), (Dconvert - atm dampings)
+    # End SSS Conversion --------------------------------------------------
+    
+    elif expparams['varname'] == "SST": # Convert to degC/mon
+        
+        # Convert Stochastic Heat Flux Forcing ~~
+        if expparams['convert_Fprime']:
+            if eof_flag:
+                Fconvert   = inputs['Fprime'].copy()           / (rho*cp*inputs['h'])[None,:,:,:] * dt # Broadcast to mode x mon x lat x lon]
+                # Also convert correction factor
+                QfactorF   = inputs['correction_factor'].copy()/ (rho*cp*inputs['h'])[:,:,:] * dt
+                outdict['correction_factor'] = QfactorF.copy()
+                
+            else:
+                if len(inputs['Fprime'].shape) > 3: # See if there is an singleton ensemble dimension, and squeeze if so
+                    inputs['Fprime'] = inputs['Fprime'].squeeze()
+                
+                Fconvert   = inputs['Fprime'].copy() / (rho*cp*inputs['h']) * dt
+        else:
+            if eof_flag: # [assume degC/mon]
+                QfactorF = inputs['correction_factor'].copy()
+            Fconvert     = inputs['Fprime'].copy()
+        outdict['Fprime'] = Fconvert.copy()    
+        
+        # Convert Atmospheric Damping ~~
+        if expparams['convert_lbd_a']:
+            Dconvert   = inputs['lbd_a'].copy() / (rho*cp*inputs['h']) * dt
+        else:
+            Dconvert   = inputs['lbd_a'].copy()
+            if np.nansum(Dconvert) < 0:
+                print("Flipping Sign")
+                Dconvert *= -1
+        outdict['lbd_a'] = Dconvert.copy()
+        
+        # Add Ekman Forcing, if it exists (should be zero otherwise) ~~
+        if expparams['convert_Qek']: # For old cases where Ekman forcing as in W/m2
+            if eof_flag:
+                Qekconvert = inputs['Qek'].copy() / (rho*cp*inputs['h'])[None,:,:,:] * dt
+            else:
+                Qekconvert = inputs['Qek'].copy() / (rho*cp*inputs['h']) * dt
+        else: # Otherwise convert from [degC/sec to degC/mon]
+            Qekconvert = inputs['Qek'].copy() * dt 
+        outdict['Qek'] = Qekconvert.copy()
+        
+        # Ekman Factor Correction
+        if expparams['correct_Qek']:
+            if expparams['convert_Qek']: # For old cases where Ekman forcing as in W/m2
+                QfactorQek = inputs['correction_factor_Qek'] .copy() / (rho*cp*inputs['h']) * dt
+            else:
+                QfactorQek = inputs['correction_factor_Qek'] * dt # Convert 
+            outdict['correction_factor_Qek'] = QfactorQek
+        else:
+            QfactorQek = 0
+        
+        # Correction Factor **************************************************
+        if eof_flag:
+            Qfactor             = QfactorF + QfactorQek # Combine Fprime and Qek correction factors
+            outdict["Qfactor"]  = Qfactor.copy()
+        
+        # Compute forcing amplitude
+        alpha = Fconvert + Qekconvert
+        outdict['alpha'] = alpha.copy()
+        # <End Variable Conversion Check>
+    # End SST Conversion --------------------------------------------------\
+    
+    if return_sep:
+        return outdict
+    return alpha,Dconvert,Qfactor
+
 
 def load_pathdict(device,csvpath=None,csvname=None):
     """
@@ -664,6 +1329,31 @@ def load_pathdict(device,csvpath=None,csvname=None):
     pathdict    = {df['Category'][i]: df[device][i] for i in range(len(df))}
     return pathdict
 
+def unpack_smdict(indict):
+    """
+    Takes a dict of [run][region][models][OTHERDIMS] and unpacks it into
+    an array [unpackaged]
+
+    """
+    # Get "Outer Shell" dimensions
+    nrun    = len(indict)
+    nregion = len(indict[0])
+    nmodels = len(indict[0][0])
+    
+    # For Autocorrelation
+    otherdims = indict[0][0][0].shape
+    print("Found... Runs (%i) Regions (%i) ; Models (%i) ; Otherdims (%s)" % (nrun,nregion,nmodels,str(otherdims)))
+    
+    # Preallocate
+    newshape = np.concatenate([[nrun,nregion,nmodels],otherdims])
+    unpacked = np.zeros(newshape) * np.nan
+    
+    # Loop thru dict
+    for run in range(nrun):
+        for reg in range(nregion):
+            for mod in range(nmodels):
+                unpacked[run,reg,mod,:] = indict[run][reg][mod]
+    return unpacked
 
 # =============================================================================
 #%% Parameterization and Preprocessing
@@ -973,6 +1663,63 @@ def point_spectra(ts, nsmooth=1, opt=1, dt=None, clvl=[.95], pct=0.1):
     coords = dict(freq=freq/dt)
     da_out = xr.DataArray(P*dt, coords=coords, dims=coords, name="spectra")
     return da_out
+
+def compute_sm_metrics(ssts,
+                    nsmooth=20,
+                    pct=0.10,
+                    opt=1,
+                    dt=3600*24*30,
+                    lags=np.arange(37)):
+    """
+    Given a list of 1-D timeseries for SST, loops through each one and computes the ACF for
+    each basemonth, the Spectra, and the Monthly variance.
+
+    Parameters
+    ----------
+    ssts : TYPE
+        DESCRIPTION.
+    nsmooth : INT or list of INT, optional
+        Number of adjacent bands to smooth over. The default is 100.
+    pct : NUMERIC, optional
+        Percentage of spectra to taper. The default is 0.10.
+    opt : INT, optional
+        Detrending option for yo_spec (0=demean, 1=demean+detrend). The default is 1.
+    dt : NUMERIC, optional
+        Time step interval in sectonds. The default is 3600*24*30.
+    lags : LIST of Int, optional
+        Lags over which to compute the ACF. The default is np.arange(37).
+
+    Returns
+    -------
+    outdict : Output dictionary with ACFs, Spectra Output, and Monthly Variance
+    """
+    
+    nexps   = len(ssts)
+    
+    # 1. Compute the autocorrelation for each basemonth -----------------------
+    acs_all = [] # [basemonth][experiment]
+    for im in range(12):
+        acout      = calc_autocorr(ssts,lags,im+1) # scm function
+        acout_proc = [acout[ii] for ii in range(nexps) ] # Convert from dict to list
+        acs_all.append(acout_proc)
+    
+    # 2. Compute the spectra --------------------------------------------------
+    spec_output = quick_spectrum(ssts,nsmooth,pct,opt=opt,dt=dt,return_dict=True) # scm function
+    
+    # 3. Compute the monthly variance -----------------------------------------
+    monvars = [proc.calc_monvar(s) for s in ssts]
+    
+    # 4. Save the output
+    outdict = {
+        "acfs"    : acs_all,
+        "specs"   : spec_output['specs'],
+        "freqs"   : spec_output['freqs'],
+        "monvars" : monvars,
+        "CCs"     : spec_output['CCs'],
+        "dofs"    : spec_output['dofs'],
+        "r1s"     : spec_output['r1s'],
+        }
+    return outdict
 
 
 # =============================================================================
@@ -1578,6 +2325,66 @@ def synth_stochmod(config,verbose=False,viz=False,
         
         specout = specout + (bnds,)
         return autocorr,sst,dampingterm,forcingterm,entrainterm,Td,kmonth,params,specout
+    
+    
+def integrate_Q(lbd,F,T,mld,cp0=3996,rho=1026,dt=3600*24*30,debug=False):
+    """
+    Q = integrate_Q(lbd,F,T)\
+        
+        
+    lbd is in 1/mon
+    F is in 1/mon
+    T is in degC
+    
+    Integrate the heat flux applied to the stochastic model, and calculate the ratio
+    
+    """
+    nlon,nlat,ntime = F.shape
+    mld_in = np.tile(mld,int(ntime/12))
+    
+    lbd_ori_units = np.tile(lbd,int(ntime/12))*(rho*cp0*mld_in)/dt # convert back to W/m2 per degC
+    q_ori_units   = F*(rho*cp0*mld_in)/dt # convert back to W/m2
+    
+    
+    Q           = np.zeros((nlon,nlat,ntime)) * np.nan
+    q           = Q.copy()
+    lbdT        = Q.copy()
+    for t in tqdm(range(ntime)):
+        q[:,:,t]    = q_ori_units[:,:,t]
+        lbdT[:,:,t] = -lbd_ori_units[:,:,t]*(T[:,:,t]+T[:,:,t-1])/2
+        Q[:,:,t]    = q[:,:,t] + lbdT[:,:,t]
+    if debug:
+        return Q,q,lbdT
+    
+    return Q
+
+def method1(lbd,include_b=True):
+    a = 1-lbd
+    b = (1-np.exp(-lbd))/lbd
+    
+    if include_b:
+        mult = ((1-b)**2 + (1-b**2)*a + 2*b*a**2)/(1+a)
+    else:
+        mult = (1+a+b**2*(1-a)-2*(1-a**2))/(1+a)
+    return mult
+
+def method2(lbd,include_b=True,original=True):
+    a = 1-lbd
+    b = (1-np.exp(-lbd))/lbd
+    
+    # Calculate variance of Q
+    if original:
+        mid_term  = (b**2 * (1-a)) / (2 * (1+a)**2)
+    else:
+        mid_term  = (b**2 * (1-a)) / (2)
+    
+    if include_b:
+        last_term = b*(1-a)
+    else:
+        last_term = (1-a)
+    
+    mult = 1 + mid_term - last_term
+    return mult
 
 def calc_kprev_lin(h,entrain1=-1,entrain0=0):
     """
@@ -2856,7 +3663,9 @@ def compute_qnet(datpath,dataset_name,vnames=None,downwards_positive=True,
 
 
 
-#%% SCM rewritten.
+#%% SST_Paper Wrappers
+# Stochastic model scripts for the Liu et al. 2023 paper
+
 def convert_Wm2(invar,h,dt,cp0=3996,rho=1026,verbose=True,reverse=False):
     """
     outvar = convert_Wm2(invar,h,dt,cp0=3996,rho=1026,verbose=True)
@@ -3160,8 +3969,6 @@ def tile_forcing(alpha,randts):
         forcing = forcing[None,None,:] # [lon x lat x mon]
         
     return forcing
-    
-
 
 def make_forcing_pt(alpha,runid,frcname,t_end,input_path,check=True):
     """
@@ -3331,381 +4138,13 @@ def cut_regions(inputs,lon,lat,bboxsim,pointmode,points=[-30,50],awgt=1):
     else:
         return outputs
 
-def calc_FAC(lbd,correct=True):
-    FAC         = np.nan_to_num((1-np.exp(-lbd))/lbd)
-    if correct:
-        FAC[FAC==0] = 1 # Change all zero FAC values to 1
-    return FAC
-
-def calc_beta(h):
-    beta = np.log( h / np.roll(h,1,axis=2) ) # h(t)/h(t-1) Is the time correct? Need to test effect
-    beta[beta<0] = 0 # Set non-entraining months to zero
-    return beta
-
-def integrate_Q(lbd,F,T,mld,cp0=3996,rho=1026,dt=3600*24*30,debug=False):
-    """
-    Q = integrate_Q(lbd,F,T)\
-        
-        
-    lbd is in 1/mon
-    F is in 1/mon
-    T is in degC
-    
-    Integrate the heat flux applied to the stochastic model, and calculate the ratio
-    
-    """
-    nlon,nlat,ntime = F.shape
-    mld_in = np.tile(mld,int(ntime/12))
-    
-    lbd_ori_units = np.tile(lbd,int(ntime/12))*(rho*cp0*mld_in)/dt # convert back to W/m2 per degC
-    q_ori_units   = F*(rho*cp0*mld_in)/dt # convert back to W/m2
-    
-    
-    Q           = np.zeros((nlon,nlat,ntime)) * np.nan
-    q           = Q.copy()
-    lbdT        = Q.copy()
-    for t in tqdm(range(ntime)):
-        q[:,:,t]    = q_ori_units[:,:,t]
-        lbdT[:,:,t] = -lbd_ori_units[:,:,t]*(T[:,:,t]+T[:,:,t-1])/2
-        Q[:,:,t]    = q[:,:,t] + lbdT[:,:,t]
-    if debug:
-        return Q,q,lbdT
-    
-    return Q
-
-def integrate_noentrain(lbd,F,T0=0,multFAC=True,debug=False,old_index=False,return_dict=False):
-    """
-    T,[damping_term],[forcing_term] = integrate_noentrain(lbd,F,T0=0,multFAC=True,debug=False)
-    
-    Integrate non-entraining stochastic model.
-    T(t) = exp(-lbd)*T(t-1) + (1-exp(-lbd))/lbd * F(t)
-    
-    Parameters
-    ----------
-    lbd : ARRAY [lon x lat x mon]
-        Atmospheric damping in units of [1/mon]
-    F   : ARRAY [lon x lat x time]
-        Forcing term in units of [degC/mon]
-    T0  : Numeric, optional
-        Initial Temperature. The default is 0.
-    multFAC : BOOL, optional
-        Multiply by integration factor. The default is True.
-    debug : BOOL, optional
-        Set to true to return all terms separately. The default is False.
-    old_index:BOOL, optional
-        For troubleshooting, index forcing at same timestep as T (T(1) = lbd(1)*T(-1) + F(1))
-        
-
-    Returns
-    -------
-    T : ARRAY [lon x lat x time]
-        Output temperature
-    damping_term : ARRAY [lon x lat x time]
-        exp(-lbd)*T(t-1)
-    forcing_term : ARRAY [lon x lat x time]
-        FAC*F(t)
-
-    """
-    # Check Dimensions and get shape
-    lbd1d,f1d = False,False
-    if (len(lbd.shape) == 1):
-        lbd = lbd[None,None,:] # Make 3-D
-        if debug:
-            print("Warning, lbd should be 3D.")
-    if (len(F.shape) ==1):
-        F   = F[None,None,:] # Make 3-D
-        if debug:
-            print("Warning, F should be 3D.")
-    nlon,nlat,ntime = F.shape
-    
-    # Calculate Integration Factor
-    FAC = 1
-    if multFAC:
-        FAC = calc_FAC(lbd)
-    
-    # Prepare other terms
-    explbd = np.exp(-lbd)
-    
-    # Preallocate
-    T            = np.zeros((nlon,nlat,ntime))
-    T[:,:,-1]    = T0 # Set first value (will overwrite)
-    damping_term = T.copy()
-    forcing_term = T.copy()
-    
-    # Integrate Forward
-    for t in tqdm(range(ntime)):
-        
-        # Get the month & month ind
-        im = t%12 # Starts from t(0) = Jan
-        
-        # Form the terms and step forrward: T(0) = lbd(0) * T(-1) + F(-1)
-        # ex. T(Jan) = lbd(Jan) * T(Dec) + F d(Dec))
-        damping_term[:,:,t] = explbd[:,:,im] * T[:,:,t-1] # exp(lbd)T'
-        if old_index: # F(0)
-            forcing_term[:,:,t] = FAC[:,:,im]    * F[:,:,t] # FAC*F'
-        else: # F(-1)
-            forcing_term[:,:,t] = FAC[:,:,im]    * F[:,:,t-1] # FAC*F'
-        T[:,:,t]            = damping_term[:,:,t] + forcing_term[:,:,t]
-        
-    # Apply masked based on forcing term
-    msk = F.sum(2)
-    msk[~np.isnan(msk)] = 1
-    T *= msk[:,:,None]
-    if np.all(np.isnan(T)):
-        print("WARNING ALL ARE NAN")
-    
-    if debug:
-        if return_dict:
-            output_dict = {
-                'T'            : T,
-                'damping_term' : damping_term,
-                'forcing_term' : forcing_term,
-                "FAC"          : FAC,
-                "lbd"          : lbd,
-                }
-            return output_dict
-        return T,damping_term,forcing_term
-    return T
-
-
-def intgr_noentrain(lbd,F,white_noise,T0=0,multFAC=True,debug=False):
-    """
-    NOTE delete this, I think I will stick with the original function integrate_noentrain()
-    Copy of integrate_noentrain, but with updated
-    indexing, etc (copied 2024.01.23, should replace original function)
-    
-    T,[damping_term],[forcing_term] = integrate_noentrain(lbd,F,T0=0,multFAC=True,debug=False)
-    
-    Integrate non-entraining stochastic model.
-    T(t) = exp(-lbd)*T(t-1) + (1-exp(-lbd))/lbd * F(t)
-    
-    Parameters
-    ----------
-    lbd : ARRAY [lon x lat x mon]
-        Atmospheric damping in units of [1/mon]
-    F :  ARRAY [lon x lat x mon]
-        Forcing term in units of [degC/mon]
-    white_noise : ARRAY [time]
-        White noise timeseries (unit variance)
-    T0 : Numeric, optional
-        Initial Temperature. The default is 0.
-    multFAC : BOOL, optional
-        Multiply by integration factor. The default is True.
-    debug : BOOL, optional
-        Set to true to return all terms separately. The default is False.
-
-    Returns
-    -------
-    T : ARRAY [lon x lat x time]
-        Output temperature
-    damping_term : ARRAY [lon x lat x time]
-        exp(-lbd)*T(t-1)
-    forcing_term : ARRAY [lon x lat x time]
-        FAC*F(t)
-
-    """
-    # Check Dimensions
-    #if (len(lbd.shape) == 1) or (len(F.shape) == 1):
-        
-    
-    ntime       = white_noise.shape[-1]
-    nlon,nlat,_ = F.shape
-    
-    # Calculate Integration Factor
-    FAC = 1
-    if multFAC:
-        FAC = calc_FAC(lbd)
-    
-    # Prepare other terms
-    explbd = np.exp(-lbd)
-    
-    # Preallocate
-    T            = np.zeros((nlon,nlat,ntime)) * T0 #Set initial value
-    damping_term = T.copy()
-    forcing_term = T.copy()
-    
-    # Integrate Forward
-    for t in tqdm(range(ntime)):
-        
-        # Get the month and Month Index
-        m = (t+1)%12 # Start from January, params are same month
-        if m == 0:
-            m = 12
-        im = m -1 # Month Index (0=Jan)
-        
-        # Form the terms and step forrward
-        damping_term[:,:,t] = explbd[:,:,im] * T[:,:,t-1] # lbd(0) * T(-1)
-        forcing_term[:,:,t] = FAC[:,:,im] * F[:,:,im-1] * white_noise[:,:,t-1] # F(-1)
-        T[:,:,t]            = damping_term[:,:,t] + forcing_term[:,:,t]
-    
-    # Apply masked based on forcing term
-    msk = F.sum(2)
-    msk[~np.isnan(msk)] = 1
-    T *= msk[:,:,None]
-    if np.all(np.isnan(T)):
-        print("WARNING ALL ARE NAN")
-    
-    if debug:
-        return T,damping_term,forcing_term
-    return T
-
-def integrate_entrain(h,kprev,lbd_a,F,T0=None,
-                      multFAC=True,debug=False,
-                      Td0=False,add_F=None,
-                      return_dict=False,Tdexp=None,
-                      beta=None,old_index=False,Td_corr=False):
-    """
-    
-    Parameters
-    ----------
-    h : ARRAY [lon x lat x 12,]
-        MIXED LAYER DEPTHS (M)
-    kprev : ARRAY [lon x lat x 12]
-        INDICES OF DETRAINMENT MONTH
-    lbd_a : ARRAY [lon x lat x 12]
-        Atmospheric heat flux damping, units of deg/sec.
-    F     : ARRAY [lon x lat x 12]
-        Forcing, in units of deg/sec
-    T0 : Initial temperature, optional
-        DESCRIPTION. The default is 0.
-    multFAC : TYPE, optional
-        DESCRIPTION. The default is True.
-    debug : TYPE, optional
-        DESCRIPTION. The default is False.
-    Td0 : ARRAY [len(Tdgrab)]
-        DESCRIPTION. The default is False.
-    add_F : ARRAYs [lon x lat x time]
-        Additional forcing to add to the expression. This is directly
-        passed into the function for each point and nothing further is done...
-    beta: ARRAY [lon x lat x 12]
-        Set to manually include entrainment damping
-        
-    Returns
-    -------
-    TYPE
-        DESCRIPTION.
-        
-    """
-    
-    nlon,nlat,ntime = F.shape
-    
-    # Replace T0 if it is not set
-    if T0 is None:
-        T0 = np.zeros((nlon,nlat))
-    
-    # Calculate beta
-    if beta is None:
-        beta = calc_beta(h)
-    
-    # Add entrainment damping, set up lbd terms
-    lbd = lbd_a + beta
-    #explbd = np.exp(-lbd)
-    
-    # Calculate Integration Factor
-    FAC = 1
-    if multFAC:
-        FAC = calc_FAC(lbd)
-        
-    # Set Td damping timescale
-    if Tdexp is None:
-        Tdexp = np.zeros(FAC.shape)
-        if Td_corr is True:
-            Tdexp = np.ones(FAC.shape) # Since we are not exponentiating, Tdexp * T = T if Tdexp = 1
-    
-    # Preallocate
-    T            = np.zeros((nlon,nlat,ntime))
-    damping_term = T.copy()
-    forcing_term = T.copy()
-    entrain_term = T.copy()
-    Td           = T.copy()
-    # Loop for each point
-    for a in tqdm(range(nlat)):
-        
-        for o in range(nlon):
-            
-            # Skip land/ice points, checking the forcing term
-            if np.any(np.isnan(F[o,a,:])):
-                continue
-             
-            # Get Last [Tdgrab] values for selected point
-            if Td0 is not False:
-                Tdgrab = Td0[o,a,:]
-            else:
-                Tdgrab = None
-                
-            # If initial values are provided, get value
-            T0_in = T0[o,a]
-            
-            # Check for additional forcing
-            if add_F is not None:
-                add_F_in = add_F[o,a,:]
-            else:
-                add_F_in = None
-                
-            # Integrate in time
-            temp_ts,damp_ts,noise_ts,entrain_ts,Td_ts = entrain(ntime,lbd[o,a,:],T0_in,F[o,a,:],beta[o,a,:],h[o,a,:],kprev[o,a,:],FAC[o,a,:],
-                                                                multFAC=multFAC,debug=True,debugprint=False,Tdgrab=Tdgrab,add_F=add_F_in,Tdexp=Tdexp[o,a,:],
-                                                                old_index=old_index,Td_corr=Td_corr)
-            
-            # Save outputs
-            T[o,a,:]            = temp_ts.copy()
-            damping_term[o,a,:] = damp_ts.copy()
-            forcing_term[o,a,:] = noise_ts.copy()
-            entrain_term[o,a,:] = entrain_ts.copy()
-            Td[o,a,:]           = Td_ts.copy()
-    
-    # Apply masked based on forcing term
-    msk = F.sum(2)
-    msk[~np.isnan(msk)] = 1
-    T *= msk[:,:,None]
-    if np.all(np.isnan(T)):
-        print("WARNING ALL ARE NAN")
-    
-    if debug or return_dict:
-        if return_dict:
-            output_dict = {
-                'T'            : T,
-                'damping_term' : damping_term,
-                'forcing_term' : forcing_term,
-                'entrain_term' : entrain_term,
-                "Td"           : Td,
-                "beta"         : beta,
-                "FAC"          : FAC,
-                "lbd"          : lbd,
-                }
-            return output_dict
-        return T,damping_term,forcing_term,entrain_term,Td
-    return T
 
 
 
-def method1(lbd,include_b=True):
-    a = 1-lbd
-    b = (1-np.exp(-lbd))/lbd
-    
-    if include_b:
-        mult = ((1-b)**2 + (1-b**2)*a + 2*b*a**2)/(1+a)
-    else:
-        mult = (1+a+b**2*(1-a)-2*(1-a**2))/(1+a)
-    return mult
 
-def method2(lbd,include_b=True,original=True):
-    a = 1-lbd
-    b = (1-np.exp(-lbd))/lbd
-    
-    # Calculate variance of Q
-    if original:
-        mid_term  = (b**2 * (1-a)) / (2 * (1+a)**2)
-    else:
-        mid_term  = (b**2 * (1-a)) / (2)
-    
-    if include_b:
-        last_term = b*(1-a)
-    else:
-        last_term = (1-a)
-    
-    mult = 1 + mid_term - last_term
-    return mult
+
+
+
     
 def run_sm_rewrite(expname,mconfig,input_path,limaskname,
                    runid,t_end,frcname,ampq,
@@ -4052,448 +4491,4 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
             },allow_pickle=True)
         print("Saved output to %s in %.2fs" % (expname,time.time()-start))
     print("Function completed in %.2fs" % (time.time()-start))
-    
 
-    
-
-#%% Silly Functions to Deal with sm data formats
-
-def unpack_smdict(indict):
-    """
-    Takes a dict of [run][region][models][OTHERDIMS] and unpacks it into
-    an array [unpackaged]
-
-    """
-    # Get "Outer Shell" dimensions
-    nrun    = len(indict)
-    nregion = len(indict[0])
-    nmodels = len(indict[0][0])
-    
-    # For Autocorrelation
-    otherdims = indict[0][0][0].shape
-    print("Found... Runs (%i) Regions (%i) ; Models (%i) ; Otherdims (%s)" % (nrun,nregion,nmodels,str(otherdims)))
-    
-    # Preallocate
-    newshape = np.concatenate([[nrun,nregion,nmodels],otherdims])
-    unpacked = np.zeros(newshape) * np.nan
-    
-    # Loop thru dict
-    for run in range(nrun):
-        for reg in range(nregion):
-            for mod in range(nmodels):
-                unpacked[run,reg,mod,:] = indict[run][reg][mod]
-    return unpacked
-
-
-#%% Convenience
-def compute_sm_metrics(ssts,
-                    nsmooth=20,
-                    pct=0.10,
-                    opt=1,
-                    dt=3600*24*30,
-                    lags=np.arange(37)):
-    """
-    Given a list of 1-D timeseries for SST, loops through each one and computes the ACF for
-    each basemonth, the Spectra, and the Monthly variance.
-
-    Parameters
-    ----------
-    ssts : TYPE
-        DESCRIPTION.
-    nsmooth : INT or list of INT, optional
-        Number of adjacent bands to smooth over. The default is 100.
-    pct : NUMERIC, optional
-        Percentage of spectra to taper. The default is 0.10.
-    opt : INT, optional
-        Detrending option for yo_spec (0=demean, 1=demean+detrend). The default is 1.
-    dt : NUMERIC, optional
-        Time step interval in sectonds. The default is 3600*24*30.
-    lags : LIST of Int, optional
-        Lags over which to compute the ACF. The default is np.arange(37).
-
-    Returns
-    -------
-    outdict : Output dictionary with ACFs, Spectra Output, and Monthly Variance
-    """
-    
-    nexps   = len(ssts)
-    
-    # 1. Compute the autocorrelation for each basemonth -----------------------
-    acs_all = [] # [basemonth][experiment]
-    for im in range(12):
-        acout      = calc_autocorr(ssts,lags,im+1) # scm function
-        acout_proc = [acout[ii] for ii in range(nexps) ] # Convert from dict to list
-        acs_all.append(acout_proc)
-    
-    # 2. Compute the spectra --------------------------------------------------
-    spec_output = quick_spectrum(ssts,nsmooth,pct,opt=opt,dt=dt,return_dict=True) # scm function
-    
-    # 3. Compute the monthly variance -----------------------------------------
-    monvars = [proc.calc_monvar(s) for s in ssts]
-    
-    # 4. Save the output
-    outdict = {
-        "acfs"    : acs_all,
-        "specs"   : spec_output['specs'],
-        "freqs"   : spec_output['freqs'],
-        "monvars" : monvars,
-        "CCs"     : spec_output['CCs'],
-        "dofs"    : spec_output['dofs'],
-        "r1s"     : spec_output['r1s'],
-        }
-    return outdict
-
-#%% Toolset for run_SSS_basinwide
-# Convenience functions for the new stochastic model integrator
-
-def repair_expparams(expparams_raw):
-    """
-    Repairs the loaded expparams file generated by run_SSS_basinwide.py
-    (they are all 0-d arrays)
-    """
-    expkeys     = list(expparams_raw.files)
-    expparams   = {}
-    for k in range(len(expkeys)):
-        kn     = expkeys[k]
-        arrout = expparams_raw[kn]
-        if arrout.shape == ():
-            arrout = arrout.item()
-        else:
-            arrout = np.array(arrout)
-        expparams[kn] = arrout
-    return expparams
-    
-def patch_expparams(expparams,verbose=True):
-    # Add toggles/settings that were implemented at a later date to run_SSS_basinwide
-    
-    print("Patching Parameter Dictionary...")
-    oldkeys = list(expparams.keys())
-    # 2024.03.25: Added toggle for specifiying whether lbd_d is a correlation or 1/months
-    if "Td_corr" not in oldkeys:
-        print("\tAdded Td_corr = False (Updated 2024.03.25)")
-        expparams["Td_corr"] = False # By default, previous versions assumed lbd_d was 1/months
-    # 2024.08.27: Add Qek Correction and conversion
-    if "convert_Qek" not in oldkeys:
-        print("\tAdded convert_Qek = False (Updated 2024.08.27), True if SST")
-        if expparams['varname'] == "SST":
-            expparams["convert_Qek"] = True
-        else:
-            expparams["convert_Qek"] = False
-    if "correct_Qek" not in oldkeys:
-        print("\tAdded correct_Qek = False (Updated 2024.08.27)")
-        expparams["correct_Qek"] = False
-    if "qfactor_sep" not in oldkeys:
-        print("\tAdded qfactor_sep = False (Updated 2024.10.02)")
-        expparams["qfactor_sep"] = False
-    if "share_noise" not in oldkeys:
-        print("\tAdded share_noise = False (Updated 2024.10.25)")
-        expparams["share_noise"] = False
-        
-    return expparams
-
-    
-def gen_expdir(expdir):
-    proc.makedir(expdir + "Input")
-    proc.makedir(expdir + "Output")
-    proc.makedir(expdir + "Metrics")
-    proc.makedir(expdir + "Figures")
-    return None
-
-
-def load_params(expparams,input_path,debug=False):
-    # Load stochastic model parameter inputs for [run_SSS_basinwide.py]
-    # Copied run_SSS_pointmode_coupled and updated in loading_func
-    # Loads and checks for all necessary inputs of the stochastic model
-    #
-    
-    # First, Check if there is EOF-based forcing (remove this if I eventually redo it)
-    if expparams['eof_forcing']:
-        print("EOF Forcing Detected.")
-        eof_flag = True
-    else:
-        eof_flag = False
-    
-    # Indicate the Parameter Names (sorry, it's all hard coded...)
-    if expparams['varname']== "SSS": # Check for LHFLX, PRECTOT, Sbar
-        chk_params = ["h","LHFLX","PRECTOT","Sbar","lbd_d","beta","kprev","lbd_a","Qek"]
-        param_type = ["mld","forcing","forcing","forcing","damping","mld","mld","damping",'forcing']
-    elif expparams['varname'] == "SST": # Check for Fprime
-        chk_params = ["h","Fprime","lbd_d","beta","kprev","lbd_a","Qek"]
-        param_type = ["mld","forcing","damping","mld","mld","damping",'forcing']
-    
-    # Check the params
-    ninputs       = len(chk_params)
-    inputs_ds     = {}
-    inputs        = {}
-    inputs_type   = {}
-    missing_input = []
-    for nn in range(ninputs):
-        # Get Parameter Name and Type
-        pname = chk_params[nn]
-        ptype = param_type[nn]
-        
-        # Check for Exceptions (Can Fix this in the preprocessing stage)
-        if pname == 'lbd_a':
-            da_varname = 'damping'
-        else:
-            da_varname = pname
-        
-        # Load DataArray
-        if type(expparams[pname])==str: # If String, Load from input folder
-            
-            # Load ds
-            if (expparams['varname'] == "SST") and (pname =="Fprime") and "Fprime" not in expparams[pname]:
-                # For LHFLX Only Runs, switch Fprime with LHFLX...
-                da_varname   = "LHFLX" # Swap to LHFLX for now
-                varname_swap = True # True so "Fprime" is input as da_varname later
-                swapname     = "Fprime" 
-            else:
-                varname_swap = False
-            
-            # Load ds
-            ds = xr.open_dataset(input_path + ptype + "/" + expparams[pname])[da_varname]
-            
-            
-            # Crop to region
-            dsreg            = proc.sel_region_xr(ds,expparams['bbox_sim']).load()
-            dsreg            = dsreg.drop_duplicates('lon')# Drop duplicate Lon (Hard coded fix, remove this)
-            inputs_ds[pname] = dsreg.copy()
-            
-            # Load to numpy arrays 
-            varout           = dsreg.values
-            # varout           = varout[...,None,None]
-            # if debug:
-            #     print(pname) # Name of variable
-            #     print("\t%s" % str(ds.shape)) # Original Shape
-            #     print("\t%s" % str(varout.shape)) # Point Shape
-            inputs[pname]    = varout.copy()
-            
-            # Load Correction Factor
-            if ((da_varname == "Fprime") and (eof_flag)) or ("corrected" in expparams[pname]) or (expparams['correct_Qek'] and (da_varname == "Qek")):
-                print("Loading %s correction factor for EOF forcing..." % pname)
-                
-                ds_corr                          = xr.open_dataset(input_path + ptype + "/" + expparams[pname])['correction_factor']
-                ds_corr_reg                      = proc.sel_region_xr(ds_corr,expparams['bbox_sim']).load()
-                ds_corr_reg                      = ds_corr_reg.drop_duplicates('lon')
-                
-                if varname_swap == True:
-                    da_varname = pname # Swap from LHFLX back to Fprime for SST Integration
-                
-                # set key based on variable type
-                if da_varname == "Fprime":
-                    keyname = "correction_factor"
-                elif da_varname == "Qek":
-                    keyname = "correction_factor_Qek"
-                elif da_varname == "LHFLX":
-                    keyname = "correction_factor_evap"
-                elif da_varname == "PRECTOT":
-                    keyname = "correction_factor_prec"
-                
-                inputs_ds[keyname]   = ds_corr_reg.copy()
-                inputs[keyname]      = ds_corr_reg.values.copy()#[...,None,None]
-                if debug:
-                    print(da_varname + " Corr") # Variable Name
-                    print("\t%s" % str(ds_corr.shape))
-                    print("\t%s" % str(inputs[keyname].shape)) # Corrected Shape
-                inputs_type[keyname] = "forcing"
-            
-        else:
-            print("Did not find %s" % pname)
-            missing_input.append(pname)
-        
-        inputs_type[pname] = ptype
-    
-    #% Detect and Process Missing Inputs
-    
-    _,nlat,nlon=inputs['h'].shape
-    
-    for pname in missing_input:
-        if type(expparams[pname]) == float:
-            print("Float detected for <%s>. Making array with the repeated value %f" % (pname,expparams[pname]))
-            inputs[pname] = np.ones((12,nlat,nlon)) * expparams[pname]
-        else:
-            print("No value found for <%s>. Setting to zero." % pname)
-            inputs[pname] = np.zeros((12,nlat,nlon))
-    
-    # Get number of modes
-    if eof_flag:
-        if expparams['varname'] == "SST":
-            nmode = inputs['Fprime'].shape[0]
-        elif expparams['varname'] == "SSS":
-            nmode = inputs['LHFLX'].shape[0]
-            
-    # Unpack things from dictionary (added after for debugging)
-    ninputs     = len(inputs_ds)
-    param_names = list(inputs_ds.keys())
-    params_vv   = [] # Unpack from dictionary
-    for ni in range(ninputs):
-        pname = param_names[ni]
-        dsin  = inputs_ds[pname]
-        params_vv.append(dsin.copy())
-    return inputs,inputs_ds,inputs_type,params_vv
-
-def convert_inputs(expparams,inputs,dt=3600*24*30,rho=1026,L=2.5e6,cp=3850,return_sep=True,qfactor_sep=False):
-    # Convert [inputs] for the stochastic model script [run_SSS_basinwide.py]
-    # with additional indicators/toggles
-    # contained in expparams.
-    # Output is [alpha],[Dconvert],[Qfactor]
-    # See testing of function in [loading_func.py]
-    # if qfactor_sep is False, returns Qfactor combined.
-    # else, returns separate Qfactors
-    if expparams['eof_forcing']:
-        eof_flag=True
-    else:
-        eof_flag=False
-    
-    # Dictionary for separate convert outpiuts
-    outdict = {}
-    
-    # Do Unit Conversions --- O --- o --- o --- 0 --- o --- o --- 0 --- o --- o
-    if expparams["varname"] == "SSS": # Convert all to psu/mon ----------------
-        
-        # Evaporation <Forcing> ~~ ********************************************
-        if expparams['convert_LHFLX']: #~~
-            if eof_flag: # Check for EOFs
-                conversion_factor = ( dt*inputs['Sbar'] / (rho*L*inputs['h']))[None,...]
-                Econvert          = inputs['LHFLX'].copy() * conversion_factor # [Mon x Lat x Lon]
-                
-                # Add Correction Factor, if it exists
-                if 'correction_factor_evap' in list(inputs.keys()):
-                    print("Processing LHFLX/Evaporation Correction factor")
-                    QfactorE      = inputs['correction_factor_evap'].copy() * conversion_factor.squeeze()
-                else:
-                    QfactorE      = np.zeros((inputs['LHFLX'].shape[1:])) # Same Shape minus the mode dimension
-            else:
-                Econvert          = inputs['LHFLX'].copy() / (rho*L*inputs['h'])*dt*inputs['Sbar'] # [Mon x Lat x Lon]
-            
-            # Multiply both by -1 (since Q'_LH = -LE')
-            Econvert = Econvert * -1
-            QfactorE = QfactorE * -1
-            
-            outdict['correction_factor_evap'] = QfactorE.copy()
-        else:
-            Econvert   = inputs['LHFLX'].copy()
-            
-        outdict['LHFLX'] = Econvert.copy()
-        
-        # Precip <Forcing> ~~ *************************************************
-        if expparams['convert_PRECTOT']:
-            
-            conversion_factor = ( dt * inputs['Sbar'] / inputs['h'] )
-            
-            if eof_flag:
-                Pconvert =  inputs['PRECTOT'] * conversion_factor[None,...]
-            else:
-                Pconvert =  inputs['PRECTOT'] * conversion_factor
-            
-            if (eof_flag) and ('correction_factor_prec' in list(inputs.keys())):
-                print("Processing Precip Correction factor")
-                QfactorP   = inputs['correction_factor_prec'] * conversion_factor
-            else:
-                QfactorP   = np.zeros((inputs['PRECTOT'].shape[1:])) # Same Shape minus the mode dimension
-            
-            outdict['correction_factor_prec'] = QfactorP.copy()
-        else:
-            Pconvert   = inputs['PRECTOT'].copy()
-        outdict['PRECTOT'] = Pconvert.copy()
-        
-        # Atmospheric <Damping> ~~ ********************************************
-        if expparams['convert_lbd_a']:
-            print("WARNING: lbd_a unit conversion for SSS currently not supported")
-            Dconvert = inputs['lbd_a'].copy()
-        else:
-            Dconvert = inputs['lbd_a'].copy()
-            if np.nansum(Dconvert) < 0:
-                print("Flipping Sign")
-                Dconvert *= -1
-        
-        outdict['lbd_a'] = Dconvert.copy()
-        
-        # Add Ekman Forcing, if it Exists (should be zero otherwise) ~~::::::::
-        # Note: No Qek additional Conversion is performed for SSS, units should be in [psu/sec]
-        Qekconvert     = inputs['Qek'].copy()  * dt #  [(mode) x Mon x Lat x Lon] Convert to [psu/mon]
-        outdict['Qek'] = Qekconvert.copy()
-        if expparams['correct_Qek']:
-            print("Processing Qek (SSS) Correction factor")
-            QfactorQek = inputs['correction_factor_Qek'] * dt # Convert 
-            outdict['correction_factor_Qek'] = QfactorQek
-        else:
-            QfactorQek = 0
-        
-        
-        # Correction Factor **************************************************
-        if eof_flag:
-            Qfactor             = QfactorE + QfactorP + QfactorQek # Combine Evap, Precip, Qek correction factors
-            outdict["Qfactor"]  = Qfactor.copy()
-        
-        # Combine Evap and Precip (and Ekman Forcing)
-        alpha         = Econvert + Pconvert + Qekconvert
-        outdict['alpha'] = alpha.copy()
-    # Main Output: (alpha - all the forcings), (Dconvert - atm dampings)
-    # End SSS Conversion --------------------------------------------------
-    
-    elif expparams['varname'] == "SST": # Convert to degC/mon
-        
-        # Convert Stochastic Heat Flux Forcing ~~
-        if expparams['convert_Fprime']:
-            if eof_flag:
-                Fconvert   = inputs['Fprime'].copy()           / (rho*cp*inputs['h'])[None,:,:,:] * dt # Broadcast to mode x mon x lat x lon]
-                # Also convert correction factor
-                QfactorF   = inputs['correction_factor'].copy()/ (rho*cp*inputs['h'])[:,:,:] * dt
-                outdict['correction_factor'] = QfactorF.copy()
-                
-            else:
-                if len(inputs['Fprime'].shape) > 3: # See if there is an singleton ensemble dimension, and squeeze if so
-                    inputs['Fprime'] = inputs['Fprime'].squeeze()
-                
-                Fconvert   = inputs['Fprime'].copy() / (rho*cp*inputs['h']) * dt
-        else:
-            if eof_flag: # [assume degC/mon]
-                QfactorF = inputs['correction_factor'].copy()
-            Fconvert     = inputs['Fprime'].copy()
-        outdict['Fprime'] = Fconvert.copy()    
-        
-        # Convert Atmospheric Damping ~~
-        if expparams['convert_lbd_a']:
-            Dconvert   = inputs['lbd_a'].copy() / (rho*cp*inputs['h']) * dt
-        else:
-            Dconvert   = inputs['lbd_a'].copy()
-            if np.nansum(Dconvert) < 0:
-                print("Flipping Sign")
-                Dconvert *= -1
-        outdict['lbd_a'] = Dconvert.copy()
-        
-        # Add Ekman Forcing, if it exists (should be zero otherwise) ~~
-        if expparams['convert_Qek']: # For old cases where Ekman forcing as in W/m2
-            if eof_flag:
-                Qekconvert = inputs['Qek'].copy() / (rho*cp*inputs['h'])[None,:,:,:] * dt
-            else:
-                Qekconvert = inputs['Qek'].copy() / (rho*cp*inputs['h']) * dt
-        else: # Otherwise convert from [degC/sec to degC/mon]
-            Qekconvert = inputs['Qek'].copy() * dt 
-        outdict['Qek'] = Qekconvert.copy()
-        
-        # Ekman Factor Correction
-        if expparams['correct_Qek']:
-            if expparams['convert_Qek']: # For old cases where Ekman forcing as in W/m2
-                QfactorQek = inputs['correction_factor_Qek'] .copy() / (rho*cp*inputs['h']) * dt
-            else:
-                QfactorQek = inputs['correction_factor_Qek'] * dt # Convert 
-            outdict['correction_factor_Qek'] = QfactorQek
-        else:
-            QfactorQek = 0
-        
-        # Correction Factor **************************************************
-        if eof_flag:
-            Qfactor             = QfactorF + QfactorQek # Combine Fprime and Qek correction factors
-            outdict["Qfactor"]  = Qfactor.copy()
-        
-        # Compute forcing amplitude
-        alpha = Fconvert + Qekconvert
-        outdict['alpha'] = alpha.copy()
-        # <End Variable Conversion Check>
-    # End SST Conversion --------------------------------------------------\
-    
-    if return_sep:
-        return outdict
-    return alpha,Dconvert,Qfactor
