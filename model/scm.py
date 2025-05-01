@@ -33,652 +33,26 @@ import scipy as sp
 #%% Helper Functions/Utilities
 
 # =============================================================================
-#%% Stochastic Model Utilities
-# =============================================================================
-
-def calc_Td(t,index,values,prevmon=False,debug=False):
-    """
-    Calculate entraining temperature (Td) using linear interpolation.
-    
-    Parameters
-    ----------
-    t : INT
-        Timestep (in months, where t(0) = Jan)
-    index : ARRAY [12]
-        Time of entraining month
-    values : ARRAY [t]
-        Array of values to interpolate
-    prevmon : BOOL, optional
-        Set to True to calculate Td0. The default is False.
-    debug : TYPE, optional
-        Set to True to print outputs. The default is False.
-    Returns
-    -------
-    Td: INT if prevmon=False, Tuple (Td1,Td0) if prevmon=False
-    """
-    
-    # Initialize month array
-    months = []
-    m1  = (t+1)%12
-    #m1=t%12
-    if m1 == 0:
-        m1 = 12
-    months.append(m1)
-    
-    # Option to include previous month
-    if prevmon:
-        m0 = m1-1
-        if m0==0:
-            m0 = 12
-        months.append(m0)
-    if debug:
-        print("t=%i, Month is %i"%(t,m1))
-    
-    # Loop for each month
-    Td = []
-    mcnts = [1,0] # Amount to add to get the index
-    for mcount,m in enumerate(months):
-        mcnt = mcnts[mcount]
-        if debug:
-            print("\tCalculating Td for m=%i"%m)
-        
-        # # For m0, check if index=0 and skip if so (first entraining month)
-        # if (len(months)>1) and (m==months[-1]):
-        #     if index[m-1] == 0:
-        #         return 0,0
-        #         # Td.append(Td[0])
-        #         # if debug:
-        #         #     print("\t\tSince m0=%i, or first entraining month, Td0=Td1" % m)
-        #         # continue
-        
-        # Find # of months since the anomaly was formed
-        k1m = (m1 - np.floor(index[m-1])) % 12
-        if k1m == 0:
-            k1m = 12
-        
-        # Get Index in t
-        kp1 = int(t+mcnt - k1m)
-        if debug:
-            print("\t\tkprev is %.2f for month %i, or %i months ago at t=%i"% (index[m-1],m,k1m,kp1))
-        
-        # Retrieve value between 0 and 1
-        kval = index[m-1]-np.floor(index[m-1])
-        
-        # Interpolate
-        Td1 = np.interp(kval,[0,1],[values[kp1],values[kp1+1]])
-        if debug:
-            print("\t\tsince %.2f is between %i and %i... "%(kval,0,1))
-            print("\t\t\tTd is interpolated to %.2f, between %.2f and %.2f"%(Td1,values[kp1],values[kp1+1]))
-        Td.append(Td1)
-    
-    if prevmon: # return Td=[Td1,Td0]
-        return Td
-    else: # Just return Td1
-        return Td[0]
-
-def find_kprev(h,debug=False,returnh=True):
-    """
-    Script to find the month of detrainment, given a seasonal
-    cycle of mixed layer depths
-
-    Parameters
-    ----------
-    h : ARRAY [12,]
-        Seasonal Mixed layer depth cyclemondet
-
-    Returns
-    -------
-    kprev : [12,]
-        Detrainment Month
-    hout : [12,]
-        Output for plotting(?)
-
-    """
-    # Preallocate
-    kprev = np.zeros(12)
-    hout  = np.zeros(12)
-    
-    # Month Array
-    monthx = np.arange(1,13,1)  
-    
-    # Determine if the mixed layer is deepening (true) or shoaling (false)--
-    dz = h / np.roll(h,1) 
-    dz = dz > 1
-    #dz = dz.values
-    
-    for m in monthx:
-        # Quick Indexing Fixes ------------------
-        im = m-1   # Month Index (Pythonic)
-        m0 = m-1   # Previous month
-        im0 = m0-1 # M-1 Index
-        
-        # Fix settings for january
-        if m0 < 1:
-            m0 = 12
-            im0 = m0-1
-        
-        # Set values for minimun/maximum -----------------------------------------
-        if im == h.argmax(): #or im== h.argmin():
-            if debug:
-                print("Ignoring %i, max/min" % m)
-            kprev[im] = m
-            hout[im] = h[im]
-            continue
-
-        # Ignore detrainment months
-        if dz[im] == False:
-            if debug:
-                print("Ignoring %i, shoaling month" % m)
-            continue
-        
-        # For all other entraining months.., search backwards
-        findmld = h[im]  # Target MLD   
-        hdiff = h - findmld
-          
-        searchflag = 0
-        ifindm     = im0
-
-        while searchflag == 0:
-            # if np.abs(ifindm) > 12:
-            #     print("Warning, indexing exceeded 12 month limit. Value is %i" % ifindm)
-            #     continue
-            # else:
-            hfind = hdiff[ifindm]
-            #print("ifindm: %i | hfind: %f" % (ifindm,hfind))
-            
-            # For the first month greater than the target MLD,
-            # grab this value and the value before it
-            if hfind >= 0: # 2025.03.17, added equal in case the values it finds are zero...
-                
-                # Set searchflag to 1 to prepare for exit
-                searchflag  = 1
-                
-                # record MLD values
-                h_before    = h[ifindm+1]
-                h_after     = h[ifindm]
-                m_before    = monthx[ifindm+1]
-                m_after     = monthx[ifindm]
-                
-                # For months between Dec/Jan, assign value between 0 and 1
-                if ifindm < 0 and ifindm == -1:
-                    m_after = ifindm+1
-                
-                # For even more negative indices
-                if debug:
-                    print("Found kprev for month %i it is %f!" % (m,np.interp(findmld,[h_before,h_after],[m_before,m_after])))
-                kprev[im] = np.interp(findmld,[h_before,h_after],[m_before,m_after])
-                hout[im] = findmld
-            
-            # Go back one month
-            ifindm -= 1
-    if returnh:
-        return kprev,hout
-    else:
-        return kprev
-
-# =============================================================================
-#%% stochmod Legacy Scripts
-# =============================================================================
-
-def cut_NAOregion(ds,bbox=[0,360,-90,90],mons=None,lonname='lon',latname='lat'):
-    """
-    Prepares input DataArray for NAO Calculation by cutting region and taking
-    an optional average over specified range of months
-    Dependencies
-        xarray as xr
-        numpy as np
-    Inputs
-        1) ds [DataArray]                    - Input DataArray
-        2) bbox [Array: lonW,lonE,latS,latN] - Bounding Boxes
-        OPTIONAL
-        3) mons [Array: months]              - Months to include in averaging
-                ex. For DJFM average, mons = [12,1,2,3]
-                Default --> No Monthly Average
-        4) lonname [str] - name of longitude in dataarray
-        5) latname [str] - name of latitude in dataarray
-    Outputs
-        ds [DataArray] - Output dataarray with time mean and region
-    """
-    # Average over specified months
-    if mons is not None:
-        # Take the DJFM Mean
-        season = ds.sel(time=np.in1d(ds['time.month'],mons))
-        dsw = season.groupby('time.year').mean('time')
-    else:
-        dsw = ds.copy()
-    
-    # Cut to specified NAO region
-    lonW,lonE,latS,latN = bbox
-    
-    # Convert to degrees East
-    if lonW < 0:
-        lonW += 360
-    if lonE < 0:
-        lonE += 360
-    
-    # Select North Atlantic Region for NAO Calculation...
-    if lonW > lonE: # Cases crossing the prime meridian
-        #print("Crossing Prime Meridian!")
-        dsna = dsw.where((dsw[lonname]>=lonW) | (dsw[lonname]<=lonE),drop=True).sel(lat=slice(latS,latN))
-    else:
-        dsna = dsw.sel(lon=slice(lonW,lonE),lat=slice(latS,latN))
-        
-    return dsna
-
-def make_naoforcing(NAOF,randts,fscale,nyr):
-    """
-    Makes forcing timeseries, given NAO Forcing Pattern for 3 different
-    treatments of MLD (NAOF), a whiite noise time series, and an scaling 
-    parameter.
-    
-    Inputs:
-        1) randts [Array] - white noise timeseries varying between -1 and 1
-        3) NAOF   [Array] - NAO forcing [Lon x Lat x Mon] in Watts/m2
-        4) fscale         - multiplier to scale white noise forcing\
-        5) nyr    [int]   - Number of years to tile the forcing
-    Dependencies: 
-        1) 
-    
-    Outputs
-        1) F{} [DICT] - [lon x lat x t_end] - Full forcing time series
-        2) Fseas{} [DICT] - [lon x lat x 12 or 1] - seasonal forcing time series
-    """
-    
-    # Make dictionary
-    F = {}
-    Fseas = {}
-
-    
-    
-    # Check if there is a month component 
-    if len(NAOF[0]) > 2:
-        
-        # Fixed MLD
-        tilecount = int(12/NAOF[0].shape[2]*nyr)
-        F[0] = np.tile(NAOF[0],tilecount) *randts[None,None,:] * fscale 
-            
-        # Max MLD
-        tilecount = int(12/NAOF[1].shape[2]*nyr)
-        F[1] = np.tile(NAOF[1],tilecount) *randts[None,None,:] * fscale 
-        
-        Fseas[0] = NAOF[0] * fscale 
-        Fseas[1] = NAOF[1] * fscale 
-        
-    else:
-        
-        # Fixed MLD 
-        F[0] = NAOF[0][:,:,None] *randts[None,None,:] * fscale
-        Fseas[0] = NAOF[0][:,:,None] * fscale
-        
-        # Max MLD
-        F[0] = NAOF[1][:,:,None] *randts[None,None,:] * fscale
-        Fseas[1] = NAOF[1][:,:,None] * fscale
-    
-    # Seasonally varying mld...
-    F[2]     = np.tile(NAOF[2],nyr) * randts[None,None,:] * fscale 
-    Fseas[2] =  NAOF[2][:,:,:] * fscale 
-    
-            
-    return F,Fseas
-
-def set_stochparams(h,damping,dt,ND=True,rho=1000,cp0=4218,hfix=50,usemax=False,hmean=None):
-    """
-    Given MLD and Heat Flux Feedback, Calculate Parameters
-    
-    Inputs:
-        1) h: Array [Lon x Lat x Mon]
-            Mixed Layer depths (climatological)
-        2) damping: Array [Lon x Lat x Mon]
-            Heat Flux Feedbacks (W/m2)
-        3) dt: INT
-            Model timestep in seconds
-        4) ND: Boolean
-            Set to 1 to process 2D data, rather than data at 1 point
-        Optional Arguments:
-            rho   - density of water [kg/m3]
-            cp0   - specific heat of water [J/(K*kg)]
-            hfix  - fixed mixed layer depth [m]
-            usemax - use seasonal maximum MLD
-    
-    
-    Outputs:
-        1) lbd: DICT [hvarmode] [Lon x Lat x Mon]
-            Dictionary of damping values for each MLD treatment 
-        2) lbd_entr: Array [Lon x Lat x Mon]
-            Damping for entraining model
-        3) FAC: Array [Lon x Lat x Mon]
-            Seasonal Reduction Factor
-        4) Beta: Array [Lon x Lat x Mon]
-            Entraining Term
-    
-    """    
-    
-    # Calculate Beta
-    if ND == True:
-        beta = np.log( h / np.roll(h,1,axis=2) ) # Roll along time axis
-        
-        # Find Maximum MLD during the year
-        hmax = np.nanmax(np.abs(h),axis=2)
-        hmax = hmax[:,:,None]
-        
-        ## Find Mean MLD during the year
-        if hmean is None:
-            hmean = np.nanmean(h,axis=2)
-            hmean = hmean[:,:,None]
-        else:
-            print("Using Slab MLD %f = 54.61" % hmean[56,74])
-        
-    else:
-        beta = np.log( h / np.roll(h,1,axis=0) )
-        
-        # Find Maximum MLD during the year
-        hmax = np.nanmax(np.abs(h))
-        if hmean is None:
-            hmean = np.nanmean(h)
-    
-    # Set non-entraining months to zero
-    beta[beta<0] = 0
-    
-    # Replace Nans with Zeros in beta
-    #beta = np.nan_to_num(beta)
-    
-    # Preallocate lambda variable 
-    lbd = {}
-    
-    # Fixed MLD
-    lbd[0] = damping / (rho*cp0*hfix) * dt
-    
-    # Mean MLD
-    lbd[1] = damping / (rho*cp0*hmean) * dt
-    
-    if usemax:
-        # Maximum MLD
-        lbd[1] = damping / (rho*cp0*hmax) * dt
-    
-    # Seasonal MLD
-    lbd[2] = damping / (rho*cp0*h) * dt
-    
-    # Calculate Damping (with entrainment)
-    lbd_entr = np.copy(lbd[2]) + beta
-    lbd[3] = lbd_entr.copy()
-    
-    
-    # Compute reduction factor
-    FAC = {}  
-    for i in range(4):
-        fac = (1-np.exp(-lbd[i]))/lbd[i]
-        fac = np.nan_to_num((1-np.exp(-lbd[i]))/lbd[i])
-        fac[fac==0] = 1 # Change all zero FAC values to 1
-        FAC[i] = fac.copy()
-    
-    return lbd,lbd_entr,FAC,beta
-
-
-
-
-def calc_kprev_lin(h,entrain1=-1,entrain0=0):
-    """
-    Estimate detrainment indices given a timeseries of mixed-layer
-    depths. Uses/Assumptions:
-        - Linear interpolation
-        - Forward direction for entrainment/detrainment (h[t], h[t+1])
-        - For last value, assumes t+1 is the first value (periodic)
-    
-    Inputs
-    ------
-        h : ARRAY [time]
-            Timeseries of mixed layer depth
-        
-        --- Optional ---
-        
-        entrain1 : Numeric (Default = -1)
-            Placeholder value for first time MLD reaches a given depth
-        entrain0 : Numeric (Default = 0)
-            Placeholder value for detraining months
-    Output
-    ------
-        kprev : ARRAY [time]
-            Indices where detrainment occurred    
-    """
-    # Preallocate, get dimensions
-    ntime = h.shape[0]
-    kprev = np.zeros(ntime)*np.nan
-    
-    # Looping for each step, get index of previous step
-    for t in range(ntime):
-        
-        # Wrap around for end value
-        if t >= (ntime-1):
-            dt = h[t]/h[0]
-        else: # Forward step comparison 
-            dt = h[t]/h[t+1]
-        
-        # Skip points where the mixed layer is detraining or unchanging
-        if dt >= 1:
-            kprev[t] = entrain0
-            continue
-        
-        
-        # Find the last index where h had the same value
-        hdiff = h - h[t]
-        hdiff = hdiff[:t] # Restrict to values before current timestep
-        kgreat = np.where(hdiff > 0)[0] # Find values deeper than current MLD
-        if len(kgreat) == 0:  # If no values are found, assume first time entraining to this depth
-            kprev[t] = entrain1
-            continue
-        else:
-            kd  = kgreat[-1] # Take index of most recent value
-            # Linear interpolate to approximate index
-            kfind = np.interp(h[t],[h[kd],h[kd+1]][::-1],[kd,kd+1][::-1])
-            
-            if kfind == float(t):
-                kprev[t] = entrain1
-            else:
-                kprev[t] = kfind
-        # End Loop
-    return kprev
-
-
-# =============================================================================
-
-def calc_tau_detrain(hcycle,kprev,z,tau_est,debug=False):
-    """
-    A series of linear interpolations to retrieve the timescale tau
-    at the depth and time of detrainment.
-    
-    Inputs:
-        hcycle  [month] (NUMERIC)        : Mixed Layer Depth cycle in [meters]
-        kprev   [month] (NUMERIC)        : Time of detraining month
-        z       [depth] (NUMERIC)        : Model Levels over which tau was estimated in [meters]
-        tau_est [month, depth] (NUMERIC) : E-folding timescale estimates
-        debug   [BOOL] : True to add debugging plots
-        
-    Return:
-        tau_out [month] : E-folding timescales at the given detraining depth and time
-        
-    """
-    tau_detrain=np.zeros([12])
-    for im in range(12):
-        
-        detrain_mon = kprev[im]
-        if detrain_mon == 0:
-            tau_detrain[im] = 0. # No detrainment.
-            continue
-        
-        # Part 1: Linear interpolation in time
-        # Take month above and below
-        dm0     = int(np.floor(detrain_mon))
-        dm1     = dm0+1
-        delta_m = detrain_mon - dm0
-        
-        # Use linear interpolation in time to retrieve detrainment level
-        h0       = hcycle[(dm0-1)%12] # Subtract 1 since dm0,dm1 is the actual month
-        h1       = hcycle[(dm1-1)%12]
-        hdetrain = np.interp(delta_m,[0,1],[h0,h1])
-        if debug:
-            # Check Linear Detrend
-            plt.plot([0,delta_m,1],[h0,hdetrain,h1],marker="x")
-            plt.axhline(hdetrain,color="k")
-            plt.axvline(delta_m,color="k")
-        
-        # Retrieve tau values for months above and below
-        tau0 = tau_est[(dm0-1)%12,:] # [Depth]
-        tau1 = tau_est[(dm1-1)%12,:] 
-        
-        # Do linear interpolation in time to get timescale
-        x_in = [0,1]
-        y_in = np.array([tau0,tau1])
-        f    = sp.interpolate.interp1d(x_in,y_in,axis=0)
-        tau_fill = f(delta_m)
-        
-        if debug:
-            zz = 44
-            fig,ax = plt.subplots(1,1)
-            ax.plot([0,delta_m,1],[tau0[zz],tau_fill[zz],tau1[zz]],marker="x")
-            plt.axhline(tau_fill[zz],color="k")
-            plt.axvline(delta_m,color="k")
-            
-        # Linearly interpolate again to get timescale relative to two depths
-        knear = np.argmin(np.abs(z-hdetrain)) # Get nearest z level
-        if z[knear] > hdetrain: # hdetrain is between [k,k+1]
-            k0 = knear-1
-            k1 = knear
-        elif z[knear] <= hdetrain: # hdetrain is between [k-1,k]
-            k0 = knear -1
-            k1 = knear
-        tau_out = np.interp(hdetrain,[z[k0],z[k1]],[tau_fill[k0],tau_fill[k1]])
-        if debug:
-            fig,ax = plt.subplots(1,1)
-            ax.plot([z[k0],hdetrain,z[k1]],[tau_fill[k0],tau_out,tau_fill[k1]],marker="x")
-            plt.axhline(tau_out,color="k")
-            plt.axvline(hdetrain,color="k")
-        
-        tau_detrain[im] = tau_out.copy()
-        # End month loop
-    return tau_detrain
-    
-
-def convert_NAO(hclim,naopattern,dt,rho=1000,cp0=4218,hfix=50,usemax=False,hmean=None):
-    """
-    Convert NAO forcing pattern [naopattern] from (W/m2) to (degC/S) 
-    given seasonal MLD (hclim)
-    
-    Inputs:
-        1) hclim [3d Array]      - climatological MLD [Mons]
-        2) NAOF [2d or 3d Array] - NAO forcing [Lon x Lat] in Watts/m2
-        3) dt                    - timestep in seconds
-        4) rho                   - Density of water [kg/m3]
-        5) cp0                   - Specific Heat of water [J/(K*kg)]
-        6) hfix                  - Fixed Mixed layer Depth
-        7) usemax (optional)     - Set to True to use max seasonal MLD
-        8) hmean (optional) [3-d array] - MLD vaue to use
-    Output:
-        1) NAOF [dict]    - Dictionary of arrays [lon x lat x mon], where 
-            0 = fixed MLD
-            1 = maximum MLD
-            2 = seasonal MLD
-    
-    """
-    # Check if forcing pattern is 3D
-    patshape = naopattern.shape
-    if len(patshape) != 3: 
-        naopattern = naopattern[:,:,None]
-    
-    # Set up MLD[lon x lat x mon x hvarmode]
-    mld = np.ones((patshape[0],patshape[1],12,3))
-    mld[:,:,:,0]  *= hfix # Fixed MLD
-    
-
-    if hmean is None:
-        mld[:,:,:,1]  = np.tile(hclim.mean(2)[:,:,None],12) # Mean MLD
-        if usemax:
-            mld[:,:,:,1]  = np.tile(hclim.max(2)[:,:,None],12) # Max MLD
-    else:
-        mld[:,:,:,1]  = np.tile(hmean,12) # Mean MLD (Slab)
-        print("Using Slab MLD %f = 54.61" % mld[56,74,0,1])
-    
-    mld[:,:,:,2]  = hclim.copy() # Clim MLD
-    
-    # Convert NAO to correct units...
-    NAOF = {}
-    for i in range(3):
-        
-        hchoose = mld[:,:,:,i]
-        NAOF[i] = naopattern * dt / cp0 / rho / hchoose
-    
-    return NAOF
-
-def get_data(pointmode,query,lat,lon,damping,mld,kprev,F):
-    """
-    Wrapper to return data based on pointmode
-    
-    Parameters
-    ----------
-    pointmode : INT
-        0 = Return variables as is
-        1 = Return variables at a point
-        2 = Return area-averaged variables
-    query : ARRAY
-        [lon,lat] if pointmode is 1
-        [lonW,lonE,latS,latN] if pointmode is 2
-    lat : ARRAY
-        latitude coordinates
-    lon : ARRAY
-        longitude coordinates
-    damping : ARRAY [lat,lon,month]
-        heat flux feedback (W/m2)
-    mld : ARRAY [lat,lon,month]
-        mixed layer depth (m)
-    kprev : ARRAY [lat,lon,month]
-        detrainment month
-    F : ARRAY [lat,lon,month]
-        forcing pattern
-    
-    Returns
-    -------
-        1. point indices ARRAY
-        2. damping at point ARRAY
-        3. mld at point ARRAY
-        4. kprev at point ARRAY
-        5. forcing at point ARRAY
-    """
-    
-    if pointmode == 1:
-        o,a = proc.find_latlon(query[0],query[1],lon,lat)
-        return [o,a],damping[o,a],mld[o,a],kprev[o,a],F[o,a]
-    else:
-        inparams = [damping,mld,kprev,F]
-        outparams = []
-        for param in inparams:
-            
-            if pointmode == 2:
-                var = proc.sel_region(param,lon,lat,query,reg_avg=1)
-                lonr=[0,] # Dummy Variable
-                latr=[0,] # Dummy Variable
-            else:    
-                var,lonr,latr = proc.sel_region()
-            outparams.append(var)
-        return np.concatenate([lonr,latr,outparams])
-
-
 #%% Stochastic Model Code
+# =============================================================================
 
-"""
-SST Stochastic Model, no Entrainment
-Integrated with the forward method
-assuming lambda at a constant monthly timestep
-
-Dependencies: 
-    - numpy as np
-
- Inputs
- 1) t_end : timestep to integrate until (monthly)
- 2) lbd   : seasonally varying decay term (lambda)
- 3) T0    : Initial temperature
- 4) F     : Forcing term
-    
-"""
 def noentrain(t_end,lbd,T0,F,FAC,multFAC=1,debug=False):
+    
+    """
+    SST Stochastic Model, no Entrainment
+    Integrated with the forward method
+    assuming lambda at a constant monthly timestep
+    
+    Dependencies: 
+        - numpy as np
+    
+     Inputs
+     1) t_end : timestep to integrate until (monthly)
+     2) lbd   : seasonally varying decay term (lambda)
+     3) T0    : Initial temperature
+     4) F     : Forcing term
+        
+    """
     
     # Preallocate
     temp_ts = np.zeros(t_end)
@@ -727,6 +101,80 @@ def noentrain(t_end,lbd,T0,F,FAC,multFAC=1,debug=False):
             damp_ts[t]  = np.copy(damp_term) 
     if debug:
         return temp_ts,noise_ts,damp_ts
+    return temp_ts
+
+def noentrain_2d(randts,lbd,T0,F,FAC,multFAC=1,debug=False):
+    
+    """
+    Run the no-entrainment model for all points at once.
+    
+    Inputs:
+        1) randts: 1D ARRAY of random number time series
+        2) lbd   : 3D ARRAY [lon x lat x mon] of seasonal damping values, degC/mon
+        3) T0    : SCALAR Initial temperature throughout basin (usually 0 degC)
+        4) F     : 3D Array [lon x lat x mon] of seasonal forcing values
+    
+    
+    """
+     
+    # Determine run length for uniform or patterned forcing
+    if len(randts.shape) > 1:
+        t_end = randts.shape[2]
+    else:
+        t_end = len(randts)
+    
+    # Preallocate
+    temp_ts = np.ones((lbd.shape[0],lbd.shape[1],t_end)) 
+    damp_term = np.ones((lbd.shape[0],lbd.shape[1],t_end))  * np.nan
+    noise_term = np.ones((lbd.shape[0],lbd.shape[1],t_end)) * np.nan
+    
+    # Prepare the entrainment term
+    explbd = np.exp(-lbd)
+
+    # Set the term to zero where damping is insignificant
+    #explbd[explbd==1] =0
+    
+    # Set initial condition
+    #temp_ts[:,:,0] = T0
+    
+    # Multiply forcing by reduction factor if option is set
+    if multFAC == 1:
+        F *= FAC
+    
+    # Loop for each timestep (note: using 1 indexing. T0 is from dec pre-simulation)
+    for t in tqdm(range(t_end)):
+        
+        # Get the month
+        m = (t+1)%12 # Start from January, params are same month
+        #m=t%12 
+        if m == 0:
+            m = 12
+        
+        # Form the damping term
+        damp_term[:,:,t] = explbd[:,:,m-1] * temp_ts[:,:,t-1]
+        
+        # Form the noise term
+        if F.shape[2] == 12:
+            noise_term[:,:,t] = F[:,:,m-1] * randts[None,None,t-1]
+        else:
+            noise_term[:,:,t] = F[:,:,t] 
+                
+        # Add with the corresponding forcing term to get the temp
+        temp_ts[:,:,t] = damp_term[:,:,t] + noise_term[:,:,t]
+        
+        #msg = '\rCompleted timestep %i of %i' % (t,t_end-1)
+        #print(msg,end="\r",flush=True)
+    
+    # Apply mask to temp_term
+    msk = noise_term.copy()
+    msk[~np.isnan(msk)] = 1
+    temp_ts *= msk[:,:,:]
+    
+    if np.all(np.isnan(temp_ts)):
+        print("WARNING ALL ARE NAN")
+    
+    if debug:
+        return temp_ts,damp_term,noise_term
     return temp_ts
 
 # Entrain Model (Single Point)
@@ -813,8 +261,7 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
             print("\t need to check interpolating/lbd_d estimation step")
             print("\t this will turn off entrainment at these steps")
         #print("This will effectively elimiated")
-        
-        
+    
     if debug:
         noise_ts   = np.zeros(t_end)
         damp_ts    = np.zeros(t_end)
@@ -983,14 +430,202 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
         return temp_ts,damp_ts,noise_ts,entrain_ts,Td_ts
     return temp_ts
 
+
+
+
+# =============================================================================
+#%% Stochastic Model Utilities
+# =============================================================================
+
+def calc_Td(t,index,values,prevmon=False,debug=False):
+    """
+    Calculate entraining temperature (Td) using linear interpolation.
+    
+    Parameters
+    ----------
+    t : INT
+        Timestep (in months, where t(0) = Jan)
+    index : ARRAY [12]
+        Time of entraining month
+    values : ARRAY [t]
+        Array of values to interpolate
+    prevmon : BOOL, optional
+        Set to True to calculate Td0. The default is False.
+    debug : TYPE, optional
+        Set to True to print outputs. The default is False.
+    Returns
+    -------
+    Td: INT if prevmon=False, Tuple (Td1,Td0) if prevmon=False
+    """
+    
+    # Initialize month array
+    months = []
+    m1  = (t+1)%12
+    #m1=t%12
+    if m1 == 0:
+        m1 = 12
+    months.append(m1)
+    
+    # Option to include previous month
+    if prevmon:
+        m0 = m1-1
+        if m0==0:
+            m0 = 12
+        months.append(m0)
+    if debug:
+        print("t=%i, Month is %i"%(t,m1))
+    
+    # Loop for each month
+    Td = []
+    mcnts = [1,0] # Amount to add to get the index
+    for mcount,m in enumerate(months):
+        mcnt = mcnts[mcount]
+        if debug:
+            print("\tCalculating Td for m=%i"%m)
+        
+        # # For m0, check if index=0 and skip if so (first entraining month)
+        # if (len(months)>1) and (m==months[-1]):
+        #     if index[m-1] == 0:
+        #         return 0,0
+        #         # Td.append(Td[0])
+        #         # if debug:
+        #         #     print("\t\tSince m0=%i, or first entraining month, Td0=Td1" % m)
+        #         # continue
+        
+        # Find # of months since the anomaly was formed
+        k1m = (m1 - np.floor(index[m-1])) % 12
+        if k1m == 0:
+            k1m = 12
+        
+        # Get Index in t
+        kp1 = int(t+mcnt - k1m)
+        if debug:
+            print("\t\tkprev is %.2f for month %i, or %i months ago at t=%i"% (index[m-1],m,k1m,kp1))
+        
+        # Retrieve value between 0 and 1
+        kval = index[m-1]-np.floor(index[m-1])
+        
+        # Interpolate
+        Td1 = np.interp(kval,[0,1],[values[kp1],values[kp1+1]])
+        if debug:
+            print("\t\tsince %.2f is between %i and %i... "%(kval,0,1))
+            print("\t\t\tTd is interpolated to %.2f, between %.2f and %.2f"%(Td1,values[kp1],values[kp1+1]))
+        Td.append(Td1)
+    
+    if prevmon: # return Td=[Td1,Td0]
+        return Td
+    else: # Just return Td1
+        return Td[0]
+    
 def calc_Td_decay_factor(kprev,m,Tdexp):
     # For when Td_corr is true
     delta_t        = calc_kprev_dmon(m,kprev) # dt = current month - detraining month
     decay_factor   = np.exp(-Tdexp[m-1] * delta_t)
     return decay_factor
+
+def find_kprev(h,debug=False,returnh=True):
+    """
+    Script to find the month of detrainment, given a seasonal
+    cycle of mixed layer depths
+
+    Parameters
+    ----------
+    h : ARRAY [12,]
+        Seasonal Mixed layer depth cyclemondet
+
+    Returns
+    -------
+    kprev : [12,]
+        Detrainment Month
+    hout : [12,]
+        Output for plotting(?)
+
+    """
+    # Preallocate
+    kprev = np.zeros(12)
+    hout  = np.zeros(12)
     
+    # Month Array
+    monthx = np.arange(1,13,1)  
+    
+    # Determine if the mixed layer is deepening (true) or shoaling (false)--
+    dz = h / np.roll(h,1) 
+    dz = dz > 1
+    #dz = dz.values
+    
+    for m in monthx:
+        # Quick Indexing Fixes ------------------
+        im = m-1   # Month Index (Pythonic)
+        m0 = m-1   # Previous month
+        im0 = m0-1 # M-1 Index
+        
+        # Fix settings for january
+        if m0 < 1:
+            m0 = 12
+            im0 = m0-1
+        
+        # Set values for minimun/maximum -----------------------------------------
+        if im == h.argmax(): #or im== h.argmin():
+            if debug:
+                print("Ignoring %i, max/min" % m)
+            kprev[im] = m
+            hout[im] = h[im]
+            continue
+
+        # Ignore detrainment months
+        if dz[im] == False:
+            if debug:
+                print("Ignoring %i, shoaling month" % m)
+            continue
+        
+        # For all other entraining months.., search backwards
+        findmld = h[im]  # Target MLD   
+        hdiff = h - findmld
+          
+        searchflag = 0
+        ifindm     = im0
+
+        while searchflag == 0:
+            # if np.abs(ifindm) > 12:
+            #     print("Warning, indexing exceeded 12 month limit. Value is %i" % ifindm)
+            #     continue
+            # else:
+            hfind = hdiff[ifindm]
+            #print("ifindm: %i | hfind: %f" % (ifindm,hfind))
+            
+            # For the first month greater than the target MLD,
+            # grab this value and the value before it
+            if hfind >= 0: # 2025.03.17, added equal in case the values it finds are zero...
+                
+                # Set searchflag to 1 to prepare for exit
+                searchflag  = 1
+                
+                # record MLD values
+                h_before    = h[ifindm+1]
+                h_after     = h[ifindm]
+                m_before    = monthx[ifindm+1]
+                m_after     = monthx[ifindm]
+                
+                # For months between Dec/Jan, assign value between 0 and 1
+                if ifindm < 0 and ifindm == -1:
+                    m_after = ifindm+1
+                
+                # For even more negative indices
+                if debug:
+                    print("Found kprev for month %i it is %f!" % (m,np.interp(findmld,[h_before,h_after],[m_before,m_after])))
+                kprev[im] = np.interp(findmld,[h_before,h_after],[m_before,m_after])
+                hout[im] = findmld
+            
+            # Go back one month
+            ifindm -= 1
+    if returnh:
+        return kprev,hout
+    else:
+        return kprev
+
 
 def calc_kprev_dmon(m,kprev):
+    """ Calculate # of months between detrainment [kprev]/entrainment [m] """
     im    = m-1
     kpmon = kprev[im]
     if m < kpmon:
@@ -1001,221 +636,38 @@ def calc_kprev_dmon(m,kprev):
         dmon = 12 # 12 months have passed.
     return dmon
 
-# Entrain Model (Single Point)
-def entrain_parallel(inputs):
+
+def load_pathdict(device,csvpath=None,csvname=None):
     """
-    SST Stochastic Model, with Entrainment rewritten to take all inputs as 1
-    t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC = inputs
-    
     Parameters
     ----------
-    t_end : INT
-        Length of integration, in months
-    lbd : ARRAY [12,]
-        Heat Flux Feedback (degC/sec)
-    T0 : INT
-        Initial Temperature (degC)
-    F : ARRAY [t_end,]
-        Forcing term (white noise time series) (degC/sec)
-    beta : ARRAY [12,]
-        Entrainment term coefficient (log(h(t+1)/h(t)))
-    h : ARRAY [12,]
-        Mixed Layer Depth (meters)
-    kprev : ARRAY [12,]
-        Month of detrainment (calculated through find_kprev)
-    FAC : ARRAY [12,]
-        Integration Factor ((1-exp(-lbd))/lbd)
-    multFAC : BOOL, optional
-        Set to true to apply integration factor to forcing and entrain term. 
-        The default is TRUE.
-    debug : BOOL, optional
-        Set to true to output each term separately
-    debugprint : BOOL, optional
-        Set to true to print messages at each timestep. The default is False.
-
+    device : STR
+        currently supports 'stormtrack','mbp2019'
+    
+    csvpath : STR, optional
+        Path to csv. The default is None.
+    csvname : STR, optional
+        Name of csv. The default is None.
     Returns
     -------
-    temp_ts : ARRAY [t_end,]
-        Resultant Temperature timeseries
-    if debug is True, returns the follow ARRAYs [t_end,]
-        damp_ts    - Damping term
-        noise_ts   - Noise term
-        entrain_ts - Entrainment Term
-        Td_ts      - Entraining Temperature
-        
+    pathdict : DICT
+        DICT with keys of the "Category" column and
+        entries for the corresponding devices
     """
-    t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC = inputs
-    debug=False
-    debugprint=False
     
-    # Preallocate
-    temp_ts = np.zeros(t_end)
     
-    if debug:
-        noise_ts = np.zeros(t_end)
-        damp_ts = np.zeros(t_end)
-        entrain_ts = np.zeros(t_end)
-        Td_ts   = np.zeros(t_end)
-        
-    entrain_term = np.zeros(t_end)
-    
-    # Prepare the entrainment term
-    explbd = np.exp(np.copy(-lbd))
-    #explbd[explbd==1] = 0
-    
-    Td0 = None # Set Td=None Initially
-    # Loop for integration period (indexing convention from matlab)
-    for t in range(t_end):
-        
-        # Get the month (start from Jan, so +1)
-        m  = (t+1)%12
-        #m=t%12
-        if m == 0:
-            m = 12
-        
-        # --------------------------
-        # Calculate entrainment term
-        # --------------------------
-        if t<12: # Start Entrainment term after first 12 months
-            entrain_term = 0
-        else:
-            if beta[m-1] == 0: # For months with no entrainment
-                entrain_term = 0
-                Td0 = None # Reset Td0 term
-                if debugprint:
-                    print("No entrainment on month %i"%m)
-                    print("--------------------\n")
-            else:
-                if (Td0 is None) & (h.argmin()==m-2) :# For first entraining month
-                    Td1 = calc_Td(t,kprev,temp_ts,prevmon=False,debug=debugprint)
-                    Td0 = Td1 # Previous month does not have entrainment!
-                if Td0 is None: # Calculate Td0 
-                    Td1,Td0 = calc_Td(t,kprev,temp_ts,prevmon=True,debug=debugprint)
-                else: # Use Td0 from last timestep
-                    Td1 = calc_Td(t,kprev,temp_ts,prevmon=False,debug=debugprint)
-                
-                Td = (Td1+Td0)/2
-                if debugprint:
-                    print("Td is %.2f, which is average of Td1=%.2f, Td0=%.2f"%(Td,Td1,Td0)) 
-                    print("--------------------\n")
-                Td0 = np.copy(Td1)# Copy Td1 to Td0 for the next loop
-                
-                # Calculate entrainment term
-                entrain_term = beta[m-1]*Td
-        
-        # ----------------------
-        # Get Noise/Forcing Term
-        # ----------------------
-        noise_term = F[t]
-        
-        # ----------------------
-        # Calculate damping term
-        # ----------------------
-        if t == 0:
-            damp_term = explbd[m-1]*T0
-        else:
-            damp_term = explbd[m-1]*temp_ts[t-1]
-        
-        # ------------------------
-        # Check Integration Factor
-        # ------------------------
-        if multFAC:
-            integration_factor = FAC[m-1]
-        else:
-            integration_factor = 1
-        
-        # -----------------------
-        # Compute the temperature
-        # -----------------------
-        temp_ts[t] = damp_term + (noise_term + entrain_term) * integration_factor
-
-        # ----------------------------------
-        # Save other variables in debug mode
-        # ----------------------------------
-        if debug:
-            damp_ts[t] = damp_term
-            noise_ts[t] = noise_term * integration_factor
-            entrain_ts[t] = entrain_term * integration_factor
-    if debug:
-        return temp_ts,damp_ts,noise_ts,entrain_ts,Td_ts
-    return temp_ts
+    if csvpath is None:
+        csvpath = "model/" # Assumed to be in the model folder
+    if csvname is None:
+        csvname = "sm_proj_path.csv" # Default Name
+    df          = pd.read_csv(csvpath+csvname)
+    pathdict    = {df['Category'][i]: df[device][i] for i in range(len(df))}
+    return pathdict
 
 
-
-def noentrain_2d(randts,lbd,T0,F,FAC,multFAC=1,debug=False):
-    
-    """
-    Run the no-entrainment model for all points at once.
-    
-    Inputs:
-        1) randts: 1D ARRAY of random number time series
-        2) lbd   : 3D ARRAY [lon x lat x mon] of seasonal damping values, degC/mon
-        3) T0    : SCALAR Initial temperature throughout basin (usually 0 degC)
-        4) F     : 3D Array [lon x lat x mon] of seasonal forcing values
-    
-    
-    """
-     
-    # Determine run length for uniform or patterned forcing
-    if len(randts.shape) > 1:
-        t_end = randts.shape[2]
-    else:
-        t_end = len(randts)
-    
-    # Preallocate
-    temp_ts = np.ones((lbd.shape[0],lbd.shape[1],t_end)) 
-    damp_term = np.ones((lbd.shape[0],lbd.shape[1],t_end))  * np.nan
-    noise_term = np.ones((lbd.shape[0],lbd.shape[1],t_end)) * np.nan
-    
-    # Prepare the entrainment term
-    explbd = np.exp(-lbd)
-
-    # Set the term to zero where damping is insignificant
-    #explbd[explbd==1] =0
-    
-    # Set initial condition
-    #temp_ts[:,:,0] = T0
-    
-    # Multiply forcing by reduction factor if option is set
-    if multFAC == 1:
-        F *= FAC
-    
-    # Loop for each timestep (note: using 1 indexing. T0 is from dec pre-simulation)
-    for t in tqdm(range(t_end)):
-        
-        # Get the month
-        m = (t+1)%12 # Start from January, params are same month
-        #m=t%12 
-        if m == 0:
-            m = 12
-        
-        # Form the damping term
-        damp_term[:,:,t] = explbd[:,:,m-1] * temp_ts[:,:,t-1]
-        
-        # Form the noise term
-        if F.shape[2] == 12:
-            noise_term[:,:,t] = F[:,:,m-1] * randts[None,None,t-1]
-        else:
-            noise_term[:,:,t] = F[:,:,t] 
-                
-        # Add with the corresponding forcing term to get the temp
-        temp_ts[:,:,t] = damp_term[:,:,t] + noise_term[:,:,t]
-        
-        #msg = '\rCompleted timestep %i of %i' % (t,t_end-1)
-        #print(msg,end="\r",flush=True)
-    
-    # Apply mask to temp_term
-    msk = noise_term.copy()
-    msk[~np.isnan(msk)] = 1
-    temp_ts *= msk[:,:,:]
-    
-    if np.all(np.isnan(temp_ts)):
-        print("WARNING ALL ARE NAN")
-    
-    if debug:
-        return temp_ts,damp_term,noise_term
-    return temp_ts
-
+# =============================================================================
+#%% Parameterization and Preprocessing
+# =============================================================================
 
 def get_detrain_depth(kprev,h):
     """
@@ -1237,237 +689,86 @@ def get_detrain_depth(kprev,h):
         hdetrain[im]= np.interp(detrain_time,[0,1],[hfloor,hceil])
     return hdetrain
 
-#%% Postprocessing Utilities
-
-def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
-                            returnresults=False,preload=None,
-                            mask_pacific=False,savesep=False,
-                            useslab=True,mask_damping=False,
-                            n_models=None,verbose=False):
+def calc_tau_detrain(hcycle,kprev,z,tau_est,debug=False):
     """
-    Script to postprocess stochmod output
+    A series of linear interpolations to retrieve the timescale tau
+    at the depth and time of detrainment.
     
     Inputs:
-        1) expid   - "%iyr_funiform%i_run%s_fscale%03d" % (nyrs,funiform,runid,fscale)
-        2) datpath - Path to model output
-        3) rawpath - Path to raw data that was used as model input
-        4) outpathdat - Path to store output data
-        5) lags    - lags to compute for autocorrelation
-        6) returnresults - option to return results [Bool]
-        7) preloaded - option to provide preloaded data. This is a three
-             element array[lon,lat,ssts], where ssts is an array of sst for 
-             each model [lon180 x lat x time]
-        8) mask_pacific - Set out True to mask out the tropical pacific below 20N
-    
-        9)  savesep - Set to True if data was saved separately (model0,model1,etc)
-        10) useslab - Set to True if only CESM-SLAB parameters were used
-        11) mask_damping - Set to True to exclude damping values that failed the significance test
-        12) n_models - Number of models to loop through. assumes len(sst) that was loaded is the # of models.
+        hcycle  [month] (NUMERIC)        : Mixed Layer Depth cycle in [meters]
+        kprev   [month] (NUMERIC)        : Time of detraining month
+        z       [depth] (NUMERIC)        : Model Levels over which tau was estimated in [meters]
+        tau_est [month, depth] (NUMERIC) : E-folding timescale estimates
+        debug   [BOOL] : True to add debugging plots
         
-    
-    Based on portions of analyze_stochoutput.py
-    
-    Dependencies:
-        numpy as np
-        from scipy.io import loadmat
-        amv.proc (sel_region)
-        time
-    
+    Return:
+        tau_out [month] : E-folding timescales at the given detraining depth and time
+        
     """
-    
-    #% ---- Presets (Can Modify) ----
-    allstart = time.time()
-    
-    # Regional Analysis Settings
-    bbox_SP     = [-60,-15,40,65]
-    bbox_ST     = [-80,-10,20,40]
-    bbox_TR     = [-75,-15,10,20]
-    bbox_NA     = [-80,0 ,0,65]
-    bbox_NA_new = [-80,0,10,65]
-    bbox_ST_w   = [-80,-40,20,40]
-    bbox_ST_e   = [-40,-10,20,40]
-    bbox_NA_ex  = [-80,0,20,60]
-    regions     = ("SPG","STG","TRO","NAT","NNAT","STGe","STGw","NATex")        # Region Names
-    bboxes      = (bbox_SP,bbox_ST,bbox_TR,bbox_NA,bbox_NA_new,bbox_ST_e,bbox_ST_w,bbox_NA_ex) # Bounding Boxes
-    
-    #% ---- Read in Data ----
-    start = time.time()
-    
-    # Read in Stochmod SST Data
-    if preload is None: # Manually Load the data
-        if "forcing" in expid: # Newer Forcing output
-            if ~savesep: # Everything was saved in a large file
-                ld = np.load(datpath+"stoch_output_%s.npz"%(expid),allow_pickle=True)
-                sst = ld["sst"]
-            else:
-                sst = []
-                for modelnum in range(3):
-                    # Set load name with model
-                    ldname = datpath+"stoch_output_%s_model%i.npz"%(expid,modelnum)
-                    if (useslab==0) and (modelnum>0): # Load different forcing for h-vary, entrain
-                        ldname = ldname.replace("SLAB","FULL")
-                    ld = np.load(ldname)
-                    sst.append(ld['sst'])
-            lonr = ld['lon']
-            latr = ld['lat']
-                    
-        else: # Older Forcing Output
-            sst = np.load(datpath+"stoch_output_%s.npy"%(expid),allow_pickle=True).item()
-            lonr = np.load(datpath+"lon.npy")
-            latr = np.load(datpath+"lat.npy")
-    else:
-        lonr,latr,sst = preload
-    if n_models is None:
-        n_models = len(sst) # Checks number of SSTs is list by default
-    
-    # Load MLD Data
-    # -------------
-    mld = np.load(rawpath+"FULL_PIC_HMXL_hclim.npy") # Climatological MLD
-    
-    # Load Damping Data for lat/lon
-    # -----------------------------
-    loaddamp = loadmat(rawpath+"ensavg_nhflxdamping_monwin3_sig020_dof082_mode4.mat")
-    lon = np.squeeze(loaddamp['LON1'])
-    lat = np.squeeze(loaddamp['LAT'])
-    
-    # Load damping masks from significance test 
-    # (Defaults to method 4) 0 = Failed test
-    # Output indicates whicn regions to include
-    # ------------------------------------------
-    if 'method' in expid:
-        moden   = proc.get_stringnum(expid,"method",nchars=1,verbose=verbose) # Get mode number from experiment name
-    else:
-        moden   = "5"# Use 5 as default
-    mskslab = np.load(rawpath+"SLAB_PIC_NHFLX_Damping_monwin3_sig005_dof893_mode%s_lag1.npy" % moden)
-    mskfull = np.load(rawpath+"FULL_PIC_NHFLX_Damping_monwin3_sig005_dof1893_mode%s_lag1.npy"% moden)
-    dmskin = [mskslab,mskfull]
-    dmsks  = []
-    for i in range(2): # select region, append
-        mskin = dmskin[i]
-        mskreg,_,_ = proc.sel_region(mskin,lon,lat,[lonr[0],lonr[-1],latr[0],latr[-1]])
-        mskreg[mskreg==0] = np.nan
-        #mskreg = proc.nan_inv(mskreg) # Change so that 1 = insignificant points
-        #mskreg = np.array(mskreg,dtype=bool)
-        dmsks.append(mskreg.prod(-1))
-    dmsks.append(dmsks[-1]) # Append again for entraining
-    # if len(sst) != 3: # For cases where preloaded SSTs are provided...
-    #     mskall = dmsks[0] * dmsks[1]
-    #     for i in range(len(sst)):
-    #         dmsk
-    
-    # Load and apply mask if option is set
-    if mask_pacific:
-        # Load the mask
-        msk = np.load(rawpath+"pacific_limask_180global.npy")
+    tau_detrain=np.zeros([12])
+    for im in range(12):
         
-        # Select the region
-        mskreg,_,_ = proc.sel_region(msk,lon,lat,[lonr[0],lonr[-1],latr[0],latr[-1]])
+        detrain_mon = kprev[im]
+        if detrain_mon == 0:
+            tau_detrain[im] = 0. # No detrainment.
+            continue
         
-        # Apply the mask to SST
-        if preload is None:
-            if len(sst.shape) < 4: # Include model dimension (?)
-                print("Adding model dimension because sst size is %i" % len(sst.shape))
-                sst = sst[None,...]
-            sst *= mskreg[None,:,:,None]
-            
-        else:
-            for i in range(len(sst)):
-                sst[i] *= mskreg[:,:,None]
-            #sst[1] *= msk[:,:,None]
-    
-    print("Data loaded in %.2fs" % (time.time()-start))
-    
-    #% ---- Get Regional Data ----
-    start = time.time()
-    nregion = len(regions)
-    sstregion = {}
-    for r in range(nregion):
-        bbox = bboxes[r]
+        # Part 1: Linear interpolation in time
+        # Take month above and below
+        dm0     = int(np.floor(detrain_mon))
+        dm1     = dm0+1
+        delta_m = detrain_mon - dm0
         
-        sstr = {}
-        for model in range(n_models):
-            tsmodel = sst[model]
-            sstr[model],_,_=proc.sel_region(tsmodel,lonr,latr,bbox)
-        sstregion[r] = sstr
-    
-    # ---- Calculate autocorrelation and Regional avg SST ----
-    kmonths = {}
-    autocorr_region = {}
-    sstavg_region   = {}
-    for r in range(nregion):
-        bbox = bboxes[r]
+        # Use linear interpolation in time to retrieve detrainment level
+        h0       = hcycle[(dm0-1)%12] # Subtract 1 since dm0,dm1 is the actual month
+        h1       = hcycle[(dm1-1)%12]
+        hdetrain = np.interp(delta_m,[0,1],[h0,h1])
+        if debug:
+            # Check Linear Detrend
+            plt.plot([0,delta_m,1],[h0,hdetrain,h1],marker="x")
+            plt.axhline(hdetrain,color="k")
+            plt.axvline(delta_m,color="k")
         
-        autocorr = {}
-        sstavg = {}
-        for model in range(n_models):
+        # Retrieve tau values for months above and below
+        tau0 = tau_est[(dm0-1)%12,:] # [Depth]
+        tau1 = tau_est[(dm1-1)%12,:] 
+        
+        # Do linear interpolation in time to get timescale
+        x_in = [0,1]
+        y_in = np.array([tau0,tau1])
+        f    = sp.interpolate.interp1d(x_in,y_in,axis=0)
+        tau_fill = f(delta_m)
+        
+        if debug:
+            zz = 44
+            fig,ax = plt.subplots(1,1)
+            ax.plot([0,delta_m,1],[tau0[zz],tau_fill[zz],tau1[zz]],marker="x")
+            plt.axhline(tau_fill[zz],color="k")
+            plt.axvline(delta_m,color="k")
             
-            # Get sst and havg
-            tsmodel = sstregion[r][model]
-            havg,_,_= proc.sel_region(mld,lon,lat,bbox)
-            
-            # Find kmonth
-            havg = np.nanmean(havg,(0,1))
-            kmonth     = havg.argmax()
-            kmonths[r] = kmonth
-            
-            # Take regional average 
-            #tsmodel = np.nanmean(tsmodel,(0,1))
-            # Take area-weighted regional average
-            if mask_damping:
-                tsmodel   = proc.sel_region(sst[model]*dmsks[model][...,None],lonr,latr,bbox,reg_avg=1,awgt=1)
-            else:
-                tsmodel   = proc.sel_region(sst[model],lonr,latr,bbox,reg_avg=1,awgt=1)
-            
-            sstavg[model] = np.copy(tsmodel)
-            tsmodel = proc.year2mon(tsmodel) # mon x year
-            
-            # Deseason (No Seasonal Cycle to Remove)
-            tsmodel2 = tsmodel - np.mean(tsmodel,1)[:,None]
-            
-            # Compute autocorrelation and save data for region
-            autocorr[model] = proc.calc_lagcovar(tsmodel2,tsmodel2,lags,kmonth+1,0)
+        # Linearly interpolate again to get timescale relative to two depths
+        knear = np.argmin(np.abs(z-hdetrain)) # Get nearest z level
+        if z[knear] > hdetrain: # hdetrain is between [k,k+1]
+            k0 = knear-1
+            k1 = knear
+        elif z[knear] <= hdetrain: # hdetrain is between [k-1,k]
+            k0 = knear -1
+            k1 = knear
+        tau_out = np.interp(hdetrain,[z[k0],z[k1]],[tau_fill[k0],tau_fill[k1]])
+        if debug:
+            fig,ax = plt.subplots(1,1)
+            ax.plot([z[k0],hdetrain,z[k1]],[tau_fill[k0],tau_out,tau_fill[k1]],marker="x")
+            plt.axhline(tau_out,color="k")
+            plt.axvline(hdetrain,color="k")
+        
+        tau_detrain[im] = tau_out.copy()
+        # End month loop
+    return tau_detrain
 
-        autocorr_region[r] = autocorr.copy()
-        sstavg_region[r] = sstavg.copy()
-        
-    # Save Regional Autocorrelation Data
-    np.savez("%sSST_Region_Autocorrelation_%s.npz"%(outpathdat,expid),autocorr_region=autocorr_region,kmonths=kmonths)
-    
-    # Save Regional Average SST 
-    np.save("%sSST_RegionAvg_%s.npy"%(outpathdat,expid),sstavg_region)
-    
-    print("Completed autocorrelation and averaging calculations in %.2fs" % (time.time()-start))
-    # ---- Calculate different AMVs for each region ----
-    start = time.time()
-    
-    amvbboxes = bboxes
-    amvidx_region = {}
-    amvpat_region = {}
-    for region in range(nregion):
-        
-        #% Calculate AMV Index
-        amvtime = time.time()
-        amvidx = {}
-        amvpat = {}
-        
-        for model in range(n_models):
-            if mask_damping:
-                amvidx[model],amvpat[model] = proc.calc_AMVquick(sst[model],lonr,latr,amvbboxes[region],dropedge=5,mask=dmsks[model])
-            else:
-                amvidx[model],amvpat[model] = proc.calc_AMVquick(sst[model],lonr,latr,amvbboxes[region],dropedge=5)
-        print("Calculated AMV variables for region %s in %.2f" % (regions[region],time.time()-amvtime))
-        
-        amvidx_region[region] = amvidx
-        amvpat_region[region] = amvpat
-        
-    # Save Regional Autocorrelation Data
-    np.savez("%sAMV_Region_%s.npz"%(outpathdat,expid),amvidx_region=amvidx_region,amvpat_region=amvpat_region)
-    print("AMV Calculations done in %.2fs" % (time.time()-start))
-    print("Stochmod Post-processing Complete in %.2fs" % (time.time() - allstart))
-    print("Data has been saved to %s" % (outpathdat))
-    if returnresults == True:
-        return sstregion,autocorr_region,kmonths,sstavg_region,amvidx_region,amvpat_region
 
+# =============================================================================
+#%% Analysis
+# =============================================================================
 
 def calc_autocorr(sst,lags,basemonth,calc_conf=False,conf=0.95,tails=2,verbose=False):
     """
@@ -1551,12 +852,429 @@ def calc_autocorr_mon(ts,lags,ts1=None,verbose=False,return_da=True):
         return acf
     return acf
 
+def quick_spectrum(sst,nsmooth,pct,
+                   opt=1,dt=None,clvl=[.95],verbose=False,return_dict=False,dim=None,make_arr=False):
+    """
+    Quick spectral estimate of an array of timeseries
+
+    Parameters
+    ----------
+    sst : ARRAY
+        Array containing timeseries to look thru [[ts1],[ts2],...]
+    nsmooth : INT
+        Number of bands to smooth over 
+    pct : Numeric
+        Percent to taper
+    opt : TYPE, optional
+        Smoothing option
+    dt : INT, optional
+        Time Interval. The default is 3600*24*30.
+    clvl : ARRAY , optional
+        Array of Confidence levels. The default is [.95].
+        
+    dim : INT, optional
+        Specify dimension to loop computation over
+
+    Returns
+    -------
+    specs : ARRAY
+        Array containing spectrum for each input series
+    freqs : ARRAY
+        Corresponding frequencies for each input
+    CCs : ARRAY
+        Confidence intervals for each input
+    dofs : ARRAY
+        Degrees of freedom for each input
+    r1s : ARRAY
+        AR1 parameter used to estimate CC
+
+    """
+    
+    # -----------------------------------------------------------------
+    # Set interval of time series (assumes monthly by default)
+    # -----------------------------------------------------------------
+    if dt is None:
+        dt = np.ones(len(sst)) * 3600*24*30
+    else:
+        dt = np.ones(len(sst)) * dt
+    
+    # -----------------------------------------------------------------
+    # Calculate and make individual plots for stochastic model output
+    # -----------------------------------------------------------------
+    #specparams  = []
+    specs = []
+    freqs = []
+    CCs = []
+    dofs = []
+    r1s = []
+    if dim is None:
+        n_ts = len(sst)
+    else:
+        n_ts = sst.shape[dim]
+    
+    for i in range(n_ts):
+        if dim is None:
+            sstin = sst[i]
+        else:
+            #sstin = np.take_along_axis(sst,i,dim)
+            sstin = np.take(sst,i,dim)
+        dt_in = dt[i]
+        
+        # Calculate Spectrum
+        if isinstance(nsmooth,int):
+            sps = ybx.yo_spec(sstin,opt,nsmooth,pct,debug=False,verbose=verbose)
+        else:
+            sps = ybx.yo_spec(sstin,opt,nsmooth[i],pct,debug=False,verbose=verbose)
+        
+        # Save spectrum and frequency, convert to 1/sec
+        P,freq,dof,r1=sps
+        specs.append(P*dt_in)
+        freqs.append(freq/dt_in)
+        dofs.append(dof)
+        r1s.append(r1)
+        
+        # Calculate Confidence Interval
+        CC = ybx.yo_speccl(freq,P,dof,r1,clvl)
+        CCs.append(CC*dt_in)
+    
+    if make_arr:
+        arrsout = [specs,freqs,CCs,dofs,r1s]
+        arrsout = [np.array(a) for a in arrsout]
+        specs,freqs,CCs,dofs,r1s = arrsout
+    
+    if return_dict:
+        output_dict = {
+            "specs":specs,
+            "freqs":freqs,
+            "CCs"  : CCs,
+            "dofs" :dofs,
+            "r1s"  :r1s,
+            }
+        return output_dict
+    return specs,freqs,CCs,dofs,r1s
+
+def get_freqdim(ts,dt=None,opt=1,nsmooth=2,pct=0.10,verbose=False,debug=False):
+    if dt is None:
+        dt = 3600*24*30
+    sps = ybx.yo_spec(ts,opt,nsmooth,pct,debug=False,verbose=verbose)
+    return sps[1]/dt
+
+
+def point_spectra(ts, nsmooth=1, opt=1, dt=None, clvl=[.95], pct=0.1):
+    # Copied from viz_atmospheric_persistence
+    if np.any(np.isnan(ts)):
+        return np.nan
+    
+    if dt is None:  # Divides to return output in 1/sec
+        dt = 3600*24*30
+    sps = ybx.yo_spec(ts, opt, nsmooth, pct, debug=False, verbose=False)
+
+    P, freq, dof, r1 = sps
+    coords = dict(freq=freq/dt)
+    da_out = xr.DataArray(P*dt, coords=coords, dims=coords, name="spectra")
+    return da_out
+
+
+# =============================================================================
+#%% stochmod Legacy Scripts
+# =============================================================================
+
+def cut_NAOregion(ds,bbox=[0,360,-90,90],mons=None,lonname='lon',latname='lat'):
+    """
+    Prepares input DataArray for NAO Calculation by cutting region and taking
+    an optional average over specified range of months
+    Dependencies
+        xarray as xr
+        numpy as np
+    Inputs
+        1) ds [DataArray]                    - Input DataArray
+        2) bbox [Array: lonW,lonE,latS,latN] - Bounding Boxes
+        OPTIONAL
+        3) mons [Array: months]              - Months to include in averaging
+                ex. For DJFM average, mons = [12,1,2,3]
+                Default --> No Monthly Average
+        4) lonname [str] - name of longitude in dataarray
+        5) latname [str] - name of latitude in dataarray
+    Outputs
+        ds [DataArray] - Output dataarray with time mean and region
+    """
+    # Average over specified months
+    if mons is not None:
+        # Take the DJFM Mean
+        season = ds.sel(time=np.in1d(ds['time.month'],mons))
+        dsw = season.groupby('time.year').mean('time')
+    else:
+        dsw = ds.copy()
+    
+    # Cut to specified NAO region
+    lonW,lonE,latS,latN = bbox
+    
+    # Convert to degrees East
+    if lonW < 0:
+        lonW += 360
+    if lonE < 0:
+        lonE += 360
+    
+    # Select North Atlantic Region for NAO Calculation...
+    if lonW > lonE: # Cases crossing the prime meridian
+        #print("Crossing Prime Meridian!")
+        dsna = dsw.where((dsw[lonname]>=lonW) | (dsw[lonname]<=lonE),drop=True).sel(lat=slice(latS,latN))
+    else:
+        dsna = dsw.sel(lon=slice(lonW,lonE),lat=slice(latS,latN))
+        
+    return dsna
+
+def make_naoforcing(NAOF,randts,fscale,nyr):
+    """
+    Makes forcing timeseries, given NAO Forcing Pattern for 3 different
+    treatments of MLD (NAOF), a whiite noise time series, and an scaling 
+    parameter.
+    
+    Inputs:
+        1) randts [Array] - white noise timeseries varying between -1 and 1
+        3) NAOF   [Array] - NAO forcing [Lon x Lat x Mon] in Watts/m2
+        4) fscale         - multiplier to scale white noise forcing\
+        5) nyr    [int]   - Number of years to tile the forcing
+    Dependencies: 
+        1) 
+    
+    Outputs
+        1) F{} [DICT] - [lon x lat x t_end] - Full forcing time series
+        2) Fseas{} [DICT] - [lon x lat x 12 or 1] - seasonal forcing time series
+    """
+    
+    # Make dictionary
+    F = {}
+    Fseas = {}
 
     
     
+    # Check if there is a month component 
+    if len(NAOF[0]) > 2:
+        
+        # Fixed MLD
+        tilecount = int(12/NAOF[0].shape[2]*nyr)
+        F[0] = np.tile(NAOF[0],tilecount) *randts[None,None,:] * fscale 
+            
+        # Max MLD
+        tilecount = int(12/NAOF[1].shape[2]*nyr)
+        F[1] = np.tile(NAOF[1],tilecount) *randts[None,None,:] * fscale 
+        
+        Fseas[0] = NAOF[0] * fscale 
+        Fseas[1] = NAOF[1] * fscale 
+        
+    else:
+        
+        # Fixed MLD 
+        F[0] = NAOF[0][:,:,None] *randts[None,None,:] * fscale
+        Fseas[0] = NAOF[0][:,:,None] * fscale
+        
+        # Max MLD
+        F[0] = NAOF[1][:,:,None] *randts[None,None,:] * fscale
+        Fseas[1] = NAOF[1][:,:,None] * fscale
+    
+    # Seasonally varying mld...
+    F[2]     = np.tile(NAOF[2],nyr) * randts[None,None,:] * fscale 
+    Fseas[2] =  NAOF[2][:,:,:] * fscale 
+    
+            
+    return F,Fseas
+
+def convert_NAO(hclim,naopattern,dt,rho=1000,cp0=4218,hfix=50,usemax=False,hmean=None):
+    """
+    Convert NAO forcing pattern [naopattern] from (W/m2) to (degC/S) 
+    given seasonal MLD (hclim)
+    
+    Inputs:
+        1) hclim [3d Array]      - climatological MLD [Mons]
+        2) NAOF [2d or 3d Array] - NAO forcing [Lon x Lat] in Watts/m2
+        3) dt                    - timestep in seconds
+        4) rho                   - Density of water [kg/m3]
+        5) cp0                   - Specific Heat of water [J/(K*kg)]
+        6) hfix                  - Fixed Mixed layer Depth
+        7) usemax (optional)     - Set to True to use max seasonal MLD
+        8) hmean (optional) [3-d array] - MLD vaue to use
+    Output:
+        1) NAOF [dict]    - Dictionary of arrays [lon x lat x mon], where 
+            0 = fixed MLD
+            1 = maximum MLD
+            2 = seasonal MLD
+    
+    """
+    # Check if forcing pattern is 3D
+    patshape = naopattern.shape
+    if len(patshape) != 3: 
+        naopattern = naopattern[:,:,None]
+    
+    # Set up MLD[lon x lat x mon x hvarmode]
+    mld = np.ones((patshape[0],patshape[1],12,3))
+    mld[:,:,:,0]  *= hfix # Fixed MLD
     
 
-#%% Synthetic Stochastic Model Wrapper
+    if hmean is None:
+        mld[:,:,:,1]  = np.tile(hclim.mean(2)[:,:,None],12) # Mean MLD
+        if usemax:
+            mld[:,:,:,1]  = np.tile(hclim.max(2)[:,:,None],12) # Max MLD
+    else:
+        mld[:,:,:,1]  = np.tile(hmean,12) # Mean MLD (Slab)
+        print("Using Slab MLD %f = 54.61" % mld[56,74,0,1])
+    
+    mld[:,:,:,2]  = hclim.copy() # Clim MLD
+    
+    # Convert NAO to correct units...
+    NAOF = {}
+    for i in range(3):
+        
+        hchoose = mld[:,:,:,i]
+        NAOF[i] = naopattern * dt / cp0 / rho / hchoose
+    
+    return NAOF
+
+def set_stochparams(h,damping,dt,ND=True,rho=1000,cp0=4218,hfix=50,usemax=False,hmean=None):
+    """
+    Given MLD and Heat Flux Feedback, Calculate Parameters
+    
+    Inputs:
+        1) h: Array [Lon x Lat x Mon]
+            Mixed Layer depths (climatological)
+        2) damping: Array [Lon x Lat x Mon]
+            Heat Flux Feedbacks (W/m2)
+        3) dt: INT
+            Model timestep in seconds
+        4) ND: Boolean
+            Set to 1 to process 2D data, rather than data at 1 point
+        Optional Arguments:
+            rho   - density of water [kg/m3]
+            cp0   - specific heat of water [J/(K*kg)]
+            hfix  - fixed mixed layer depth [m]
+            usemax - use seasonal maximum MLD
+    
+    
+    Outputs:
+        1) lbd: DICT [hvarmode] [Lon x Lat x Mon]
+            Dictionary of damping values for each MLD treatment 
+        2) lbd_entr: Array [Lon x Lat x Mon]
+            Damping for entraining model
+        3) FAC: Array [Lon x Lat x Mon]
+            Seasonal Reduction Factor
+        4) Beta: Array [Lon x Lat x Mon]
+            Entraining Term
+    
+    """    
+    
+    # Calculate Beta
+    if ND == True:
+        beta = np.log( h / np.roll(h,1,axis=2) ) # Roll along time axis
+        
+        # Find Maximum MLD during the year
+        hmax = np.nanmax(np.abs(h),axis=2)
+        hmax = hmax[:,:,None]
+        
+        ## Find Mean MLD during the year
+        if hmean is None:
+            hmean = np.nanmean(h,axis=2)
+            hmean = hmean[:,:,None]
+        else:
+            print("Using Slab MLD %f = 54.61" % hmean[56,74])
+        
+    else:
+        beta = np.log( h / np.roll(h,1,axis=0) )
+        
+        # Find Maximum MLD during the year
+        hmax = np.nanmax(np.abs(h))
+        if hmean is None:
+            hmean = np.nanmean(h)
+    
+    # Set non-entraining months to zero
+    beta[beta<0] = 0
+    
+    # Replace Nans with Zeros in beta
+    #beta = np.nan_to_num(beta)
+    
+    # Preallocate lambda variable 
+    lbd = {}
+    
+    # Fixed MLD
+    lbd[0] = damping / (rho*cp0*hfix) * dt
+    
+    # Mean MLD
+    lbd[1] = damping / (rho*cp0*hmean) * dt
+    
+    if usemax:
+        # Maximum MLD
+        lbd[1] = damping / (rho*cp0*hmax) * dt
+    
+    # Seasonal MLD
+    lbd[2] = damping / (rho*cp0*h) * dt
+    
+    # Calculate Damping (with entrainment)
+    lbd_entr = np.copy(lbd[2]) + beta
+    lbd[3] = lbd_entr.copy()
+    
+    
+    # Compute reduction factor
+    FAC = {}  
+    for i in range(4):
+        fac = (1-np.exp(-lbd[i]))/lbd[i]
+        fac = np.nan_to_num((1-np.exp(-lbd[i]))/lbd[i])
+        fac[fac==0] = 1 # Change all zero FAC values to 1
+        FAC[i] = fac.copy()
+    
+    return lbd,lbd_entr,FAC,beta
+
+
+def get_data(pointmode,query,lat,lon,damping,mld,kprev,F):
+    """
+    Wrapper to return data based on pointmode
+    
+    Parameters
+    ----------
+    pointmode : INT
+        0 = Return variables as is
+        1 = Return variables at a point
+        2 = Return area-averaged variables
+    query : ARRAY
+        [lon,lat] if pointmode is 1
+        [lonW,lonE,latS,latN] if pointmode is 2
+    lat : ARRAY
+        latitude coordinates
+    lon : ARRAY
+        longitude coordinates
+    damping : ARRAY [lat,lon,month]
+        heat flux feedback (W/m2)
+    mld : ARRAY [lat,lon,month]
+        mixed layer depth (m)
+    kprev : ARRAY [lat,lon,month]
+        detrainment month
+    F : ARRAY [lat,lon,month]
+        forcing pattern
+    
+    Returns
+    -------
+        1. point indices ARRAY
+        2. damping at point ARRAY
+        3. mld at point ARRAY
+        4. kprev at point ARRAY
+        5. forcing at point ARRAY
+    """
+    
+    if pointmode == 1:
+        o,a = proc.find_latlon(query[0],query[1],lon,lat)
+        return [o,a],damping[o,a],mld[o,a],kprev[o,a],F[o,a]
+    else:
+        inparams = [damping,mld,kprev,F]
+        outparams = []
+        for param in inparams:
+            
+            if pointmode == 2:
+                var = proc.sel_region(param,lon,lat,query,reg_avg=1)
+                lonr=[0,] # Dummy Variable
+                latr=[0,] # Dummy Variable
+            else:    
+                var,lonr,latr = proc.sel_region()
+            outparams.append(var)
+        return np.concatenate([lonr,latr,outparams])
+    
 
 def load_data(mconfig,ftype,projpath=None):
     
@@ -1861,129 +1579,443 @@ def synth_stochmod(config,verbose=False,viz=False,
         specout = specout + (bnds,)
         return autocorr,sst,dampingterm,forcingterm,entrainterm,Td,kmonth,params,specout
 
-def quick_spectrum(sst,nsmooth,pct,
-                   opt=1,dt=None,clvl=[.95],verbose=False,return_dict=False,dim=None,make_arr=False):
+def calc_kprev_lin(h,entrain1=-1,entrain0=0):
     """
-    Quick spectral estimate of an array of timeseries
+    Estimate detrainment indices given a timeseries of mixed-layer
+    depths. Uses/Assumptions:
+        - Linear interpolation
+        - Forward direction for entrainment/detrainment (h[t], h[t+1])
+        - For last value, assumes t+1 is the first value (periodic)
+    
+    Inputs
+    ------
+        h : ARRAY [time]
+            Timeseries of mixed layer depth
+        
+        --- Optional ---
+        
+        entrain1 : Numeric (Default = -1)
+            Placeholder value for first time MLD reaches a given depth
+        entrain0 : Numeric (Default = 0)
+            Placeholder value for detraining months
+    Output
+    ------
+        kprev : ARRAY [time]
+            Indices where detrainment occurred    
+    """
+    # Preallocate, get dimensions
+    ntime = h.shape[0]
+    kprev = np.zeros(ntime)*np.nan
+    
+    # Looping for each step, get index of previous step
+    for t in range(ntime):
+        
+        # Wrap around for end value
+        if t >= (ntime-1):
+            dt = h[t]/h[0]
+        else: # Forward step comparison 
+            dt = h[t]/h[t+1]
+        
+        # Skip points where the mixed layer is detraining or unchanging
+        if dt >= 1:
+            kprev[t] = entrain0
+            continue
+        
+        
+        # Find the last index where h had the same value
+        hdiff = h - h[t]
+        hdiff = hdiff[:t] # Restrict to values before current timestep
+        kgreat = np.where(hdiff > 0)[0] # Find values deeper than current MLD
+        if len(kgreat) == 0:  # If no values are found, assume first time entraining to this depth
+            kprev[t] = entrain1
+            continue
+        else:
+            kd  = kgreat[-1] # Take index of most recent value
+            # Linear interpolate to approximate index
+            kfind = np.interp(h[t],[h[kd],h[kd+1]][::-1],[kd,kd+1][::-1])
+            
+            if kfind == float(t):
+                kprev[t] = entrain1
+            else:
+                kprev[t] = kfind
+        # End Loop
+    return kprev
 
+
+
+# Entrain Model (Single Point)
+def entrain_parallel(inputs):
+    """
+    SST Stochastic Model, with Entrainment rewritten to take all inputs as 1
+    t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC = inputs
+    
     Parameters
     ----------
-    sst : ARRAY
-        Array containing timeseries to look thru [[ts1],[ts2],...]
-    nsmooth : INT
-        Number of bands to smooth over 
-    pct : Numeric
-        Percent to taper
-    opt : TYPE, optional
-        Smoothing option
-    dt : INT, optional
-        Time Interval. The default is 3600*24*30.
-    clvl : ARRAY , optional
-        Array of Confidence levels. The default is [.95].
-        
-    dim : INT, optional
-        Specify dimension to loop computation over
+    t_end : INT
+        Length of integration, in months
+    lbd : ARRAY [12,]
+        Heat Flux Feedback (degC/sec)
+    T0 : INT
+        Initial Temperature (degC)
+    F : ARRAY [t_end,]
+        Forcing term (white noise time series) (degC/sec)
+    beta : ARRAY [12,]
+        Entrainment term coefficient (log(h(t+1)/h(t)))
+    h : ARRAY [12,]
+        Mixed Layer Depth (meters)
+    kprev : ARRAY [12,]
+        Month of detrainment (calculated through find_kprev)
+    FAC : ARRAY [12,]
+        Integration Factor ((1-exp(-lbd))/lbd)
+    multFAC : BOOL, optional
+        Set to true to apply integration factor to forcing and entrain term. 
+        The default is TRUE.
+    debug : BOOL, optional
+        Set to true to output each term separately
+    debugprint : BOOL, optional
+        Set to true to print messages at each timestep. The default is False.
 
     Returns
     -------
-    specs : ARRAY
-        Array containing spectrum for each input series
-    freqs : ARRAY
-        Corresponding frequencies for each input
-    CCs : ARRAY
-        Confidence intervals for each input
-    dofs : ARRAY
-        Degrees of freedom for each input
-    r1s : ARRAY
-        AR1 parameter used to estimate CC
+    temp_ts : ARRAY [t_end,]
+        Resultant Temperature timeseries
+    if debug is True, returns the follow ARRAYs [t_end,]
+        damp_ts    - Damping term
+        noise_ts   - Noise term
+        entrain_ts - Entrainment Term
+        Td_ts      - Entraining Temperature
+        
+    """
+    t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC = inputs
+    debug=False
+    debugprint=False
+    
+    # Preallocate
+    temp_ts = np.zeros(t_end)
+    
+    if debug:
+        noise_ts = np.zeros(t_end)
+        damp_ts = np.zeros(t_end)
+        entrain_ts = np.zeros(t_end)
+        Td_ts   = np.zeros(t_end)
+        
+    entrain_term = np.zeros(t_end)
+    
+    # Prepare the entrainment term
+    explbd = np.exp(np.copy(-lbd))
+    #explbd[explbd==1] = 0
+    
+    Td0 = None # Set Td=None Initially
+    # Loop for integration period (indexing convention from matlab)
+    for t in range(t_end):
+        
+        # Get the month (start from Jan, so +1)
+        m  = (t+1)%12
+        #m=t%12
+        if m == 0:
+            m = 12
+        
+        # --------------------------
+        # Calculate entrainment term
+        # --------------------------
+        if t<12: # Start Entrainment term after first 12 months
+            entrain_term = 0
+        else:
+            if beta[m-1] == 0: # For months with no entrainment
+                entrain_term = 0
+                Td0 = None # Reset Td0 term
+                if debugprint:
+                    print("No entrainment on month %i"%m)
+                    print("--------------------\n")
+            else:
+                if (Td0 is None) & (h.argmin()==m-2) :# For first entraining month
+                    Td1 = calc_Td(t,kprev,temp_ts,prevmon=False,debug=debugprint)
+                    Td0 = Td1 # Previous month does not have entrainment!
+                if Td0 is None: # Calculate Td0 
+                    Td1,Td0 = calc_Td(t,kprev,temp_ts,prevmon=True,debug=debugprint)
+                else: # Use Td0 from last timestep
+                    Td1 = calc_Td(t,kprev,temp_ts,prevmon=False,debug=debugprint)
+                
+                Td = (Td1+Td0)/2
+                if debugprint:
+                    print("Td is %.2f, which is average of Td1=%.2f, Td0=%.2f"%(Td,Td1,Td0)) 
+                    print("--------------------\n")
+                Td0 = np.copy(Td1)# Copy Td1 to Td0 for the next loop
+                
+                # Calculate entrainment term
+                entrain_term = beta[m-1]*Td
+        
+        # ----------------------
+        # Get Noise/Forcing Term
+        # ----------------------
+        noise_term = F[t]
+        
+        # ----------------------
+        # Calculate damping term
+        # ----------------------
+        if t == 0:
+            damp_term = explbd[m-1]*T0
+        else:
+            damp_term = explbd[m-1]*temp_ts[t-1]
+        
+        # ------------------------
+        # Check Integration Factor
+        # ------------------------
+        if multFAC:
+            integration_factor = FAC[m-1]
+        else:
+            integration_factor = 1
+        
+        # -----------------------
+        # Compute the temperature
+        # -----------------------
+        temp_ts[t] = damp_term + (noise_term + entrain_term) * integration_factor
 
+        # ----------------------------------
+        # Save other variables in debug mode
+        # ----------------------------------
+        if debug:
+            damp_ts[t] = damp_term
+            noise_ts[t] = noise_term * integration_factor
+            entrain_ts[t] = entrain_term * integration_factor
+    if debug:
+        return temp_ts,damp_ts,noise_ts,entrain_ts,Td_ts
+    return temp_ts
+
+
+
+def postprocess_stochoutput(expid,datpath,rawpath,outpathdat,lags,
+                            returnresults=False,preload=None,
+                            mask_pacific=False,savesep=False,
+                            useslab=True,mask_damping=False,
+                            n_models=None,verbose=False):
+    """
+    Script to postprocess stochmod output
+    
+    Inputs:
+        1) expid   - "%iyr_funiform%i_run%s_fscale%03d" % (nyrs,funiform,runid,fscale)
+        2) datpath - Path to model output
+        3) rawpath - Path to raw data that was used as model input
+        4) outpathdat - Path to store output data
+        5) lags    - lags to compute for autocorrelation
+        6) returnresults - option to return results [Bool]
+        7) preloaded - option to provide preloaded data. This is a three
+             element array[lon,lat,ssts], where ssts is an array of sst for 
+             each model [lon180 x lat x time]
+        8) mask_pacific - Set out True to mask out the tropical pacific below 20N
+    
+        9)  savesep - Set to True if data was saved separately (model0,model1,etc)
+        10) useslab - Set to True if only CESM-SLAB parameters were used
+        11) mask_damping - Set to True to exclude damping values that failed the significance test
+        12) n_models - Number of models to loop through. assumes len(sst) that was loaded is the # of models.
+        
+    
+    Based on portions of analyze_stochoutput.py
+    
+    Dependencies:
+        numpy as np
+        from scipy.io import loadmat
+        amv.proc (sel_region)
+        time
+    
     """
     
-    # -----------------------------------------------------------------
-    # Set interval of time series (assumes monthly by default)
-    # -----------------------------------------------------------------
-    if dt is None:
-        dt = np.ones(len(sst)) * 3600*24*30
+    #% ---- Presets (Can Modify) ----
+    allstart = time.time()
+    
+    # Regional Analysis Settings
+    bbox_SP     = [-60,-15,40,65]
+    bbox_ST     = [-80,-10,20,40]
+    bbox_TR     = [-75,-15,10,20]
+    bbox_NA     = [-80,0 ,0,65]
+    bbox_NA_new = [-80,0,10,65]
+    bbox_ST_w   = [-80,-40,20,40]
+    bbox_ST_e   = [-40,-10,20,40]
+    bbox_NA_ex  = [-80,0,20,60]
+    regions     = ("SPG","STG","TRO","NAT","NNAT","STGe","STGw","NATex")        # Region Names
+    bboxes      = (bbox_SP,bbox_ST,bbox_TR,bbox_NA,bbox_NA_new,bbox_ST_e,bbox_ST_w,bbox_NA_ex) # Bounding Boxes
+    
+    #% ---- Read in Data ----
+    start = time.time()
+    
+    # Read in Stochmod SST Data
+    if preload is None: # Manually Load the data
+        if "forcing" in expid: # Newer Forcing output
+            if ~savesep: # Everything was saved in a large file
+                ld = np.load(datpath+"stoch_output_%s.npz"%(expid),allow_pickle=True)
+                sst = ld["sst"]
+            else:
+                sst = []
+                for modelnum in range(3):
+                    # Set load name with model
+                    ldname = datpath+"stoch_output_%s_model%i.npz"%(expid,modelnum)
+                    if (useslab==0) and (modelnum>0): # Load different forcing for h-vary, entrain
+                        ldname = ldname.replace("SLAB","FULL")
+                    ld = np.load(ldname)
+                    sst.append(ld['sst'])
+            lonr = ld['lon']
+            latr = ld['lat']
+                    
+        else: # Older Forcing Output
+            sst = np.load(datpath+"stoch_output_%s.npy"%(expid),allow_pickle=True).item()
+            lonr = np.load(datpath+"lon.npy")
+            latr = np.load(datpath+"lat.npy")
     else:
-        dt = np.ones(len(sst)) * dt
+        lonr,latr,sst = preload
+    if n_models is None:
+        n_models = len(sst) # Checks number of SSTs is list by default
     
-    # -----------------------------------------------------------------
-    # Calculate and make individual plots for stochastic model output
-    # -----------------------------------------------------------------
-    #specparams  = []
-    specs = []
-    freqs = []
-    CCs = []
-    dofs = []
-    r1s = []
-    if dim is None:
-        n_ts = len(sst)
+    # Load MLD Data
+    # -------------
+    mld = np.load(rawpath+"FULL_PIC_HMXL_hclim.npy") # Climatological MLD
+    
+    # Load Damping Data for lat/lon
+    # -----------------------------
+    loaddamp = loadmat(rawpath+"ensavg_nhflxdamping_monwin3_sig020_dof082_mode4.mat")
+    lon = np.squeeze(loaddamp['LON1'])
+    lat = np.squeeze(loaddamp['LAT'])
+    
+    # Load damping masks from significance test 
+    # (Defaults to method 4) 0 = Failed test
+    # Output indicates whicn regions to include
+    # ------------------------------------------
+    if 'method' in expid:
+        moden   = proc.get_stringnum(expid,"method",nchars=1,verbose=verbose) # Get mode number from experiment name
     else:
-        n_ts = sst.shape[dim]
+        moden   = "5"# Use 5 as default
+    mskslab = np.load(rawpath+"SLAB_PIC_NHFLX_Damping_monwin3_sig005_dof893_mode%s_lag1.npy" % moden)
+    mskfull = np.load(rawpath+"FULL_PIC_NHFLX_Damping_monwin3_sig005_dof1893_mode%s_lag1.npy"% moden)
+    dmskin = [mskslab,mskfull]
+    dmsks  = []
+    for i in range(2): # select region, append
+        mskin = dmskin[i]
+        mskreg,_,_ = proc.sel_region(mskin,lon,lat,[lonr[0],lonr[-1],latr[0],latr[-1]])
+        mskreg[mskreg==0] = np.nan
+        #mskreg = proc.nan_inv(mskreg) # Change so that 1 = insignificant points
+        #mskreg = np.array(mskreg,dtype=bool)
+        dmsks.append(mskreg.prod(-1))
+    dmsks.append(dmsks[-1]) # Append again for entraining
+    # if len(sst) != 3: # For cases where preloaded SSTs are provided...
+    #     mskall = dmsks[0] * dmsks[1]
+    #     for i in range(len(sst)):
+    #         dmsk
     
-    for i in range(n_ts):
-        if dim is None:
-            sstin = sst[i]
+    # Load and apply mask if option is set
+    if mask_pacific:
+        # Load the mask
+        msk = np.load(rawpath+"pacific_limask_180global.npy")
+        
+        # Select the region
+        mskreg,_,_ = proc.sel_region(msk,lon,lat,[lonr[0],lonr[-1],latr[0],latr[-1]])
+        
+        # Apply the mask to SST
+        if preload is None:
+            if len(sst.shape) < 4: # Include model dimension (?)
+                print("Adding model dimension because sst size is %i" % len(sst.shape))
+                sst = sst[None,...]
+            sst *= mskreg[None,:,:,None]
+            
         else:
-            #sstin = np.take_along_axis(sst,i,dim)
-            sstin = np.take(sst,i,dim)
-        dt_in = dt[i]
+            for i in range(len(sst)):
+                sst[i] *= mskreg[:,:,None]
+            #sst[1] *= msk[:,:,None]
+    
+    print("Data loaded in %.2fs" % (time.time()-start))
+    
+    #% ---- Get Regional Data ----
+    start = time.time()
+    nregion = len(regions)
+    sstregion = {}
+    for r in range(nregion):
+        bbox = bboxes[r]
         
-        # Calculate Spectrum
-        if isinstance(nsmooth,int):
-            sps = ybx.yo_spec(sstin,opt,nsmooth,pct,debug=False,verbose=verbose)
-        else:
-            sps = ybx.yo_spec(sstin,opt,nsmooth[i],pct,debug=False,verbose=verbose)
+        sstr = {}
+        for model in range(n_models):
+            tsmodel = sst[model]
+            sstr[model],_,_=proc.sel_region(tsmodel,lonr,latr,bbox)
+        sstregion[r] = sstr
+    
+    # ---- Calculate autocorrelation and Regional avg SST ----
+    kmonths = {}
+    autocorr_region = {}
+    sstavg_region   = {}
+    for r in range(nregion):
+        bbox = bboxes[r]
         
-        # Save spectrum and frequency, convert to 1/sec
-        P,freq,dof,r1=sps
-        specs.append(P*dt_in)
-        freqs.append(freq/dt_in)
-        dofs.append(dof)
-        r1s.append(r1)
+        autocorr = {}
+        sstavg = {}
+        for model in range(n_models):
+            
+            # Get sst and havg
+            tsmodel = sstregion[r][model]
+            havg,_,_= proc.sel_region(mld,lon,lat,bbox)
+            
+            # Find kmonth
+            havg = np.nanmean(havg,(0,1))
+            kmonth     = havg.argmax()
+            kmonths[r] = kmonth
+            
+            # Take regional average 
+            #tsmodel = np.nanmean(tsmodel,(0,1))
+            # Take area-weighted regional average
+            if mask_damping:
+                tsmodel   = proc.sel_region(sst[model]*dmsks[model][...,None],lonr,latr,bbox,reg_avg=1,awgt=1)
+            else:
+                tsmodel   = proc.sel_region(sst[model],lonr,latr,bbox,reg_avg=1,awgt=1)
+            
+            sstavg[model] = np.copy(tsmodel)
+            tsmodel = proc.year2mon(tsmodel) # mon x year
+            
+            # Deseason (No Seasonal Cycle to Remove)
+            tsmodel2 = tsmodel - np.mean(tsmodel,1)[:,None]
+            
+            # Compute autocorrelation and save data for region
+            autocorr[model] = proc.calc_lagcovar(tsmodel2,tsmodel2,lags,kmonth+1,0)
+
+        autocorr_region[r] = autocorr.copy()
+        sstavg_region[r] = sstavg.copy()
         
-        # Calculate Confidence Interval
-        CC = ybx.yo_speccl(freq,P,dof,r1,clvl)
-        CCs.append(CC*dt_in)
+    # Save Regional Autocorrelation Data
+    np.savez("%sSST_Region_Autocorrelation_%s.npz"%(outpathdat,expid),autocorr_region=autocorr_region,kmonths=kmonths)
     
-    if make_arr:
-        arrsout = [specs,freqs,CCs,dofs,r1s]
-        arrsout = [np.array(a) for a in arrsout]
-        specs,freqs,CCs,dofs,r1s = arrsout
+    # Save Regional Average SST 
+    np.save("%sSST_RegionAvg_%s.npy"%(outpathdat,expid),sstavg_region)
     
-    if return_dict:
-        output_dict = {
-            "specs":specs,
-            "freqs":freqs,
-            "CCs"  : CCs,
-            "dofs" :dofs,
-            "r1s"  :r1s,
-            }
-        return output_dict
-    return specs,freqs,CCs,dofs,r1s
-
-def get_freqdim(ts,dt=None,opt=1,nsmooth=2,pct=0.10,verbose=False,debug=False):
-    if dt is None:
-        dt = 3600*24*30
-    sps = ybx.yo_spec(ts,opt,nsmooth,pct,debug=False,verbose=verbose)
-    return sps[1]/dt
-
-
-def point_spectra(ts, nsmooth=1, opt=1, dt=None, clvl=[.95], pct=0.1):
-    # Copied from viz_atmospheric_persistence
-    if np.any(np.isnan(ts)):
-        return np.nan
+    print("Completed autocorrelation and averaging calculations in %.2fs" % (time.time()-start))
+    # ---- Calculate different AMVs for each region ----
+    start = time.time()
     
-    if dt is None:  # Divides to return output in 1/sec
-        dt = 3600*24*30
-    sps = ybx.yo_spec(ts, opt, nsmooth, pct, debug=False, verbose=False)
-
-    P, freq, dof, r1 = sps
-    coords = dict(freq=freq/dt)
-    da_out = xr.DataArray(P*dt, coords=coords, dims=coords, name="spectra")
-    return da_out
+    amvbboxes = bboxes
+    amvidx_region = {}
+    amvpat_region = {}
+    for region in range(nregion):
+        
+        #% Calculate AMV Index
+        amvtime = time.time()
+        amvidx = {}
+        amvpat = {}
+        
+        for model in range(n_models):
+            if mask_damping:
+                amvidx[model],amvpat[model] = proc.calc_AMVquick(sst[model],lonr,latr,amvbboxes[region],dropedge=5,mask=dmsks[model])
+            else:
+                amvidx[model],amvpat[model] = proc.calc_AMVquick(sst[model],lonr,latr,amvbboxes[region],dropedge=5)
+        print("Calculated AMV variables for region %s in %.2f" % (regions[region],time.time()-amvtime))
+        
+        amvidx_region[region] = amvidx
+        amvpat_region[region] = amvpat
+        
+    # Save Regional Autocorrelation Data
+    np.savez("%sAMV_Region_%s.npz"%(outpathdat,expid),amvidx_region=amvidx_region,amvpat_region=amvpat_region)
+    print("AMV Calculations done in %.2fs" % (time.time()-start))
+    print("Stochmod Post-processing Complete in %.2fs" % (time.time() - allstart))
+    print("Data has been saved to %s" % (outpathdat))
+    if returnresults == True:
+        return sstregion,autocorr_region,kmonths,sstavg_region,amvidx_region,amvpat_region
     
+# =============================================================================
 #%% Data Loading
+# =============================================================================
 
 def load_hadisst(datpath,method=2,startyr=1870,endyr=2018,grabpoint=None):
     
@@ -2149,6 +2181,88 @@ def load_cesm_le(datpath=None,preprocess=False,return_ds=False):
     lat = ds.lat.values
     print("Loaded in %.2fs" % (time.time()-st))
     return sst,lon,lat
+
+
+def load_limopt_sst(datpath=None,vname="SSTRES"):
+    """
+    Load SST Data that has been detrended using LIM-opt (Frankignoul et al. 2017).
+    Loads the Residual SST (SSTRES) rather than the external trend (SST), change
+    this using the vname argument.
+    """
+    # Set Inputs
+    if datpath is None: # Location of lim-opt data
+        datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/lim-opt/"
+    dnames = ("COBE","HadISST","ERSST")
+    
+    # Loop and load into NumPy Arrays
+    lons  = []
+    lats  = []
+    ssts  = []
+    times = []
+    for d,dname in enumerate(dnames):
+
+        # Read in indices, lat, time
+        ds = xr.open_dataset("%s%s-SST-LIM-opt.nc"%(datpath,dname))
+        lat = ds.lat.values
+        sst = ds[vname].values
+        lon360 = ds.lon.values
+        times.append(ds.time.values)
+        
+
+        # Get Mask Information (HADISST Mask is flipped, need to consider this)
+        #dsm = xr.open_dataset("%s%s.MSK.nc"%(datpath,dname))
+        #msk = dsm.MSK.values
+
+        # Flip the lon/lat, apply mask, transpose to  time x lat x lon --> lon x lat x time
+        lats.append(np.flip(lat))  # Flip lat variable
+        sst  = np.flip(sst,axis=1) # Flip latitude axis
+        #sst *= msk[None,:,:]       # Apply Mask
+        lon180,sst180 = proc.lon360to180(lon360,sst.transpose(2,1,0)) # Transpose 
+        ssts.append(sst180)
+        lons.append(lon180)
+    return ssts,lons,lats,times
+
+def load_limopt_amv(datpath=None):
+    """
+    Load AMO Data that has been detrended using LIM-opt (Frankignoul et al. 2017).
+
+    """
+    # Set Inputs
+    if datpath is None: # Location of lim-opt data
+        datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/lim-opt/"
+    dnames = ("COBE","HadISST","ERSST")
+    
+    # Loop and load into NumPy Arrays
+    lons  = []
+    lats  = []
+    ssts  = [] # AMV Pattern
+    idxs  = []
+    times = []
+    for d,dname in enumerate(dnames):
+
+        # Read in indices, lat, time
+        ds = xr.open_dataset("%s%s-AMO+PDO-LIMopt.nc"%(datpath,dname))
+        lat = ds.lat.values
+        sst = ds.SSTAMO.values
+        idx = ds.AMO.values
+        lon360 = ds.lon.values
+        times.append(ds.time.values)
+        idxs.append(idx)
+        
+
+        # Flip the lon/lat, apply mask, transpose to  time x lat x lon --> lon x lat x time
+        lats.append(np.flip(lat))  # Flip lat variable
+        sst  = np.flip(sst,axis=0) # Flip latitude axis
+        lon180,sst180 = proc.lon360to180(lon360,sst.T) # Transpose 
+        sst180[np.where(np.abs(sst180) < 1e-10)] = np.nan # Remove NaN points
+        ssts.append(sst180 * np.std(idx)) # Multiply to convert to degC/std_amv
+        lons.append(lon180)
+        
+    return ssts,idxs,lons,lats,times
+
+
+    
+
 
 #%% Heat Flux Feedback Calculations
 
@@ -2736,6 +2850,11 @@ def compute_qnet(datpath,dataset_name,vnames=None,downwards_positive=True,
         ds_new *= -1 # Convert to downwards positive
         
     return ds_new
+
+# =============================================================================
+#%% Organization LImit
+
+
 
 #%% SCM rewritten.
 def convert_Wm2(invar,h,dt,cp0=3996,rho=1026,verbose=True,reverse=False):
@@ -3934,115 +4053,7 @@ def run_sm_rewrite(expname,mconfig,input_path,limaskname,
         print("Saved output to %s in %.2fs" % (expname,time.time()-start))
     print("Function completed in %.2fs" % (time.time()-start))
     
-    
 
-
-#%% Loading limopt data
-
-def load_limopt_sst(datpath=None,vname="SSTRES"):
-    """
-    Load SST Data that has been detrended using LIM-opt (Frankignoul et al. 2017).
-    Loads the Residual SST (SSTRES) rather than the external trend (SST), change
-    this using the vname argument.
-    """
-    # Set Inputs
-    if datpath is None: # Location of lim-opt data
-        datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/lim-opt/"
-    dnames = ("COBE","HadISST","ERSST")
-    
-    # Loop and load into NumPy Arrays
-    lons  = []
-    lats  = []
-    ssts  = []
-    times = []
-    for d,dname in enumerate(dnames):
-
-        # Read in indices, lat, time
-        ds = xr.open_dataset("%s%s-SST-LIM-opt.nc"%(datpath,dname))
-        lat = ds.lat.values
-        sst = ds[vname].values
-        lon360 = ds.lon.values
-        times.append(ds.time.values)
-        
-
-        # Get Mask Information (HADISST Mask is flipped, need to consider this)
-        #dsm = xr.open_dataset("%s%s.MSK.nc"%(datpath,dname))
-        #msk = dsm.MSK.values
-
-        # Flip the lon/lat, apply mask, transpose to  time x lat x lon --> lon x lat x time
-        lats.append(np.flip(lat))  # Flip lat variable
-        sst  = np.flip(sst,axis=1) # Flip latitude axis
-        #sst *= msk[None,:,:]       # Apply Mask
-        lon180,sst180 = proc.lon360to180(lon360,sst.transpose(2,1,0)) # Transpose 
-        ssts.append(sst180)
-        lons.append(lon180)
-    return ssts,lons,lats,times
-
-def load_limopt_amv(datpath=None):
-    """
-    Load AMO Data that has been detrended using LIM-opt (Frankignoul et al. 2017).
-
-    """
-    # Set Inputs
-    if datpath is None: # Location of lim-opt data
-        datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/lim-opt/"
-    dnames = ("COBE","HadISST","ERSST")
-    
-    # Loop and load into NumPy Arrays
-    lons  = []
-    lats  = []
-    ssts  = [] # AMV Pattern
-    idxs  = []
-    times = []
-    for d,dname in enumerate(dnames):
-
-        # Read in indices, lat, time
-        ds = xr.open_dataset("%s%s-AMO+PDO-LIMopt.nc"%(datpath,dname))
-        lat = ds.lat.values
-        sst = ds.SSTAMO.values
-        idx = ds.AMO.values
-        lon360 = ds.lon.values
-        times.append(ds.time.values)
-        idxs.append(idx)
-        
-
-        # Flip the lon/lat, apply mask, transpose to  time x lat x lon --> lon x lat x time
-        lats.append(np.flip(lat))  # Flip lat variable
-        sst  = np.flip(sst,axis=0) # Flip latitude axis
-        lon180,sst180 = proc.lon360to180(lon360,sst.T) # Transpose 
-        sst180[np.where(np.abs(sst180) < 1e-10)] = np.nan # Remove NaN points
-        ssts.append(sst180 * np.std(idx)) # Multiply to convert to degC/std_amv
-        lons.append(lon180)
-        
-    return ssts,idxs,lons,lats,times
-
-def load_pathdict(device,csvpath=None,csvname=None):
-    """
-    Parameters
-    ----------
-    device : STR
-        currently supports 'stormtrack','mbp2019'
-    
-    csvpath : STR, optional
-        Path to csv. The default is None.
-    csvname : STR, optional
-        Name of csv. The default is None.
-    Returns
-    -------
-    pathdict : DICT
-        DICT with keys of the "Category" column and
-        entries for the corresponding devices
-    """
-    
-    
-    if csvpath is None:
-        csvpath = "model/" # Assumed to be in the model folder
-    if csvname is None:
-        csvname = "sm_proj_path.csv" # Default Name
-    df          = pd.read_csv(csvpath+csvname)
-    pathdict    = {df['Category'][i]: df[device][i] for i in range(len(df))}
-    return pathdict
-    
     
 
 #%% Silly Functions to Deal with sm data formats
@@ -4486,7 +4497,3 @@ def convert_inputs(expparams,inputs,dt=3600*24*30,rho=1026,L=2.5e6,cp=3850,retur
     if return_sep:
         return outdict
     return alpha,Dconvert,Qfactor
-
-
-
-#%%
