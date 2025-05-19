@@ -77,6 +77,7 @@ get_freqdim             : Get the frequency dimension from spectra calculation
 point_spectra           : Compute power spectra at a point, copied from viz_atmospheric_persistence
 
 compute_sm_metrics      : Compute basic metrics for the stochastic model (ACF, Spectra, MonVar)
+calc_leadlagcovar       : Calculate lead-lag covariance using moving monthwindow
 
 -------------------------------------------------------------------------------
 ~~ stochmod Legacy Scripts 

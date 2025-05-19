@@ -1722,6 +1722,75 @@ def compute_sm_metrics(ssts,
     return outdict
 
 
+
+def calc_leadlagcovar(var1,var2,lags,monwin,ds_flag=False):
+    # Based on calc_HF, Calculate lead-lag covariance using moving window
+    # Requirements: var1.shape == var2.shape
+    # Lags < 12 (currently only works within 1 year)
+    # var1 = leading variable (var1 leads when lags are positive)
+    # var2 = lagging variable (var2 leads when lags are negative)
+    
+    # Prepare and Reshape Data
+    ntime,nlat,nlon=var1.shape
+    nyr            =int(ntime/12)
+    nspace         =nlat*nlon
+    if type(var1) == xr.DataArray:
+        ds_flag = True
+        lat     = var1.lat
+        lon     = var1.lon
+        var1    = var1.data
+    if type(var2) == xr.DataArray:
+        ds_flag = True
+        lat     = var2.lat
+        lon     = var2.lon
+        var2    = var2.data
+    var1_rs = var1.reshape(nyr,12,nspace)
+    var2_rs = var2.reshape(nyr,12,nspace)
+    
+    # Preallocate and prepare lags
+    nlags       = len(lags)
+    cov_lag     = np.zeros((nlags,12,nspace)) * np.nan
+    cov_lead    = np.zeros((nlags,12,nspace))* np.nan
+    for l in tqdm(range(nlags)):
+        lag = lags[l]
+        for m in range(12):
+            lm = m-lag # Note, lag is 1 month prior....
+            
+            var1mon = indexwindow(var1_rs,m,monwin,combinetime=True,verbose=False) # [Time x Space]
+            var1lag = indexwindow(var1_rs,lm,monwin,combinetime=True,verbose=False) # [Time x Space]
+    
+            var2mon = indexwindow(var2_rs,m,monwin,combinetime=True,verbose=False) # [Time x Space]
+            var2lag = indexwindow(var2_rs,lm,monwin,combinetime=True,verbose=False) # [Time x Space]
+            
+            # Variable 1 Leads
+            covoutlag       = proc.covariance2d(var1mon,var2lag,0)
+            cov_lag[l,m,:]  = covoutlag.copy()
+            
+            # Variable 1 Leads
+            covoutlead      = proc.covariance2d(var1lag,var2mon,0)
+            cov_lead[l,m,:] = covoutlead.copy()
+            
+    
+    # Flip Along Lead Dimension and drop Lead 0
+    cov_lead_flip = np.flip(cov_lead[1:,:,:],0) 
+    cov_leadlag   = np.concatenate([cov_lead_flip,cov_lag],axis=0)
+    leadlags      = np.hstack([np.flip(lags[1:]) * -1,lags] )
+    
+    # Do reshaping
+    nleadlags     = len(leadlags)
+    cov_leadlag   = cov_leadlag.reshape(nleadlags,12,nlat,nlon)
+    
+    
+    # Put into DataArray
+    if ds_flag:
+        coordsout     = dict(lag=leadlags,mon=np.arange(1,13,1),lat=lat,lon=lon)
+        daout         = xr.DataArray(cov_leadlag,coords=coordsout,dims=coordsout,name="covariance")
+        return daout
+    return leadlags,cov_leadlag  
+
+
+
+
 # =============================================================================
 #%% stochmod Legacy Scripts
 # =============================================================================
@@ -3110,6 +3179,7 @@ def indexwindow(invar,m,monwin,combinetime=False,verbose=False):
             varmons.append(invar[:-2,m,:])
             
         elif m > 11: # Indexing months from next year
+            
             msg.append("Next Year")
             varmons.append(invar[2:,m-12,:])
             
@@ -3198,12 +3268,13 @@ def calc_HF(sst,flx,lags,monwin,verbose=True,posatm=True,return_cov=False,
             # Restrict to time ----
             flxmon = indexwindow(flx,m,monwin,combinetime=True,verbose=False)
             sstmon = indexwindow(sst,m,monwin,combinetime=True,verbose=False)
-            if var_denom is None:
+            if var_denom is None: # one month prior
                 sstlag = indexwindow(sst,lm,monwin,combinetime=True,verbose=False)
             else:
                 sstlag = indexwindow(var_denom,lm,monwin,combinetime=True,verbose=False)
             
             # Compute Correlation Coefficients ----
+            # Note in this case, sst is one month before flx (i.e. sstlag is actually sstlead, confusingly...)
             crosscorr[m,l,:] = proc.pearsonr_2d(flxmon,sstlag,0) # [space]
             autocorr[m,l,:]  = proc.pearsonr_2d(sstmon,sstlag,0) # [space]
             
@@ -3293,6 +3364,7 @@ def prep_HF(damping,rsst,rflx,p,tails,dof,mode,
     ptilde    = 1-p/tails
     critval   = stats.t.ppf(ptilde,dof)
     corrthres = np.sqrt(1/ ((dof/np.power(critval,2))+1))
+    
     
     # Check sign
     if posatm:
