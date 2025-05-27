@@ -1723,12 +1723,13 @@ def compute_sm_metrics(ssts,
 
 
 
-def calc_leadlagcovar(var1,var2,lags,monwin,ds_flag=False):
+def calc_leadlagcovar(var1,var2,lags,monwin,ds_flag=False,calc_corr=False):
     # Based on calc_HF, Calculate lead-lag covariance using moving window
     # Requirements: var1.shape == var2.shape
     # Lags < 12 (currently only works within 1 year)
     # var1 = leading variable (var1 leads when lags are positive)
     # var2 = lagging variable (var2 leads when lags are negative)
+    # set <calc_corr> to True to compute cross-correlation
     
     # Prepare and Reshape Data
     ntime,nlat,nlon=var1.shape
@@ -1763,11 +1764,11 @@ def calc_leadlagcovar(var1,var2,lags,monwin,ds_flag=False):
             var2lag = indexwindow(var2_rs,lm,monwin,combinetime=True,verbose=False) # [Time x Space]
             
             # Variable 1 Leads
-            covoutlag       = proc.covariance2d(var1mon,var2lag,0)
+            covoutlag       = proc.covariance2d(var1mon,var2lag,0,normalize=calc_corr)
             cov_lag[l,m,:]  = covoutlag.copy()
             
             # Variable 1 Leads
-            covoutlead      = proc.covariance2d(var1lag,var2mon,0)
+            covoutlead      = proc.covariance2d(var1lag,var2mon,0,normalize=calc_corr)
             cov_lead[l,m,:] = covoutlead.copy()
             
     
@@ -3144,7 +3145,7 @@ def load_limopt_amv(datpath=None):
 
 def indexwindow(invar,m,monwin,combinetime=False,verbose=False):
     """
-    index a specific set of months/years for an odd sliding window
+    index a specific set of months/years for an ODD sliding window
     given the following information (see inputs)
     
     drops the first and last years when a the dec-jan boundary
@@ -3154,20 +3155,22 @@ def indexwindow(invar,m,monwin,combinetime=False,verbose=False):
     inputs:
         1) invar [ARRAY: yr x mon x otherdims] : variable to index
         2) m [int] : index of central month in the window
-        3) monwin [int]: total size of moving window of months
+        3) monwin [int]: total size of moving window of months, inclusive of center month (supports 3,5,7...)
         4) combinetime [bool]: set to true to combine mons and years into 1 dimension
     
     output:
         1) varout [ARRAY]
             [yr x mon x otherdims] if combinetime=False
             [time x otherdims] if combinetime=True
-    
     """
-    
-    if monwin > 1:  
+    if (monwin%2 == 0) or (monwin < 3):
+        print("Warning, only odd window sizes are supported...")
+        print("\tJust indexing normally with no window...")
+        winsize = 0
+        monid   = [m,]
+    else:
         winsize = int(np.floor((monwin-1)/2))
         monid = [m-winsize,m,m+winsize]
-
     
     varmons = []
     msg = []
