@@ -1791,6 +1791,36 @@ def calc_leadlagcovar(var1,var2,lags,monwin,ds_flag=False,calc_corr=False):
 
 
 
+def calc_leadlagcovar_allmon(var1,var2,lags,dim=0,return_da=True,ds_flag=False):
+    # Same as above, but for all months
+    if type(var1) == xr.DataArray:
+        ds_flag = True
+        lat     = var1.lat
+        lon     = var1.lon
+        var1    = var1.data
+    if type(var2) == xr.DataArray:
+        ds_flag = True
+        lat     = var2.lat
+        lon     = var2.lon
+        var2    = var2.data
+        
+    # Assume time is in the first dimension
+    lagcovar,winlens       = proc.calc_lag_covar_ann(var1,var2,lags,dim,0,)
+    lagcovar_lead,_        = proc.calc_lag_covar_ann(var2,var1,lags,dim,0,)
+    leadlags               = np.hstack([-1*np.flip(lags)[:-1],lags])
+    
+    # Flip Along Lead Dimension and drop Lead 0
+    cov_lead_flip  = np.flip(lagcovar_lead[1:,:,:],0) 
+    lagcovar_out   = np.concatenate([cov_lead_flip,lagcovar],axis=0)
+    
+    if return_da:
+        if ds_flag:
+            coords     = dict(lag=leadlags,lat=lat,lon=lon)
+        else:
+            coords = dict(lag=leadlags)
+        da_out = xr.DataArray(lagcovar_out,coords=coords,dims=coords,name='cov')
+        return da_out
+    return lagcovar_out,leadlags
 
 # =============================================================================
 #%% stochmod Legacy Scripts

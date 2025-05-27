@@ -78,7 +78,7 @@ point_spectra           : Compute power spectra at a point, copied from viz_atmo
 
 compute_sm_metrics      : Compute basic metrics for the stochastic model (ACF, Spectra, MonVar)
 calc_leadlagcovar       : Calculate lead-lag covariance using moving monthwindow
-
+calc_leadlagcovar_allmon: Same as above, but for all months
 -------------------------------------------------------------------------------
 ~~ stochmod Legacy Scripts 
     Legacy scripts for the old stochmod simulations... (first paper and older?)
