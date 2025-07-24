@@ -1460,7 +1460,7 @@ def calc_tau_detrain(hcycle,kprev,z,tau_est,debug=False):
 #%% Analysis
 # =============================================================================
 
-def calc_autocorr(sst,lags,basemonth,calc_conf=False,conf=0.95,tails=2,verbose=False):
+def calc_autocorr(sst,lags,basemonth,calc_conf=False,conf=0.95,tails=2,verbose=False,detrend=True):
     """
     Calculate autocorrelation for output of stochastic models
     
@@ -1497,10 +1497,11 @@ def calc_autocorr(sst,lags,basemonth,calc_conf=False,conf=0.95,tails=2,verbose=F
         tsmodel2 = tsmodel - np.mean(tsmodel,1)[:,None]
         
         # Detrend (Linear)
-        tsmodel2 = signal.detrend(tsmodel2,axis=1,type='linear')
+        if detrend:
+            tsmodel2 = signal.detrend(tsmodel2,axis=1,type='linear')
         
-        # Calculate the autocorrelation
-        autocorr[model] = proc.calc_lagcovar(tsmodel2,tsmodel2,lags,basemonth,1,debug=verbose)
+        # Calculate the autocorrelation (set detrendopt to zero)
+        autocorr[model] = proc.calc_lagcovar(tsmodel2,tsmodel2,lags,basemonth,0,debug=verbose)
         
         confs[model] = proc.calc_conflag(autocorr[model],conf,tails,tsmodel.shape[1])
     if calc_conf:
@@ -1669,6 +1670,7 @@ def compute_sm_metrics(ssts,
                     pct=0.10,
                     opt=1,
                     dt=3600*24*30,
+                    detrend_acf=True,
                     lags=np.arange(37)):
     """
     Given a list of 1-D timeseries for SST, loops through each one and computes the ACF for
@@ -1699,7 +1701,7 @@ def compute_sm_metrics(ssts,
     # 1. Compute the autocorrelation for each basemonth -----------------------
     acs_all = [] # [basemonth][experiment]
     for im in range(12):
-        acout      = calc_autocorr(ssts,lags,im+1) # scm function
+        acout      = calc_autocorr(ssts,lags,im+1,detrend=detrend_acf) # scm function
         acout_proc = [acout[ii] for ii in range(nexps) ] # Convert from dict to list
         acs_all.append(acout_proc)
     
@@ -3352,7 +3354,7 @@ def calc_HF(sst,flx,lags,monwin,verbose=True,posatm=True,return_cov=False,
     return damping,autocorr,crosscorr
 
 def prep_HF(damping,rsst,rflx,p,tails,dof,mode,
-            returnall=False,posatm=True,maskval=np.nan):
+            returnall=False,posatm=True,maskval=np.nan,return_ds=False):
     """
     
     Mask the damping values using Students T-Test on based on the 
@@ -3387,6 +3389,9 @@ def prep_HF(damping,rsst,rflx,p,tails,dof,mode,
             Set to True to ensure positive upwards into the atmosphere
         10) maskval : NUMERIC
             Fill value for failed points
+        11) return_ds: BOOL
+            Set to True to return dataset. Note that returnall must be True.
+            NOTE: Incomplete, still need to figure out how to return lon/lat info
     
     Outputs
     -------
@@ -3433,8 +3438,13 @@ def prep_HF(damping,rsst,rflx,p,tails,dof,mode,
     # Apply Significance Mask
     dampingmasked = damping * mall
     
+    # if not returnall and return_ds:
+    #     print("Warning: Dataset will not be returned. returnall must be set to <True>")
     if returnall:
+        # if return_ds:
+        #     coords = 
         return dampingmasked,mtot,mall
+        
     return dampingmasked
 
 def postprocess_HF(dampingmasked,limask,sellags,lon,pos_upward=True):
