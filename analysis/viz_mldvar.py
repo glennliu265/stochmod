@@ -19,7 +19,6 @@ import time
 import sys
 
 #%% Import my modules
-sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
 sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
 
 from amv import proc,viz

@@ -32,7 +32,7 @@ if stormtrack == 0:
     datpath = projpath + '01_Data/model_output/'
     rawpath = projpath + '01_Data/model_input/'
     outpathdat = datpath + '/proc/'
-    figpath = projpath + "02_Figures/20220824/"
+    figpath = projpath + "02_Figures/20241124/"
 
     sys.path.append(
         "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
@@ -73,9 +73,9 @@ exname = "Fprime_amq0_method5_cont"
 
 
 # Plotting Params
-darkmode = False
+darkmode = True
 debug    = False
-pubready = True
+pubready = False
 # %% Functions
 def calc_conflag(ac, conf, tails, n):
     cflags = np.zeros((len(ac), 2))
@@ -441,12 +441,15 @@ print("Thus, the ratio is %f" % (valmax[0]/valmax[1]))
 
 # Plot settings
 notitle      = True
-darkmode     = False
+darkmode     = True
 cmax         = 0.5
 cstep        = 0.025
 lstep        = 0.05
 cint, cl_int = viz.return_clevels(cmax, cstep, lstep)
 clb          = ["%.2f" % i for i in cint[::4]]
+
+thesisdef_ver = True # Omit SP Label and Title
+ 
 
 bboxplot = [-80,0,9,62]
 cl_int   = cint
@@ -488,16 +491,26 @@ else:
 
 # Plot Stochastic Model Output
 for aid, mid in enumerate([0, 2]):
-    ax = axs.flatten()[aid]
-
-    # Set Labels, Axis, Coastline
-    if mid == 0:
-        blabel = [1, 0, 0, 0]
-    elif mid == 1:
-        blabel = [0, 0, 0, 1]
+    if not thesisdef_ver:
+        ax = axs.flatten()[aid]
+        
+        # Set Labels, Axis, Coastline
+        if mid == 0:
+            blabel = [1, 0, 0, 0]
+        elif mid == 1:
+            blabel = [0, 0, 0, 1]
+        else:
+            blabel = [0, 0, 0, 0]
+            
     else:
-        blabel = [0, 0, 0, 0]
-
+        ax = axs[1,aid]
+        
+        if mid == 0:
+            blabel = [1,0,0,1]
+        else:
+            blabel = [0,0,0,1]
+        #blabel   = [1,0,0,1]
+    
     # Make the Plot
     ax = viz.add_coast_grid(ax, bboxplot, blabels=blabel, line_color=dfcol,
                             fill_color='gray')
@@ -514,23 +527,29 @@ for aid, mid in enumerate([0, 2]):
     else:
         ptitle = "%s ($\sigma^2_{AMV}$ = %.04f $K^2$)" % (
             modelnames[mid], np.var(amvids[mid, :, rid]))
-    ax.set_title(ptitle)
+    
     if plotbbox:
         ax, ll = viz.plot_box(amvbboxes[rid], ax=ax, leglab="AMV",
                               color=dfcol, linestyle="dashed", linewidth=2, return_line=True)
 
     viz.plot_mask(lon, lat, dmsks[mid], ax=ax, markersize=0.3)
     ax.set_facecolor = dfcol
-    ax = viz.label_sp(spid, case='lower', ax=ax, labelstyle="(%s)",
-                      fontsize=16, alpha=0.7, fontcolor=dfcol)
+    
+    if not thesisdef_ver:
+        ax = viz.label_sp(spid, case='lower', ax=ax, labelstyle="(%s)",
+                          fontsize=16, alpha=0.7, fontcolor=dfcol)
+        ax.set_title(ptitle)
+        
     spid += 1
 
 # Plot CESM1
 # axs[1,1].axis('off')
 
 for cid in range(2):
-
-    ax = axs[1, cid]
+    if not thesisdef_ver:
+        ax = axs[1, cid]
+    else:
+        ax = axs[0, cid]
     if cid == 0:
         #ax = axs[1,0]
         blabel = [1, 0, 0, 1]
@@ -559,21 +578,30 @@ for cid in range(2):
     else:
         ptitle = "CESM-%s ($\sigma^2_{AMV}$ = %.04f $K^2$)" % (
             mconfigs[cid], np.var(camvids[rid][cid]))
-    ax.set_title(ptitle)
+    
     if plotbbox:
         ax, ll = viz.plot_box(amvbboxes[rid], ax=ax, leglab="",
                               color=dfcol, linestyle="dashed", linewidth=2, return_line=True)
-    ax = viz.label_sp(spid, case='lower', ax=ax, labelstyle="(%s)",
-                      fontsize=16, alpha=0.7, fontcolor=dfcol)
+        
+    if not thesisdef_ver:
+        ax = viz.label_sp(spid, case='lower', ax=ax, labelstyle="(%s)",
+                          fontsize=16, alpha=0.7, fontcolor=dfcol)
+        ax.set_title(ptitle)
 
-cb = fig.colorbar(pcm, ax=axs.flatten(),
-                  orientation='horizontal', fraction=0.030, pad=0.05)
+if not thesisdef_ver: # Add Horizontal Colorbar
+
+    cb = fig.colorbar(pcm, ax=axs.flatten(),
+                      orientation='horizontal', fraction=0.030, pad=0.05)
+else:
+    cb = fig.colorbar(pcm, ax=axs.flatten(),
+                      orientation='horizontal', fraction=0.035, pad=0.02)
+    cb.ax.tick_params(labelsize=12)
 cb.set_ticks(cint[::4])
 cb.ax.set_xticklabels(clb, rotation=45)
 if useC:
-    cb.set_label("SST ($\degree C \, \sigma_{AMV}^{-1}$)")
+    cb.set_label("SST ($\degree C \, \sigma_{AMV}^{-1}$)",fontsize=14)
 else:
-    cb.set_label("SST ($\degree C \, \sigma_{AMV}^{-1}$)")
+    cb.set_label("SST ($\degree C \, \sigma_{AMV}^{-1}$)",fontsize=14)
 # cb.ax.set_xticklabels(cint[::2],rotation=90)
 #tick_start = np.argmin(abs(cint-cint[0]))
 # cb.ax.set_xticklabels(cint[tick_start::2],rotation=90)
@@ -584,7 +612,148 @@ if notitle is False:
 if pubready:
     plt.savefig("%sFig08_AMV_Pattern_Comparison.png" % (figpath), dpi=900, bbox_inches='tight')
 else:
-    plt.savefig(savename, dpi=150, bbox_inches='tight')
+    plt.savefig(savename, dpi=150, bbox_inches='tight',transparent=True)
+    
+    
+    
+#%% Remake above plot, but for thesis overview
+# (Focus on the Comparison between CESM-FULL and Entraining)
+# Just copied above on 2024.11.24
+
+# Plot settings
+notitle      = True
+darkmode     = True
+cmax         = 0.5
+cstep        = 0.025
+lstep        = 0.05
+cint, cl_int = viz.return_clevels(cmax, cstep, lstep)
+clb          = ["%.2f" % i for i in cint[::4]]
+
+bboxplot = [-80,0,9,62]
+cl_int   = cint
+sel_rid  = 1
+plotbbox = False
+useC     = True
+
+
+fsz_tick = 12
+
+
+
+# Begin Plotting
+# ----------------
+rid = sel_rid
+bbin = amvbboxes[rid]
+print("Plotting AMV for bbox: %s" % (bbin))
+bbstr = "lon%ito%i_lat%ito%i" % (bbin[0], bbin[1], bbin[2], bbin[3])
+
+spid = 0
+proj = ccrs.PlateCarree()
+fig, axs = plt.subplots(1, 2, subplot_kw={'projection': proj}, figsize=(10, 8.5),
+                        constrained_layout=True)
+
+if darkmode:
+    plt.style.use('dark_background')
+
+    savename = "%sSST_AMVPattern_ThesisOverview_dark.png" % (
+        figpath)
+    fig.patch.set_facecolor('black')
+    dfcol = 'k'
+    bgcol = np.array([15,15,15])/256
+else:
+    plt.style.use('default')
+    savename = "%sSST_AMVPattern_ThesisOverview.png" % (
+        figpath)
+    fig.patch.set_facecolor('white')
+    bgcol = np.array([15,15,15])/256
+
+# Plot Stochastic Model ----------
+
+ax      = axs[1]
+mid     = 2
+blabel  = [0,0,0,1]
+
+# # figsize=(12,6)
+# # ncol = 3
+# # fig,axs = viz.init_2rowodd(ncol,proj,figsize=figsize,oddtop=False,debug=True)
+
+# # Plot Stochastic Model Output
+# for aid, mid in enumerate([0, 2]):
+#     ax = axs.flatten()[aid]
+
+# Make the Plot
+ax = viz.add_coast_grid(ax, bboxplot, blabels=blabel, line_color=dfcol,
+                        fill_color='gray')
+pcm = ax.contourf(
+    lon, lat, amvpats[mid, :, :, rid].T, levels=cint, cmap='cmo.balance')
+# ax.pcolormesh(lon,lat,amvpats[mid,:,:,rid].T,vmin=cint[0],vmax=cint[-1],cmap='cmo.balance',zorder=-1)
+cl = ax.contour(
+    lon, lat, amvpats[mid, :, :, rid].T, levels=cl_int, colors="k", linewidths=0.5)
+ax.clabel(cl, levels=cl_int[::2], fontsize=fsz_tick, fmt="%.02f")
+
+if useC:
+    ptitle = "%s ($\sigma^2_{AMV}$ = %.04f$\degree C^2$)" % (
+        modelnames[mid], np.var(amvids[mid, :, rid]))
+else:
+    ptitle = "%s ($\sigma^2_{AMV}$ = %.04f $K^2$)" % (
+        modelnames[mid], np.var(amvids[mid, :, rid]))
+ax.set_title(ptitle)
+if plotbbox:
+    ax, ll = viz.plot_box(amvbboxes[rid], ax=ax, leglab="AMV",
+                          color=dfcol, linestyle="dashed", linewidth=2, return_line=True)
+
+viz.plot_mask(lon, lat, dmsks[mid], ax=ax, markersize=0.3)
+ax.set_facecolor = bgcol
+# ax = viz.label_sp(spid, case='lower', ax=ax, labelstyle="(%s)",
+#                   fontsize=16, alpha=0.7, fontcolor=dfcol)
+# spid += 1
+
+# Plot CESM1 -----------------------
+ax = axs[0]
+cid = 1
+
+blabel = [1,0,0,1]
+
+# Make the Plot
+ax = viz.add_coast_grid(ax, bboxplot, blabels=blabel, line_color=dfcol,
+                        fill_color='gray')
+pcm = ax.contourf(
+    lon, lat, camvpats[rid][cid].T, levels=cint, cmap='cmo.balance')
+ax.pcolormesh(lon, lat, camvpats[rid][cid].T, vmin=cint[0],
+              vmax=cint[-1], cmap='cmo.balance', zorder=-1)
+cl = ax.contour(lon, lat, camvpats[rid][cid].T,
+                levels=cl_int, colors="k", linewidths=0.5)
+ax.clabel(cl, levels=cl_int[::2], fontsize=fsz_tick, fmt="%.02f")
+if useC:
+    ptitle = "CESM-%s ($\sigma^2_{AMV}$ = %.04f$\degree C^2$)" % (
+        mconfigs[cid], np.var(camvids[rid][cid]))
+else:
+    ptitle = "CESM-%s ($\sigma^2_{AMV}$ = %.04f $K^2$)" % (
+        mconfigs[cid], np.var(camvids[rid][cid]))
+ax.set_title(ptitle)
+if plotbbox:
+    ax, ll = viz.plot_box(amvbboxes[rid], ax=ax, leglab="",
+                          color=dfcol, linestyle="dashed", linewidth=2, return_line=True)
+
+# ax = viz.label_sp(spid, case='lower', ax=ax, labelstyle="(%s)",
+#                   fontsize=16, alpha=0.7, fontcolor=dfcol)
+
+# -----------------------
+
+cb = fig.colorbar(pcm, ax=axs.flatten(),
+                  orientation='horizontal', fraction=0.030, pad=0.05)
+cb.set_ticks(cint[::4])
+cb.ax.set_xticklabels(clb, rotation=45)
+cb.ax.tick_params(labelsize=fsz_tick)
+
+cb.set_label("SST ($\degree C \, \sigma_{AMV}^{-1}$)",fontsize=14)
+
+
+plt.savefig(savename, dpi=150, bbox_inches='tight',transparent=True)
+
+
+
+
 
 # %% Save the parameters needed for the plot
 """
@@ -623,6 +792,11 @@ frcname = "flxeof_090pct_SLAB-PIC_eofcorr2_Fprime_rolln0"
 inputs = scm.load_inputs('SLAB_PIC', frcname, input_path, load_both=True)
 lon, lat, h, kprevall, dampingslab, dampingfull, alpha, alpha_full = inputs
 
+#%% Load Mean currents (albeit from CESM1 HTR)
+
+from amv import loaders as dl
+ds_uvel,ds_vvel = dl.load_current()
+
 # %% SM Paper Draft 3 (CESM AMV Inset for Seasonal Cycle Figure)
 
 # Calculate the AMV over bounding box bbin
@@ -640,7 +814,7 @@ cb_lab = np.arange(-.5, .6, .1)
 
 # Make the Plot
 fig, ax = plt.subplots(
-    1, 1, subplot_kw={'projection': ccrs.PlateCarree()}, figsize=(6, 4))
+    1, 1, subplot_kw={'projection': ccrs.PlateCarree()}, figsize=(6, 4),constrained_layout=True)
 #ax = viz.add_coast_grid(ax, bbox=bboxplot)
 ax = viz.add_coast_grid(ax, bboxplot, blabels=[1, 0, 0, 1], line_color=dfcol,
                         fill_color='gray')
@@ -650,19 +824,30 @@ pcm = ax.contourf(lon, lat, amvpat.T, levels=cint,
 cl = ax.contour(lon, lat, amvpat.T, levels=cl_int, colors="k", linewidths=0.5)
 ax.scatter(-30, 50, 200, marker="*", facecolor='yellow',
            zorder=9, edgecolor='k', linewidth=.5)
-ax.clabel(cl, levels=cl_int, fontsize=8)
+ax.clabel(cl, levels=cl_int, fontsize=10)
 
 # Add Colorbar, Reduce tick labels
-cb = fig.colorbar(pcm, ax=ax, orientation="horizontal",
-                  fraction=0.050, pad=0.1)
+cb = fig.colorbar(pcm, ax=ax, orientation="vertical",
+                  fraction=0.030, pad=0.1)
 if useC:
     cb.set_label("SST ($\degree C \sigma_{AMV}^{-1}$)")
 else:
     cb.set_label("SST ($K \sigma_{AMV}^{-1}$)")
 cb.set_ticks(cb_lab)
 
+# # Add Currents
+# # Plot Currents
+# qint = 2
+# tlon = ds_uvel.TLONG.data.mean(0)
+# tlat = ds_uvel.TLAT.data.mean(0)
+# plotu = ds_uvel.UVEL.mean('ens').mean('month').values
+# plotv = ds_vvel.VVEL.mean('ens').mean('month').values
+# ax.quiver(tlon[::qint,::qint],tlat[::qint,::qint],plotu[::qint,::qint],plotv[::qint,::qint],
+#           color='navy',alpha=0.75)
+
+
 plt.savefig("%sFig04b_SPG_Locator_%s.png" %
-            (figpath, mconfigs[cid]), dpi=900, bbox_inches='tight')
+            (figpath, mconfigs[cid]), dpi=900, bbox_inches='tight',transparent=True)
 
 # %% Plot of regional AMV with bounding Boxes (moved from plot_temporal_region)
 

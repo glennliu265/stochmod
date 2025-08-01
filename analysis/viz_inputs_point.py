@@ -45,10 +45,9 @@ from matplotlib import colors
 projpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
 scriptpath  = projpath + '03_Scripts/stochmod/'
 datpath     = projpath + '01_Data/'
-outpath     = projpath + '02_Figures/20230907/'
+outpath     = projpath + '02_Figures/20241201/'
 input_path  = datpath + 'model_input/'
 proc.makedir(outpath)
-
 
 pubready = False # Set to True to save figures as EPS for publication
 
@@ -131,6 +130,25 @@ bbsty       = ["solid","dashed","solid","dotted","dotted","dashed","dotted"]
 method      = 4
 lagstr      = 'lag1'
 brew_cat8   = ['#7fc97f','#beaed4','#fdc086','#ffff99','#386cb0','#f0027f','#bf5b17','#666666']
+
+
+#%% Set Darkmode Option
+
+darkmode = False
+
+if darkmode:
+    plt.style.use('dark_background')
+    
+    #fig.patch.set_facecolor('black')
+    dfcol = 'k'
+    bgcol = np.array([15,15,15])/256
+else:
+    plt.style.use('default')
+    #fig.patch.set_facecolor('white')
+    dfcol = "w"
+    bgcol = np.array([15,15,15])/256
+
+
 #%% Load All Inputs (Basinwide)
 
 # Use the function used for sm_rewrite.py
@@ -186,8 +204,9 @@ beta = scm.calc_beta(h)
 Figure 01 in Stochastic Model Paper
     - Updated for Revision 01 (08/24/2022)
 """
-usegrid = False
 
+usegrid     = False
+reverse_y   = True
 monstr_kprv = np.append(mons3,'Jan')
 if pubready:
     fig,ax = plt.subplots(1,1,figsize=(4.5,3.5),constrained_layout=True)
@@ -203,6 +222,9 @@ ax.set_yticks(np.arange(10,170,20))
 ax.minorticks_on()
 ax.xaxis.set_tick_params(which='minor', bottom=False)
 
+if reverse_y:
+    ax.invert_yaxis()
+    
 if pubready:
     plt.savefig(outpath+"Fig01_Detrainment_Example.eps",dpi=1200,format='eps')
 else:
@@ -323,6 +345,102 @@ for m in range(2): # Loop for SLAB, and FULL
         plt.savefig(outpath+"Fig04a_Scycle_Point_%s.eps"% (mcf),dpi=1200,format='eps',bbox_inches='tight')
     else:
         plt.savefig(outpath+"Scycle_MLD_Forcing_%s_Triaxis_%s.png"% (flocstring,mcf),dpi=150,bbox_inches='tight')
+
+
+#%% Updated plot above for thesis defense
+
+useC     = True
+notitle  = True
+
+lw       = 2.5
+mks      = 8
+fsz_axis = 14
+fsz_tick = 12
+
+# plotting specs
+if useC:
+    plotylab = ("Mixed-Layer Depth ($m$)",
+                "Forcing Amplitude $(Wm^{-2})$",
+                "Heat Flux Feedback $(Wm^{-2} \, \degree C^{-1})$"
+                )
+    
+else:
+    plotylab = ("Mixed-Layer Depth ($m$)",
+                "Forcing Amplitude $(Wm^{-2})$",
+                "Heat Flux Feedback $(Wm^{-2} \, K^{-1})$"
+                )
+plotlab  = ("h",r"$ F'$",r"$\lambda_a$")
+plotmarker =("o","d","x")
+plotcolor  = ("blanchedalmond","mediumorchid","tomato")
+
+for m in range(2): # Loop for SLAB, and FULL
+
+    # Setup based on model
+    if m == 0:
+        # Set variables to plot
+        plotvar = [hpt,Fptstd,lbd_a]
+        mcf = "CESM-SLAB"
+    elif m == 1:
+        plotvar = [hpt,Fptstdf,lbd_af]
+        mcf = "CESM-FULL"
+    title="Seasonal Cycle of Inputs (%s)" % (mcf)
+    
+    # Initialize figure, axes -------------
+    
+    fig,ax1 = plt.subplots(1,1,figsize=(8,4),constrained_layout=True)
+    fig.subplots_adjust(right=0.75)
+    ax2 = ax1.twinx()
+    ax3 = ax1.twinx()
+    
+    axs     = [ax1,ax2,ax3]
+    tkw = dict(size=4, width=1.5)
+    
+    ls = []
+    for i in range(3): # Plot each axis
+        
+        ax = axs[i]
+        
+        if i == 1:
+            # Offset the right spine of par2.  The ticks and label have already been
+            # placed on the right by twinx above.
+            ax.spines["right"].set_position(("axes", 1.12))
+            
+            # Having been created by twinx, par2 has its frame off, so the line of its
+            # detached spine is invisible.  First, activate the frame but make the patch
+            # and spines invisible.
+            make_patch_spines_invisible(ax)
+            
+            # Second, show the right spine.
+            ax.spines["right"].set_visible(True)
+            
+            
+        # Plot axis, then label and color
+        p, = ax.plot(mons3,plotvar[i],color=plotcolor[i],
+                     label=plotlab[i],lw=lw,marker=plotmarker[i],markersize=mks)
+        ax.set_ylabel(plotylab[i],fontsize=fsz_axis)
+        ax.yaxis.label.set_color(p.get_color())
+        ax.tick_params(axis='y', colors=p.get_color(), **tkw,labelsize=fsz_tick)
+        ls.append(p)
+    
+    # Additional Settings, Save Figure
+    ax1.set_xticklabels(mons3, rotation = 45, ha="right",fontsize=fsz_tick)
+    ax1.grid(True,ls='dotted')
+    ax1.legend(ls, [l.get_label() for l in ls],loc='upper center',fontsize=fsz_axis)
+    
+    if notitle is False:
+        ax1.set_title(title)
+    
+    
+    plt.savefig(outpath+"Scycle_MLD_Forcing_%s_Triaxis_%s_Defense.png"% (flocstring,mcf),
+                dpi=150,bbox_inches='tight',transparent=True)
+    
+    
+    # Add the slab model depth
+    hblt_pt = hblt[klon,klat,:]
+    axs[0].plot(mons3,hblt_pt,color="yellow",label="$\overline{h} (SLAB)",marker="s")
+
+    plt.savefig(outpath+"Scycle_MLD_Forcing_%s_Triaxis_%s_Defense_withslab.png"% (flocstring,mcf),
+                dpi=150,bbox_inches='tight',transparent=True)
 
 # ****************************************************************************
 #%% Some Basinwide Plots...
