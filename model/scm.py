@@ -394,7 +394,7 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
         #     break
         
         # If threshold is exceeded, stop the simulation
-        if temp_ts[t] > max_thres:
+        if np.abs(temp_ts[t]) > max_thres:
             temp_ts[(t+1):]         = np.nan
             damp_ts[(t+1):]         = np.nan
             noise_ts[(t+1):]        = np.nan
