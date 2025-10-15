@@ -18,11 +18,13 @@ from tqdm import tqdm
 import glob
 
 import sys
-stormtrack = 1
+stormtrack = 2
 if stormtrack == 0:
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
 elif stormtrack == 1:
     sys.path.append("/home/glliu/00_Scripts/01_Projects/00_Commons/")
+elif stormtrack == 2: # Run on Niu
+    sys.path.append("/home/niu4/gliu8/scripts/commons/yo_box/")
 from amv import proc
 import time
 import yo_box as ybx
@@ -345,6 +347,7 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
 
                 # Compute Td (in future, could implement month-dependent decay..)
                 Td = (Td1+Td0)/2
+                Td_ts[t] = Td
                 if debugprint:
                     print("Td is %.2f, which is average of Td1=%.2f, Td0=%.2f"%(Td,Td1,Td0)) 
                     print("--------------------\n")
@@ -352,6 +355,7 @@ def entrain(t_end,lbd,T0,F,beta,h,kprev,FAC,multFAC=1,debug=False,debugprint=Fal
                 
                 # Calculate entrainment term
                 entrain_term = beta[m-1]*Td
+            
         
         # ----------------------
         # Get Noise/Forcing Term
@@ -1003,7 +1007,7 @@ def gen_expdir(expdir):
     return None
 
 
-def load_params(expparams,input_path,debug=False):
+def load_params(expparams,input_path,debug=False,pointmode=None):
     # Load stochastic model parameter inputs for [run_SSS_basinwide.py]
     # Copied run_SSS_pointmode_coupled and updated in loading_func
     # Loads and checks for all necessary inputs of the stochastic model
@@ -1058,12 +1062,19 @@ def load_params(expparams,input_path,debug=False):
             
             
             # Crop to region
-            dsreg            = proc.sel_region_xr(ds,expparams['bbox_sim']).load()
-            dsreg            = dsreg.drop_duplicates('lon')# Drop duplicate Lon (Hard coded fix, remove this)
+            if pointmode is not None:
+                lonf,latf = pointmode
+                print("Point Mode Detected...")
+                dsreg = proc.selpt_ds(ds,lonf,latf).load()
+            else:
+                dsreg            = proc.sel_region_xr(ds,expparams['bbox_sim']).load()
+                dsreg            = dsreg.drop_duplicates('lon')# Drop duplicate Lon (Hard coded fix, remove this)
             inputs_ds[pname] = dsreg.copy()
             
             # Load to numpy arrays 
             varout           = dsreg.values
+            if pointmode is not None:
+                varout = varout[:,None,None] # Insert singleton dimensions for lat.lon
             # varout           = varout[...,None,None]
             # if debug:
             #     print(pname) # Name of variable
@@ -1076,8 +1087,11 @@ def load_params(expparams,input_path,debug=False):
                 print("Loading %s correction factor for EOF forcing..." % pname)
                 
                 ds_corr                          = xr.open_dataset(input_path + ptype + "/" + expparams[pname])['correction_factor']
-                ds_corr_reg                      = proc.sel_region_xr(ds_corr,expparams['bbox_sim']).load()
-                ds_corr_reg                      = ds_corr_reg.drop_duplicates('lon')
+                if pointmode:
+                    ds_corr_reg  = proc.selpt_ds(ds_corr,lonf,latf,).load()
+                else:
+                    ds_corr_reg                      = proc.sel_region_xr(ds_corr,expparams['bbox_sim']).load()
+                    ds_corr_reg                      = ds_corr_reg.drop_duplicates('lon')
                 
                 if varname_swap == True:
                     da_varname = pname # Swap from LHFLX back to Fprime for SST Integration
@@ -1246,9 +1260,15 @@ def convert_inputs(expparams,inputs,dt=3600*24*30,rho=1026,L=2.5e6,cp=3850,retur
                 outdict['correction_factor'] = QfactorF.copy()
                 
             else:
-                if len(inputs['Fprime'].shape) > 3: # See if there is an singleton ensemble dimension, and squeeze if so
-                    inputs['Fprime'] = inputs['Fprime'].squeeze()
-                
+                if (len(inputs['Fprime'].shape) > 3):
+                    num_singleton = (np.count_nonzero(np.array(inputs['Fprime'].shape) == 1))
+                    if num_singleton == 1: # See if there is ONE singleton ensemble dimension, and squeeze if so
+                        inputs['Fprime'] = inputs['Fprime'].squeeze() 
+                    else:
+                        while (len(inputs['Fprime'].shape) > 3):
+                            inputs['Fprime'] = inputs['Fprime'][...,0] # Drop the last dimension
+                            # This is because we want to preserve point cases where it is [mon x 1 x 1]
+
                 Fconvert   = inputs['Fprime'].copy() / (rho*cp*inputs['h']) * dt
         else:
             if eof_flag: # [assume degC/mon]
