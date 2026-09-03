@@ -1384,19 +1384,25 @@ def get_detrain_depth(kprev,h):
     Given detrainment times [kprev: mon] and mixed layer depths [h: mon]
     Retrieve the approximate detrainment depth via linear interpolation
     """
-    hdetrain = np.zeros(12)*np.nan
-    for im in range(12):
-        detrain_mon = kprev[im] # Get Detrainment Month
-        if detrain_mon == 0.:
-            continue
-        idfloor      = int(np.floor(detrain_mon))-1
-        idceil       = int(np.ceil(detrain_mon))-1
-        hfloor       = h[idfloor]
-        hceil        = h[idceil]
-        detrain_time = detrain_mon-1-idfloor
-        if detrain_time >= 1:
-            print("Warning, detrain time not between lower/upper bounds...")
-        hdetrain[im]= np.interp(detrain_time,[0,1],[hfloor,hceil])
+    try:
+    
+        hdetrain = np.zeros(12)*np.nan
+        for im in range(12):
+            detrain_mon = kprev[im] # Get Detrainment Month
+            if detrain_mon == 0.:
+                continue
+            idfloor      = int(np.floor(detrain_mon))-1
+            idceil       = int(np.ceil(detrain_mon))-1
+            hfloor       = h[idfloor]
+            hceil        = h[idceil]
+            detrain_time = detrain_mon-1-idfloor
+            if detrain_time >= 1:
+                print("Warning, detrain time not between lower/upper bounds...")
+            hdetrain[im]= np.interp(detrain_time,[0,1],[hfloor,hceil])
+    except:
+        return np.nan * np.zeros(12)
+        print("Error where kprev: %s" % str(kprev))
+        print("Error where h: %s" % str(h))
     return hdetrain
 
 def calc_tau_detrain(hcycle,kprev,z,tau_est,debug=False):
